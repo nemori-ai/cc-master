@@ -246,25 +246,6 @@ export interface InspectInstallationOptions {
   probeHeadlessAuth?: boolean;
 }
 
-export interface HarnessAdapter {
-  id: HarnessId;
-  displayName: string;
-  aliases: readonly string[];
-  detect(env: Env): boolean;
-  inspectInstallation(env: Env, opts?: InspectInstallationOptions): HarnessInstallation;
-  session(env: Env): HarnessSession;
-  sessionStoreRoots(env: Env): string[];
-  usageSource(env: Env): HarnessUsageSource;
-  accountPoolLocation(env: Env): string | null;
-  readCurrentUsage(env: Env): CurrentUsageReading;
-  readCurrentUsageForSurface?(surfaceId: string, env: Env): CurrentUsageReading;
-  accountSwitchPreflight(env: Env): AccountSwitchPreflight;
-  upgradePlugin(request: PluginUpgradeRequest): Promise<PluginUpgradeResult>;
-  accountPool: Capability;
-  externalStatusline: Capability;
-  pluginDistribution: Capability;
-}
-
 export interface HarnessSelection {
   env?: Env;
   harnessFlag?: string;

@@ -139,16 +139,26 @@ function assertNegativeHookClaim(cardId, host, kind, hookIds) {
   assert.ok(unsupported.length > 0, `${cardId}.${host}: partial must retain an unsupported slice`);
 }
 
-function booleanCapability(source, name) {
-  return new RegExp(`${name}:\\s*\\{\\s*supported:\\s*true`).test(source);
-}
-
 function assertQuotaClaim(host, kind) {
-  const source = read(join(ROOT, 'ccm/apps/cli/src/harnesses', `${host}.ts`));
+  const source = read(join(ROOT, 'ccm/apps/cli/src/harnesses/composition.ts'));
+  const idOffset = source.indexOf(`    id: '${host}',`);
+  assert.notEqual(idOffset, -1, `ccm-quota-account.${host}: missing HarnessModule declaration`);
+  const moduleStart = source.lastIndexOf('  module({', idOffset);
+  const moduleEnd = source.indexOf('\n  }),', idOffset);
+  assert.ok(moduleStart >= 0 && moduleEnd > moduleStart, `ccm-quota-account.${host}: malformed HarnessModule declaration`);
+  const module = source.slice(moduleStart, moduleEnd);
+  const portfolioStart = source.indexOf('  const capabilities: CapabilityPortfolioDraft = {');
+  const portfolioEnd = source.indexOf('\n  };', portfolioStart);
+  const portfolio = source.slice(portfolioStart, portfolioEnd);
+  assert.match(
+    portfolio,
+    /'usage-observation':\s*supported\(input\.usage\)/,
+    'CapabilityPortfolio must keep module-owned usage observation as an implemented slice',
+  );
   const slices = {
-    usage: /\breadCurrentUsage\s*\(/.test(source),
-    accountPool: booleanCapability(source, 'accountPool'),
-    externalStatusline: booleanCapability(source, 'externalStatusline'),
+    usage: /\busage:\s*[A-Za-z_][A-Za-z0-9_]*/.test(module),
+    accountPool: /\baccount:\s*supported\(/.test(module),
+    externalStatusline: /\bstatusline:\s*supported\(/.test(module),
   };
   const implemented = Object.entries(slices).filter(([, value]) => value).map(([name]) => name);
   if (kind === 'unsupported') {

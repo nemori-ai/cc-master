@@ -1,6 +1,13 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type {
+  WorkerExecutionFace,
+  WorkerExecutionObserver,
+  WorkerProcessRequest,
+  WorkerProcessResult,
+  WorkerProcessState,
+} from './harnesses/capability-model.js';
 import {
   createProviderRequestDeadline,
   type ProviderChildResult,
@@ -10,47 +17,17 @@ import {
 import {
   type ProviderProcessIdentity,
   ProviderProcessTreeOwnershipError,
-  type ProviderRuntime,
 } from './provider-runtime.js';
-import type { WorkerDescriptor } from './worker-descriptors.js';
+import type { WorkerHarness } from './worker-descriptors.js';
+
+export type {
+  WorkerExecutionObserver,
+  WorkerProcessRequest,
+  WorkerProcessResult,
+  WorkerProcessState,
+} from './harnesses/capability-model.js';
 
 export const WORKER_PROCESS_RESULT_SCHEMA = 'ccm/worker-process-result/v1' as const;
-
-export type WorkerProcessState = 'exited' | 'timed_out' | 'cancelled' | 'failed' | 'rejected';
-
-export interface WorkerProcessRequest {
-  descriptor: WorkerDescriptor;
-  providerArgv: string[];
-  cwd: string;
-  timeoutMs: number;
-  maxOutputBytes: number;
-  stdinFd: number | 'ignore';
-  env: Record<string, string | undefined>;
-  runtime: ProviderRuntime;
-  signal?: AbortSignal;
-}
-
-export interface WorkerProcessResult {
-  schema: typeof WORKER_PROCESS_RESULT_SCHEMA;
-  harness: string;
-  executable: string | null;
-  argv: string[];
-  cwd: string;
-  state: WorkerProcessState;
-  exit_code: number | null;
-  signal: NodeJS.Signals | null;
-  stdout: string;
-  stderr: string;
-  stdout_bytes: number;
-  stderr_bytes: number;
-  truncated: { stdout: boolean; stderr: boolean };
-  timed_out: boolean;
-  cancelled: boolean;
-  reaped: boolean;
-  duration_ms: number | null;
-  cleanup: { temporary_resources_removed: true };
-  error: { code: string; message: string } | null;
-}
 
 const MAX_TIMEOUT_MS = 7_200_000;
 // Raw-worker output ceilings. A real agent dispatch (e.g. `codex exec --json` emitting a large
@@ -286,6 +263,7 @@ function recordSupervisorFailure(
 
 export async function runWorkerProcess(
   request: WorkerProcessRequest,
+  observer?: WorkerExecutionObserver,
 ): Promise<WorkerProcessResult> {
   const result = baseResult(request);
   // A relative --cwd resolves against the launching process cwd (the shell the caller ran ccm in),
@@ -347,6 +325,19 @@ export async function runWorkerProcess(
         reapTimeoutMs: resolveReapTimeoutMs(request.env),
       },
       signal: request.signal,
+      onStarted: observer?.onStarted
+        ? () => {
+            const pid = owned.child.pid;
+            if (!Number.isSafeInteger(pid) || Number(pid) <= 0 || !owned.tree) {
+              throw new ProviderProcessTreeOwnershipError(
+                'spawned worker did not expose a real owned process PID',
+              );
+            }
+            observer.onStarted?.({ pid: Number(pid) });
+          }
+        : undefined,
+      onStdoutText: observer?.onStdoutText,
+      onStderrText: observer?.onStderrText,
       ...(request.descriptor.harness === 'cursor-agent'
         ? {
             // Cursor's packaged worker-server and the exact TypeScript language-service chain it
@@ -369,4 +360,24 @@ export async function runWorkerProcess(
     }
     return fail(result, 'failed', 'spawn_error', String((error as Error)?.message || error));
   }
+}
+
+export function createHeadlessWorkerExecutionFace(harness: WorkerHarness): WorkerExecutionFace {
+  return Object.freeze({
+    executionModes: Object.freeze(['headless-cli'] as const),
+    execute(request: WorkerProcessRequest, observer?: WorkerExecutionObserver) {
+      if (request.descriptor.harness !== harness) {
+        return Promise.resolve(
+          rejectedWorkerProcess({
+            harness: request.descriptor.harness,
+            providerArgv: request.providerArgv,
+            cwd: request.cwd,
+            code: 'worker_capability_mismatch',
+            message: `worker capability for ${harness} cannot execute ${request.descriptor.harness}`,
+          }),
+        );
+      }
+      return runWorkerProcess(request, observer);
+    },
+  });
 }

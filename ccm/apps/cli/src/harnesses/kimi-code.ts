@@ -3,30 +3,35 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { captureRuntimeEnvironment, localPluginBase as resolvePluginBase } from '@ccm/engine';
 import { describeKimiUsageRefresh, readKimiUsageSignal } from '../kimi-usage.js';
+import type {
+  InstallationDiscoveryFace,
+  PluginProjectionFace,
+  SessionObservationFace,
+  UsageObservationFace,
+} from './capability-model.js';
 import { probeExecutable } from './probe.js';
-import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
+import type { Env, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
 const PLUGIN_NAME = 'cc-master';
 
-const ACCOUNT_POOL_REASON =
+export const KIMI_ACCOUNT_POOL_REASON =
   'kimi-code authenticates through a single managed OAuth login; ccm exposes no account pool or account switching for it.';
-const STATUSLINE_REASON =
+export const KIMI_STATUSLINE_REASON =
   'kimi-code has no Claude Code-style external statusLine.command hook; its /usage panel is TUI-internal.';
 const PLUGIN_DISTRIBUTION_REASON =
   'kimi-code installs cc-master as a managed plugin under $KIMI_CODE_HOME/plugins/managed/cc-master registered in plugins/installed.json.';
 
-export const kimiCodeAdapter: HarnessAdapter = {
-  id: 'kimi-code',
-  displayName: 'Kimi Code',
-  aliases: ['kimi', 'kimi-code', 'kimicode', 'moonshot-kimi'],
-  detect(env) {
-    // kimi injects KIMI_CODE_HOME into its origin session and plugin hook subprocesses;
-    // the cc-master launcher additionally sets CC_MASTER_HARNESS=kimi-code (resolved earlier).
-    return !!env.KIMI_CODE_HOME;
-  },
-  inspectInstallation(env) {
+function detectKimiCode(env: Env): boolean {
+  // kimi injects KIMI_CODE_HOME into its origin session and plugin hook subprocesses;
+  // the cc-master launcher additionally sets CC_MASTER_HARNESS=kimi-code (resolved earlier).
+  return !!env.KIMI_CODE_HOME;
+}
+
+export const kimiInstallationDiscovery: InstallationDiscoveryFace = {
+  detect: detectKimiCode,
+  discoverInstallation(env) {
     const cli = probeExecutable(env.CCM_KIMI_BIN || env.KIMI_BIN || 'kimi', env);
     const configDir = kimiHome(env);
     const hasConfig = pathExists(configDir);
@@ -35,7 +40,7 @@ export const kimiCodeAdapter: HarnessAdapter = {
       id: 'kimi-code',
       displayName: 'Kimi Code',
       installed,
-      active: this.detect(env),
+      active: detectKimiCode(env),
       reason: installed
         ? null
         : 'kimi CLI not found and kimi-code home directory ($KIMI_CODE_HOME / ~/.kimi-code) not present',
@@ -43,28 +48,33 @@ export const kimiCodeAdapter: HarnessAdapter = {
       configPaths: [configDir],
       surfaces: [],
       capabilities: {
-        accountPool: this.accountPool,
-        externalStatusline: this.externalStatusline,
-        pluginDistribution: this.pluginDistribution,
+        accountPool: { supported: false, reason: KIMI_ACCOUNT_POOL_REASON },
+        externalStatusline: { supported: false, reason: KIMI_STATUSLINE_REASON },
+        pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
       },
     };
   },
-  session(env) {
+};
+
+export const kimiSessionObservation: SessionObservationFace = {
+  observeSession(env) {
     const id = env.KIMI_SESSION_ID || '';
     return { id, source: id ? 'env:KIMI_SESSION_ID' : 'none' };
   },
   sessionStoreRoots(env) {
     return [path.join(kimiHome(env), 'sessions')];
   },
-  usageSource: () => ({
+};
+
+export const kimiUsageObservation: UsageObservationFace = {
+  source: () => ({
     // kimi's account quota is a rolling 5h/weekly model served by the managed /usages dashboard API.
     // Poll-on-demand against the stored OAuth token; freshness = stored-token validity (see readCurrentUsage).
     kind: 'dashboard-api',
     pollable: true,
     quotaModel: 'rolling-5h-7d',
   }),
-  accountPoolLocation: () => null,
-  readCurrentUsage(env) {
+  observeUsage({ env }) {
     // kimi exposes GET /coding/v1/usages (Bearer OAuth) → rolling 5h + weekly quota. The collector is
     // owner-authorized to refresh an expired stored token. Refresh is serialized with an adjacent
     // advisory lock, re-reads inside the lock, and atomically publishes the rotated token pair.
@@ -82,16 +92,10 @@ export const kimiCodeAdapter: HarnessAdapter = {
       refreshHint: hint,
     };
   },
-  accountSwitchPreflight: () => ({
-    action: 'noop',
-    reason: ACCOUNT_POOL_REASON,
-  }),
-  async upgradePlugin(request) {
-    return upgradeKimiPlugin(request);
-  },
-  accountPool: { supported: false, reason: ACCOUNT_POOL_REASON },
-  externalStatusline: { supported: false, reason: STATUSLINE_REASON },
-  pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
+};
+
+export const kimiPluginProjection: PluginProjectionFace = {
+  upgrade: upgradeKimiPlugin,
 };
 
 function pathExists(p: string): boolean {

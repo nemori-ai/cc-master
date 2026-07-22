@@ -18,7 +18,7 @@
 //   chmod +x → 验新二进制 `--version` 能跑 → 原子 renameSync 覆盖自身路径（macOS/Linux：运行中进程持旧 inode·
 //   覆盖目录项安全）。非 SEA（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错。
 //
-// 插件升级：按 HarnessAdapter 的 plugin distribution strategy 执行。Claude Code 策略走 claude plugin
+// 插件升级：按 `PluginProjectionFace` 执行。Claude Code 策略走 claude plugin
 //   marketplace/update；Codex 策略走本地 marketplace/plugin registry 注册 plugin+skills（不再同步 prompts）；未来 harness 只需在
 //   adapter 内实现同一命令接口。
 //
@@ -31,11 +31,17 @@ import * as fs from 'node:fs';
 import * as https from 'node:https';
 import * as path from 'node:path';
 import {
+  type HarnessCapabilityBinding,
+  harnessId,
+  type PluginProjectionFace,
+} from '../harnesses/capability-model.js';
+import {
   inspectKnownHarnesses,
-  knownHarnessAdapters,
-  resolveHarnessAdapter,
-} from '../harnesses/registry.js';
-import type { HarnessAdapter, PluginUpgradeResult } from '../harnesses/types.js';
+  type SelectedHarness,
+  selectHarness,
+} from '../harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from '../harnesses/composition.js';
+import type { PluginUpgradeResult } from '../harnesses/types.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
@@ -403,7 +409,7 @@ export async function plugin(ctx: Ctx): Promise<number> {
   }
 
   if (harnessFlag) {
-    const harness = resolveHarnessAdapter({
+    const harness = selectHarness({
       env: ctx.env,
       harnessFlag,
     });
@@ -417,12 +423,22 @@ export async function plugin(ctx: Ctx): Promise<number> {
 
 async function pluginForHarness(
   ctx: Ctx,
-  harness: HarnessAdapter,
+  harness: SelectedHarness,
+  opts: { emitJson: boolean },
+): Promise<PluginUpgradeResult> {
+  const binding = builtInHarnessCatalog.plugin.forHarness(harness.id);
+  if (!binding) return unsupportedPluginUpgrade(ctx, harness, opts);
+  return pluginForBinding(ctx, binding, opts);
+}
+
+async function pluginForBinding(
+  ctx: Ctx,
+  binding: HarnessCapabilityBinding<PluginProjectionFace>,
   opts: { emitJson: boolean },
 ): Promise<PluginUpgradeResult> {
   const env = ctx.env;
   const to = (ctx.values.to as string) || '';
-  return harness.upgradePlugin({
+  return binding.face.upgrade({
     env,
     to,
     dryRun: ctx.flags.dryRun,
@@ -437,7 +453,6 @@ async function pluginForHarness(
 
 async function pluginAllHarnesses(ctx: Ctx): Promise<number> {
   const installed = inspectKnownHarnesses(ctx.env).filter((h) => h.installed);
-  const adapters = knownHarnessAdapters();
   if (installed.length === 0) {
     ctx.err(
       'upgrade(plugin): 未发现本机已安装的 ccm-supported harness。可用 `ccm harness list` 查看探测结果。',
@@ -450,16 +465,14 @@ async function pluginAllHarnesses(ctx: Ctx): Promise<number> {
   let supportedCount = 0;
   let firstFailure: number = EXIT.OK;
   for (const h of installed) {
-    const adapter = adapters.find((a) => a.id === h.id);
-    if (!adapter) continue;
-    if (adapter.pluginDistribution.supported) supportedCount++;
-    const result = await pluginForHarness(ctx, adapter, { emitJson: false });
+    const binding = builtInHarnessCatalog.plugin.forHarness(harnessId(h.id));
+    const selected = selectHarness({ harnessFlag: h.id, env: ctx.env });
+    const result = binding
+      ? await pluginForBinding(ctx, binding, { emitJson: false })
+      : await unsupportedPluginUpgrade(ctx, selected, { emitJson: false });
+    if (binding) supportedCount++;
     results.push(result);
-    if (
-      adapter.pluginDistribution.supported &&
-      result.exitCode !== EXIT.OK &&
-      firstFailure === EXIT.OK
-    ) {
+    if (binding && result.exitCode !== EXIT.OK && firstFailure === EXIT.OK) {
       firstFailure = result.exitCode;
     }
   }
@@ -474,6 +487,32 @@ async function pluginAllHarnesses(ctx: Ctx): Promise<number> {
     return EXIT.USAGE;
   }
   return firstFailure;
+}
+
+async function unsupportedPluginUpgrade(
+  ctx: Ctx,
+  harness: SelectedHarness,
+  opts: { emitJson: boolean },
+): Promise<PluginUpgradeResult> {
+  const support = builtInHarnessCatalog.plugin.supportFor(harness.id);
+  const reason =
+    support?.support === 'unsupported'
+      ? (support.detail ??
+        `${harness.displayName} harness has no registered plugin distribution adapter`)
+      : `${harness.displayName} harness has no registered plugin distribution adapter`;
+  ctx.err(
+    `upgrade(plugin): NotImplemented: ${harness.displayName} harness 暂不支持通过 ccm 升级 cc-master plugin。${reason}`,
+  );
+  if (opts.emitJson) {
+    ctx.out(io.jsonOk({ component: 'plugin', action: 'skipped', reason, harness: harness.id }));
+  }
+  return {
+    component: 'plugin',
+    harness: harness.id,
+    action: 'skipped',
+    exitCode: EXIT.USAGE,
+    reason,
+  };
 }
 
 // ════════════════════ verb: all（默认 verb·两者各升各自线最新）═══════════════════════════════════════

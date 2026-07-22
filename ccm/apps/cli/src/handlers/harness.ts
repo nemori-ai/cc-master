@@ -1,35 +1,37 @@
 // handlers/harness.ts — local supported-harness inventory.
 
 import {
-  buildCursorSurfaceInventory,
-  type CursorExecutionSurfaceDescriptor,
-  defaultCursorAgentQuotaReader,
-  inspectCursorExecutionSurfaces,
-} from '../harnesses/cursor-surfaces.js';
-import {
-  type HarnessInstallation,
   inspectKnownHarnesses,
   installedSurfaceIds,
-  MachineHarnessRegistry,
-  resolveHarnessAdapter,
-} from '../harnesses/registry.js';
+  MachineHarnessInventory,
+  presentHarnessInstallationV1,
+  selectedInstallation,
+  selectHarness,
+} from '../harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from '../harnesses/composition.js';
+import type {
+  CursorExecutionSurfaceDescriptor,
+  CursorSurfaceInventory,
+} from '../harnesses/cursor-surfaces.js';
+import type { HarnessInstallation } from '../harnesses/types.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
 
 const EXIT = io.EXIT;
 
 export function list(ctx: Ctx): number {
-  const selected = resolveHarnessAdapter({
+  const selected = selectHarness({
     env: ctx.env,
     harnessFlag: ctx.values.harness as string | undefined,
   });
   if (ctx.values['machine-wide']) {
-    const registry = MachineHarnessRegistry.sweep(ctx.env, { probeHeadlessAuth: true });
+    const registry = MachineHarnessInventory.sweep(ctx.env, { probeHeadlessAuth: true });
     const snapshot = registry.toJSON();
-    const surfaces = inspectCursorExecutionSurfaces(ctx.env, {
-      readQuota: defaultCursorAgentQuotaReader,
-    });
-    const surfaceInventory = buildCursorSurfaceInventory(surfaces);
+    const surfaceInventory = builtInHarnessCatalog.installation
+      .list()
+      .map((binding) => binding.face.discoverSurfaceInventory?.(ctx.env))
+      .find((inventory): inventory is CursorSurfaceInventory => inventory !== undefined);
+    const surfaces = surfaceInventory?.surfaces ?? [];
     if (ctx.flags.json) {
       ctx.out(
         io.jsonOk({
@@ -51,7 +53,9 @@ export function list(ctx: Ctx): number {
     return EXIT.OK;
   }
 
-  const harnesses = inspectKnownHarnesses(ctx.env, { probeHeadlessAuth: true });
+  const harnesses = inspectKnownHarnesses(ctx.env, { probeHeadlessAuth: true }).map(
+    presentHarnessInstallationV1,
+  );
   if (ctx.flags.json) {
     ctx.out(
       io.jsonOk({
@@ -81,11 +85,16 @@ function formatExecutionSurfaceLine(surface: CursorExecutionSurfaceDescriptor): 
 }
 
 export function current(ctx: Ctx): number {
-  const selected = resolveHarnessAdapter({
+  const selected = selectHarness({
     env: ctx.env,
     harnessFlag: ctx.values.harness as string | undefined,
   });
-  const info = selected.inspectInstallation(ctx.env, { probeHeadlessAuth: true });
+  const info = presentHarnessInstallationV1(
+    selectedInstallation(
+      { env: ctx.env, harnessFlag: ctx.values.harness as string | undefined },
+      { probeHeadlessAuth: true },
+    ),
+  );
   if (ctx.flags.json) {
     ctx.out(io.jsonOk({ current: selected.id, harness: info }));
     return EXIT.OK;

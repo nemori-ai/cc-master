@@ -1,27 +1,31 @@
-// harness-registry.test.ts — HarnessAdapter selection contract.
+// harness-registry.test.ts — catalog selection and inventory compatibility contract.
 
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
-import { probeCursorAgentAuthFact } from '../src/harnesses/cursor.js';
+import { harnessId } from '../src/harnesses/capability-model.js';
 import {
   detectTrustedHarnessId,
   harnessSessionId,
   inspectKnownHarnesses,
-  MachineHarnessRegistry,
-  resolveHarnessAdapter,
+  MachineHarnessInventory,
   resolveHarnessId,
-} from '../src/harnesses/registry.js';
+  selectedInstallation,
+  selectHarness,
+} from '../src/harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from '../src/harnesses/composition.js';
+import { probeCursorAgentAuthFact } from '../src/harnesses/cursor.js';
 import type { HarnessCliProbe } from '../src/harnesses/types.js';
+import { usageReading } from '../src/usage-reading.js';
 
 test('--harness flag wins over env aliases', () => {
-  const adapter = resolveHarnessAdapter({
+  const selected = selectHarness({
     harnessFlag: 'codex',
     env: { CC_MASTER_HARNESS: 'claude-code', CLAUDE_CODE_SESSION_ID: 'cc-sid' },
   });
-  assert.equal(adapter.id, 'codex');
+  assert.equal(selected.id, 'codex');
 });
 
 test('CC_MASTER_HARNESS wins over legacy host env aliases', () => {
@@ -38,12 +42,17 @@ test('legacy host env aliases still work', () => {
   assert.equal(resolveHarnessId({ env: { CCM_HOST: 'claude' } }), 'claude-code');
 });
 
-test('explicit unknown harness uses generic adapter, not Claude fallback', () => {
-  const adapter = resolveHarnessAdapter({ harnessFlag: 'future-agent', env: {} });
-  assert.equal(adapter.id, 'future-agent');
-  assert.equal(adapter.accountPool.supported, false);
-  assert.equal(adapter.externalStatusline.supported, false);
-  assert.equal(adapter.readCurrentUsage({}).source, 'unavailable');
+test('explicit unknown harness is explicit unsupported data, not Claude fallback', () => {
+  const selected = selectHarness({ harnessFlag: 'future-agent', env: {} });
+  const installation = selectedInstallation({ harnessFlag: 'future-agent', env: {} });
+  assert.equal(selected.id, 'future-agent');
+  assert.equal(selected.known, false);
+  assert.equal(installation.capabilities.accountPool.supported, false);
+  assert.equal(installation.capabilities.externalStatusline.supported, false);
+  assert.equal(
+    usageReading.readCurrent({ harnessFlag: 'future-agent', env: {} }).source,
+    'unavailable',
+  );
 });
 
 test('auto-detect recognizes Codex and Claude Code markers', () => {
@@ -143,7 +152,7 @@ test('Cursor inventory keeps IDE plugin and headless agent as independent surfac
     );
     assert.ok(cursor, fixture.name);
     const ide = cursor.surfaces.find((surface) => surface.id === 'cursor-ide-plugin');
-    const agent = cursor.surfaces.find((surface) => surface.id === 'cursor-agent');
+    const agent = cursor.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
     assert.ok(ide, fixture.name);
     assert.ok(agent, fixture.name);
 
@@ -253,7 +262,7 @@ test('harness list opt-in 探测：已登录 cursor-agent → facts available + 
     { PATH: bin, HOME: join(root, 'home') },
     { probeHeadlessAuth: true },
   ).find((h) => h.id === 'cursor');
-  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.ok(agent);
   assert.deepEqual(agent.facts.authentication, {
     state: 'available',
@@ -279,7 +288,7 @@ test('harness list opt-in 探测：未登录 cursor-agent → unavailable，admi
     { PATH: bin, HOME: join(root, 'home') },
     { probeHeadlessAuth: true },
   ).find((h) => h.id === 'cursor');
-  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.equal(agent?.facts.authentication.state, 'unavailable');
   assert.equal(agent?.admission?.schedulable, false);
 });
@@ -294,7 +303,7 @@ test('harness list 默认路径不 opt-in → 保持轻量 unprobed（零回归�
   const cursor = inspectKnownHarnesses({ PATH: bin, HOME: join(root, 'home') }).find(
     (h) => h.id === 'cursor',
   );
-  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.deepEqual(agent?.facts.authentication, { state: 'unknown', source: 'not-probed' });
 });
 
@@ -311,7 +320,7 @@ test('Cursor headless executable probe accepts symlinks and rejects non-executab
     PATH: join(symlinkRoot, 'bin'),
     HOME: join(symlinkRoot, 'home'),
   }).find((h) => h.id === 'cursor');
-  const linkedAgent = linkedCursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const linkedAgent = linkedCursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.equal(linkedAgent?.installed, true);
   assert.equal(linkedAgent?.available, true);
   assert.equal(linkedAgent?.binary.path, link);
@@ -326,7 +335,7 @@ test('Cursor headless executable probe accepts symlinks and rejects non-executab
     HOME: join(nonExecutableRoot, 'home'),
   }).find((h) => h.id === 'cursor');
   const nonExecutableAgent = nonExecutableCursor?.surfaces.find(
-    (surface) => surface.id === 'cursor-agent',
+    (surface) => surface.id === 'cursor-agent-cli',
   );
   assert.equal(nonExecutableAgent?.installed, false);
   assert.equal(nonExecutableAgent?.available, false);
@@ -341,7 +350,7 @@ test('Cursor headless executable probe rejects searchable directories', () => {
   const cursor = inspectKnownHarnesses({ PATH: bin, HOME: join(root, 'home') }).find(
     (h) => h.id === 'cursor',
   );
-  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.equal(agent?.installed, false);
   assert.equal(agent?.available, false);
   assert.equal(agent?.binary.path, null);
@@ -357,89 +366,100 @@ test('Cursor headless executable probe reports an absolute path from relative PA
     PATH: relative(process.cwd(), bin),
     HOME: join(root, 'home'),
   }).find((h) => h.id === 'cursor');
-  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent-cli');
   assert.equal(agent?.installed, true);
   assert.equal(agent?.available, true);
   assert.equal(agent?.binary.path, join(bin, 'cursor-agent'));
 });
 
-test('harness adapters expose machine-wide registry coordinates', () => {
+test('typed directories expose machine-wide inventory coordinates', () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-harness-coords-'));
   const claudeConfig = join(root, 'claude-config');
   const ccmHome = join(root, 'ccm-home');
   const codexHome = join(root, 'codex-home');
   const cursorState = join(root, 'Cursor', 'User', 'globalStorage', 'state.vscdb');
 
-  const claude = resolveHarnessAdapter({ harnessFlag: 'claude-code', env: {} });
-  assert.deepEqual(claude.sessionStoreRoots({ HOME: root, CLAUDE_CONFIG_DIR: claudeConfig }), [
-    join(claudeConfig, 'projects'),
-  ]);
-  assert.deepEqual(claude.usageSource({}), {
+  const claudeSession = builtInHarnessCatalog.session.forHarness(harnessId('claude-code'));
+  const claudeUsage = builtInHarnessCatalog.usage.forHarness(harnessId('claude-code'));
+  const claudeAccount = builtInHarnessCatalog.account.forHarness(harnessId('claude-code'));
+  assert.ok(claudeSession && claudeUsage && claudeAccount);
+  assert.deepEqual(
+    claudeSession.face.sessionStoreRoots({ HOME: root, CLAUDE_CONFIG_DIR: claudeConfig }),
+    [join(claudeConfig, 'projects')],
+  );
+  assert.deepEqual(claudeUsage.face.source({}), {
     kind: 'statusline-sidecar',
     pollable: false,
     quotaModel: 'rolling-5h-7d',
   });
   assert.equal(
-    claude.accountPoolLocation({ HOME: root, CC_MASTER_HOME: ccmHome }),
+    claudeAccount.face.poolLocation({ HOME: root, CC_MASTER_HOME: ccmHome }),
     join(ccmHome, 'accounts.json'),
   );
 
-  const codex = resolveHarnessAdapter({ harnessFlag: 'codex', env: {} });
-  assert.deepEqual(codex.sessionStoreRoots({ HOME: root, CODEX_HOME: codexHome }), [
+  const codexSession = builtInHarnessCatalog.session.forHarness(harnessId('codex'));
+  const codexUsage = builtInHarnessCatalog.usage.forHarness(harnessId('codex'));
+  assert.ok(codexSession && codexUsage);
+  assert.deepEqual(codexSession.face.sessionStoreRoots({ HOME: root, CODEX_HOME: codexHome }), [
     join(codexHome, 'sessions'),
   ]);
-  assert.deepEqual(codex.usageSource({}), {
+  assert.deepEqual(codexUsage.face.source({}), {
     kind: 'app-server',
     pollable: true,
     quotaModel: 'primary-secondary',
   });
-  assert.equal(codex.accountPoolLocation({ HOME: root }), null);
+  assert.equal(builtInHarnessCatalog.account.forHarness(harnessId('codex')), undefined);
 
-  const cursor = resolveHarnessAdapter({ harnessFlag: 'cursor', env: {} });
-  assert.deepEqual(cursor.sessionStoreRoots({ HOME: root, CCM_CURSOR_STATE_DB: cursorState }), [
-    join(root, 'Cursor', 'User', 'globalStorage'),
-  ]);
-  assert.deepEqual(cursor.usageSource({}), {
+  const cursorSession = builtInHarnessCatalog.session.forHarness(harnessId('cursor'));
+  const cursorUsage = builtInHarnessCatalog.usage.forHarness(harnessId('cursor'));
+  assert.ok(cursorSession && cursorUsage);
+  assert.deepEqual(
+    cursorSession.face.sessionStoreRoots({ HOME: root, CCM_CURSOR_STATE_DB: cursorState }),
+    [join(root, 'Cursor', 'User', 'globalStorage')],
+  );
+  assert.deepEqual(cursorUsage.face.source({}), {
     kind: 'dashboard-api',
     pollable: true,
     quotaModel: 'billing-period',
   });
-  assert.equal(cursor.accountPoolLocation({ HOME: root }), null);
+  assert.equal(builtInHarnessCatalog.account.forHarness(harnessId('cursor')), undefined);
 
   const kimiHome = join(root, 'kimi-home');
-  const kimi = resolveHarnessAdapter({ harnessFlag: 'kimi-code', env: {} });
-  assert.deepEqual(kimi.sessionStoreRoots({ HOME: root, KIMI_CODE_HOME: kimiHome }), [
+  const kimiSession = builtInHarnessCatalog.session.forHarness(harnessId('kimi-code'));
+  const kimiUsage = builtInHarnessCatalog.usage.forHarness(harnessId('kimi-code'));
+  assert.ok(kimiSession && kimiUsage);
+  assert.deepEqual(kimiSession.face.sessionStoreRoots({ HOME: root, KIMI_CODE_HOME: kimiHome }), [
     join(kimiHome, 'sessions'),
   ]);
-  assert.deepEqual(kimi.usageSource({}), {
+  assert.deepEqual(kimiUsage.face.source({}), {
     kind: 'dashboard-api',
     pollable: true,
     quotaModel: 'rolling-5h-7d',
   });
-  assert.equal(kimi.accountPoolLocation({ HOME: root }), null);
+  assert.equal(builtInHarnessCatalog.account.forHarness(harnessId('kimi-code')), undefined);
 });
 
-test('kimi-code adapter: detection, aliases, credential-gated usage/account, plugin distribution', () => {
+test('kimi-code module: detection, aliases, credential-gated usage, and explicit support data', () => {
   assert.equal(resolveHarnessId({ env: { KIMI_CODE_HOME: '/tmp/kimi-home' } }), 'kimi-code');
   assert.equal(detectTrustedHarnessId({ KIMI_CODE_HOME: '/tmp/kimi-home' }), 'kimi-code');
 
-  const kimi = resolveHarnessAdapter({ harnessFlag: 'kimi', env: {} });
+  const kimi = selectHarness({ harnessFlag: 'kimi', env: {} });
   assert.equal(kimi.id, 'kimi-code');
+  const usageFace = builtInHarnessCatalog.usage.forHarness(kimi.id);
+  assert.ok(usageFace);
 
   // With no discoverable credential (isolated KIMI_CODE_HOME), the /usages collector degrades to an
   // honest `unavailable` reason — never a crash, never a credential mutation.
-  const usage = kimi.readCurrentUsage({ KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' });
+  const usage = usageFace.face.observeUsage({
+    env: { KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' },
+  });
   assert.equal(usage.signal, null);
   assert.equal(usage.source, 'unavailable');
   assert.match(usage.unavailableReason, /凭证/);
 
-  assert.equal(kimi.accountPool.supported, false);
-  assert.equal(kimi.externalStatusline.supported, false);
-  assert.equal(kimi.pluginDistribution.supported, true);
-  assert.deepEqual(kimi.accountSwitchPreflight({}), {
-    action: 'noop',
-    reason: kimi.accountPool.reason,
-  });
+  assert.equal(builtInHarnessCatalog.account.supportFor(kimi.id)?.support, 'unsupported');
+  assert.equal(builtInHarnessCatalog.statusline.supportFor(kimi.id)?.support, 'unsupported');
+  assert.equal(builtInHarnessCatalog.plugin.supportFor(kimi.id)?.support, 'supported');
 });
 
 test('kimi-code inventory reports install from bin or home without claiming other harnesses', () => {
@@ -458,14 +478,14 @@ test('kimi-code inventory reports install from bin or home without claiming othe
   assert.equal(kimi?.capabilities.accountPool.supported, false);
 });
 
-test('MachineHarnessRegistry.sweep walks all known adapters into an immutable snapshot', () => {
+test('MachineHarnessInventory.sweep walks all modules into an immutable compatibility snapshot', () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-machine-harness-'));
   mkdirSync(join(root, 'bin'), { recursive: true });
   writeExecutable(join(root, 'bin', 'cursor-agent'));
   mkdirSync(join(root, '.codex'), { recursive: true });
   mkdirSync(join(root, '.claude'), { recursive: true });
 
-  const registry = MachineHarnessRegistry.sweep({
+  const registry = MachineHarnessInventory.sweep({
     HOME: root,
     PATH: join(root, 'bin'),
     CODEX_HOME: join(root, '.codex'),

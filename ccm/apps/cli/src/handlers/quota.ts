@@ -88,13 +88,14 @@ export async function status(ctx: Ctx): Promise<number> {
     //   salt, then reads — so a machine with no daemon is never permanently all-unknown. Default
     //   (no flag) stays a cheap cached read that never calls a provider collector.
     if (ctx.values.refresh === true) {
-      if (!ctx.machineQuotaCollectors) {
+      if (!ctx.machineQuotaCollectors || !ctx.machineQuotaDirectory) {
         throw new Error('machine-wide quota collector boundary is required');
       }
       const data = await refreshMachineWideQuotaObservations({
         env: ctx.env,
         store: store(ctx) as MachineQuotaStore,
         collectors: ctx.machineQuotaCollectors,
+        directory: ctx.machineQuotaDirectory,
       });
       return emitMachineWide(ctx, data);
     }
@@ -106,7 +107,12 @@ export async function status(ctx: Ctx): Promise<number> {
         readings: [],
       });
     }
-    const data = await readMachineWideQuotaStatus(store(ctx) as MachineQuotaStore);
+    if (!ctx.machineQuotaDirectory) throw new Error('machine-wide quota directory is required');
+    const data = await readMachineWideQuotaStatus(
+      store(ctx) as MachineQuotaStore,
+      new Date(),
+      ctx.machineQuotaDirectory,
+    );
     return emitMachineWide(ctx, data);
   }
   return emit(ctx, await store(ctx, ['filesystem.quota.stat']).status());
@@ -156,6 +162,7 @@ export async function refresh(ctx: Ctx): Promise<number> {
   if (!ctx.machineQuotaCollectors) {
     throw new Error('machine-wide quota collector boundary is required');
   }
+  if (!ctx.machineQuotaDirectory) throw new Error('machine-wide quota directory is required');
   return emitMachineWide(
     ctx,
     await refreshMachineWideQuota({
@@ -164,6 +171,7 @@ export async function refresh(ctx: Ctx): Promise<number> {
       store: store(ctx) as MachineQuotaStore,
       collectors: ctx.machineQuotaCollectors,
       coordination: ctx.machineQuotaCoordination,
+      directory: ctx.machineQuotaDirectory,
     }),
   );
 }

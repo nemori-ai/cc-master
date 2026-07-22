@@ -2,7 +2,7 @@
 //
 // DDD 分层（本模块是 domain service，坐在 application handler 与 infrastructure adapter 之间）：
 //   · Domain      —— `UsageSignal`（@ccm/engine 的纯值对象）+ 本模块的 `UsageReading` 规范值对象。
-//   · Infrastructure —— 每个 harness 的 `HarnessAdapter.readCurrentUsage[ForSurface]`（读 statusline
+//   · Infrastructure —— 每个 harness module 的 `UsageObservationFace`（读 statusline
 //     sidecar / codex app-server / cursor dashboard / kimi /usages 各一套·**per-harness 各异**·不强统一）。
 //   · Application  —— usage / quota / coordination / router collect / account 各 handler，**只经本服务读**，
 //     不再各自散调 adapter / wrapper / machine-wide cache。
@@ -17,7 +17,9 @@
 
 import type { UsageSignal } from '@ccm/engine';
 import * as discover from './discover.js';
-import { knownHarnessAdapters, resolveHarnessAdapter } from './harnesses/registry.js';
+import { quotaTargetId, surfaceId } from './harnesses/capability-model.js';
+import { selectHarness } from './harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from './harnesses/composition.js';
 import type {
   CurrentQuotaAuthorityRefs,
   CurrentUsageReading,
@@ -26,7 +28,11 @@ import type {
   UsageRefreshHint,
   UsageSignalSource,
 } from './harnesses/types.js';
-import { readMachineWideQuotaStatusCached } from './machine-wide-quota.js';
+import { findMachineQuotaReading, readMachineWideQuotaStatusCached } from './machine-wide-quota.js';
+
+export const CURSOR_AGENT_BILLING_PERIOD_QUOTA_TARGET_ID = quotaTargetId(
+  'machine-wide/cursor/cursor-agent-cli/billing_period',
+);
 
 /**
  * Canonical usage-reading value object every command space consumes. It supersets the per-harness
@@ -148,33 +154,51 @@ export function readCurrent(req: AmbientUsageRequest): UsageReading {
   const wantsCursorAgent = cursorAgentRequested(harnessFlag);
   if (wantsCursorAgent) {
     const home = discover.resolveHome({ homeFlag, env });
-    const status = readMachineWideQuotaStatusCached(home);
-    const cached = Array.isArray(status.readings)
-      ? status.readings.find(
-          (candidate: Record<string, any>) => candidate?.target?.surface_id === 'cursor-agent-cli',
-        )
-      : undefined;
+    const status = readMachineWideQuotaStatusCached(
+      home,
+      new Date(),
+      builtInHarnessCatalog.machineQuota,
+    );
+    const cached = findMachineQuotaReading(
+      status,
+      CURSOR_AGENT_BILLING_PERIOD_QUOTA_TARGET_ID,
+      builtInHarnessCatalog.machineQuota,
+    );
     const projected = projectMachineCacheReading(cached);
     if (projected) return projected;
   }
-  const adapter = resolveHarnessAdapter({ env, harnessFlag });
-  const reading =
-    wantsCursorAgent && adapter.readCurrentUsageForSurface
-      ? adapter.readCurrentUsageForSurface('cursor-agent-cli', env)
-      : adapter.readCurrentUsage(env);
-  return toUsageReading(adapter.id, adapter.displayName, adapter.usageSource(env), reading);
+  const selected = selectHarness({ env, harnessFlag });
+  const binding = builtInHarnessCatalog.usage.forHarness(selected.id);
+  if (!binding) return unavailableUsage(selected.id, selected.displayName);
+  const reading = binding.face.observeUsage({
+    env,
+    ...(wantsCursorAgent ? { surfaceId: surfaceId('cursor-agent-cli') } : {}),
+  });
+  return toUsageReading(selected.id, selected.displayName, binding.face.source(env), reading);
 }
 
-// readSurface — 指定 harness + surface 的定向读取（machine-wide collect / fresh 填充用·按 TARGETS 的
-//   default_collector_harness 选 adapter，不走 ambient 解析）。harness 未知 → null（caller 判 not-installed）。
+// readSurface — 指定 harness + canonical surface 的定向读取。harness 未知 → null。
 export function readSurface(req: SurfaceUsageRequest): UsageReading | null {
-  const { env, harnessId, surfaceId } = req;
-  const adapter = knownHarnessAdapters().find((candidate) => candidate.id === harnessId);
-  if (!adapter) return null;
-  const reading = adapter.readCurrentUsageForSurface
-    ? adapter.readCurrentUsageForSurface(surfaceId, env)
-    : adapter.readCurrentUsage(env);
-  return toUsageReading(adapter.id, adapter.displayName, adapter.usageSource(env), reading);
+  const { env, harnessId: requestedHarness, surfaceId: requestedSurface } = req;
+  const binding = builtInHarnessCatalog.usage.forHarness(
+    selectHarness({ harnessFlag: requestedHarness, env }).id,
+  );
+  if (!binding) return null;
+  const reading = binding.face.observeUsage({ env, surfaceId: surfaceId(requestedSurface) });
+  return toUsageReading(binding.harnessId, binding.displayName, binding.face.source(env), reading);
+}
+
+function unavailableUsage(harness: string, label: string): UsageReading {
+  return toUsageReading(
+    harness,
+    label,
+    { kind: 'app-server', pollable: false, quotaModel: 'primary-secondary' },
+    {
+      signal: null,
+      source: 'unavailable',
+      unavailableReason: `${label} harness has no registered usage provider`,
+    },
+  );
 }
 
 // The domain service, grouped so consumers read through one authoritative object.

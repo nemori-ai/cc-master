@@ -38,7 +38,7 @@ import {
 } from '../capability-manifest.js';
 import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
-import { detectTrustedHarnessId } from '../harnesses/registry.js';
+import { detectTrustedHarnessId } from '../harnesses/catalog-services.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { REGISTRY } from '../registry.js';

@@ -7,14 +7,15 @@ import {
   deliverCoordinationNotification,
   listCurrentCoordinationSubscriptions,
 } from '../src/handlers/coordination.js';
+import { builtInHarnessCatalog } from '../src/harnesses/composition.js';
 import {
   aggregateMachineQuotaCapacityViews,
   type MachineQuotaAuthorityRefs,
   type MachineQuotaCollection,
   type MachineQuotaCollectorBoundary,
   type MachineQuotaStore,
-  readMachineWideQuotaStatus,
-  refreshMachineWideQuota,
+  readMachineWideQuotaStatus as readMachineWideQuotaStatusWithDirectory,
+  refreshMachineWideQuota as refreshMachineWideQuotaWithDirectory,
 } from '../src/machine-wide-quota.js';
 import { createQuotaAdmissionStore } from '../src/quota-admission-store.js';
 import { createProductionQuotaEffectBoundary } from '../src/quota-production-effects.js';
@@ -290,6 +291,19 @@ const coordination = {
   listSubscriptions: listCurrentCoordinationSubscriptions,
   deliverNotification: deliverCoordinationNotification,
 };
+
+function readMachineWideQuotaStatus(store: MachineQuotaStore, now: Date) {
+  return readMachineWideQuotaStatusWithDirectory(store, now, builtInHarnessCatalog.machineQuota);
+}
+
+function refreshMachineWideQuota(
+  input: Omit<Parameters<typeof refreshMachineWideQuotaWithDirectory>[0], 'directory'>,
+) {
+  return refreshMachineWideQuotaWithDirectory({
+    ...input,
+    directory: builtInHarnessCatalog.machineQuota,
+  });
+}
 
 test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplicate-free', async () => {
   const { home, boardPath } = setupSubscription();
@@ -647,6 +661,7 @@ test('machine-wide target catalog includes exact kimi five-hour and seven-day qu
     capturedTargets
       .filter((target) => target.harness_id === 'kimi-code')
       .map((target) => ({
+        target_id: target.target_id,
         harness_id: target.harness_id,
         surface_id: target.surface_id,
         provider_id: target.provider_id,
@@ -654,11 +669,11 @@ test('machine-wide target catalog includes exact kimi five-hour and seven-day qu
         window: target.window,
         window_name: target.window_name,
         collector_id: target.collector_id,
-        default_collector_harness: target.default_collector_harness,
       }))
       .sort((left, right) => left.window_name.localeCompare(right.window_name)),
     [
       {
+        target_id: 'machine-wide/kimi-code/kimi-cli/five_hour',
         harness_id: 'kimi-code',
         surface_id: 'kimi-cli',
         provider_id: 'moonshot',
@@ -666,9 +681,9 @@ test('machine-wide target catalog includes exact kimi five-hour and seven-day qu
         window: { kind: 'rolling', name: 'five_hour', duration_sec: 18_000 },
         window_name: 'five_hour',
         collector_id: 'kimi-usages-api',
-        default_collector_harness: 'kimi-code',
       },
       {
+        target_id: 'machine-wide/kimi-code/kimi-cli/seven_day',
         harness_id: 'kimi-code',
         surface_id: 'kimi-cli',
         provider_id: 'moonshot',
@@ -676,7 +691,6 @@ test('machine-wide target catalog includes exact kimi five-hour and seven-day qu
         window: { kind: 'rolling', name: 'seven_day', duration_sec: 604_800 },
         window_name: 'seven_day',
         collector_id: 'kimi-usages-api',
-        default_collector_harness: 'kimi-code',
       },
     ],
   );

@@ -28,7 +28,8 @@ import {
   resolveRateCachePath,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
-import { resolveHarnessAdapter } from '../harnesses/registry.js';
+import { selectHarness } from '../harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from '../harnesses/composition.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import type { BoardArg, Ctx } from './_common.js';
@@ -48,13 +49,15 @@ const SWITCH_EXIT = {
 } as const;
 
 function accountPoolNotImplemented(ctx: Ctx, verb: string): number | null {
-  const harness = resolveHarnessAdapter({
+  const harness = selectHarness({
     env: ctx.env,
     harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
   });
-  if (harness.accountPool.supported) return null;
+  if (builtInHarnessCatalog.account.forHarness(harness.id)) return null;
+  const support = builtInHarnessCatalog.account.supportFor(harness.id);
+  const reason = support?.support === 'unsupported' ? support.detail : undefined;
   ctx.err(
-    `NotImplemented: \`ccm account ${verb}\` is not supported on the ${harness.displayName} harness. ${harness.accountPool.reason || 'This harness has no registered account-pool adapter.'}`,
+    `NotImplemented: \`ccm account ${verb}\` is not supported on the ${harness.displayName} harness. ${reason || 'This harness has no registered account-pool adapter.'}`,
   );
   return EXIT.USAGE;
 }
@@ -446,11 +449,13 @@ export async function switchAccount(ctx: Ctx): Promise<number> {
   if (ni !== null) return ni;
   const env = ctx.env;
   // ── 0. 云后端自检（红线5·no-op·先于任何 token 读）─────────────────────────────────────────────────
-  const harness = resolveHarnessAdapter({
+  const harness = selectHarness({
     env: ctx.env,
     harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
   });
-  const preflight = harness.accountSwitchPreflight(env);
+  const binding = builtInHarnessCatalog.account.forHarness(harness.id);
+  if (!binding) return SWITCH_EXIT.USAGE;
+  const preflight = binding.face.switchPreflight(env);
   if (preflight.action === 'noop') {
     ctx.err(`switch: ${preflight.reason}`);
     return SWITCH_EXIT.OK;

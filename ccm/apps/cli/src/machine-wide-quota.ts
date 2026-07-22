@@ -3,6 +3,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
 import { canonicalJson, sha256Hex } from '@ccm/engine';
+import type {
+  MachineQuotaDirectory,
+  MachineQuotaTarget,
+  QuotaTargetId,
+} from './harnesses/capability-model.js';
 import type { CurrentQuotaAuthorityRefs, Env, UsageRefreshHint } from './harnesses/types.js';
 import { projectMachineWideQuotaNotifications } from './machine-wide-quota-notification.js';
 import {
@@ -11,21 +16,6 @@ import {
 } from './machine-wide-quota-posture.js';
 
 type Data = Record<string, any>;
-
-interface MachineQuotaTarget {
-  harnessId: string;
-  surfaceId: string;
-  providerId: string;
-  bucketId: string;
-  windowName: 'five_hour' | 'seven_day' | 'billing_period' | 'billing_period_usage_based';
-  poolKind?: 'first_party' | 'usage_based';
-  poolIds?: readonly string[];
-  durationSec: number;
-  collectorId: string;
-  sourceSchema: string;
-  authSource: string;
-  defaultCollectorHarness: string | null;
-}
 
 export type MachineQuotaAuthorityRefs = CurrentQuotaAuthorityRefs;
 
@@ -60,138 +50,6 @@ export interface MachineQuotaStore {
   publishMachineProjection(projection: Readonly<Data>): Promise<Data>;
 }
 
-const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
-  {
-    harnessId: 'codex',
-    surfaceId: 'codex-cli',
-    providerId: 'codex',
-    bucketId: 'seven-day-global',
-    windowName: 'seven_day',
-    durationSec: 604_800,
-    collectorId: 'codex-app-server',
-    sourceSchema: 'codex/account-rate-limits/v1',
-    authSource: 'codex-cli-current-login',
-    defaultCollectorHarness: 'codex',
-  },
-  {
-    harnessId: 'claude-code',
-    surfaceId: 'claude-cli',
-    providerId: 'anthropic',
-    bucketId: 'five-hour-global',
-    windowName: 'five_hour',
-    durationSec: 18_000,
-    collectorId: 'claude-statusline-sidecar',
-    sourceSchema: 'claude-code/rate-limits/v1',
-    authSource: 'claude-cli-current-login',
-    defaultCollectorHarness: 'claude-code',
-  },
-  {
-    harnessId: 'claude-code',
-    surfaceId: 'claude-cli',
-    providerId: 'anthropic',
-    bucketId: 'seven-day-global',
-    windowName: 'seven_day',
-    durationSec: 604_800,
-    collectorId: 'claude-statusline-sidecar',
-    sourceSchema: 'claude-code/rate-limits/v1',
-    authSource: 'claude-cli-current-login',
-    defaultCollectorHarness: 'claude-code',
-  },
-  {
-    harnessId: 'claude-code',
-    surfaceId: 'claude-fable-5-cli',
-    providerId: 'anthropic',
-    bucketId: 'seven-day-fable-global',
-    windowName: 'seven_day',
-    durationSec: 604_800,
-    collectorId: 'claude-statusline-sidecar',
-    sourceSchema: 'claude-code/rate-limits/v1',
-    authSource: 'claude-cli-current-login',
-    defaultCollectorHarness: 'claude-code',
-  },
-  {
-    harnessId: 'cursor',
-    surfaceId: 'cursor-ide-plugin',
-    providerId: 'cursor',
-    bucketId: 'billing-period-global',
-    windowName: 'billing_period',
-    poolKind: 'first_party',
-    poolIds: ['cursor-total', 'cursor-auto'],
-    durationSec: 2_592_000,
-    collectorId: 'cursor-dashboard',
-    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
-    authSource: 'cursor-ide-current-login',
-    defaultCollectorHarness: 'cursor',
-  },
-  {
-    harnessId: 'cursor',
-    surfaceId: 'cursor-ide-plugin',
-    providerId: 'cursor',
-    bucketId: 'billing-period-usage-based',
-    windowName: 'billing_period_usage_based',
-    poolKind: 'usage_based',
-    poolIds: ['cursor-api', 'cursor-spend-limit'],
-    durationSec: 2_592_000,
-    collectorId: 'cursor-dashboard',
-    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
-    authSource: 'cursor-ide-current-login',
-    defaultCollectorHarness: 'cursor',
-  },
-  {
-    harnessId: 'cursor',
-    surfaceId: 'cursor-agent-cli',
-    providerId: 'cursor',
-    bucketId: 'billing-period-global',
-    windowName: 'billing_period',
-    poolKind: 'first_party',
-    poolIds: ['cursor-total', 'cursor-auto'],
-    durationSec: 2_592_000,
-    collectorId: 'cursor-agent-dashboard',
-    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
-    authSource: 'cursor-agent-current-login',
-    // The Agent owns its credential discovery, while both surfaces may observe one subscription pool.
-    defaultCollectorHarness: 'cursor',
-  },
-  {
-    harnessId: 'cursor',
-    surfaceId: 'cursor-agent-cli',
-    providerId: 'cursor',
-    bucketId: 'billing-period-usage-based',
-    windowName: 'billing_period_usage_based',
-    poolKind: 'usage_based',
-    poolIds: ['cursor-api', 'cursor-spend-limit'],
-    durationSec: 2_592_000,
-    collectorId: 'cursor-agent-dashboard',
-    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
-    authSource: 'cursor-agent-current-login',
-    defaultCollectorHarness: 'cursor',
-  },
-  {
-    harnessId: 'kimi-code',
-    surfaceId: 'kimi-cli',
-    providerId: 'moonshot',
-    bucketId: 'five-hour-global',
-    windowName: 'five_hour',
-    durationSec: 18_000,
-    collectorId: 'kimi-usages-api',
-    sourceSchema: 'kimi-code/usages/v1',
-    authSource: 'kimi-code-current-login',
-    defaultCollectorHarness: 'kimi-code',
-  },
-  {
-    harnessId: 'kimi-code',
-    surfaceId: 'kimi-cli',
-    providerId: 'moonshot',
-    bucketId: 'seven-day-global',
-    windowName: 'seven_day',
-    durationSec: 604_800,
-    collectorId: 'kimi-usages-api',
-    sourceSchema: 'kimi-code/usages/v1',
-    authSource: 'kimi-code-current-login',
-    defaultCollectorHarness: 'kimi-code',
-  },
-]);
-
 function digest(value: unknown): string {
   return `sha256:${sha256Hex(canonicalJson(value))}`;
 }
@@ -216,8 +74,28 @@ function collectionTarget(target: MachineQuotaTarget): Data {
   };
 }
 
+/** Resolve a public cached reading through its canonical catalog target without changing v1 output. */
+export function findMachineQuotaReading(
+  status: Data,
+  targetId: QuotaTargetId,
+  directory: MachineQuotaDirectory,
+): Data | undefined {
+  const target = directory.findTarget(targetId);
+  if (!target || !Array.isArray(status.readings)) return undefined;
+  const expectedTarget = canonicalJson(collectionTarget(target));
+  return status.readings.find((reading: unknown) => {
+    if (reading === null || typeof reading !== 'object') return false;
+    const candidateTarget = (reading as Data).target;
+    return (
+      candidateTarget !== null &&
+      typeof candidateTarget === 'object' &&
+      canonicalJson(candidateTarget) === expectedTarget
+    );
+  });
+}
+
 function sourceKey(target: MachineQuotaTarget): string {
-  return `machine-wide/${target.harnessId}/${target.surfaceId}/${target.windowName}`;
+  return target.id;
 }
 
 function signalWindow(
@@ -554,9 +432,10 @@ async function decisionsFromStore(
   store: MachineQuotaStore,
   now: Date,
   homeSalt: string | null,
+  directory: MachineQuotaDirectory,
 ): Promise<Data[]> {
   return Promise.all(
-    TARGETS.map(async (target) => {
+    directory.listTargets().map(async (target) => {
       // Before the owner-only home salt exists, never correlate a real cached identity with a
       // process-global fallback. The sentinel posture remains unknown until explicit refresh.
       const observation = homeSalt ? await store.readObservation(sourceKey(target)) : undefined;
@@ -652,11 +531,17 @@ function safeQuotaReading(
   };
 }
 
-async function safeReadingsFromStore(store: MachineQuotaStore, now: Date): Promise<Data[]> {
+async function safeReadingsFromStore(
+  store: MachineQuotaStore,
+  now: Date,
+  directory: MachineQuotaDirectory,
+): Promise<Data[]> {
   return Promise.all(
-    TARGETS.map(async (target) =>
-      safeQuotaReading(target, await store.readObservation(sourceKey(target)), now),
-    ),
+    directory
+      .listTargets()
+      .map(async (target) =>
+        safeQuotaReading(target, await store.readObservation(sourceKey(target)), now),
+      ),
   );
 }
 
@@ -728,15 +613,20 @@ function machineQuotaStatus(
 
 export async function readMachineWideQuotaStatus(
   store: MachineQuotaStore,
-  now = new Date(),
+  now: Date,
+  directory: MachineQuotaDirectory,
 ): Promise<Data> {
   const projection = await store.readMachineProjection();
   const homeSalt =
     typeof projection?.home_salt === 'string' && projection.home_salt.length > 0
       ? projection.home_salt
       : null;
-  const decisions = await decisionsFromStore(store, now, homeSalt);
-  return machineQuotaStatus(decisions, projection, await safeReadingsFromStore(store, now));
+  const decisions = await decisionsFromStore(store, now, homeSalt, directory);
+  return machineQuotaStatus(
+    decisions,
+    projection,
+    await safeReadingsFromStore(store, now, directory),
+  );
 }
 
 /**
@@ -753,9 +643,11 @@ export async function refreshMachineWideQuotaObservations(input: {
   env: Env;
   store: MachineQuotaStore;
   collectors: MachineQuotaCollectorBoundary;
+  directory: MachineQuotaDirectory;
   now?: Date;
 }): Promise<Data> {
   const now = input.now ?? new Date();
+  const directory = input.directory;
   // Establish the owner-only durable home salt if missing, so decisions can correlate scope.
   const previous = await input.store.readMachineProjection();
   const homeSalt =
@@ -769,15 +661,15 @@ export async function refreshMachineWideQuotaObservations(input: {
       decisions: Array.isArray(previous?.decisions) ? previous.decisions : [],
     });
   }
-  for (const target of TARGETS) {
+  for (const target of directory.listTargets()) {
     let collection: MachineQuotaCollection;
     try {
       collection = await input.collectors.collect(
         {
+          target_id: target.id,
           ...collectionTarget(target),
           window_name: target.windowName,
           pool_kind: target.poolKind ?? null,
-          default_collector_harness: target.defaultCollectorHarness,
           collector_id: target.collectorId,
         },
         input.env,
@@ -798,7 +690,7 @@ export async function refreshMachineWideQuotaObservations(input: {
       // best-effort per target: one surface's persist failure must not abort the whole fill.
     }
   }
-  return readMachineWideQuotaStatus(input.store, now);
+  return readMachineWideQuotaStatus(input.store, now, directory);
 }
 
 function readCachedJson(path: string): Data | undefined {
@@ -813,7 +705,11 @@ function readCachedJson(path: string): Data | undefined {
 }
 
 /** Synchronous cached-only reader for the existing synchronous orchestrator-context command. */
-export function readMachineWideQuotaStatusCached(home: string, now = new Date()): Data {
+export function readMachineWideQuotaStatusCached(
+  home: string,
+  now: Date,
+  directory: MachineQuotaDirectory,
+): Data {
   const quotaRoot = join(home, 'quota', 'v1');
   const projection = readCachedJson(join(quotaRoot, 'machine-wide', 'projection.json'));
   const homeSalt =
@@ -821,7 +717,7 @@ export function readMachineWideQuotaStatusCached(home: string, now = new Date())
       ? projection.home_salt
       : null;
   const readings: Data[] = [];
-  const decisions = TARGETS.map((target) => {
+  const decisions = directory.listTargets().map((target) => {
     let observation: Data | undefined;
     if (homeSalt) {
       const sourceDigest = createHash('sha256').update(sourceKey(target)).digest('hex');
@@ -874,12 +770,13 @@ export function projectMachineQuotaContextSummary(status: Data): Data | undefine
 
 export function readMachineWideQuotaContextSummaryCached(
   home: string,
-  now = new Date(),
+  now: Date,
+  directory: MachineQuotaDirectory,
 ): Data | undefined {
   const projection = readCachedJson(join(home, 'quota', 'v1', 'machine-wide', 'projection.json'));
   if (typeof projection?.home_salt !== 'string' || projection.home_salt.length === 0)
     return undefined;
-  return projectMachineQuotaContextSummary(readMachineWideQuotaStatusCached(home, now));
+  return projectMachineQuotaContextSummary(readMachineWideQuotaStatusCached(home, now, directory));
 }
 
 /**
@@ -887,14 +784,16 @@ export function readMachineWideQuotaContextSummaryCached(
  * source lock, fresh-TTL recheck, and atomic publication, so adjacent commands share one live read.
  */
 export async function readOrRefreshMachineQuotaSurfaceReading(input: {
-  surfaceId: string;
+  targetId: QuotaTargetId;
   env: Env;
   store: MachineQuotaStore;
   collectors: MachineQuotaCollectorBoundary;
+  directory: MachineQuotaDirectory;
   now?: Date;
 }): Promise<Data> {
-  const target = TARGETS.find((candidate) => candidate.surfaceId === input.surfaceId);
-  if (!target) throw new Error(`unsupported machine quota surface: ${input.surfaceId}`);
+  const directory = input.directory;
+  const target = directory.findTarget(input.targetId);
+  if (!target) throw new Error(`unsupported machine quota target: ${input.targetId}`);
   const now = input.now ?? new Date();
   const observation = await input.store.refreshObservation(
     { source_key: sourceKey(target), force: false },
@@ -903,10 +802,10 @@ export async function readOrRefreshMachineQuotaSurfaceReading(input: {
       try {
         collection = await input.collectors.collect(
           {
+            target_id: target.id,
             ...collectionTarget(target),
             window_name: target.windowName,
             pool_kind: target.poolKind ?? null,
-            default_collector_harness: target.defaultCollectorHarness,
             collector_id: target.collectorId,
           },
           input.env,
@@ -929,9 +828,11 @@ export async function refreshMachineWideQuota(input: {
   store: MachineQuotaStore;
   collectors: MachineQuotaCollectorBoundary;
   coordination: MachineQuotaCoordinationBoundary;
+  directory: MachineQuotaDirectory;
   now?: Date;
 }): Promise<Data> {
   const now = input.now ?? new Date();
+  const directory = input.directory;
   const collectors = input.collectors;
   let previousProjection = await input.store.readMachineProjection();
   let homeSalt =
@@ -954,15 +855,15 @@ export async function refreshMachineWideQuota(input: {
     };
   }
   const scopeResults: Data[] = [];
-  for (const target of TARGETS) {
+  for (const target of directory.listTargets()) {
     let collection: MachineQuotaCollection;
     try {
       collection = await collectors.collect(
         {
+          target_id: target.id,
           ...collectionTarget(target),
           window_name: target.windowName,
           pool_kind: target.poolKind ?? null,
-          default_collector_harness: target.defaultCollectorHarness,
           collector_id: target.collectorId,
         },
         input.env,
@@ -993,9 +894,9 @@ export async function refreshMachineWideQuota(input: {
     }
   }
 
-  const decisions = await decisionsFromStore(input.store, now, homeSalt);
+  const decisions = await decisionsFromStore(input.store, now, homeSalt, directory);
   const decisionsBySource = new Map(
-    TARGETS.map((target, index) => [sourceKey(target), decisions[index] as Data]),
+    directory.listTargets().map((target, index) => [sourceKey(target), decisions[index] as Data]),
   );
   const scopes = scopeResults.map((result) => {
     const decision = decisionsBySource.get(String(result.source_key));
