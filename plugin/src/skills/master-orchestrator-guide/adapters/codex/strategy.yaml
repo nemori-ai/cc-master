@@ -44,6 +44,7 @@ slot_replacements:
   "{{HANDOFF_REFERENCE_ROW}}": adapters/codex/overlays/handoff-reference-row.md
   "{{CROSS_HARNESS_WORKER_HELP_POINTER}}": adapters/codex/overlays/cross-harness-worker-help-pointer.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/codex/overlays/cross-harness-target-facts-pointer.md
+  "{{WORKFLOW_RUNTIME_SEMANTICS}}": adapters/codex/overlays/workflow-runtime-semantics.md
 notes:
   - Codex projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus Codex-verified dispatch and watchdog slots.
   - Verified in Codex CLI 0.142.5 and current Codex manual: subagents are explicit, codex exec resume is scriptable, codex cloud tasks are addressable, and app thread automations are app-side rather than a CLI CronCreate equivalent.

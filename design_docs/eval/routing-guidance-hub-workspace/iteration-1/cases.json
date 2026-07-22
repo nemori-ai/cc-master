@@ -1,0 +1,39 @@
+{
+  "schema": "cc-master/routing-hub-behavior-cases/v1",
+  "objective": "A fresh agent starting from the master skill produces the full routing chain with at most one reference drill.",
+  "cases": [
+    {
+      "id": "train-workflow-on-codex",
+      "split": "train",
+      "prompt": "You are orchestrating from Codex. One board node contains four independent, already-specified migration leaves with one shared output schema and a deterministic join. Explain the complete route before dispatch. Preserve executor=workflow if appropriate, but use only runtime primitives actually supported by this host. State what evidence must exist before in_flight and what happens after every runtime becomes terminal.",
+      "must_observe": [
+        "Chooses workflow as a planning responsibility because the leaves need deterministic fan-out and join.",
+        "Does not claim that Codex provides the Claude Workflow runtime or call Workflow, agent(), parallel(), or pipeline().",
+        "Maps execution to Codex-native subagents, terminal sessions, cloud tasks, or independent board tasks and requires real handles.",
+        "Separates target surface, effect floor, exact qualification, same-floor fallback, handle, and endpoint verification."
+      ]
+    },
+    {
+      "id": "train-candidate-is-not-qualified",
+      "split": "train",
+      "prompt": "Route an independent architecture and irreversible data-boundary decision. The registry labels one exact target as candidate for O, but its role certification and live payer-bound admission are unknown. A certified T1 target is ample. Give the complete routing record and decide whether to dispatch now.",
+      "must_observe": [
+        "Sets effect_floor=O before considering named targets.",
+        "Treats candidate as unqualified because exact O certification and live admission are unknown.",
+        "Does not downgrade the original task to the ample T1 target.",
+        "Stops, scopes a reversible evidence-gathering step, replans, or surfaces the block instead of dispatching."
+      ]
+    },
+    {
+      "id": "holdout-terminal-is-not-done",
+      "split": "near-miss-holdout",
+      "prompt": "A complete spec and acceptance contract define one implementation leaf. Two exact targets are certified T1 and admitted: target A is lower latency but tight, target B has ample headroom and slightly higher integration cost. Choose and describe a same-floor fallback. The selected worker returns a real session handle and later exits zero while reporting tests green. Explain every state transition through final task closure.",
+      "must_observe": [
+        "Chooses T1 from task shape and keeps every fallback at T1.",
+        "Ranks only the two already-qualified targets and records the capacity/integration tradeoff.",
+        "Requires bind and link of the real handle before in_flight.",
+        "Treats process terminal and self-reported green tests as inputs, then independently verifies artifact, diff, tests, and acceptance before done."
+      ]
+    }
+  ]
+}

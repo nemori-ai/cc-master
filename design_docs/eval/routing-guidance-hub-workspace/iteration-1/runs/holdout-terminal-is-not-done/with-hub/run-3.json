@@ -1,0 +1,13 @@
+{
+  "case_id": "holdout-terminal-is-not-done",
+  "arm": "with-hub",
+  "source_agent_id": "agt-054",
+  "record_kind": "normalized_capture",
+  "normalization": "Removed markdown fencing and condensed the state-transition appendix without changing opened files, routing fields, decisions, or evidence claims.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md"
+  ],
+  "answer": "task_shape=terminal-leaf: complete spec and acceptance define one independently verifiable implementation leaf; executor=subagent; target_surface=exact admitted certified-T1 target A as primary; effect_floor=T1 solely because this is specified implementation rather than architecture or mechanical extraction, with acceptance bounding implementation-error risk; qualification=A and B must each pass same-freshness role, admission, capacity, execution-boundary, and traceability gates, and unknown/stale/deny fails closed; ranked_fallback=A first for lower latency while current tight capacity remains valid, then qualified same-floor B for more headroom at slightly higher integration cost; runtime_handle=real recon-able session handle must be returned, bound, and linked before in_flight; endpoint_verdict=exit zero and self-reported green only terminalize the runtime agent while the task stays active, then the orchestrator independently verifies artifact, diff, tests, acceptance, and content hash before done/verified, otherwise retry or replan."
+}

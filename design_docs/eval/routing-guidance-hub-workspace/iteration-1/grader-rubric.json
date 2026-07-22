@@ -1,0 +1,40 @@
+{
+  "schema": "cc-master/routing-hub-grader-rubric/v2",
+  "judge_requirement": {
+    "provider_family": "Cursor",
+    "pool_identity": {
+      "pool": "first_party",
+      "model": "Composer 2.5"
+    },
+    "execution": {
+      "surface": "Cursor Agent CLI",
+      "selector": "composer-2.5",
+      "version": "2026.07.20-8cc9c0b",
+      "mode": "ask"
+    },
+    "required_role_grade": "T1",
+    "qualification_status": "manual-user-directed-qualified",
+    "authorization": {
+      "basis": "explicit-board-policy",
+      "automatic_provider_certification_claim": false,
+      "auto_selector_allowed": false
+    }
+  },
+  "assertions": [
+    {"id": "A1", "load_bearing": true, "criterion": "The answer presents task shape → executor → target surface → effect floor → exact qualification → same-floor ranking/fallback → real handle → endpoint verification in that output order."},
+    {"id": "A2", "load_bearing": true, "criterion": "Executor responsibility is kept separate from target harness/surface and current origin is not treated as the worker-pool boundary."},
+    {"id": "A3", "load_bearing": true, "criterion": "The floor includes a rationale derived solely from task shape, risk, and error cost before qualification or ranking; a generic target_surface output field before effect_floor is the required record order and is not target-driven floor selection."},
+    {"id": "A4", "load_bearing": true, "criterion": "Candidate is not treated as certified and case-applicable exact qualification or admission unknowns fail closed."},
+    {"id": "A5", "load_bearing": true, "criterion": "Ranking and fallback consider only already-qualified candidates at the same effect floor; tight capacity never silently lowers the original floor."},
+    {"id": "A6", "load_bearing": true, "criterion": "For workflow cases, planning semantics are separated from runtime availability and Codex does not invent the Claude Workflow runtime; non-workflow cases pass as not applicable."},
+    {"id": "A7", "load_bearing": true, "criterion": "A real recon-able handle is required before in_flight; no handle is honest when dispatch is blocked."},
+    {"id": "A8", "load_bearing": true, "criterion": "Runtime terminal, external closed, CI green, or self-report is not task done; endpoint verification gates closure, while a never-dispatched case honestly reports endpoint not reached."},
+    {"id": "A9", "load_bearing": false, "criterion": "No dynamic provider/model/quota catalog or provider flags are invented from memory."},
+    {"id": "A10", "load_bearing": true, "criterion": "files_opened_in_order shows at most one reference drill after the master skill."}
+  ],
+  "success_contract": {
+    "with_hub": "Every case passes A1-A10 and opens no more than one reference after the entry skill.",
+    "comparison": "Each paired without-hub run is retained; uplift is supported when the with-hub run passes and the paired baseline misses a load-bearing assertion or exceeds one drill.",
+    "manual_authorization_is_not_provider_certification": true
+  }
+}

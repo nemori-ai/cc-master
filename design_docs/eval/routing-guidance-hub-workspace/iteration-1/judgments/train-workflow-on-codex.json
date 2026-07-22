@@ -1,0 +1,23 @@
+{
+  "case_id": "train-workflow-on-codex",
+  "source_agent_id": "agt-064",
+  "record_kind": "normalized_judgment",
+  "prompt_contract_revision": "fair-final-v1",
+  "blind_mapping_after_judgment": {"answer-1": "with-hub", "answer-2": "without-hub"},
+  "answers": [
+    {
+      "label": "answer-1",
+      "verdict": "pass",
+      "passed": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
+      "reference_drills": 1,
+      "evidence": "Ordered eight-field record; workflow planning stays separate from Codex-native runtime; shape-derived T1, fail-closed qualification, real-handle gate, join and endpoint verification all pass without dynamic facts."
+    },
+    {
+      "label": "answer-2",
+      "verdict": "fail",
+      "failed": ["A9", "A10"],
+      "reference_drills": 2,
+      "evidence": "Fair-prompt baseline reconstructs the chain but asserts exact provider flags, Codex seven-day quota and session-id extraction without live evidence, and opens two references."
+    }
+  ]
+}

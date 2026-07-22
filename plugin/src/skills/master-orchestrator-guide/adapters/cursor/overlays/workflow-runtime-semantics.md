@@ -1,0 +1,1 @@
+当前 Cursor adapter **不支持 Claude Code Workflow runtime**。你仍可用 `executor=workflow` 表达结构化多叶的 planning 责任，但发车时要把叶子映射成 Cursor Task、后台 Shell 或独立 board tasks，并分别记录真实 handle；不要调用或声称调用 `Workflow`、`agent()`、`parallel()`、`pipeline()`。

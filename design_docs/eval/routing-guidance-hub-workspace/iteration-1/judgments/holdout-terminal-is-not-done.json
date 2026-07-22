@@ -1,0 +1,23 @@
+{
+  "case_id": "holdout-terminal-is-not-done",
+  "source_agent_id": "agt-066",
+  "record_kind": "normalized_judgment",
+  "prompt_contract_revision": "fair-final-v1",
+  "blind_mapping_after_judgment": {"answer-1": "with-hub", "answer-2": "without-hub"},
+  "answers": [
+    {
+      "label": "answer-1",
+      "verdict": "pass",
+      "passed": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
+      "reference_drills": 1,
+      "evidence": "Latest answer emits all fields in order, derives T1 from specified implementation, ranks A then same-floor B, requires bind/link, terminalizes runtime and gates done on independent endpoint verification."
+    },
+    {
+      "label": "answer-2",
+      "verdict": "fail",
+      "failed": ["A8", "A10"],
+      "reference_drills": 4,
+      "evidence": "Fair-prompt baseline retains an internal contradiction on agent terminalization relative to endpoint verification and opens four references across master and pacing skills."
+    }
+  ]
+}

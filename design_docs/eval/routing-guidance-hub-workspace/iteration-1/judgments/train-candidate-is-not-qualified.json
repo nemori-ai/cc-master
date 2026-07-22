@@ -1,0 +1,23 @@
+{
+  "case_id": "train-candidate-is-not-qualified",
+  "source_agent_id": "agt-063",
+  "record_kind": "normalized_judgment",
+  "prompt_contract_revision": "fair-final-v1",
+  "blind_mapping_after_judgment": {"answer-1": "without-hub", "answer-2": "with-hub"},
+  "answers": [
+    {
+      "label": "answer-1",
+      "verdict": "fail",
+      "failed": ["A5", "A10"],
+      "reference_drills": 4,
+      "evidence": "Fair-prompt baseline fails closed but places a rejected unqualified O candidate inside ranked_fallback and opens four references."
+    },
+    {
+      "label": "answer-2",
+      "verdict": "pass",
+      "passed": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
+      "reference_drills": 1,
+      "evidence": "Latest answer derives O from architecture/irreversibility, treats candidate and unknown admission as insufficient, leaves fallback empty, and honestly records no handle or endpoint."
+    }
+  ]
+}
