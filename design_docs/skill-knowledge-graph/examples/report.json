@@ -32,7 +32,7 @@
     "graph_invariants": true,
     "runtime_projection": true,
     "hop_analysis": true,
-    "typed_change_transactions": false,
+    "typed_change_transactions": true,
     "entry_surface_binding": true,
     "canonical_source_inventory": true,
     "derived_freshness": true,

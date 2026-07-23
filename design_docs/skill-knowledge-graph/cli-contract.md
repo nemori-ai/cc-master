@@ -38,9 +38,9 @@ node scripts/skill-knowledge.mjs <command> [options]
 | `report [--format json\|markdown] [--host <host>] [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=report`；分轨 `structural_status` / `behavioral_evidence_status`；含 graph hash、counts、witness、remediation。`--host` 仍 exit 10 |
 | `path --from <id> --to <id> --host <host> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=path`；在 **authored navigation plane**（`runtime.enabled_by_default`）上 BFS；对不存在 / 歧义 / 不可达 fail closed，带 shortest-path witness |
 | `explain <id-or-code> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=explain`；解释 entity 或 diagnostic code；歧义 / 缺失 fail closed |
-| `change begin\|validate\|apply` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `change begin\|validate\|apply` | implemented-k1 | ignored candidate workspace 中的 typed change transaction；`begin → validate → apply` fail-closed 事务链 |
 
-`change` / `check --host|--base` / `report --host` 仍为 declared-unavailable。K1 pilot 的 authored `path`/`hop_analysis` **不替代** final-host H1–H4（那由 `compile` + `runtime_projection=true` 证明）。
+`check --host|--base` / `report --host` 仍为 declared-unavailable。K1 pilot 的 authored `path`/`hop_analysis` **不替代** final-host H1–H4（那由 `compile` + `runtime_projection=true` 证明）。
 
 ## 2. JSON envelope
 
@@ -64,20 +64,22 @@ node scripts/skill-knowledge.mjs <command> [options]
 {
   "schema": "cc-master/skill-knowledge-cli/v1alpha1",
   "ok": false,
-  "command": "change",
+  "command": "check",
   "result_kind": "diagnostic",
   "contract_version": "v1alpha1",
   "diagnostics": [
     {
       "severity": "error",
       "code": "SKG-CAPABILITY-NOT-IMPLEMENTED",
-      "message": "change is declared but not implemented in K1 pilot",
+      "message": "check --host is declared but not implemented in K1 pilot",
       "location": "scripts/skill-knowledge.mjs",
       "witness": {
-        "command": "change",
+        "command": "check",
+        "option": "--host",
+        "value": "codex",
         "stage": "K1"
       },
-      "remediation": "Implement the next admitted slice; do not treat this command as successful."
+      "remediation": "Omit --host/--base until changed-scope / host portability slices land; do not treat this option as successful."
     }
   ]
 }
@@ -157,7 +159,7 @@ JSON 结果必须包含：
   "graph_invariants": true,
   "runtime_projection": true,
   "hop_analysis": true,
-  "typed_change_transactions": false,
+  "typed_change_transactions": true,
   "entry_surface_binding": true,
   "canonical_source_inventory": true,
   "derived_freshness": true,
@@ -189,7 +191,6 @@ verifier 在真实 link/anchor 上证明。authored `path` 仍只覆盖 authored
 仍为 `false`、留给后续切片的 capability：
 
 - `behavioral_evidence_tracking`
-- `typed_change_transactions`
 
 ## 4. K0 `check`
 
@@ -256,7 +257,7 @@ loud、exit 10，不把 envelope check 冒充 full validation。
     "graph_invariants": true,
     "runtime_projection": true,
     "hop_analysis": true,
-    "typed_change_transactions": false,
+    "typed_change_transactions": true,
     "entry_surface_binding": true,
     "canonical_source_inventory": true,
     "derived_freshness": true,
@@ -293,8 +294,8 @@ loud、exit 10，不把 envelope check 冒充 full validation。
 `change begin --op <type> --scope <path...> --base <git-ref>` 创建 ignored workspace，并冻结 resolved
 base ref、base graph hash 与 scope file hashes。agent 只编辑 `candidate/`。
 
-`change validate <workspace>` 必须对完整 candidate graph 与四 host projection 验证，计算 result graph
-hash、deterministic semantic diff 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
+`change validate <workspace>` 必须对完整 candidate graph 的 schema、marker/binding、membership、authority、admission、edge endpoint、inventory freshness 与 typed-operation precondition 验证，计算 result graph
+hash 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
 全部通过才产生 `candidate_valid: true`。
 
 `change apply <workspace>` 必须重验 accepted scope 后全有或全无写入；成功写入后才 finalized immutable

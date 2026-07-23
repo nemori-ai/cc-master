@@ -60,6 +60,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.result_kind, 'contract');
   assert.equal(body.contract_version, 'v1alpha1');
   assert.deepEqual(body.implemented_commands, [
+    'change',
     'check',
     'compile',
     'contract',
@@ -108,7 +109,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
   assert.equal(body.capabilities.hop_analysis, true);
   assert.equal(body.capabilities.runtime_projection, true);
-  assert.equal(body.capabilities.typed_change_transactions, false);
+  assert.equal(body.capabilities.typed_change_transactions, true);
   assert.deepEqual(Object.keys(body.hardening_contract),
     Array.from({ length: 14 }, (_, index) => `C${index + 1}`));
   assert.deepEqual(body.hardening_contract.C5.change_workflow, ['begin', 'validate', 'apply']);
@@ -231,15 +232,7 @@ test('SKG-CLI-06: K1 with envelope-only source fails full schema validation loud
     );
   }));
 
-test('SKG-CLI-07: change and unavailable check options still fail closed with exit 10', () => {
-  const change = runCli(['change', '--json']);
-  assert.equal(change.status, 10, `change: ${change.stderr}`);
-  const changeBody = parseJson(change);
-  assert.equal(changeBody.ok, false);
-  assert.equal(changeBody.command, 'change');
-  assert.equal(changeBody.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
-  assert.equal(changeBody.diagnostics[0].witness.command, 'change');
-
+test('SKG-CLI-07: only undelivered check/report options fail closed with exit 10', () => {
   for (const [option, value] of [
     ['--host', 'codex'],
     ['--base', 'HEAD^'],
@@ -259,6 +252,12 @@ test('SKG-CLI-07: change and unavailable check options still fail closed with ex
     assert.equal(body.diagnostics[0].witness.option, option);
     assert.equal(body.diagnostics[0].witness.value, value);
   }
+
+  const reportHost = runCli(['report', '--host', 'codex', '--json']);
+  assert.equal(reportHost.status, 10, `report --host: ${reportHost.stdout}`);
+  const reportBody = parseJson(reportHost);
+  assert.equal(reportBody.ok, false);
+  assert.equal(reportBody.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
 });
 
 test('SKG-CLI-08: usage errors are nonzero and machine-readable', () => {
@@ -606,7 +605,7 @@ test('SKG-DOC-01: K0 check success sample uses the executable capability map', (
   );
 });
 
-test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay truthful about K1', () => {
+test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/src/AGENTS stay truthful about K1', () => {
   const knowledgeContract = fs.readFileSync(
     path.join(repoRoot, 'plugin', 'src', 'knowledge', 'CONTRACT.md'),
     'utf8',
@@ -618,6 +617,10 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
   );
   const cliContract = fs.readFileSync(
     path.join(repoRoot, 'design_docs', 'skill-knowledge-graph', 'cli-contract.md'),
+    'utf8',
+  );
+  const pluginSrcAgents = fs.readFileSync(
+    path.join(repoRoot, 'plugin', 'src', 'AGENTS.md'),
     'utf8',
   );
 
@@ -662,7 +665,7 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
     /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
     'README must state real inventory is 3 modules / 9 points',
   );
-  for (const command of ['check', 'contract', 'compile', 'report', 'path', 'explain']) {
+  for (const command of ['change', 'check', 'contract', 'compile', 'report', 'path', 'explain']) {
     assert.match(
       designReadme,
       new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
@@ -671,18 +674,33 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
   }
   assert.match(
     designReadme,
-    /(check|contract|compile|report|path|explain)[\s\S]{0,200}(已实现|implemented)/i,
-    'README must state check/contract/compile/report/path/explain are implemented',
+    /(check|contract|compile|change|report|path|explain)[\s\S]{0,220}(已实现|implemented)/i,
+    'README must state check/contract/compile/change/report/path/explain are implemented',
   );
   assert.match(
     designReadme,
-    /`?change`?[\s\S]{0,160}exit\s*10/i,
-    'README must keep change as exit 10',
+    /typed\s+change\s+transactions[\s\S]{0,180}(已交付|implemented|begin\s*→\s*validate\s*→\s*apply)/i,
+    'README must state typed change transactions are implemented rather than declared unavailable',
+  );
+  assert.match(
+    designReadme,
+    /runtime_projection[\s\S]{0,40}true|compile[\s\S]{0,80}(已实现|implemented)/i,
+    'README must state runtime_projection/compile is delivered',
   );
   assert.doesNotMatch(
     designReadme,
     /`?compile`?[\s\S]{0,80}`?change`?[\s\S]{0,80}exit\s*10/,
     'must not keep compile bundled with change as exit 10',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /`?change`?[\s\S]{0,40}exit\s*10/i,
+    'must not keep change itself as exit 10 after typed transactions landed',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /`?compile`?[\s\S]{0,40}exit\s*10/i,
+    'must not keep compile itself as exit 10 after runtime projection landed',
   );
   assert.match(
     designReadme,
@@ -767,6 +785,75 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
     documentedFailure.diagnostics[0].witness.stage,
     'K1',
     'unavailable sample witness.stage must be K1',
+  );
+
+  // plugin/src/AGENTS.md: directory nav + maintainer discipline only (no runtime methodology dump).
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /当前\s*K0\s*只落\s*CONTRACT\s*骨架/i,
+    'plugin/src/AGENTS.md must not claim knowledge/ is still K0 CONTRACT-only skeleton',
+  );
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /只允许\s*K0\s*`?check`?/i,
+    'plugin/src/AGENTS.md must not claim only K0 check is allowed',
+  );
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /不代表\s*inventory\/coverage\s*已完成|inventory\s+有意为空|为空\s*inventory/i,
+    'plugin/src/AGENTS.md must not claim inventory is incomplete or intentionally empty',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /K1\s+pilot/i,
+    'plugin/src/AGENTS.md must state current knowledge maturity is K1 pilot',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
+    'plugin/src/AGENTS.md must state authored inventory is 3 modules / 9 points',
+  );
+  for (const command of ['change', 'check', 'compile', 'contract', 'explain', 'path', 'report']) {
+    assert.match(
+      pluginSrcAgents,
+      new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
+      `plugin/src/AGENTS.md must mention implemented command ${command}`,
+    );
+  }
+  assert.match(
+    pluginSrcAgents,
+    /(change|check|compile|contract|explain|path|report)[\s\S]{0,220}(已实现|implemented)/i,
+    'plugin/src/AGENTS.md must state change/check/compile/contract/explain/path/report are implemented',
+  );
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /`?compile`?[\s\S]{0,40}exit\s*10/i,
+    'plugin/src/AGENTS.md must not keep compile as exit 10',
+  );
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /`?change`?[\s\S]{0,40}exit\s*10/i,
+    'plugin/src/AGENTS.md must not keep change as exit 10',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /(check\s+--host|--host|--base)[\s\S]{0,160}exit\s*10/i,
+    'plugin/src/AGENTS.md must keep check --host/--base as exit 10',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /report\s+--host[\s\S]{0,120}exit\s*10/i,
+    'plugin/src/AGENTS.md must keep report --host as exit 10',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /四\s*host[\s\S]{0,120}(fixture\s+)?probe[\s\S]{0,120}(已|交付|landed|delivered)/i,
+    'plugin/src/AGENTS.md must state four-host fixture probe is delivered',
+  );
+  assert.match(
+    pluginSrcAgents,
+    /(不等于|≠|not\s+(equal|the\s+same|equivalent)|probe[\s\S]{0,80}≠)[\s\S]{0,120}(CLI|check\s+--host|host\s+integration)/i,
+    'plugin/src/AGENTS.md must distinguish fixture probe from CLI host integration',
   );
 });
 

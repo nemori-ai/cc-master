@@ -5,6 +5,7 @@ export const CHANGE_SCHEMA_VERSION = 'cc-master/skill-knowledge-change/v1alpha1'
 export const DEFAULT_SOURCE_ROOT = 'plugin/src/knowledge';
 
 export const IMPLEMENTED_COMMANDS = Object.freeze([
+  'change',
   'check',
   'compile',
   'contract',
@@ -164,7 +165,7 @@ export const CAPABILITIES = Object.freeze({
   graph_invariants: true,
   runtime_projection: true,
   hop_analysis: true,
-  typed_change_transactions: false,
+  typed_change_transactions: true,
   entry_surface_binding: true,
   canonical_source_inventory: true,
   derived_freshness: true,

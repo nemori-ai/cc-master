@@ -213,16 +213,16 @@ function snapshotPointNavSnippets(host) {
   return snippets;
 }
 
-test('SKG-COMPILE-01: contract flips runtime_projection and lists compile as implemented', () => {
+test('SKG-COMPILE-01: contract flips runtime_projection and lists compile+change as implemented', () => {
   const body = parseJson(runCli(['contract', '--json']));
   assertValidCliOutput(body, 'contract');
   assert.equal(body.capabilities.runtime_projection, true);
   assert.equal(body.capabilities.host_portability_probe, true);
-  assert.equal(body.capabilities.typed_change_transactions, false);
+  assert.equal(body.capabilities.typed_change_transactions, true);
   assert.ok(body.implemented_commands.includes('compile'));
   assert.ok(body.declared_commands.includes('compile'));
   assert.ok(body.declared_commands.includes('change'));
-  assert.equal(body.implemented_commands.includes('change'), false);
+  assert.ok(body.implemented_commands.includes('change'));
 });
 
 test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves host-native entry/token divergence', async () => {
@@ -494,7 +494,7 @@ test('SKG-COMPILE-05: broken link / malformed / duplicate / path-token / drift m
   });
 });
 
-test('SKG-COMPILE-06: per-host compile and unknown host / change remain honest', () => {
+test('SKG-COMPILE-06: per-host compile and unknown host / check --host remain honest', () => {
   const one = parseJson(runCli(['compile', '--host', 'codex', '--json']));
   assert.equal(one.ok, true);
   assert.deepEqual(one.hosts, ['codex']);
@@ -504,11 +504,9 @@ test('SKG-COMPILE-06: per-host compile and unknown host / change remain honest',
   assert.equal(unknown.ok, false);
   assert.equal(unknown.diagnostics[0].code, 'SKG-HOST-UNKNOWN');
 
-  const changeResult = runCli(['change', '--json']);
-  assert.equal(changeResult.status, 10);
-  const change = parseJson(changeResult);
-  assert.equal(change.ok, false);
-  assert.equal(change.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
+  const changeUsage = runCli(['change', '--json']);
+  assert.equal(changeUsage.status, 2, 'bare change is usage, not capability-unavailable');
+  assert.equal(parseJson(changeUsage).diagnostics[0].code, 'SKG-USAGE');
 
   const checkHost = runCli(['check', '--host', 'codex', '--json']);
   assert.equal(checkHost.status, 10);
@@ -536,7 +534,7 @@ test('SKG-COMPILE-07: sync-plugin-dist post-pass keeps knowledge in package allo
   );
 });
 
-test('SKG-COMPILE-08: docs lockstep — compile delivered; change / check --host still exit 10', () => {
+test('SKG-COMPILE-08: docs lockstep — compile+change delivered; check --host still exit 10', () => {
   const knowledgeContract = fs.readFileSync(
     path.join(repoRoot, 'plugin/src/knowledge/CONTRACT.md'),
     'utf8',
@@ -555,12 +553,20 @@ test('SKG-COMPILE-08: docs lockstep — compile delivered; change / check --host
   );
 
   assert.match(knowledgeContract, /runtime_projection[\s\S]{0,80}true|compile[\s\S]{0,80}(已|implemented)/i);
-  assert.match(knowledgeContract, /`?change`?[\s\S]{0,120}exit\s*10/i);
+  assert.match(
+    knowledgeContract,
+    /typed_change_transactions[\s\S]{0,40}true|change begin[\s\S]{0,80}validate[\s\S]{0,80}apply/i,
+  );
   assert.match(knowledgeContract, /(check\s+--host|--host)[\s\S]{0,120}exit\s*10/i);
+  assert.doesNotMatch(knowledgeContract, /Still declared-unavailable[\s\S]{0,40}`change`/i);
+  assert.doesNotMatch(knowledgeContract, /Still declared-unavailable[\s\S]{0,40}`compile`/i);
 
   assert.match(designReadme, /`?compile`?[\s\S]{0,160}(已实现|implemented)/i);
   assert.match(designReadme, /runtime_projection[\s\S]{0,40}true/i);
-  assert.match(designReadme, /`?change`?[\s\S]{0,120}exit\s*10/i);
+  assert.match(
+    designReadme,
+    /typed\s+change\s+transactions[\s\S]{0,180}(已交付|implemented|begin\s*→\s*validate\s*→\s*apply)/i,
+  );
   assert.doesNotMatch(
     designReadme,
     /`?compile`?[\s\S]{0,80}`?change`?[\s\S]{0,80}exit\s*10/,
@@ -569,9 +575,12 @@ test('SKG-COMPILE-08: docs lockstep — compile delivered; change / check --host
 
   assert.match(cliContract, /`compile`[\s\S]{0,80}implemented|compile.*implemented-k1/i);
   assert.match(cliContract, /runtime_projection": true/);
-  assert.match(cliContract, /`?change`?[\s\S]{0,120}exit\s*10/i);
+  assert.match(cliContract, /typed_change_transactions": true/);
+  assert.match(cliContract, /`change begin\\|validate\\|apply`[\s\S]{0,40}implemented-k1/);
+  assert.match(cliContract, /(check\s+--host|--host|--base)[\s\S]{0,120}exit\s*10|declared-unavailable/i);
 
   assert.match(specification, /runtime_projection[\s\S]{0,40}true|compile[\s\S]{0,80}已实现/i);
+  assert.match(specification, /typed_change_transactions[\s\S]{0,40}true|typed `change`/i);
 });
 
 test('SKG-COMPILE-09: wrong-file point anchor placement fails binding verification (bypass diffArtifacts)', async () => {
