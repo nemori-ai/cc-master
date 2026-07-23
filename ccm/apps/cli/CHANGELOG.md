@@ -1,5 +1,22 @@
 # ccm
 
+## 0.22.1
+
+> **Accurate cross-harness agent-stream attribution and native-subagent discovery.** This patch release is paired with cc-master plugin `v0.21.1`.
+
+### Fixes
+
+- **Actionable no-source diagnostics** — stream responses now distinguish a missing transcript/session binding from an unsupported harness. Claude Code, Codex, and Kimi Code records point to `ccm worker dispatch` or an explicit `agent amend` binding; Cursor explains that native `state.vscdb` is not tail-able and points to an external transcript path.
+- **Host-correct native-subagent discovery** — Claude Code resolves `subagents/agent-<agentId>.jsonl` from the parent session JSONL, while Kimi Code resolves `agents/<agentId>/wire.jsonl` from `agents/main/wire.jsonl` and parses its typed wire events.
+- **No parent-event leakage** — when a derived child transcript does not exist yet, the stream remains honestly unavailable instead of falling back to the parent transcript and attributing orchestrator/main events to the child.
+- **Web Viewer fallback clarity** — the agent inspector mirrors the server-side reason and recovery path instead of reporting every unbound source as an unsupported agent type.
+- **Concurrent bootstrap recovery on macOS** — two cold activations can now reclaim the same dead native-materializer bootstrap without the losing reclaimer treating the winner's exact `1 → 0` unlink transition as tampering. Any inode, size, mode, owner, flags, or modification-time change still fails closed.
+
+### Compatibility
+
+- `ccm` and `@ccm/engine` remain version-locked at `0.22.1`; this release does not change the board schema or engine API.
+- Existing explicit readable `transcript_ref` and `session-id` bindings remain compatible. Native parent-to-child derivation is enabled only for empirically verified Claude Code and Kimi Code layouts; Codex and Cursor remain fail-closed when no exact child source is known.
+
 ## 0.22.0
 
 > **Deadline-aware four-harness execution, tracked dispatch, and live agent observability.** This is the stable CLI/engine release paired with cc-master plugin `v0.21.0`.
