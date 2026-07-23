@@ -154,7 +154,7 @@ package_one() {
   else
     include_dirs=( .codex-plugin "${include_dirs[@]}" )
   fi
-  local include_files=( README.md README_zh.md CHANGELOG.md LICENSE )
+  local include_files=( README.md README_zh.md CHANGELOG.md LICENSE LICENSING.md TRADEMARKS.md )
 
   log "host: ${host}"
   for d in "${include_dirs[@]}"; do

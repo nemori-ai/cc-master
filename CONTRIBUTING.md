@@ -175,3 +175,15 @@ opening a PR; a PR that violates one will be sent back.
 
 Use the issue templates under `.github/ISSUE_TEMPLATE/`. For anything security-
 sensitive, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+
+## Contribution license
+
+Unless the maintainers agree otherwise in writing, any contribution submitted to
+this repository is offered under the project's current
+[PolyForm Noncommercial License 1.0.0](LICENSE). By submitting a contribution,
+you represent that you have the right to do so and agree that the contribution
+may be distributed under those terms. This does not transfer your copyright.
+
+除非维护者另行书面同意，提交到本仓库的贡献均按项目当前的
+[PolyForm Noncommercial License 1.0.0](LICENSE) 提供。提交贡献即表示你有权提供该贡献，
+并同意项目按该协议分发。该约定不转让你的著作权。

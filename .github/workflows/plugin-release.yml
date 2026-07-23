@@ -70,6 +70,9 @@ jobs:
         run: |
           DEST="$(mktemp -d)"
           unzip -q "dist/cc-master-plugin-claude-code-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
+          test -f "${DEST}/cc-master/LICENSE"
+          test -f "${DEST}/cc-master/LICENSING.md"
+          test -f "${DEST}/cc-master/TRADEMARKS.md"
           claude plugin validate "${DEST}/cc-master"
 
       - name: Validate Codex packaged adapter
@@ -79,6 +82,9 @@ jobs:
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/hooks"
           test -f "${DEST}/cc-master/.codex-plugin/plugin.json"
+          test -f "${DEST}/cc-master/LICENSE"
+          test -f "${DEST}/cc-master/LICENSING.md"
+          test -f "${DEST}/cc-master/TRADEMARKS.md"
 
       - name: Validate Cursor packaged adapter
         run: |
@@ -88,6 +94,9 @@ jobs:
           test -d "${DEST}/cc-master/hooks"
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/rules"
+          test -f "${DEST}/cc-master/LICENSE"
+          test -f "${DEST}/cc-master/LICENSING.md"
+          test -f "${DEST}/cc-master/TRADEMARKS.md"
 
       # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ dir; commands and
       # hooks both project host-native. Because the manifest registers hook commands inline, hooks/
@@ -100,6 +109,9 @@ jobs:
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/commands"
           test -d "${DEST}/cc-master/hooks"
+          test -f "${DEST}/cc-master/LICENSE"
+          test -f "${DEST}/cc-master/LICENSING.md"
+          test -f "${DEST}/cc-master/TRADEMARKS.md"
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact

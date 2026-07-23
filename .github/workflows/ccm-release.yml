@@ -161,6 +161,16 @@ jobs:
           path: dist/SHA256SUMS
           if-no-files-found: error
 
+      - name: Upload license documents artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccm-license-documents
+          path: |
+            LICENSE
+            LICENSING.md
+            TRADEMARKS.md
+          if-no-files-found: error
+
       - name: Plan GitHub release metadata
         id: release_meta
         if: startsWith(github.ref, 'refs/tags/')
@@ -170,11 +180,15 @@ jobs:
           --repository "${GITHUB_REPOSITORY}"
           --github-output "${GITHUB_OUTPUT}"
 
-      - name: Attach checksums to GitHub release
+      - name: Attach checksums and license documents to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.release_meta.outputs.title }}
           prerelease: ${{ steps.release_meta.outputs.prerelease }}
           body: ${{ steps.release_meta.outputs.body }}
-          files: dist/SHA256SUMS
+          files: |
+            dist/SHA256SUMS
+            LICENSE
+            LICENSING.md
+            TRADEMARKS.md

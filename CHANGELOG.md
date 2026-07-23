@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the MIT license for new revisions with the
+  [PolyForm Noncommercial License 1.0.0](LICENSE). The project is now
+  source-available for noncommercial use; the public license does not permit
+  commercial use, repackaging for sale, or adoption as a for-profit product.
+- Added bilingual licensing guidance and a name/trademark policy; synchronized
+  all plugin and ccm package metadata; and made plugin archives and ccm releases
+  distribute the applicable license documents. Previously published MIT
+  revisions retain their original rights.
+
 ## [0.21.1] — 2026-07-23
 
 > **Cross-harness transcript integrity and macOS installer compatibility** — patch release paired with **ccm-v0.22.1**; upgrade `ccm` first.
