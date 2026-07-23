@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json",
+  "title": "cc-master skill knowledge CLI output",
+  "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "command",
+    "result_kind",
+    "contract_version"
+  ],
+  "properties": {
+    "schema": {
+      "const": "cc-master/skill-knowledge-cli/v1alpha1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result_kind": {
+      "enum": [
+        "contract",
+        "check",
+        "diagnostic"
+      ]
+    },
+    "contract_version": {
+      "const": "v1alpha1"
+    },
+    "implemented_commands": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "declared_commands": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "operations": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "planes": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "invariants": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "exit_codes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "change",
+        "output",
+        "cli"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "change": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "output": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "cli": {
+          "$ref": "#/$defs/repoPath"
+        }
+      }
+    },
+    "source_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "portfolio",
+        "changes",
+        "skills"
+      ],
+      "properties": {
+        "root": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "portfolio": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "changes": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "skills": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stage": {
+      "enum": [
+        "K0",
+        "K1",
+        "K2",
+        "K3"
+      ]
+    },
+    "source_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/capabilities"
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "contract"
+          },
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "result_kind",
+          "ok"
+        ]
+      },
+      "then": {
+        "required": [
+          "implemented_commands",
+          "declared_commands",
+          "operations",
+          "planes",
+          "invariants",
+          "exit_codes",
+          "schemas",
+          "source_layout",
+          "capabilities"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "check"
+          }
+        },
+        "required": [
+          "result_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "stage",
+          "source_root",
+          "summary",
+          "capabilities",
+          "diagnostics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ok": {
+            "const": false
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "then": {
+        "required": [
+          "diagnostics"
+        ],
+        "properties": {
+          "diagnostics": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._<>/-]+$"
+    },
+    "stringSet": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_json_parse",
+        "source_envelope_validation",
+        "global_id_uniqueness",
+        "full_json_schema_validation",
+        "markdown_binding",
+        "graph_invariants",
+        "runtime_projection",
+        "hop_analysis",
+        "typed_change_transactions"
+      ],
+      "properties": {
+        "source_json_parse": {
+          "type": "boolean"
+        },
+        "source_envelope_validation": {
+          "type": "boolean"
+        },
+        "global_id_uniqueness": {
+          "type": "boolean"
+        },
+        "full_json_schema_validation": {
+          "type": "boolean"
+        },
+        "markdown_binding": {
+          "type": "boolean"
+        },
+        "graph_invariants": {
+          "type": "boolean"
+        },
+        "runtime_projection": {
+          "type": "boolean"
+        },
+        "hop_analysis": {
+          "type": "boolean"
+        },
+        "typed_change_transactions": {
+          "type": "boolean"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documents",
+        "portfolio",
+        "skill",
+        "module",
+        "change",
+        "errors",
+        "debts"
+      ],
+      "properties": {
+        "documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "portfolio": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skill": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "module": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "change": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "debts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "location",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "debt",
+            "info"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^SKG-[A-Z0-9-]+$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness": {
+          "type": "object"
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

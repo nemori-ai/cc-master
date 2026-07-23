@@ -1,0 +1,31 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:master-orchestrator-guide",
+  "name": "master-orchestrator-guide",
+  "package_root": "plugin/src/skills/master-orchestrator-guide",
+  "intent": "让主会话 agent 对长程目标做调度、收割、端点验收、replan 与收口。",
+  "modules": [
+    {
+      "id": "module:verification.endpoint",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json"
+    }
+  ],
+  "entry_modules": [
+    "module:verification.endpoint"
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  }
+}

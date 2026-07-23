@@ -1,0 +1,548 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-master.dev/schemas/skill-knowledge-change-v1alpha1.json",
+  "title": "cc-master skill knowledge semantic change set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "change_id",
+    "base_graph_sha256",
+    "result_graph_sha256",
+    "reason",
+    "operations",
+    "evidence",
+    "expected_effects"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cc-master/skill-knowledge-change/v1alpha1"
+    },
+    "kind": {
+      "const": "change"
+    },
+    "change_id": {
+      "$ref": "#/$defs/changeId"
+    },
+    "base_graph_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "result_graph_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reason": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "expected_effects": {
+      "$ref": "#/$defs/expectedEffects"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "globalId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9.:-]*$"
+    },
+    "pointId": {
+      "type": "string",
+      "pattern": "^point:[a-z0-9][a-z0-9.-]*$"
+    },
+    "moduleId": {
+      "type": "string",
+      "pattern": "^module:[a-z0-9][a-z0-9.-]*$"
+    },
+    "skillId": {
+      "type": "string",
+      "pattern": "^skill:[a-z0-9][a-z0-9.-]*$"
+    },
+    "edgeId": {
+      "type": "string",
+      "pattern": "^edge:[a-z0-9][a-z0-9.-]*$"
+    },
+    "changeId": {
+      "type": "string",
+      "pattern": "^change:[0-9]{8}\\.[a-z0-9][a-z0-9.-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "idList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/globalId"
+      },
+      "uniqueItems": true
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "design",
+            "research",
+            "test",
+            "migration",
+            "review",
+            "user-decision"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "note": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "bindingRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "marker"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+\\.md$"
+        },
+        "marker": {
+          "$ref": "#/$defs/pointId"
+        }
+      }
+    },
+    "edgeRewrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "edge"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "add",
+            "remove",
+            "retarget"
+          ]
+        },
+        "edge": {
+          "$ref": "#/$defs/edgeId"
+        },
+        "from": {
+          "$ref": "#/$defs/globalId"
+        },
+        "to": {
+          "$ref": "#/$defs/globalId"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "baseOperationFields": {
+      "type": "object",
+      "required": [
+        "op",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "addOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "entities",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "add"
+        },
+        "entities": {
+          "$ref": "#/$defs/idList"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "wordingOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "binding",
+        "before_sha256",
+        "after_sha256",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "wording"
+        },
+        "subject": {
+          "$ref": "#/$defs/pointId"
+        },
+        "binding": {
+          "$ref": "#/$defs/bindingRef"
+        },
+        "before_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "after_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "refineOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "changed_fields",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "refine"
+        },
+        "subject": {
+          "$ref": "#/$defs/globalId"
+        },
+        "changed_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "intent",
+              "boundary",
+              "summary",
+              "recognition_cues",
+              "access",
+              "authority.subject",
+              "edge.when",
+              "edge.avoid_when",
+              "edge.path_role"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "moveEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "module": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "binding": {
+          "$ref": "#/$defs/bindingRef"
+        }
+      }
+    },
+    "moveOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "from",
+        "to",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "move"
+        },
+        "subject": {
+          "$ref": "#/$defs/pointId"
+        },
+        "from": {
+          "$ref": "#/$defs/moveEndpoint"
+        },
+        "to": {
+          "$ref": "#/$defs/moveEndpoint"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "splitOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "results",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "split"
+        },
+        "subject": {
+          "$ref": "#/$defs/globalId"
+        },
+        "results": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/globalId"
+          },
+          "uniqueItems": true
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "mergeOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "result",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "merge"
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/globalId"
+          },
+          "uniqueItems": true
+        },
+        "result": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "transferOwnerOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "from_skill",
+        "to_skill",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "transfer_owner"
+        },
+        "subject": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "from_skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "to_skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "deprecateOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "deprecate"
+        },
+        "subjects": {
+          "$ref": "#/$defs/idList"
+        },
+        "replacement": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "retireOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "retire"
+        },
+        "subjects": {
+          "$ref": "#/$defs/idList"
+        },
+        "replacement": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/addOperation"
+        },
+        {
+          "$ref": "#/$defs/wordingOperation"
+        },
+        {
+          "$ref": "#/$defs/refineOperation"
+        },
+        {
+          "$ref": "#/$defs/moveOperation"
+        },
+        {
+          "$ref": "#/$defs/splitOperation"
+        },
+        {
+          "$ref": "#/$defs/mergeOperation"
+        },
+        {
+          "$ref": "#/$defs/transferOwnerOperation"
+        },
+        {
+          "$ref": "#/$defs/deprecateOperation"
+        },
+        {
+          "$ref": "#/$defs/retireOperation"
+        }
+      ]
+    },
+    "expectedEffects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_delta",
+        "canonical_subject_delta",
+        "max_hop_regression_allowed",
+        "coverage_debt_allowed"
+      ],
+      "properties": {
+        "identity_delta": {
+          "type": "integer"
+        },
+        "canonical_subject_delta": {
+          "type": "integer"
+        },
+        "max_hop_regression_allowed": {
+          "const": 0
+        },
+        "coverage_debt_allowed": {
+          "type": "boolean"
+        },
+        "notes": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    }
+  }
+}

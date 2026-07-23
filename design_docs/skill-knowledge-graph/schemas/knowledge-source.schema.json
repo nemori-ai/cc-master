@@ -1,0 +1,948 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-master.dev/schemas/skill-knowledge-source-v1alpha1.json",
+  "title": "cc-master skill knowledge authored source",
+  "description": "Normative source contract for portfolio, skill, and module shards.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/portfolio"
+    },
+    {
+      "$ref": "#/$defs/skill"
+    },
+    {
+      "$ref": "#/$defs/module"
+    }
+  ],
+  "$defs": {
+    "schemaVersion": {
+      "const": "cc-master/skill-knowledge-source/v1alpha1"
+    },
+    "globalId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9.:-]*$"
+    },
+    "entryId": {
+      "type": "string",
+      "pattern": "^entry:[a-z0-9][a-z0-9.-]*$"
+    },
+    "skillId": {
+      "type": "string",
+      "pattern": "^skill:[a-z0-9][a-z0-9.-]*$"
+    },
+    "moduleId": {
+      "type": "string",
+      "pattern": "^module:[a-z0-9][a-z0-9.-]*$"
+    },
+    "pointId": {
+      "type": "string",
+      "pattern": "^point:[a-z0-9][a-z0-9.-]*$"
+    },
+    "edgeId": {
+      "type": "string",
+      "pattern": "^edge:[a-z0-9][a-z0-9.-]*$"
+    },
+    "subjectId": {
+      "type": "string",
+      "pattern": "^subject:[a-z0-9][a-z0-9.-]*$"
+    },
+    "hostId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "repoJsonPath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._/-]+\\.json$"
+    },
+    "repoMarkdownPath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._/-]+\\.md$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uniqueStringList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "since"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "draft",
+            "accepted",
+            "deprecated",
+            "retired"
+          ]
+        },
+        "since": {
+          "$ref": "#/$defs/date"
+        },
+        "replacement": {
+          "$ref": "#/$defs/globalId"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "deprecated",
+                  "retired"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "rationale"
+            ]
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "canonical-prose",
+            "design",
+            "research",
+            "test",
+            "migration",
+            "review"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "note": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "schema",
+            "binding",
+            "invariant",
+            "golden",
+            "mutation",
+            "projection",
+            "behavior-eval",
+            "review"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "host": {
+          "$ref": "#/$defs/hostId"
+        }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "verifiers"
+      ],
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "verifiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/verifier"
+          }
+        }
+      }
+    },
+    "hostCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "state"
+      ],
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/hostId"
+        },
+        "state": {
+          "enum": [
+            "full",
+            "partial",
+            "stub",
+            "unsupported"
+          ]
+        },
+        "covered_modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/moduleId"
+          },
+          "uniqueItems": true
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "stub",
+                  "unsupported"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "partial"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "covered_modules",
+              "reason"
+            ],
+            "properties": {
+              "covered_modules": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "module": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "point": {
+          "$ref": "#/$defs/pointId"
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "recognition_cues",
+        "targets",
+        "hosts",
+        "lifecycle",
+        "admission"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/entryId"
+        },
+        "label": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "recognition_cues": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        },
+        "hosts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hostId"
+          },
+          "uniqueItems": true
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        }
+      }
+    },
+    "hopPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_diameter_max",
+        "entry_discovery_max",
+        "critical_entry_to_primary_max",
+        "critical_any_point_to_primary_max",
+        "primary_entry_to_primary_max"
+      ],
+      "properties": {
+        "point_diameter_max": {
+          "const": 3
+        },
+        "entry_discovery_max": {
+          "const": 3
+        },
+        "critical_entry_to_primary_max": {
+          "const": 1
+        },
+        "critical_any_point_to_primary_max": {
+          "const": 2
+        },
+        "primary_entry_to_primary_max": {
+          "const": 2
+        }
+      }
+    },
+    "pinBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_modules",
+        "max_fraction"
+      ],
+      "properties": {
+        "max_modules": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "routerBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atlas_max_lines",
+        "atlas_max_tokens",
+        "module_max_lines",
+        "module_max_tokens",
+        "point_nav_max_lines"
+      ],
+      "properties": {
+        "atlas_max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "atlas_max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "module_max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "module_max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "point_nav_max_lines": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "portfolioSkillRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "manifest"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/skillId"
+        },
+        "manifest": {
+          "$ref": "#/$defs/repoJsonPath"
+        }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "id",
+        "runtime_hosts",
+        "skills",
+        "entries",
+        "hop_policy",
+        "critical_pin_budget",
+        "router_budget",
+        "rollout"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "kind": {
+          "const": "portfolio"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^portfolio:[a-z0-9][a-z0-9.-]*$"
+        },
+        "runtime_hosts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hostId"
+          },
+          "uniqueItems": true
+        },
+        "skills": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/portfolioSkillRef"
+          }
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/entry"
+          }
+        },
+        "hop_policy": {
+          "$ref": "#/$defs/hopPolicy"
+        },
+        "critical_pin_budget": {
+          "$ref": "#/$defs/pinBudget"
+        },
+        "router_budget": {
+          "$ref": "#/$defs/routerBudget"
+        },
+        "rollout": {
+          "enum": [
+            "K0",
+            "K1",
+            "K2",
+            "K3"
+          ]
+        }
+      }
+    },
+    "moduleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "manifest"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "manifest": {
+          "$ref": "#/$defs/repoJsonPath"
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "id",
+        "name",
+        "package_root",
+        "intent",
+        "modules",
+        "entry_modules",
+        "host_coverage",
+        "lifecycle"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "kind": {
+          "const": "skill"
+        },
+        "id": {
+          "$ref": "#/$defs/skillId"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "package_root": {
+          "type": "string",
+          "pattern": "^plugin/src/skills/[a-z0-9-]+$"
+        },
+        "intent": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/moduleRef"
+          }
+        },
+        "entry_modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/moduleId"
+          },
+          "uniqueItems": true
+        },
+        "host_coverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hostCoverage"
+          }
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
+    "moduleBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "includes",
+        "excludes"
+      ],
+      "properties": {
+        "includes": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        },
+        "excludes": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "relevant_entries",
+        "primary_points",
+        "rationale"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "critical",
+            "primary",
+            "on_demand"
+          ]
+        },
+        "relevant_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entryId"
+          },
+          "uniqueItems": true
+        },
+        "primary_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pointId"
+          },
+          "uniqueItems": true
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "enum": [
+                  "critical",
+                  "primary"
+                ]
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "relevant_entries": {
+                "minItems": 1
+              },
+              "primary_points": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "marker"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repoMarkdownPath"
+        },
+        "marker": {
+          "$ref": "#/$defs/pointId"
+        },
+        "heading_hint": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "canonicalAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "subject"
+      ],
+      "properties": {
+        "role": {
+          "const": "canonical"
+        },
+        "subject": {
+          "$ref": "#/$defs/subjectId"
+        }
+      }
+    },
+    "derivedAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "subject",
+        "canonical"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "summary",
+            "example"
+          ]
+        },
+        "subject": {
+          "$ref": "#/$defs/subjectId"
+        },
+        "canonical": {
+          "$ref": "#/$defs/pointId"
+        },
+        "sync_policy": {
+          "enum": [
+            "review-on-canonical-change",
+            "generated"
+          ],
+          "default": "review-on-canonical-change"
+        }
+      }
+    },
+    "authority": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/canonicalAuthority"
+        },
+        {
+          "$ref": "#/$defs/derivedAuthority"
+        }
+      ]
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "point_kind",
+        "summary",
+        "recognition_cues",
+        "binding",
+        "authority",
+        "lifecycle",
+        "admission"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/pointId"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "point_kind": {
+          "enum": [
+            "principle",
+            "decision_rule",
+            "procedure",
+            "check",
+            "boundary",
+            "example",
+            "reference"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "recognition_cues": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        }
+      }
+    },
+    "edgeRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled_by_default"
+      ],
+      "properties": {
+        "enabled_by_default": {
+          "type": "boolean"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hostId"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "navigationEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "from",
+        "to",
+        "when",
+        "path_role",
+        "runtime",
+        "lifecycle",
+        "admission"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/edgeId"
+        },
+        "type": {
+          "enum": [
+            "requires",
+            "next",
+            "deepens_to",
+            "operationalizes",
+            "applies_to",
+            "contrasts_with",
+            "fallback_to",
+            "routes_to"
+          ]
+        },
+        "from": {
+          "$ref": "#/$defs/globalId"
+        },
+        "to": {
+          "$ref": "#/$defs/globalId"
+        },
+        "when": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        },
+        "avoid_when": {
+          "$ref": "#/$defs/uniqueStringList"
+        },
+        "path_role": {
+          "enum": [
+            "support",
+            "next",
+            "check",
+            "contrast",
+            "fallback",
+            "route"
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runtime": {
+          "$ref": "#/$defs/edgeRuntime"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        }
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "id",
+        "owner_skill",
+        "title",
+        "intent",
+        "recognition_cues",
+        "boundary",
+        "access",
+        "lifecycle",
+        "admission",
+        "points",
+        "edges"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "kind": {
+          "const": "module"
+        },
+        "id": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "owner_skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "intent": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "recognition_cues": {
+          "$ref": "#/$defs/uniqueStringList",
+          "minItems": 1
+        },
+        "boundary": {
+          "$ref": "#/$defs/moduleBoundary"
+        },
+        "access": {
+          "$ref": "#/$defs/access"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/point"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/navigationEdge"
+          }
+        }
+      }
+    }
+  }
+}

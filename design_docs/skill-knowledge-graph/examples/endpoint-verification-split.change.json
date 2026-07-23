@@ -1,0 +1,42 @@
+{
+  "schema_version": "cc-master/skill-knowledge-change/v1alpha1",
+  "kind": "change",
+  "change_id": "change:20260723.endpoint-verification-split",
+  "base_graph_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "reason": "旧 procedure 同时拥有 artifact、diff/test 与异构复核三个可独立路由和验证的决策单元。",
+  "operations": [
+    {
+      "op": "split",
+      "subject": "point:verification.endpoint-procedure",
+      "results": [
+        "point:verification.artifact-check",
+        "point:verification.diff-test-check",
+        "point:verification.heterogeneous-review"
+      ],
+      "edge_rewrites": [
+        {
+          "action": "retarget",
+          "edge": "edge:verification.principle-to-procedure",
+          "to": "point:verification.artifact-check",
+          "reason": "procedure 的入口先落到 artifact 收割。"
+        }
+      ],
+      "rationale": "三个结果有不同 recognition cue、verifier 与变化频率，应拥有独立 identity。"
+    }
+  ],
+  "evidence": [
+    {
+      "kind": "design",
+      "ref": "skill-knowledge-graph pilot topology review",
+      "note": "示例证据；真实 K1 change 必须换成实际 review anchor。"
+    }
+  ],
+  "expected_effects": {
+    "identity_delta": 2,
+    "canonical_subject_delta": 2,
+    "max_hop_regression_allowed": 0,
+    "coverage_debt_allowed": false,
+    "notes": "新 points 必须继承或重写所有 inbound routes，并保持 critical SLO。"
+  }
+}

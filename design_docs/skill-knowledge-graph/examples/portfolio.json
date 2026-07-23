@@ -1,0 +1,73 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "portfolio",
+  "id": "portfolio:cc-master-runtime-skills",
+  "runtime_hosts": [
+    "claude-code",
+    "codex"
+  ],
+  "skills": [
+    {
+      "id": "skill:master-orchestrator-guide",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/skill.json"
+    }
+  ],
+  "entries": [
+    {
+      "id": "entry:master-orchestrator",
+      "label": "Master orchestrator runtime entry",
+      "recognition_cues": [
+        "开始或恢复一场长程编排",
+        "worker 或 workflow 报告 terminal"
+      ],
+      "targets": [
+        {
+          "skill": "skill:master-orchestrator-guide",
+          "module": "module:verification.endpoint",
+          "point": "point:verification.terminal-is-not-done"
+        }
+      ],
+      "hosts": [
+        "claude-code",
+        "codex"
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.master-orchestrator"
+          }
+        ]
+      }
+    }
+  ],
+  "hop_policy": {
+    "point_diameter_max": 3,
+    "entry_discovery_max": 3,
+    "critical_entry_to_primary_max": 1,
+    "critical_any_point_to_primary_max": 2,
+    "primary_entry_to_primary_max": 2
+  },
+  "critical_pin_budget": {
+    "max_modules": 2,
+    "max_fraction": 1
+  },
+  "router_budget": {
+    "atlas_max_lines": 120,
+    "atlas_max_tokens": 1800,
+    "module_max_lines": 80,
+    "module_max_tokens": 1200,
+    "point_nav_max_lines": 4
+  },
+  "rollout": "K1"
+}
