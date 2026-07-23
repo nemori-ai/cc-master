@@ -7,10 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] — 2026-07-23
+
+> **Cross-harness transcript integrity and macOS installer compatibility** — patch release paired with **ccm-v0.22.1**; upgrade `ccm` first.
+
 ### Fixed
 
-- **bash 3.2 multibyte varname parsing (stock macOS `/bin/bash`)** — `install.sh` crashed with `dest�: unbound variable` at the Cursor step (aborting the remaining kimi-code install) and the bootstrap hook's ccm-capability directive silently dropped the installed version: bash 3.2 absorbs a CJK punctuation character immediately following `$var` into the variable name. All affected expansions now use the `${var}` brace form (`install.sh` ×5, `bootstrap-board.sh` ×2).
-- **多 harness native subagent transcript 定位与指引** — `using-ccm` 此前把 Claude Code 的 Task 子转录布局复制给所有 host，且 viewer 在子文件未出现时会把父 transcript 冒充成子 agent。现将登记配方投影为 per-host contract：Claude Code 由父 session JSONL + `task-id:<agentId>` 派生 `subagents/agent-<agentId>.jsonl`；Kimi Code 由父 `agents/main/wire.jsonl` 派生 `agents/<agentId>/wire.jsonl` 并按 typed wire 解析；Codex/Cursor 对未实证的父→子布局保持 fail-closed。父 transcript 只作定位锚，子源未出现时如实返回无源，不再泄漏父事件。
+- **bash 3.2 multibyte varname parsing on stock macOS `/bin/bash` (GitHub #205)** — `install.sh` crashed with `dest�: unbound variable` at the Cursor step, aborting the remaining Kimi Code install, while the bootstrap hook silently dropped the installed ccm version from its capability directive. All affected expansions now use the `${var}` brace form (`install.sh` ×5, `bootstrap-board.sh` ×2).
+- **Cross-harness native-subagent transcript discovery and guidance (GitHub #206)** — `using-ccm` no longer projects Claude Code's Task transcript layout into every host, and the viewer no longer treats the parent transcript as the child when the child file has not appeared. Claude Code derives `subagents/agent-<agentId>.jsonl` from the parent session JSONL; Kimi Code derives `agents/<agentId>/wire.jsonl` from `agents/main/wire.jsonl` and parses typed wire events. Codex and Cursor remain fail-closed where no parent-to-child layout has been verified.
+
+### Compatibility and upgrade
+
+- The plugin remains installable for Claude Code, Codex, Cursor, and Kimi Code. No board schema migration is required.
+- Install `ccm-v0.22.1` before plugin `v0.21.1` so the projected native-subagent guidance and the CLI/Web Viewer stream behavior stay in lockstep.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/v0.21.1/install.sh | \
+  bash -s -- --ccm-version ccm-v0.22.1 --plugin-version v0.21.1 --all-harnesses
+```
 
 ## [0.21.0] — 2026-07-23
 

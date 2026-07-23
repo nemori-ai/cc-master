@@ -1,5 +1,9 @@
 # @ccm/engine
 
+## 0.22.1
+
+> Version synchronized with the `ccm` CLI fixed group. This patch changes transcript discovery and Web Viewer diagnostics in the CLI package only; the engine API, board model, and validation semantics are unchanged.
+
 ## 0.22.0
 
 > Stable engine support for delivery deadlines, four-harness capability composition, tracked dispatch, and multi-pool usage evidence.
