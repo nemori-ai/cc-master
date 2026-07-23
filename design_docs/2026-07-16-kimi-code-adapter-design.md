@@ -239,7 +239,7 @@ kimi 有原生 plugin `commands[]`（manifest 字段，指向 `./commands/*.md` 
   "sessionStart": { "skill": "cc-master-role-substrate" },  // reinject 锚（见 §5.2 论證）
   "skillInstructions": "…",               // 可选：全局 skill 使用提示
   "author": { "name": "cc-master contributors" },
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "interface": {
     "displayName": "cc-master",
     "shortDescription": "Long-horizon master orchestrator adapter",

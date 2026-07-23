@@ -55,7 +55,7 @@ cat >"${PLUGIN_DIR}/.codex-plugin/plugin.json" <<EOF
   "author": {
     "name": "cc-master"
   },
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "interface": {
     "displayName": "cc-master hook env probe",
     "shortDescription": "Temporary hook probe",

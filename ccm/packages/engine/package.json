@@ -1,6 +1,7 @@
 {
   "name": "@ccm/engine",
   "version": "0.22.1",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "exports": {
     ".": {
