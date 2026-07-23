@@ -35,8 +35,56 @@ export const PLANES = Object.freeze([
   'projection',
 ]);
 export const INVARIANTS = Object.freeze(
-  Array.from({ length: 16 }, (_, index) => `K-I${String(index + 1).padStart(2, '0')}`),
+  Array.from({ length: 23 }, (_, index) => `K-I${String(index + 1).padStart(2, '0')}`),
 );
+
+export const HARDENING_CONTRACT = Object.freeze({
+  C1: Object.freeze({
+    entry_surface_fields: Object.freeze([
+      'host',
+      'source_file',
+      'binding',
+      'surface_kind',
+      'targets',
+      'lifecycle',
+    ]),
+  }),
+  C2: Object.freeze({
+    coverage_states: Object.freeze(['full', 'partial', 'non_knowledge', 'excluded']),
+    denominator: 'git_canonical_markdown',
+  }),
+  C3: Object.freeze({
+    derived_fields: Object.freeze(['canonical', 'review_policy', 'reviewed_canonical_sha256']),
+  }),
+  C4: Object.freeze({ accepted_skill_requires_admission: true }),
+  C5: Object.freeze({
+    change_workflow: Object.freeze(['begin', 'validate', 'apply']),
+    workspace_root: '.skill-knowledge/workspaces/<change-id>',
+  }),
+  C6: Object.freeze({
+    algorithm: 'cc-master/skill-knowledge-canonical-graph-hash/v1',
+    authored_manifest_kinds: Object.freeze(['portfolio', 'skill', 'module']),
+    change_head_digest_excludes: Object.freeze(['result_graph_sha256']),
+  }),
+  C7: Object.freeze({
+    algorithm: 'cc-master/skill-knowledge-markdown-span-hash/v1',
+    newline_normalization: 'crlf-to-lf',
+  }),
+  C8: Object.freeze({
+    algorithm: 'cc-master/skill-knowledge-budget-estimator/v1',
+    formula: 'ceil(utf8_bytes/3)',
+  }),
+  C9: Object.freeze({
+    hosts: Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']),
+  }),
+  C10: Object.freeze({ changed_scope_base_option: '--base', immutable_chain: true }),
+  C11: Object.freeze({ k2_allows_partial: false }),
+  C12: Object.freeze({
+    report_tracks: Object.freeze(['structural_status', 'behavioral_evidence_status']),
+  }),
+  C13: Object.freeze({ research_supersession_required: true }),
+  C14: Object.freeze({ runtime_skill_count: 8, governance_meta_skill_is_runtime: false }),
+});
 
 export const EXIT_CODES = Object.freeze({
   success: 0,
@@ -74,6 +122,14 @@ export const CAPABILITIES = Object.freeze({
   runtime_projection: false,
   hop_analysis: false,
   typed_change_transactions: false,
+  entry_surface_binding: false,
+  canonical_source_inventory: false,
+  derived_freshness: false,
+  canonical_graph_hash: false,
+  deterministic_budget_estimator: false,
+  host_portability_probe: false,
+  semantic_coverage: false,
+  behavioral_evidence_tracking: false,
 });
 
 export function contractEnvelope() {
@@ -92,5 +148,8 @@ export function contractEnvelope() {
     schemas: { ...SCHEMAS },
     source_layout: { ...SOURCE_LAYOUT },
     capabilities: { ...CAPABILITIES },
+    hardening_contract: Object.fromEntries(
+      Object.entries(HARDENING_CONTRACT).map(([id, value]) => [id, { ...value }]),
+    ),
   };
 }

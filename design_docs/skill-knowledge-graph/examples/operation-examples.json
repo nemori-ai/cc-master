@@ -1,0 +1,92 @@
+{
+  "schema_version": "cc-master/skill-knowledge-operation-fragments/v1alpha1",
+  "kind": "operation_fragment_library",
+  "fragment_target": "#/$defs/operation",
+  "operations": {
+    "add": {
+      "op": "add",
+      "entities": [
+        "point:example.added"
+      ],
+      "rationale": "新增一个已经过 admission 的独立知识点。"
+    },
+    "wording": {
+      "op": "wording",
+      "subject": "point:example.wording",
+      "binding": {
+        "path": "plugin/src/skills/example/canonical/SKILL.md",
+        "marker": "point:example.wording"
+      },
+      "before_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "after_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "rationale": "只改 canonical prose 措辞，不改变语义身份。"
+    },
+    "refine": {
+      "op": "refine",
+      "subject": "point:example.refined",
+      "changed_fields": [
+        "summary",
+        "recognition_cues"
+      ],
+      "rationale": "收紧知识点的识别线索与摘要边界。"
+    },
+    "move": {
+      "op": "move",
+      "subject": "point:example.moved",
+      "from": {
+        "module": "module:example.source"
+      },
+      "to": {
+        "module": "module:example.destination"
+      },
+      "edge_rewrites": [],
+      "rationale": "知识点身份不变，只迁移所属模块。"
+    },
+    "split": {
+      "op": "split",
+      "subject": "point:example.combined",
+      "results": [
+        "point:example.split-a",
+        "point:example.split-b"
+      ],
+      "edge_rewrites": [],
+      "rationale": "原知识点含两个可独立路由和验证的决策单元。"
+    },
+    "merge": {
+      "op": "merge",
+      "subjects": [
+        "point:example.duplicate-a",
+        "point:example.duplicate-b"
+      ],
+      "result": "point:example.merged",
+      "edge_rewrites": [],
+      "rationale": "两个知识点表达同一 canonical subject。"
+    },
+    "transfer_owner": {
+      "op": "transfer_owner",
+      "subject": "module:example.transferred",
+      "from_skill": "skill:example-source",
+      "to_skill": "skill:example-destination",
+      "edge_rewrites": [],
+      "rationale": "模块职责边界已迁移到新的 runtime skill。"
+    },
+    "deprecate": {
+      "op": "deprecate",
+      "subjects": [
+        "point:example.deprecated"
+      ],
+      "replacement": "point:example.replacement",
+      "edge_rewrites": [],
+      "rationale": "保留过渡期身份，但新路径应指向 replacement。"
+    },
+    "retire": {
+      "op": "retire",
+      "subjects": [
+        "point:example.retired"
+      ],
+      "replacement": "point:example.successor",
+      "edge_rewrites": [],
+      "rationale": "过渡期结束，旧身份退出 active graph。"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "cc-master/skill-knowledge-cli/v1alpha1",
+  "ok": true,
+  "command": "report",
+  "result_kind": "report",
+  "contract_version": "v1alpha1",
+  "structural_status": {
+    "state": "not_run"
+  },
+  "behavioral_evidence_status": {
+    "state": "not_run",
+    "evidence": []
+  },
+  "diagnostics": []
+}

@@ -140,7 +140,8 @@
         "role": "summary",
         "subject": "subject:verification.terminal-is-not-done",
         "canonical": "point:verification.terminal-is-not-done",
-        "sync_policy": "review-on-canonical-change"
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
       },
       "lifecycle": {
         "state": "accepted",

@@ -144,13 +144,19 @@ skill-knowledge bootstrap --skill <name>
 | query → point 路由行为 eval | `grounding-skill-evals` |
 | 新功能前真实痛点与设计准入 | `requirement-elicitation` |
 
-暂不新增 `knowledge-graph-maintainer`：
+研究时点暂不新增 `knowledge-graph-maintainer`：
 
 - 它的主要触发瞬间与“编辑/审查一个 skill”重合；
 - 静态机制不应包装成 agent 判断力；
 - 跨 portfolio 与 eval 已有明确 owner。
 
 未来只有当“维护 graph 本身但不编辑 skill body”形成独立、高频、强判断工作流时再过准入。
+
+> **演进标记（superseded as a portfolio decision，2026-07-23）：** 正式设计随后确认了该触发条件：
+> maintainer 需要读取 invariant/path/projection witness、选择 9 类 typed operation，并在 ignored
+> workspace 中执行 `begin → validate → apply`，这是一条不等于正文写作、portfolio 边界判断或 eval 的
+> 独立执行工作流。因此规范准入 dev-only `governing-skill-knowledge`，但只在 K1 工具能力真实可用后
+> 创建。原“暂不新增”保留为能力不存在时的正确判断，不静默改写。
 
 ## 7. 与八个分发 skills 的边界
 

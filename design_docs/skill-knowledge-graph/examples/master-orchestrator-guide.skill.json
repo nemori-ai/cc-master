@@ -14,6 +14,28 @@
   "entry_modules": [
     "module:verification.endpoint"
   ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:verification.terminal-is-not-done",
+        "point:verification.terminal-summary"
+      ],
+      "reviewed_unbound_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "coverage": "partial",
+      "point_ids": [
+        "point:verification.endpoint-procedure"
+      ],
+      "reviewed_unbound_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "unresolved_coverage_debt": [
+        "该文件中 verification pilot 之外的 canonical prose 尚未切成 admitted points。"
+      ]
+    }
+  ],
   "host_coverage": [
     {
       "host": "claude-code",
@@ -22,10 +44,32 @@
     {
       "host": "codex",
       "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
     }
   ],
   "lifecycle": {
     "state": "accepted",
     "since": "2026-07-23"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "design",
+        "ref": "design_docs/skill-knowledge-graph/specification.md#12-dev-meta-skill-架构"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "accepted-skill-admission"
+      }
+    ]
   }
 }

@@ -8,6 +8,8 @@ tests/**/.tmp-*/
 .claude/cc-master/
 # working plans + build board — not version-controlled
 design_docs/plans/
+# local skill-knowledge begin/validate/apply transaction workspaces
+.skill-knowledge/workspaces/
 .gstack/
 # ccm monorepo build artifacts (T0 industrial stack)
 ccm/node_modules

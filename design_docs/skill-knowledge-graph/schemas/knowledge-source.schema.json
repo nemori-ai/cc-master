@@ -46,6 +46,18 @@
       "type": "string",
       "pattern": "^subject:[a-z0-9][a-z0-9.-]*$"
     },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "knownHost": {
+      "enum": [
+        "claude-code",
+        "codex",
+        "cursor",
+        "kimi-code"
+      ]
+    },
     "hostId": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
@@ -172,7 +184,7 @@
           "$ref": "#/$defs/nonEmptyString"
         },
         "host": {
-          "$ref": "#/$defs/hostId"
+          "$ref": "#/$defs/knownHost"
         }
       }
     },
@@ -209,7 +221,7 @@
       ],
       "properties": {
         "host": {
-          "$ref": "#/$defs/hostId"
+          "$ref": "#/$defs/knownHost"
         },
         "state": {
           "enum": [
@@ -292,6 +304,66 @@
         }
       }
     },
+    "entrySurfaceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "marker",
+            "anchor"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      }
+    },
+    "entrySurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "source_file",
+        "binding",
+        "surface_kind",
+        "targets",
+        "lifecycle"
+      ],
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/knownHost"
+        },
+        "source_file": {
+          "$ref": "#/$defs/repoMarkdownPath"
+        },
+        "binding": {
+          "$ref": "#/$defs/entrySurfaceBinding"
+        },
+        "surface_kind": {
+          "enum": [
+            "command",
+            "skill_entry",
+            "agents_navigation"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
     "entry": {
       "type": "object",
       "additionalProperties": false,
@@ -299,8 +371,7 @@
         "id",
         "label",
         "recognition_cues",
-        "targets",
-        "hosts",
+        "surfaces",
         "lifecycle",
         "admission"
       ],
@@ -315,20 +386,43 @@
           "$ref": "#/$defs/uniqueStringList",
           "minItems": 1
         },
-        "targets": {
+        "surfaces": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 4,
+          "maxItems": 4,
           "items": {
-            "$ref": "#/$defs/target"
-          }
-        },
-        "hosts": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/hostId"
+            "$ref": "#/$defs/entrySurface"
           },
-          "uniqueItems": true
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "claude-code"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "codex"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "cursor"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "kimi-code"}}
+              }
+            }
+          ]
         },
         "lifecycle": {
           "$ref": "#/$defs/lifecycle"
@@ -462,11 +556,34 @@
         },
         "runtime_hosts": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 4,
+          "maxItems": 4,
           "items": {
-            "$ref": "#/$defs/hostId"
+            "$ref": "#/$defs/knownHost"
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "allOf": [
+            {
+              "contains": {
+                "const": "claude-code"
+              }
+            },
+            {
+              "contains": {
+                "const": "codex"
+              }
+            },
+            {
+              "contains": {
+                "const": "cursor"
+              }
+            },
+            {
+              "contains": {
+                "const": "kimi-code"
+              }
+            }
+          ]
         },
         "skills": {
           "type": "array",
@@ -517,6 +634,114 @@
         }
       }
     },
+    "inventoryReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "rationale"
+      ],
+      "properties": {
+        "reviewer": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "sourceInventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "coverage",
+        "point_ids",
+        "reviewed_unbound_sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repoMarkdownPath"
+        },
+        "coverage": {
+          "enum": [
+            "full",
+            "partial",
+            "non_knowledge",
+            "excluded"
+          ]
+        },
+        "point_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pointId"
+          },
+          "uniqueItems": true
+        },
+        "reviewed_unbound_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "unresolved_coverage_debt": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "uniqueItems": true
+        },
+        "review": {
+          "$ref": "#/$defs/inventoryReview"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "coverage": {
+                "const": "partial"
+              }
+            },
+            "required": [
+              "coverage"
+            ]
+          },
+          "then": {
+            "required": [
+              "unresolved_coverage_debt"
+            ],
+            "properties": {
+              "unresolved_coverage_debt": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "coverage": {
+                "enum": [
+                  "non_knowledge",
+                  "excluded"
+                ]
+              }
+            },
+            "required": [
+              "coverage"
+            ]
+          },
+          "then": {
+            "required": [
+              "review"
+            ],
+            "properties": {
+              "point_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
     "skill": {
       "type": "object",
       "additionalProperties": false,
@@ -529,8 +754,10 @@
         "intent",
         "modules",
         "entry_modules",
+        "canonical_source_inventory",
         "host_coverage",
-        "lifecycle"
+        "lifecycle",
+        "admission"
       ],
       "properties": {
         "schema_version": {
@@ -568,15 +795,56 @@
           },
           "uniqueItems": true
         },
-        "host_coverage": {
+        "canonical_source_inventory": {
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "#/$defs/hostCoverage"
+            "$ref": "#/$defs/sourceInventoryEntry"
           }
+        },
+        "host_coverage": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/hostCoverage"
+          },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "claude-code"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "codex"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "cursor"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["host"],
+                "properties": {"host": {"const": "kimi-code"}}
+              }
+            }
+          ]
         },
         "lifecycle": {
           "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
         }
       }
     },
@@ -702,7 +970,9 @@
       "required": [
         "role",
         "subject",
-        "canonical"
+        "canonical",
+        "review_policy",
+        "reviewed_canonical_sha256"
       ],
       "properties": {
         "role": {
@@ -717,12 +987,14 @@
         "canonical": {
           "$ref": "#/$defs/pointId"
         },
-        "sync_policy": {
+        "review_policy": {
           "enum": [
             "review-on-canonical-change",
             "generated"
-          ],
-          "default": "review-on-canonical-change"
+          ]
+        },
+        "reviewed_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
