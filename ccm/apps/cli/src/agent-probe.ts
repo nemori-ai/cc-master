@@ -451,7 +451,12 @@ function locateKimiTranscript(
 //   外部提供的纯文本 transcript 路径（CURSOR_TRANSCRIPT_PATH），让 cursor hook / wrapper 无需显式
 //   `ccm agent bind --transcript` 也能挂上可 tail 的日志（走 raw parser·见 parserFor）。显式登记的
 //   transcript_ref 优先级更高（在本函数更早处命中）。
-const CURSOR_HARNESSES = new Set(['cursor-agent', 'cursor', 'cursor-agent-cli', 'cursor-ide']);
+export const CURSOR_HARNESSES = new Set([
+  'cursor-agent',
+  'cursor',
+  'cursor-agent-cli',
+  'cursor-ide',
+]);
 
 function locateCursorEnvTranscript(
   harness: string | undefined,
@@ -467,8 +472,22 @@ function locateCursorEnvTranscript(
   }
 }
 
+function readableTranscript(path: string): TranscriptLocation | null {
+  if (!existsSync(path)) return null;
+  try {
+    return { path, mtimeMs: statSync(path).mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+function isSinglePathSegment(value: string): boolean {
+  return value !== '' && value !== '.' && value !== '..' && basename(value) === value;
+}
+
 // locateTranscriptFile — 按 agent handle 解析其 transcript 文件路径（实时流的源定位单点）。
-//   优先级：transcript_ref 存在即用 → session-id 经 harness adapter roots + 匹配 → 否则 null。
+//   优先级：原生 subagent 的父转录锚 + task-id 派生 → transcript_ref 直接引用 → session-id
+//   经 harness adapter roots + 匹配 → 否则 null。
 //
 //   信任边界（有意不做路径 allowlist）：transcript_ref 是 board 内容 ⇒ 指向任意本地文件的只读
 //   tail。这是正当功能——bg-shell / workflow worker 的日志文件就登记在这里，圈死到 session 目录
@@ -487,44 +506,48 @@ export function locateTranscriptFile(
   //   信封多 isSidechain:true / agentId / sessionId=父 sid；旁有 agent-<id>.meta.json：
   //   {agentType, description, toolUseId, spawnDepth}）。
   //   登记配方：`ccm agent bind <id> --handle task-id:<agentId> --transcript <父session.jsonl>`
-  //   → 此处派生子文件路径，存在即优先；尚未落盘（启动竞态）→ 回退父文件（子文件出现后
-  //   path/ino 变化触发 client 轮转检测清窗重 tail，自愈到子代理流）。
-  // harness 含 origin：in-session subagent 的登记惯例是 type=subagent/harness=origin，
-  // 其转录布局跟随宿主 Claude Code——派生同样适用（existsSync 已兜住不存在的情形）。
+  //   → 此处派生子文件路径；尚未落盘（启动竞态）→ 如实无源，绝不回退父文件把 orchestrator
+  //   消息冒充成子代理流。子文件出现后下一次轮询会直接命中。
+  // `origin` 保留旧 Claude Code 登记的向后兼容；新登记应记录具体 host，让 parser 身份不含糊。
   if (
     (input.harness === 'claude-code' || input.harness === 'origin') &&
     input.handleKind === 'task-id' &&
-    value &&
+    isSinglePathSegment(value) &&
     ref
   ) {
     const base = basename(ref);
-    if (base.endsWith('.jsonl')) {
+    if (base.endsWith('.jsonl') && basename(dirname(ref)) !== 'subagents') {
       const derived = join(
         dirname(ref),
         base.slice(0, -'.jsonl'.length),
         'subagents',
         `agent-${value}.jsonl`,
       );
-      if (existsSync(derived)) {
-        try {
-          return { path: derived, mtimeMs: statSync(derived).mtimeMs };
-        } catch {
-          /* stat 失败：走通用回退 */
-        }
-      }
+      return readableTranscript(derived);
     }
   }
+
+  // kimi-code Task 子代理：实证布局为
+  //   `<session>/agents/main/wire.jsonl`（父）与 `<session>/agents/<agentId>/wire.jsonl`（子）。
+  //   Task 返回的 agent id 原样作为 task-id handle；父 main wire 只是 session 锚，不能作为子流
+  //   fallback。若调用方已经直接绑定 `<agentId>/wire.jsonl`，则留给下方通用 ref 分支。
+  if (
+    input.harness === 'kimi-code' &&
+    input.handleKind === 'task-id' &&
+    isSinglePathSegment(value) &&
+    ref &&
+    basename(ref) === 'wire.jsonl' &&
+    basename(dirname(ref)) === 'main' &&
+    basename(dirname(dirname(ref))) === 'agents'
+  ) {
+    return readableTranscript(join(dirname(dirname(ref)), value, 'wire.jsonl'));
+  }
+
   // TODO(codex subagent/collab)：codex rollout 里也见到 multi_agent_v1 spawn_agent 工具面——
   //   若其子代理消息在 rollout 内有等价可寻址结构（独立文件或行级身份），可在此加对应派生；
   //   目前未实证，不猜。
 
-  if (ref && existsSync(ref)) {
-    try {
-      return { path: ref, mtimeMs: statSync(ref).mtimeMs };
-    } catch {
-      return null;
-    }
-  }
+  if (ref) return readableTranscript(ref);
   // cursor 短期：显式 transcript_ref 之后、session-id walk（对 cursor 恒 null·.vscdb 不入 walk）之前，
   //   兜一个外部提供的纯文本 transcript（CURSOR_TRANSCRIPT_PATH）。
   const cursorEnv = locateCursorEnvTranscript(input.harness, opts);

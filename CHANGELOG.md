@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **bash 3.2 multibyte varname parsing (stock macOS `/bin/bash`)** — `install.sh` crashed with `dest�: unbound variable` at the Cursor step (aborting the remaining kimi-code install) and the bootstrap hook's ccm-capability directive silently dropped the installed version: bash 3.2 absorbs a CJK punctuation character immediately following `$var` into the variable name. All affected expansions now use the `${var}` brace form (`install.sh` ×5, `bootstrap-board.sh` ×2).
+- **多 harness native subagent transcript 定位与指引** — `using-ccm` 此前把 Claude Code 的 Task 子转录布局复制给所有 host，且 viewer 在子文件未出现时会把父 transcript 冒充成子 agent。现将登记配方投影为 per-host contract：Claude Code 由父 session JSONL + `task-id:<agentId>` 派生 `subagents/agent-<agentId>.jsonl`；Kimi Code 由父 `agents/main/wire.jsonl` 派生 `agents/<agentId>/wire.jsonl` 并按 typed wire 解析；Codex/Cursor 对未实证的父→子布局保持 fail-closed。父 transcript 只作定位锚，子源未出现时如实返回无源，不再泄漏父事件。
 
 ## [0.21.0] — 2026-07-23
 

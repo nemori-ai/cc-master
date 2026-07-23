@@ -1,0 +1,1 @@
+**Codex native subagent / collaboration 登记边界**：当前尚未实证可从父会话 transcript 派生某个子 agent 的独立 rollout 路径，因此绝不套 Claude Code 的 `subagents/agent-*.jsonl` 规则，也不把父 rollout 绑定给子 agent。Task/collaboration 返回真实 id 后可用 `task-id:<id>` 登记；只有拿到**该子 agent 自己的可读 transcript 绝对路径**时，才以具体 `--harness codex` 直接绑定它。拿不到就让 viewer 如实显示无源，等待后续有证据的 Codex locator。

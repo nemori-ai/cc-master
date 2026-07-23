@@ -1919,13 +1919,13 @@ ccm agent create --type <t> --harness <h> --intent <str> [flags]
 | flag | 短名 | 类型 | enum 取值 | 必填 | 含义 |
 |---|---|---|---|---|---|
 | `--type <enum>` | | enum | `cli-worker, subagent, background-shell, workflow` | 是 | agent 类型 |
-| `--harness <enum>` | | enum | `codex, claude-code, cursor-agent, kimi-code, origin` | 是 | agent 所在 harness（`origin` = 本 orchestrator 进程内 sub-agent） |
+| `--harness <enum>` | | enum | `codex, claude-code, cursor-agent, kimi-code, origin` | 是 | agent 所在的 runtime / transcript 语义分区。`origin` 只用于不需要具体 host transcript parser 的本 orchestrator 本地机制；要流式观察 native subagent 时按下方 host-specific 配方登记具体 harness。 |
 | `--intent <str>` | | string | | 是 | 一句话：派它去干什么 |
 | `--model <str>` | | string | | | 已知才填的模型（unknown 保真·缺则不填） |
 | `--cwd <str>` | | string | | | agent 工作目录 |
 | `--json` | | bool | | | 结构化输出（`{agent_id, agent}`） |
 
-- 例：`ccm agent create --type cli-worker --harness codex --intent "review repo diff"` · `ccm agent create --board /abs/x.board.json --type subagent --harness origin --intent "写 i18n" --json`
+- 例：`ccm agent create --type cli-worker --harness codex --intent "review repo diff"` · `ccm agent create --board /abs/x.board.json --type background-shell --harness origin --intent "跑回归测试" --json`
 
 ### agent bind
 
@@ -1954,6 +1954,15 @@ ccm agent bind <id> --handle <kind:value> [flags]
 2. **立即 bind 兜底证据**：`ccm agent bind <id> --handle pid:<pid> --transcript /abs/worker.log`——pid 立刻可探测、日志立刻可看（纯文本 fallback）。
 3. **起跑后升级 bind**：日志**首行 `thread.started` 事件的 `thread_id` 就是 sid**（`head -1 /abs/worker.log` 即可提取；它与 rollout 文件名里的 sid 一致。旧版 codex 若输出的是 `session_meta` 形状，则取其 `payload.session_id`）。拿到就升级：`ccm agent bind <id> --handle session-id:<sid> --attach-cmd "cd /abs/cwd && codex resume <sid>"`——探测随之升级为会话文件 mtime（rollout 落盘于 `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sid>.jsonl`），attach / 流定位升级为精确 rollout 源。
 4. **反模式**：`codex exec resume --last` 不可作 attach 命令——它接「最近一个 session」，并行多 worker 时会接错人；shell 后台任务 id 也不是可探测的 handle（登记成 `task-id:<shell任务id>` 会让 probe 无从探测、流定位不到 rollout 文件）。精确 resume 永远是 `codex resume <sid>`。
+
+**Claude Code in-session subagent 登记配方（Task tool 派生）**：为让 viewer 选择 Claude transcript parser，创建登记时用具体 `--harness claude-code`，handle 用 Task 返回的 `task-id:<agentId>`，并把 master 的父 session JSONL 绝对路径作为定位锚：
+
+```bash
+ccm agent create --type subagent --harness claude-code --intent "<任务摘要>"
+ccm agent bind <id> --handle task-id:<agentId> --transcript <父-session.jsonl>
+```
+
+viewer 由 `<父-session.jsonl>` 派生 `<父-session-去.jsonl>/subagents/agent-<agentId>.jsonl`，并按 Claude Code JSONL 解析。**父 transcript 只作定位锚**：子文件尚未落盘时返回无源，绝不把 master 的事件冒充成子 agent；文件出现后下一轮轮询自动命中。反模式：把 agentId 登成 `session-id`、漏 `--transcript`、或直接把父 transcript 当子 transcript。
 
 ### agent amend
 

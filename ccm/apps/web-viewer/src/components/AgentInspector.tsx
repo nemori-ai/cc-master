@@ -167,7 +167,8 @@ export function AgentInspector({
           </button>
         ) : (
           <div className="dim-note">
-            no live stream — no readable stream source for this agent type yet
+            no live stream — this record has no session-id handle or transcript ref; dispatch via
+            `ccm worker dispatch` to bind one, or attach it with `ccm agent amend`
           </div>
         )}
       </div>

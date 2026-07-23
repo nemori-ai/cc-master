@@ -1,0 +1,1 @@
+| `task-id` | Kimi Code Task 子 agent：value = Task 返回的完整 agentId（如 `agent-0`）；登记用 `harness=kimi-code`，同时以 `--transcript <session>/agents/main/wire.jsonl` 提供定位锚，viewer 派生 `agents/<agentId>/wire.jsonl`。子文件未出现时保持无源，不回退 main 流。 | `--transcript` 只记父 main wire 路径引用（绝不内嵌内容）；完整配方见 command-catalog 的 agent bind 节。 |

@@ -64,6 +64,8 @@ slot_replacements:
   "{{USING_CCM_FMT_POLICY_ROW}}": adapters/codex/overlays/fmt-policy-row.md
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/codex/overlays/coordination-quota-model-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/codex/overlays/cross-harness-target-facts-pointer.md
+  "{{USING_CCM_NATIVE_SUBAGENT_TRANSCRIPT_RECIPE}}": adapters/codex/overlays/native-subagent-transcript-recipe.md
+  "{{USING_CCM_TASK_ID_HANDLE_ROW}}": adapters/codex/overlays/task-id-handle-row.md
 host_slots:
   "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":
     capability: background_dispatch
