@@ -52,6 +52,8 @@ slot_replacements:
   "{{USING_CCM_FMT_POLICY_ROW}}": adapters/claude-code/overlays/fmt-policy-row.md
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/claude-code/overlays/coordination-quota-model-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/claude-code/overlays/cross-harness-target-facts-pointer.md
+  "{{USING_CCM_NATIVE_SUBAGENT_TRANSCRIPT_RECIPE}}": adapters/claude-code/overlays/native-subagent-transcript-recipe.md
+  "{{USING_CCM_TASK_ID_HANDLE_ROW}}": adapters/claude-code/overlays/task-id-handle-row.md
 mechanisms:
   declarative-patch:
     enabled: false

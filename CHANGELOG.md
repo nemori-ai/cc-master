@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **bash 3.2 multibyte varname parsing (stock macOS `/bin/bash`)** — `install.sh` crashed with `dest�: unbound variable` at the Cursor step (aborting the remaining kimi-code install) and the bootstrap hook's ccm-capability directive silently dropped the installed version: bash 3.2 absorbs a CJK punctuation character immediately following `$var` into the variable name. All affected expansions now use the `${var}` brace form (`install.sh` ×5, `bootstrap-board.sh` ×2).
-- **`using-ccm` in-session subagent 登记配方补全** — 分发 skill 此前未教「Task tool 派生的 subagent 该怎么登记才能被 web viewer 流式观测」（正确配方只存在于 ccm 源码注释），orchestrator 实操中把 subagent 的 agentId 错登成 `session-id:<agentId>` 且漏 `--transcript`，导致 viewer 对全部 in-session subagent 显示「无源」。`command-catalog.md`（agent bind 节新增配方 + 反模式）与 `board-model-guide.md`（handle.kind 表 `task-id` 行）现明确：handle 用 `task-id:<subagent agentId>` + 必须同时 `--transcript <父 session 转录绝对路径>`。
+- **多 harness native subagent transcript 定位与指引** — `using-ccm` 此前把 Claude Code 的 Task 子转录布局复制给所有 host，且 viewer 在子文件未出现时会把父 transcript 冒充成子 agent。现将登记配方投影为 per-host contract：Claude Code 由父 session JSONL + `task-id:<agentId>` 派生 `subagents/agent-<agentId>.jsonl`；Kimi Code 由父 `agents/main/wire.jsonl` 派生 `agents/<agentId>/wire.jsonl` 并按 typed wire 解析；Codex/Cursor 对未实证的父→子布局保持 fail-closed。父 transcript 只作定位锚，子源未出现时如实返回无源，不再泄漏父事件。
 
 ## [0.21.0] — 2026-07-23
 

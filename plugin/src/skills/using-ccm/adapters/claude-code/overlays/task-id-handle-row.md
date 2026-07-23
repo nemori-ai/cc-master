@@ -1,0 +1,1 @@
+| `task-id` | Claude Code Task subagent：value = Task 返回的 agentId；登记用具体 `harness=claude-code`，同时以 `--transcript <父-session.jsonl>` 提供定位锚，viewer 派生 `subagents/agent-<agentId>.jsonl`。子文件未出现时保持无源，不回退父流。其他 task 粒度派发只有在绑定其**自身**可读 transcript 时才可流式观察。 | `--transcript` 只记路径引用（绝不内嵌内容）；完整配方见 command-catalog 的 agent bind 节。 |

@@ -64,5 +64,7 @@ slot_replacements:
   "{{USING_CCM_FMT_POLICY_ROW}}": adapters/kimi-code/overlays/fmt-policy-row.md
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/kimi-code/overlays/coordination-quota-model-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
+  "{{USING_CCM_NATIVE_SUBAGENT_TRANSCRIPT_RECIPE}}": adapters/kimi-code/overlays/native-subagent-transcript-recipe.md
+  "{{USING_CCM_TASK_ID_HANDLE_ROW}}": adapters/kimi-code/overlays/task-id-handle-row.md
 notes:
   - kimi projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots (5h/7d read-only quota signal; built-in subagent roles + background Bash; no account switch or external statusline).

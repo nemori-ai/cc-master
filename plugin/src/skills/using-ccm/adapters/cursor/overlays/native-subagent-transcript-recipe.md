@@ -1,0 +1,1 @@
+**Cursor Task 子 agent 登记边界**：Cursor 原生会话落在 SQLite `state.vscdb`，当前不能作为可 tail transcript；也没有已实证的父→子日志派生规则。Task 返回真实 id 后可用 `task-id:<id>` 登记。只有 wrapper / hook 确实产出**该 Task 子 agent 自己的纯文本日志**时，才以具体 `--harness cursor-agent --transcript <子-agent.log>` 绑定并走 raw parser；不要绑定 `state.vscdb`，也不要用父 agent 日志冒充子流。

@@ -243,6 +243,67 @@ test('kimi-code locates wire.jsonl by path-segment sid (session-id handle, no tr
   );
 });
 
+test('kimi-code Task subagent resolves its own wire.jsonl from parent main ref + task-id handle', () => {
+  // Real Kimi layout: one session contains `agents/main/wire.jsonl` plus one sibling directory
+  // per Task subagent (`agents/<agentId>/wire.jsonl`). The Task-returned agent id is the handle;
+  // registering the parent main wire supplies the stable session anchor without copying content.
+  const dir = mkdtempSync(join(tmpdir(), 'ccm-kimi-subagent-'));
+  TMPDIRS.push(dir);
+  const agentsDir = join(
+    dir,
+    'sessions',
+    'wd_repo_deadbeef',
+    'session_7cfabeb1-ad90-41bc-b9a3-bc4e2f105bbc',
+    'agents',
+  );
+  const mainDir = join(agentsDir, 'main');
+  const agentId = 'agent-0';
+  const subDir = join(agentsDir, agentId);
+  mkdirSync(mainDir, { recursive: true });
+  mkdirSync(subDir, { recursive: true });
+  const parentPath = join(mainDir, 'wire.jsonl');
+  writeFileSync(
+    parentPath,
+    `${[
+      '{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"parent request"}],"toolCalls":[]},"time":1784270606400}',
+      '{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"parent line — must NOT stream under the subagent"}},"time":1784270606420}',
+    ].join('\n')}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    join(subDir, 'wire.jsonl'),
+    `${[
+      '{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"inspect the parser"}],"toolCalls":[]},"time":1784270606500}',
+      '{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"tc1","name":"Read","args":{"path":"src/parser.ts"}},"time":1784270606510}',
+      '{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"tc1","result":{"output":"export function parse() {}"}},"time":1784270606520}',
+      '{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"parser inspected"}},"time":1784270606530}',
+    ].join('\n')}\n`,
+    'utf8',
+  );
+
+  const p = buildAgentStream({
+    agentId: 'agt-kimi-sub',
+    harness: 'kimi-code',
+    handleKind: 'task-id',
+    handleValue: agentId,
+    transcriptRef: parentPath,
+  });
+  assert.equal(p.source.kind, 'transcript');
+  assert.ok(
+    String(p.source.path).endsWith(`agents/${agentId}/wire.jsonl`),
+    'derived Kimi Task subagent wire wins over the parent main ref',
+  );
+  assert.deepEqual(
+    p.events.map((e) => e.kind),
+    ['user', 'tool', 'tool_result', 'assistant'],
+  );
+  assert.equal(p.events[3]?.text, 'parser inspected');
+  assert.ok(
+    p.events.every((e) => !e.text.includes('parent line')),
+    'no Kimi main-agent events leak into the Task subagent stream',
+  );
+});
+
 test('cursor short-term: external transcript via CURSOR_TRANSCRIPT_PATH tails as raw lines', () => {
   // Cursor's native store is SQLite (state.vscdb) — not tailable. Short-term: an externally
   // provided plain-text transcript path is honored as a raw-line source when no explicit
@@ -755,8 +816,8 @@ test('claude subagent stream resolves the derived subagents file from parent ref
     'no parent events leak into the subagent stream',
   );
 
-  // Startup race / unknown agentId: derived file absent -> honest fallback to the parent ref
-  // (once the subagent file appears, path+ino change and the client re-tails onto it).
+  // Startup race / unknown agentId: derived file absent -> honest no-source. Falling back to the
+  // parent transcript would misattribute the orchestrator's events to this subagent.
   const fallback = buildAgentStream({
     agentId: 'agt-sub2',
     harness: 'claude-code',
@@ -764,6 +825,7 @@ test('claude subagent stream resolves the derived subagents file from parent ref
     handleValue: 'anotheragentid000',
     transcriptRef: parentPath,
   });
-  assert.equal(fallback.source.path, parentPath);
-  assert.ok(fallback.events.some((e) => e.text.includes('parent line')));
+  assert.equal(fallback.source.kind, 'none');
+  assert.deepEqual(fallback.events, []);
+  assert.match(fallback.source.reason ?? '', /subagent transcript.*not found/i);
 });

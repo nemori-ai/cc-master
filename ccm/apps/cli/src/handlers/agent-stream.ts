@@ -661,6 +661,14 @@ const STREAM_LOCATABLE_HARNESSES = new Set(['claude-code', 'origin', 'codex', 'k
 //   agent 类型不支持」——前者是操作者可修的绑定缺口（用户实测踩过：codex agent 以 task-id 登记、
 //   无 transcript_ref，viewer 显示旧文案后被误读成 codex 流式不支持），归因必须区分且给出操作出口。
 function noSourceReason(req: AgentStreamRequest): string {
+  if (
+    req.transcriptRef &&
+    req.handleKind === 'task-id' &&
+    req.handleValue &&
+    (req.harness === 'claude-code' || req.harness === 'origin' || req.harness === 'kimi-code')
+  ) {
+    return 'subagent transcript is not found yet; the parent transcript is never streamed as the child';
+  }
   if (req.transcriptRef) return 'transcript reference does not resolve to a readable file';
   if (req.harness && CURSOR_HARNESSES.has(req.harness)) {
     return (
