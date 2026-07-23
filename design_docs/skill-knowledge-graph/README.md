@@ -13,6 +13,7 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 | 编写或验证 authored graph source | [schemas/knowledge-source.schema.json](schemas/knowledge-source.schema.json) |
 | 编写或验证语义变更事务 | [schemas/knowledge-change.schema.json](schemas/knowledge-change.schema.json) |
 | 看一套最小但完整的 source 示例 | [examples/](examples/) |
+| 查四 host anchor/path/partial/stub 冻结合同与 fixture | [fixtures/host-portability/](fixtures/host-portability/) |
 | 追溯近一年官方规范、论文与工程证据 | [../research/skill_knowledge_graph/README.md](../research/skill_knowledge_graph/README.md) |
 | 理解为何选 Git-native JSON + Markdown，而不选数据库 | [../../adrs/ADR-038-git-native-skill-knowledge-graph.md](../../adrs/ADR-038-git-native-skill-knowledge-graph.md) |
 

@@ -76,6 +76,10 @@ export const HARDENING_CONTRACT = Object.freeze({
   }),
   C9: Object.freeze({
     hosts: Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']),
+    worker_allowlist: Object.freeze(['codex', 'cursor']),
+    payload_modes: Object.freeze(['canonical', 'partial', 'stub']),
+    anchor_form: 'explicit-html-id',
+    path_policy: 'relative-final-host-path',
   }),
   C10: Object.freeze({ changed_scope_base_option: '--base', immutable_chain: true }),
   C11: Object.freeze({ k2_allows_partial: false }),
@@ -127,7 +131,7 @@ export const CAPABILITIES = Object.freeze({
   derived_freshness: false,
   canonical_graph_hash: false,
   deterministic_budget_estimator: false,
-  host_portability_probe: false,
+  host_portability_probe: true,
   semantic_coverage: false,
   behavioral_evidence_tracking: false,
 });

@@ -128,7 +128,13 @@ JSON 结果必须包含：
   "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"]},
   "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
   "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
-  "C9": {"hosts": ["claude-code", "codex", "cursor", "kimi-code"]},
+  "C9": {
+    "hosts": ["claude-code", "codex", "cursor", "kimi-code"],
+    "worker_allowlist": ["codex", "cursor"],
+    "payload_modes": ["canonical", "partial", "stub"],
+    "anchor_form": "explicit-html-id",
+    "path_policy": "relative-final-host-path"
+  },
   "C10": {"changed_scope_base_option": "--base", "immutable_chain": true},
   "C11": {"k2_allows_partial": false},
   "C12": {"report_tracks": ["structural_status", "behavioral_evidence_status"]},
@@ -155,16 +161,16 @@ JSON 结果必须包含：
 }
 ```
 
-K1 hardening 增加但在 K0 仍必须为 `false` 的 capability：
+K1 hardening capabilities；当前实现状态以 `contract --json` 的 `capabilities` 为准：
 
-- `entry_surface_binding`
-- `canonical_source_inventory`
-- `derived_freshness`
-- `canonical_graph_hash`
-- `deterministic_budget_estimator`
-- `host_portability_probe`
-- `semantic_coverage`
-- `behavioral_evidence_tracking`
+- `entry_surface_binding`（仍 false，直到 entry surface binding 落地）
+- `canonical_source_inventory`（仍 false）
+- `derived_freshness`（仍 false）
+- `canonical_graph_hash`（仍 false）
+- `deterministic_budget_estimator`（仍 false）
+- `host_portability_probe`（**true**：C9 四 host fixture probe + frozen adapter contract 已落地）
+- `semantic_coverage`（仍 false）
+- `behavioral_evidence_tracking`（仍 false）
 
 ## 4. K0 `check`
 
@@ -237,7 +243,7 @@ full validation。
     "derived_freshness": false,
     "canonical_graph_hash": false,
     "deterministic_budget_estimator": false,
-    "host_portability_probe": false,
+    "host_portability_probe": true,
     "semantic_coverage": false,
     "behavioral_evidence_tracking": false
   },

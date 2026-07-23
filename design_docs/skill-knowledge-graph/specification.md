@@ -107,7 +107,7 @@ K1 的编译器、编辑器和 host verifier 不得自行补设计。以下 `C1`
 | `C6` | canonical graph hash 只纳入 accepted portfolio/skill/module manifests、canonical span hashes、source inventory 与 accepted change-head digest；digest 排除当前 record 的 `result_graph_sha256` 防自引用，按 §10.2 稳定序列化 |
 | `C7` | Markdown span hash 在 UTF-8、CRLF→LF 后计算 start/end marker 之间的精确 bytes；marker 与 span 外 generated block 不纳入，nested crossing/overlap/unclosed/duplicate fail closed |
 | `C8` | budget 只报告 `estimated_tokens`、lines、UTF-8 bytes；v1 估算器是确定性的 `ceil(utf8_bytes / 3)`，不声称等于任一模型 tokenizer |
-| `C9` | K1 的 host portability probe 固定覆盖 `claude-code / codex / cursor / kimi-code`，分别验证 explicit anchor、relative link、path rewrite 与 canonical/partial/stub payload |
+| `C9` | K1 的 host portability probe 固定覆盖 `claude-code / codex / cursor / kimi-code`，分别验证 explicit anchor、relative link、path rewrite 与 canonical/partial/stub payload；冻结 `worker_allowlist=[codex,cursor]`（与四产品 host 分界）、`anchor_form=explicit-html-id`、`path_policy=relative-final-host-path`；heading auto-slug 与 live click-through 标为 unverifiable 且 fail closed |
 | `C10` | changed-scope 检查接受显式 `--base <git-ref>`；finalized change 记录 base ref、base/result graph hash、parent chain link 与 scoped before/after hashes，retired ID 从完整 immutable ledger 推导 |
 | `C11` | semantic coverage denominator 是 Git 中全部 canonical Markdown，不是 graph 已声明的子集；K2 禁止缺 inventory、`partial` 或 stale unbound review |
 | `C12` | report 分开输出 structural status 与 behavioral evidence status；无 baseline/candidate/holdout 证据时不得声称 agent 定位更精准 |

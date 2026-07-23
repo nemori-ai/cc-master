@@ -523,7 +523,11 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "hosts"
+            "hosts",
+            "worker_allowlist",
+            "payload_modes",
+            "anchor_form",
+            "path_policy"
           ],
           "properties": {
             "hosts": {
@@ -533,6 +537,25 @@
                 "cursor",
                 "kimi-code"
               ]
+            },
+            "worker_allowlist": {
+              "const": [
+                "codex",
+                "cursor"
+              ]
+            },
+            "payload_modes": {
+              "const": [
+                "canonical",
+                "partial",
+                "stub"
+              ]
+            },
+            "anchor_form": {
+              "const": "explicit-html-id"
+            },
+            "path_policy": {
+              "const": "relative-final-host-path"
             }
           }
         },

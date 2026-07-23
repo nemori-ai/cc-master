@@ -95,7 +95,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.derived_freshness, false);
   assert.equal(body.capabilities.canonical_graph_hash, false);
   assert.equal(body.capabilities.deterministic_budget_estimator, false);
-  assert.equal(body.capabilities.host_portability_probe, false);
+  assert.equal(body.capabilities.host_portability_probe, true);
   assert.equal(body.capabilities.semantic_coverage, false);
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
   assert.deepEqual(Object.keys(body.hardening_contract),
@@ -115,6 +115,14 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'cursor',
     'kimi-code',
   ]);
+  assert.deepEqual(body.hardening_contract.C9.worker_allowlist, ['codex', 'cursor']);
+  assert.deepEqual(body.hardening_contract.C9.payload_modes, [
+    'canonical',
+    'partial',
+    'stub',
+  ]);
+  assert.equal(body.hardening_contract.C9.anchor_form, 'explicit-html-id');
+  assert.equal(body.hardening_contract.C9.path_policy, 'relative-final-host-path');
   assert.equal(body.hardening_contract.C14.runtime_skill_count, 8);
   assert.equal(body.hardening_contract.C14.governance_meta_skill_is_runtime, false);
 });
