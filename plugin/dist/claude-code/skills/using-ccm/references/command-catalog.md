@@ -1955,6 +1955,12 @@ ccm agent bind <id> --handle <kind:value> [flags]
 3. **起跑后升级 bind**：日志**首行 `thread.started` 事件的 `thread_id` 就是 sid**（`head -1 /abs/worker.log` 即可提取；它与 rollout 文件名里的 sid 一致。旧版 codex 若输出的是 `session_meta` 形状，则取其 `payload.session_id`）。拿到就升级：`ccm agent bind <id> --handle session-id:<sid> --attach-cmd "cd /abs/cwd && codex resume <sid>"`——探测随之升级为会话文件 mtime（rollout 落盘于 `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sid>.jsonl`），attach / 流定位升级为精确 rollout 源。
 4. **反模式**：`codex exec resume --last` 不可作 attach 命令——它接「最近一个 session」，并行多 worker 时会接错人；shell 后台任务 id 也不是可探测的 handle（登记成 `task-id:<shell任务id>` 会让 probe 无从探测、流定位不到 rollout 文件）。精确 resume 永远是 `codex resume <sid>`。
 
+**in-session subagent 登记配方（Task tool 派生的 subagent·harness `origin`）**：subagent 的转录独立落盘在**父会话转录旁**：`<父转录去 .jsonl>/subagents/agent-<agentId>.jsonl`。要让 viewer 能实时流式观测，登记必须给足派生这条路径的两个原料：
+
+1. **handle 用 `task-id:<subagent agentId>`**——agentId 是 spawn 返回的 subagent 标识（`ccm agent bind <id> --handle task-id:<agentId> ...`）。
+2. **必须同时 `--transcript <父 session 转录的绝对路径>`**——即你（master）自己这个会话的转录文件（Claude Code 落在 `<claude 配置目录>/projects/<项目路径 slug>/<你的 session_id>.jsonl`；`session_id` 可从 board 的 `owner.session_id` 读）。viewer 由「父转录 + agentId」派生 subagent 子转录的实时流；子文件尚未落盘时先回退父转录，落盘后自动切换。
+3. **反模式**：把 subagent 的 agentId 当 `session-id` 登记（`session-id:<agentId>`）或漏 `--transcript`——定位器会拿 agentId 当会话文件名去找、永远找不到，viewer 里这个 agent 的 stream 恒为「无源」。
+
 ### agent amend
 
 **写**（只改 handle 域·非状态转移）
