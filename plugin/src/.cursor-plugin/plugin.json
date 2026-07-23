@@ -1,6 +1,6 @@
 {
   "name": "cc-master",
-  "version": "0.21.0-rc.3",
+  "version": "0.21.0-rc.4",
   "description": "Turn a Cursor IDE Agent session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
   "rules": "./rules/",

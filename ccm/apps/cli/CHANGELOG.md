@@ -1,5 +1,17 @@
 # ccm
 
+## 0.22.0-rc.4
+
+### Minor Changes
+
+- rc4: tracked worker dispatch, adapter-owned harness capabilities, and provider-facts refresh
+
+  - **tracked dispatch**: `ccm worker dispatch` synchronously claims an idempotency key, spawns the real harness process, registers and binds the board agent, upgrades only from typed session/transcript evidence, and closes sanitized lifecycle facts with durable reconciliation. `ccm worker run` remains the zero-board-side-effect raw transport.
+  - **stream/viewer seam**: registered dispatches expose the same harness-specific transcript evidence consumed by the existing Web Viewer stream surface; unsupported session or transcript capabilities remain explicit rather than guessed from model text.
+  - **harness composition**: capability value objects, provider/strategy composition, catalog services, and adapter-owned discovery replace parallel switch/list ownership across quota, usage, statusline, account, worker, and upgrade consumers.
+  - **provider facts**: refreshes current provider/model evidence and keeps model-policy candidates bound to attested facts.
+  - **test integrity**: Turbo cache inputs now include plugin harness contracts and shared sources, with a mutation-kill regression test proving those inputs invalidate cached CCM tests.
+
 ## 0.22.0-rc.3
 
 ### Patch Changes
