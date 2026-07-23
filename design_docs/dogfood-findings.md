@@ -1284,3 +1284,11 @@
 - **影响**:rc 未标 pre-release 会被 marketplace / consumer 当正式版;title 不描述、body 体例不一致降低 release 可读性与检索性。
 - **处置(含蒸馏判定)**:**已修**(`gh release edit` 对齐 title + `--prerelease` + 规范 body)。根治=发版脚本化——`plugin-release-engineering` skill 的 release checklist 加硬项「rc 必 `--prerelease` + title `<product> vX.Y.Z` + body『一行摘要 + See CHANGELOG』」,或让 release workflow 生成时按 tag 前缀自动置 prerelease/title/body。**蒸馏落点**:plugin-release-engineering skill(发版 checklist)+ 可脚本化(workflow 自动生成 release 元数据)。
 - **严重度 / 来源**:should-fix(发版规范手工漏项·应脚本化)+ ✅正向(用户 review 抓到·已修正)/ 一手(rc3 发版 + 用户 review,2026-07-21)。
+
+## Finding #105 — bash 3.2(stock macOS /bin/bash)把 `$var` 后紧跟的多字节中文标点并进变量名:install.sh 在 cursor 收尾行 `$dest。` 处 `set -u` 崩(`dest�: unbound variable`)、中断后续 kimi-code 安装;bootstrap-board.sh 的 ccm 能力拒绝 directive 同型(`$ccm_version；`·无 set -u 则静默丢值+乱码)· should-fix(中文文案 shell 脚本的可移植性盲区)
+
+- **现象 / 证据**:v0.21.0 正式版首次 `bash install.sh` 全默认安装,ccm/claude-code/codex/cursor 四步全成功后崩在 `install.sh:1053`(`dest�: unbound variable`),kimi-code 未装。最小复现:`/bin/bash -uc 'dest=/tmp; echo "$dest。"'` 必崩;无 `set -u` 时 `echo "$x；end"` 输出 `got:��end`(值丢失+标点乱码)。花括号形式 `${dest}。` 两种模式下均正常。
+- **根因**:bash 3.2 的 tokenizer 把 `$var` 后紧跟的多字节字符(UTF-8 中文标点首字节 ≥0x80)并进变量名 → 解析成不存在的变量 `dest。`。bash 4+/5 无此问题,但 macOS 因 GPLv3 永远停在 3.2——`curl | bash` 与 Claude Code hook 在 stock macOS 上跑的就是它。中文文案 + shell 变量插值的组合让这颗雷只在「变量后无空格直接接中文标点」时引爆,test 环境(新 bash / 英文文案)全绿。
+- **影响**:install.sh 五处(1053/1116 主路径 + 916/936/1286 die 路径)——主路径崩断安装链(cursor 之后的 harness 装不上);bootstrap-board.sh:664 的 ccm 能力拒绝 directive 丢 `installed: <version>` 信息+乱码(无 set -u,不崩但消息劣化)。全仓 `.sh` 已扫,其余命中均在注释内(安全)。
+- **处置(含蒸馏判定)**:**已修**——七处全部 `$var` → `${var}`(install.sh ×5 + bootstrap-board.sh ×2),两处主文件加注释立纪律「变量引用后接中文标点一律花括号」;bootstrap-board 属单端(claude-code bash)修复,其余 host 为 node 实现天然免疫,已按 hook N-host 锁步在 CONTRACT.md 降级行为节声明。**蒸馏判定:不回流 skill**——这是本仓 shell 编码纪律(中文文案 repo 特有),受众是本仓贡献者非 user-agent;落点即本条台账 + 两处代码注释。可选根治:CI 加 `perl -ne '/\$[A-Za-z_]\w*[^\x00-\x7F]/'` 扫描门(本轮未加,PR review 提及)。
+- **严重度 / 来源**:should-fix(安装链中断·主路径)/ 一手(v0.21.0 安装升级 dogfood,2026-07-23)。

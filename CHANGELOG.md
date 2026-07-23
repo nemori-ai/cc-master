@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **bash 3.2 multibyte varname parsing (stock macOS `/bin/bash`)** — `install.sh` crashed with `dest�: unbound variable` at the Cursor step (aborting the remaining kimi-code install) and the bootstrap hook's ccm-capability directive silently dropped the installed version: bash 3.2 absorbs a CJK punctuation character immediately following `$var` into the variable name. All affected expansions now use the `${var}` brace form (`install.sh` ×5, `bootstrap-board.sh` ×2).
+
 ## [0.21.0] — 2026-07-23
 
 > **Four-harness orchestration, deadline-aware delivery, and tracked workers** — stable release paired with **ccm-v0.22.0**; upgrade `ccm` first.

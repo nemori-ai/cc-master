@@ -190,6 +190,22 @@ proves their host-native projections without broadening registration beyond the 
     SSOT: `_hosts/cursor/ENVELOPE.md`.
   tracked_by: "plugin v0.17.2 envelope fix"
 
+- rule: bootstrap-bash32-multibyte-varname-quoting
+  kind: host-convention-divergence
+  affected_hosts: [claude-code]
+  reason: >
+    The claude-code implementation is bash and runs under stock macOS /bin/bash 3.2, whose parser
+    absorbs a multibyte (CJK punctuation) character immediately following `$var` into the variable
+    name — the expansion silently resolves to an unset name, dropping the value and mangling the
+    punctuation in the injected message (or aborting under `set -u`). Fix is claude-code-only
+    because codex / cursor / kimi-code implementations are node/JS (bootstrap-board-core.js) and
+    have no bash parsing layer; no business rule, threshold, or injection semantics changed —
+    only `$var` → `${var}` brace quoting where a CJK punctuation character directly follows.
+  compensating_mechanism: >
+    bootstrap-board.sh uses `${var}` brace form for every variable expansion immediately followed
+    by CJK punctuation inside double-quoted strings (same discipline as repo-root install.sh).
+  tracked_by: "design_docs/dogfood-findings.md Finding #105"
+
 - rule: bootstrap-kimi-trigger-and-envelope
   kind: host-convention-divergence
   affected_hosts: [kimi-code]
