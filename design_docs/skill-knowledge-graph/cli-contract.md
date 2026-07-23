@@ -33,12 +33,12 @@ node scripts/skill-knowledge.mjs <command> [options]
 | Command | K0 状态 | 合同 |
 |---|---|---|
 | `contract [--json]` | implemented | 返回能力、plane、operation、invariant 与 exit-code registry |
-| `check [--source <dir>] [--stage K0\|K1\|K2\|K3] [--json]` | implemented-k0 | 运行 K0 source scaffold checks |
-| `compile` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
-| `report` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
-| `path` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
-| `explain` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
-| `change` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `check [--source <dir>] [--stage K0\|K1\|K2\|K3] [--host <host>] [--base <git-ref>] [--json]` | implemented-k0 | K0 只执行 scaffold；`--host/--base` 已冻结但在 K0 exit 10 |
+| `compile [--host <host>] [--check]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `report [--format json\|markdown] [--host <host>]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `path --from <id> --to <id> [--host <host>]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `explain <diagnostic-or-entity>` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `change begin\|validate\|apply` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
 
 Declared 命令存在是为了冻结 vocabulary 和让 agent fail loud，不代表对应能力已经交付。
 
@@ -114,6 +114,30 @@ JSON 结果必须包含：
 - `schemas`
 - `source_layout`
 - `capabilities`
+- `hardening_contract`
+
+`hardening_contract` 固定包含 `C1`–`C14`，让后续实现和 CI 不从 prose 猜字段。其最小机器形状：
+
+```json
+{
+  "C1": {"entry_surface_fields": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"]},
+  "C2": {"coverage_states": ["full", "partial", "non_knowledge", "excluded"], "denominator": "git_canonical_markdown"},
+  "C3": {"derived_fields": ["canonical", "review_policy", "reviewed_canonical_sha256"]},
+  "C4": {"accepted_skill_requires_admission": true},
+  "C5": {"change_workflow": ["begin", "validate", "apply"], "workspace_root": ".skill-knowledge/workspaces/<change-id>"},
+  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"]},
+  "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
+  "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
+  "C9": {"hosts": ["claude-code", "codex", "cursor", "kimi-code"]},
+  "C10": {"changed_scope_base_option": "--base", "immutable_chain": true},
+  "C11": {"k2_allows_partial": false},
+  "C12": {"report_tracks": ["structural_status", "behavioral_evidence_status"]},
+  "C13": {"research_supersession_required": true},
+  "C14": {"runtime_skill_count": 8, "governance_meta_skill_is_runtime": false}
+}
+```
+
+数组顺序是 contract 输出顺序；消费者不得按 object key 的序号推断语义。
 
 `capabilities` 在 K0 必须诚实声明：
 
@@ -130,6 +154,17 @@ JSON 结果必须包含：
   "typed_change_transactions": false
 }
 ```
+
+K1 hardening 增加但在 K0 仍必须为 `false` 的 capability：
+
+- `entry_surface_binding`
+- `canonical_source_inventory`
+- `derived_freshness`
+- `canonical_graph_hash`
+- `deterministic_budget_estimator`
+- `host_portability_probe`
+- `semantic_coverage`
+- `behavioral_evidence_tracking`
 
 ## 4. K0 `check`
 
@@ -158,6 +193,11 @@ K0 明确不执行：
 - per-host projection；
 - change replay。
 
+K0 `check --host` 或 `check --base` 必须返回 exit 10 和
+`SKG-CAPABILITY-NOT-IMPLEMENTED`；不得把它们当未知参数返回 exit 2，也不得忽略参数后执行缩小版
+检查。`--base` 只在 K1+ 解释 PR changed scope，routine full check 的 coverage denominator 始终是
+Git 中全部 canonical Markdown。
+
 零 authored JSON 在 K0 是 `debt`、exit 0；在 K1+ 是 hard failure、exit 4。若 K1+ 已有
 documents，但 full schema validator 尚未交付，则 fail loud、exit 10，不把 envelope check 冒充
 full validation。
@@ -182,12 +222,54 @@ full validation。
     "errors": 0,
     "debts": 2
   },
-  "capabilities": {},
-  "diagnostics": []
+  "capabilities": {
+    "source_json_parse": true,
+    "source_envelope_validation": true,
+    "global_id_uniqueness": true,
+    "full_json_schema_validation": false,
+    "markdown_binding": false,
+    "graph_invariants": false,
+    "runtime_projection": false,
+    "hop_analysis": false,
+    "typed_change_transactions": false,
+    "entry_surface_binding": false,
+    "canonical_source_inventory": false,
+    "derived_freshness": false,
+    "canonical_graph_hash": false,
+    "deterministic_budget_estimator": false,
+    "host_portability_probe": false,
+    "semantic_coverage": false,
+    "behavioral_evidence_tracking": false
+  },
+  "diagnostics": [
+    {
+      "severity": "debt",
+      "code": "SKG-COVERAGE-EMPTY",
+      "message": "K0 source root has no authored knowledge inventory yet.",
+      "location": "plugin/src/knowledge",
+      "witness": {
+        "documents": 0,
+        "stage": "K0"
+      },
+      "remediation": "Start the admitted K1 pilot; do not create an empty portfolio that claims coverage."
+    },
+    {
+      "severity": "debt",
+      "code": "SKG-SCHEMA-VALIDATOR-UNAVAILABLE",
+      "message": "Full JSON Schema instance validation is declared but not executable in K0.",
+      "location": "design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json",
+      "witness": {
+        "full_json_schema_validation": false,
+        "envelope_validation": true,
+        "stage": "K0"
+      },
+      "remediation": "Generate and commit the standalone Draft 2020-12 validator; do not equate envelope checks with schema validation."
+    }
+  ]
 }
 ```
 
-`debts` 的精确数量可随 K0 scanner 增加诊断而变化；消费者依赖 code，不依赖数组位置。
+`summary.debts` 与 `diagnostics[].code` 必须与可执行 `check --stage K0` 锁步；消费者依赖 code，不依赖数组位置。
 
 ## 5. Exit codes
 
@@ -205,7 +287,26 @@ full validation。
 
 一次运行按最高优先级失败类别退出，但 JSON 中应保留同轮发现的全部 diagnostics。
 
-## 6. Compatibility
+## 6. K1 change workspace 与 report 合同
+
+`change begin --op <type> --scope <path...> --base <git-ref>` 创建 ignored workspace，并冻结 resolved
+base ref、base graph hash 与 scope file hashes。agent 只编辑 `candidate/`。
+
+`change validate <workspace>` 必须对完整 candidate graph 与四 host projection 验证，计算 result graph
+hash、deterministic semantic diff 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
+全部通过才产生 `candidate_valid: true`。
+
+`change apply <workspace>` 必须重验 accepted scope 后全有或全无写入；成功写入后才 finalized immutable
+change record。任一 scope stale/dirty/写失败都拒绝部分写入和 ledger finalize。closed operation set 保持：
+`add / wording / refine / move / split / merge / transfer_owner / deprecate / retire`。
+
+未来 `report` envelope 的 `result_kind` 为 `report`，并同时含：
+
+- `structural_status.state`: `pass | fail | debt | not_run`；
+- `behavioral_evidence_status.state`: `not_run | baseline | candidate | holdout_verdict`；
+- 行为证据未到 `holdout_verdict` 时不得出现 improvement claim。
+
+## 7. Compatibility
 
 - `schema` 或命令/字段发生 breaking change 时发布新 contract version。
 - v1alpha1 内可以新增 diagnostic code、registry item 和 optional field。

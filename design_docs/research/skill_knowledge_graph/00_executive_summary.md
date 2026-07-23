@@ -31,9 +31,15 @@
    但还必须单独守 context/token budget 和 agent 是否选对路径的行为 eval。
 7. **图是原文的导航骨架。** graph summary 不能取代 knowledge span；最终判断必须能回到绑定的
    Markdown evidence。无法覆盖时应暴露 coverage debt 或停下，而不是补猜。
-8. **暂不新增独立 skill。** schema/compiler/CI 是机制，不是 skill；
+8. **研究时点暂不新增独立 skill。** schema/compiler/CI 是机制，不是 skill；
    单 skill 维护纪律进入 `cc-master-skillsmith`，跨 skill owner/overlap 进入
    `curating-skill-portfolios`，行为度量进入 `grounding-skill-evals`。
+
+> **演进标记（superseded as a portfolio decision，2026-07-23）：** 上述结论描述的是治理工具尚不可
+> 执行的研究时点，因而“先不立空气操作手册”仍然成立。后续正式规范已通过反事实准入，决定在 K1
+> `begin → validate → apply`、graph witness 与 projection 能力真实可用后创建 dev-only
+> `governing-skill-knowledge`，专责执行图诊断与 typed transaction。它不进入 runtime plugin，也不接管
+> skillsmith / curating / eval 的职责。保留原文是为了保留决策演进证据，不把后来的条件倒写回研究时点。
 
 ## 推荐架构
 

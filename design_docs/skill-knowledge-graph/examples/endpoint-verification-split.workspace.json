@@ -1,0 +1,20 @@
+{
+  "schema_version": "cc-master/skill-knowledge-workspace/v1alpha1",
+  "kind": "change_workspace",
+  "change_id": "change:20260723.endpoint-verification-split",
+  "operation": "split",
+  "base_ref": "origin/main",
+  "base_graph_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "scope": [
+    {
+      "path": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "candidate_root": ".skill-knowledge/workspaces/20260723.endpoint-verification-split/candidate",
+  "status": "begun"
+}

@@ -13,7 +13,7 @@ const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
 
 Commands:
   contract [--json]
-  check [--source <dir>] [--stage K0|K1|K2|K3] [--json]
+  check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
   compile|report|path|explain|change [--json]   Declared; unavailable in K0
 
 Global:
@@ -22,7 +22,7 @@ Global:
 `;
 
 function parseCheckOptions(args) {
-  const options = { source: undefined, stage: 'K0', json: false };
+  const options = { source: undefined, stage: 'K0', host: undefined, base: undefined, json: false };
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
     if (token === '--json') options.json = true;
@@ -34,6 +34,14 @@ function parseCheckOptions(args) {
       index += 1;
       if (!args[index]) throw new Error('--stage requires K0, K1, K2, or K3');
       options.stage = args[index];
+    } else if (token === '--host') {
+      index += 1;
+      if (!args[index]) throw new Error('--host requires a host');
+      options.host = args[index];
+    } else if (token === '--base') {
+      index += 1;
+      if (!args[index]) throw new Error('--base requires a git ref');
+      options.base = args[index];
     } else {
       throw new Error(`unknown check argument: ${token}`);
     }
@@ -95,6 +103,19 @@ function unavailable(command) {
   return failureEnvelope(command, [item]);
 }
 
+function unavailableCheckOption(option, value) {
+  const item = diagnostic({
+    severity: 'error',
+    code: 'SKG-CAPABILITY-NOT-IMPLEMENTED',
+    message: `check ${option} is declared but not implemented in K0`,
+    location: 'scripts/skill-knowledge.mjs',
+    witness: { command: 'check', option, value, stage: 'K0' },
+    remediation: 'Omit --host/--base in K0, or implement the next admitted slice; do not treat this option as successful.',
+    exitCode: EXIT_CODES.capability_not_implemented,
+  });
+  return failureEnvelope('check', [item]);
+}
+
 export function main(argv = process.argv.slice(2)) {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const json = argv.includes('--json');
@@ -127,6 +148,12 @@ export function main(argv = process.argv.slice(2)) {
     } catch (error) {
       emit(usageFailure(command, error.message), json, process.stdout);
       return EXIT_CODES.usage;
+    }
+    if (options.host !== undefined || options.base !== undefined) {
+      const option = options.host !== undefined ? '--host' : '--base';
+      const value = options.host !== undefined ? options.host : options.base;
+      emit(unavailableCheckOption(option, value), options.json);
+      return EXIT_CODES.capability_not_implemented;
     }
     const result = runCheck({
       repoRoot,

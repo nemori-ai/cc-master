@@ -23,6 +23,16 @@ node scripts/skill-knowledge.mjs check --stage K0
 
 它必须报告 `SKG-COVERAGE-EMPTY` debt，但返回成功。K1 开始，同一缺口升级为 hard failure。
 
+K1 source 被接纳前还必须满足 specification 的 `C1`–`C14` hardening contract：EntryNode 绑定真实
+host surface；SkillNode 盘点 Git 中全部 canonical Markdown 并保存 reviewed-unbound hash；derived
+authority 保存 canonical review hash；accepted SkillNode 有 admission；finalized changes 通过 ignored
+workspace 的 `begin → validate → apply` 流程形成 base/result/parent hash chain。四 host 固定为
+`claude-code / codex / cursor / kimi-code`。
+
+`skill-knowledge contract --json` 的 `hardening_contract` 是上述字段的机器可读 registry，但 capability
+仍为 false 时只表示 vocabulary 已冻结。不得因 registry 存在就声称 marker/hash/projection/change 已实现；
+尚未实现的命令和 `check --host/--base` 必须 exit 10。
+
 规范与机器合同：
 
 - `design_docs/skill-knowledge-graph/specification.md`

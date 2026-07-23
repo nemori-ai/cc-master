@@ -4,7 +4,9 @@
   "id": "portfolio:cc-master-runtime-skills",
   "runtime_hosts": [
     "claude-code",
-    "codex"
+    "codex",
+    "cursor",
+    "kimi-code"
   ],
   "skills": [
     {
@@ -20,16 +22,87 @@
         "开始或恢复一场长程编排",
         "worker 或 workflow 报告 terminal"
       ],
-      "targets": [
+      "surfaces": [
         {
-          "skill": "skill:master-orchestrator-guide",
-          "module": "module:verification.endpoint",
-          "point": "point:verification.terminal-is-not-done"
+          "host": "claude-code",
+          "source_file": "plugin/src/commands/as-master-orchestrator/adapters/claude-code/body.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "cc-master-as-master-orchestrator"
+          },
+          "surface_kind": "command",
+          "targets": [
+            {
+              "skill": "skill:master-orchestrator-guide",
+              "module": "module:verification.endpoint",
+              "point": "point:verification.terminal-is-not-done"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-23"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/cc-master-as-master-orchestrator/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "entry:master-orchestrator"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:master-orchestrator-guide",
+              "module": "module:verification.endpoint",
+              "point": "point:verification.terminal-is-not-done"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-23"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/commands/as-master-orchestrator/adapters/cursor/body.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "cc-master-as-master-orchestrator"
+          },
+          "surface_kind": "command",
+          "targets": [
+            {
+              "skill": "skill:master-orchestrator-guide",
+              "module": "module:verification.endpoint",
+              "point": "point:verification.terminal-is-not-done"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-23"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/commands/as-master-orchestrator/adapters/kimi-code/body.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "cc-master-as-master-orchestrator"
+          },
+          "surface_kind": "command",
+          "targets": [
+            {
+              "skill": "skill:master-orchestrator-guide",
+              "module": "module:verification.endpoint",
+              "point": "point:verification.terminal-is-not-done"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-23"
+          }
         }
-      ],
-      "hosts": [
-        "claude-code",
-        "codex"
       ],
       "lifecycle": {
         "state": "accepted",

@@ -31,11 +31,12 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 当前完成 **K0 executable outer contract**：
 
 - 架构、source/change/output schema、示例、治理门与 K0→K3 晋级条件已经确定；
+- K1 实现前的 `C1`–`C14` hardening contract 已进入 specification、Schema、CLI registry 与 examples；
 - `plugin/src/knowledge/` 已成为正式 authored source root，但 inventory 有意为空并报告 debt；
 - `node scripts/skill-knowledge.mjs contract --json` 提供机器可读 capability registry；
 - `check --stage K0 --json` 已接入无第三方依赖的 content tests 与 GitHub Actions；
 - 未实现的 `compile/report/path/explain/change` 均 fail closed（exit 10）。
 
-完整 JSON Schema instance validator、真实 pilot inventory、Markdown binding、图不变式、类型化编辑器、
+合同冻结不等于能力实现。完整 JSON Schema instance validator、真实 pilot inventory、Markdown binding、图不变式、类型化编辑器、
 projection 与 hop analysis 仍属于 K1+。在 K3 全覆盖验收之前，不得对外声称八个分发 skill 已满足
 全图有向直径 `≤ 3`。

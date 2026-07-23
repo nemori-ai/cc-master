@@ -27,6 +27,7 @@
       "enum": [
         "contract",
         "check",
+        "report",
         "diagnostic"
       ]
     },
@@ -124,6 +125,19 @@
     "capabilities": {
       "$ref": "#/$defs/capabilities"
     },
+    "hardening_contract": {
+      "$ref": "#/$defs/hardeningContract"
+    },
+    "structural_status": {
+      "$ref": "#/$defs/structuralStatus"
+    },
+    "behavioral_evidence_status": {
+      "$ref": "#/$defs/behavioralEvidenceStatus"
+    },
+    "improvement_claim": {
+      "type": "string",
+      "minLength": 1
+    },
     "diagnostics": {
       "type": "array",
       "items": {
@@ -157,7 +171,27 @@
           "exit_codes",
           "schemas",
           "source_layout",
-          "capabilities"
+          "capabilities",
+          "hardening_contract"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "report"
+          }
+        },
+        "required": [
+          "result_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "structural_status",
+          "behavioral_evidence_status",
+          "diagnostics"
         ]
       }
     },
@@ -203,6 +237,30 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "required": [
+          "improvement_claim"
+        ]
+      },
+      "then": {
+        "properties": {
+          "behavioral_evidence_status": {
+            "properties": {
+              "state": {
+                "const": "holdout_verdict"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "behavioral_evidence_status"
+        ]
+      }
     }
   ],
   "$defs": {
@@ -231,7 +289,15 @@
         "graph_invariants",
         "runtime_projection",
         "hop_analysis",
-        "typed_change_transactions"
+        "typed_change_transactions",
+        "entry_surface_binding",
+        "canonical_source_inventory",
+        "derived_freshness",
+        "canonical_graph_hash",
+        "deterministic_budget_estimator",
+        "host_portability_probe",
+        "semantic_coverage",
+        "behavioral_evidence_tracking"
       ],
       "properties": {
         "source_json_parse": {
@@ -260,8 +326,357 @@
         },
         "typed_change_transactions": {
           "type": "boolean"
+        },
+        "entry_surface_binding": {
+          "type": "boolean"
+        },
+        "canonical_source_inventory": {
+          "type": "boolean"
+        },
+        "derived_freshness": {
+          "type": "boolean"
+        },
+        "canonical_graph_hash": {
+          "type": "boolean"
+        },
+        "deterministic_budget_estimator": {
+          "type": "boolean"
+        },
+        "host_portability_probe": {
+          "type": "boolean"
+        },
+        "semantic_coverage": {
+          "type": "boolean"
+        },
+        "behavioral_evidence_tracking": {
+          "type": "boolean"
         }
       }
+    },
+    "hardeningContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C14"
+      ],
+      "properties": {
+        "C1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entry_surface_fields"
+          ],
+          "properties": {
+            "entry_surface_fields": {
+              "const": [
+                "host",
+                "source_file",
+                "binding",
+                "surface_kind",
+                "targets",
+                "lifecycle"
+              ]
+            }
+          }
+        },
+        "C2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coverage_states",
+            "denominator"
+          ],
+          "properties": {
+            "coverage_states": {
+              "const": [
+                "full",
+                "partial",
+                "non_knowledge",
+                "excluded"
+              ]
+            },
+            "denominator": {
+              "const": "git_canonical_markdown"
+            }
+          }
+        },
+        "C3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "derived_fields"
+          ],
+          "properties": {
+            "derived_fields": {
+              "const": [
+                "canonical",
+                "review_policy",
+                "reviewed_canonical_sha256"
+              ]
+            }
+          }
+        },
+        "C4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accepted_skill_requires_admission"
+          ],
+          "properties": {
+            "accepted_skill_requires_admission": {
+              "const": true
+            }
+          }
+        },
+        "C5": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "change_workflow",
+            "workspace_root"
+          ],
+          "properties": {
+            "change_workflow": {
+              "const": [
+                "begin",
+                "validate",
+                "apply"
+              ]
+            },
+            "workspace_root": {
+              "const": ".skill-knowledge/workspaces/<change-id>"
+            }
+          }
+        },
+        "C6": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "authored_manifest_kinds",
+            "change_head_digest_excludes"
+          ],
+          "properties": {
+            "algorithm": {
+              "const": "cc-master/skill-knowledge-canonical-graph-hash/v1"
+            },
+            "authored_manifest_kinds": {
+              "const": [
+                "portfolio",
+                "skill",
+                "module"
+              ]
+            },
+            "change_head_digest_excludes": {
+              "const": [
+                "result_graph_sha256"
+              ]
+            }
+          }
+        },
+        "C7": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "newline_normalization"
+          ],
+          "properties": {
+            "algorithm": {
+              "const": "cc-master/skill-knowledge-markdown-span-hash/v1"
+            },
+            "newline_normalization": {
+              "const": "crlf-to-lf"
+            }
+          }
+        },
+        "C8": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "formula"
+          ],
+          "properties": {
+            "algorithm": {
+              "const": "cc-master/skill-knowledge-budget-estimator/v1"
+            },
+            "formula": {
+              "const": "ceil(utf8_bytes/3)"
+            }
+          }
+        },
+        "C9": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hosts"
+          ],
+          "properties": {
+            "hosts": {
+              "const": [
+                "claude-code",
+                "codex",
+                "cursor",
+                "kimi-code"
+              ]
+            }
+          }
+        },
+        "C10": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changed_scope_base_option",
+            "immutable_chain"
+          ],
+          "properties": {
+            "changed_scope_base_option": {
+              "const": "--base"
+            },
+            "immutable_chain": {
+              "const": true
+            }
+          }
+        },
+        "C11": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "k2_allows_partial"
+          ],
+          "properties": {
+            "k2_allows_partial": {
+              "const": false
+            }
+          }
+        },
+        "C12": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report_tracks"
+          ],
+          "properties": {
+            "report_tracks": {
+              "const": [
+                "structural_status",
+                "behavioral_evidence_status"
+              ]
+            }
+          }
+        },
+        "C13": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "research_supersession_required"
+          ],
+          "properties": {
+            "research_supersession_required": {
+              "const": true
+            }
+          }
+        },
+        "C14": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runtime_skill_count",
+            "governance_meta_skill_is_runtime"
+          ],
+          "properties": {
+            "runtime_skill_count": {
+              "const": 8
+            },
+            "governance_meta_skill_is_runtime": {
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "structuralStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pass",
+            "fail",
+            "debt",
+            "not_run"
+          ]
+        }
+      }
+    },
+    "behavioralEvidenceStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "evidence"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not_run",
+            "baseline",
+            "candidate",
+            "holdout_verdict"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/repoPath"
+          },
+          "uniqueItems": true
+        },
+        "verdict": {
+          "enum": [
+            "improved",
+            "regressed",
+            "no_material_change",
+            "inconclusive"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "holdout_verdict"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "verdict"
+            ]
+          }
+        }
+      ]
     },
     "summary": {
       "type": "object",
