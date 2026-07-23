@@ -39,6 +39,14 @@ group gone. There was no OK output; exact model, payer and live task success rem
 on this exact host/version is therefore `partial` with an external provider-compatibility block, not a fully
 qualified success. This host evidence does not transfer to another OS, kernel or Cursor version.
 
+The `ccm 0.22.0` stable path resolves that historical Cursor wrapper failure without weakening cleanup:
+request-independent `worker-server` and its exactly bound TypeScript language-service chain are recognized and
+reaped as provider services; an unknown, mixed, out-of-root or uninspectable descendant tree still fails closed.
+All four harnesses now have hermetic resolver/help/run/PID-lifecycle coverage, and `ccm worker dispatch` composes
+that same session-bound transport with idempotent Agent Registry lifecycle. This does not turn hermetic coverage
+into proof of live entitlement, payer, exact-model success, a universal sandbox or automatic route eligibility;
+those remain per-surface live facts.
+
 ## Declared divergence
 
 None in the guidance path. Each origin uses the same process-boundary capability; host-native subagents are

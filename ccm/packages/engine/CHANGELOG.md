@@ -1,5 +1,61 @@
 # @ccm/engine
 
+## 0.22.0
+
+> Stable engine support for delivery deadlines, four-harness capability composition, tracked dispatch, and multi-pool usage evidence.
+
+### Stable summary
+
+- Added the deadline state machine, lint/read helpers, RCPSP-in-trial Monte Carlo scheduler, honest deadline-risk verdict, and calibration snapshot primitives used by the CLI, hooks, and viewer.
+- Added the `TrackedDispatch` aggregate and its board write authority, idempotency key, task reference, runtime handle, lifecycle, evidence-monotonicity, terminal, replay, and reconciliation invariants.
+- Added `kimi-code` to harness/agent enums and provider-aware engine contracts while preserving unsupported capability states.
+- Added named usage pools, Codex per-model rate-limit parsing, source-owned refresh hints, and pacing helpers without collapsing independent provider windows.
+- Kept board compatibility additive: legacy documents remain readable, generic setters cannot bypass the new deadline or tracked-dispatch owners, and agent settlement never changes task acceptance.
+
+The complete changeset ledger follows.
+
+### Minor Changes
+
+- 1c2e8ec: 新增显式副作用型 `ccm calibration capture` producer：复用只读 deadline-risk 计算路径，把真实 backlog 与预测特征写入 home-level observed snapshot store；以 canonical board 文件身份稳定关联同一 board，并在 store lock 内按 `board_id + as-of` 幂等去重。`ccm estimate deadline-risk` 保持纯只读；本片不含 label 回填或 calibration flip。
+- 42fb45e: 交付 DDL（delivery deadline）核心（issue #149）：board 的 `goal_contract` 新增 👁 `deadline` 子对象（四态 settledness 状态机 `pending|asserted|confirmed|none` + `at`/`precision`/`kind`/`rev`/`provenance`/`updated_at`，与 goal `assurance` 正交、单一 SSOT、窄腰一字不动）+ 新 writer verb `ccm goal deadline set|confirm|confirm-none|amend|show`（带锁 + board.log 审计 + rev 单调递增；confirm/confirm-none/amend 强制 `--user-authorized`、amend 强制 `--reason`；deadline 写绝不 bump goal revision；`--precision day` 落当日末刻 23:59:59Z 且强制 `--tz-input`；`--at` 只收严格 ISO-8601 UTC，时区/自然语言归 agent）+ 三条新 lint 规则（`FMT-DEADLINE` hard 形状 / `BIZ-DEADLINE-PENDING` warn 未 settle 却有可执行任务 / `BIZ-DEADLINE-OVERDUE` warn 已过期未完成，`lintBoard` 加可选 `now` 注入）+ `ccm goal check` verdict 扩展（新增 `deadline_pending`·exit 0，`ok` 收紧为 goal settled 且 deadline settled，`malformed` 覆盖 deadline 形状错，`--json` 附 `deadline` 子块）+ 引擎新增 `readDeadline`/`isDeadlineSettled`/`isDeadlineWellShaped`/`normalizeDeadlineAt` 纯 helper 供下游 endpoint / hook 复用 + 泛型 `--set goal_contract.*` bypass 封堵。`goal amend` 现原样保留 deadline 子对象（scope 变更 ≠ deadline 变更）。legacy board 自动兼容（无 deadline 键三规则皆早返回）。
+- 42fb45e: 交付 DDL margin/风险状态暴露到用户可见面（issue #149·契约 §4.3 验收项 8·D6）：把 `ccm estimate deadline-risk` 的 verdict 接进既有的只读展示面，**不重算算法**（复用单一 SSOT·红线 3）。
+
+  - **`ccm estimate forecast`**：板有 `asserted`/`confirmed` DDL 时，`--json` 输出附 `deadline_risk` 摘要块（`deadline`/`deadline_state`/`time_remaining_hours`/`risk_band`/`strength`/`on_time_probability`/`margin`/`confidence`），人读输出加 `DDL:` + `DDL margin:` 两行（margin 带符号·负=越过 DDL）。摘要 margin 与 `estimate deadline-risk` endpoint 逐字段一致（复用 `computeDeadlineRisk`·单一计算路径）。无 DDL / `none` / `pending` → `deadline_risk: null`（诚实 n/a·不假绿·不为无 DDL 板白跑 MC）。
+  - **`ccm status-report`**：report 附一个**确定性、board-derived** 的 `deadline` 块（`present`/`state`/`at`/`precision`/`kind`/`time_remaining_hours`/`overdue`）+ 人读一行（settled → 截止时刻/剩余/OVERDUE；`none` → confirmed no-ddl；缺失 → 无行）。不跑 MC/不读跨板语料（保 board-hash 缓存语义）；相对 forecast 的 margin/risk band 指向 `ccm estimate deadline-risk`。
+  - **web-viewer**：mission 只读投影新增 board-derived `deadline` 事实（截止时刻/状态/精度/硬软）；goal-contract 面板渲染 deadline 行 + 实时倒计时/OVERDUE 徽章（客户端挂钟·同 board-watchdog 倒计时）+ overdue 提示 callout。viewer 不跑 MC——margin/risk band verdict 归 `ccm estimate deadline-risk`。
+
+  诚实降级贯穿三面：无 DDL 不崩、不假显示；`unknown` band 照实透出、绝不映射绿色。
+
+- 42fb45e: 新增 `ccm estimate deadline-risk --json` 只读 endpoint（交付 DDL 风险 verdict·issue #149·契约 §4.3）：三通道 Monte Carlo 出**准时概率** `on_time_probability` + 分位 margin + 六态 `risk_band`（on_track/watch/at_risk/likely_late/overdue/unknown）+ `top_drivers` + 诚实字段（coverage/confidence/channel_disagreement/calibration_status/notes）。**通道诚实性**：`on_time_probability` **只来自 RCPSP-in-trial 通道**（真调度当前 DAG + 吃 `scheduling.wip_limit` 资源竞争）——`on_time_probability_source` 恒为 `rcpsp-in-trial` 或 `unknown`；precedence-only 只作显式标注的乐观下界（喂 forecast/margin + 双通道分歧信号）；throughput 降为 `channels.throughput_reference`（`kind:"heuristic-reference"`）**绝不映射 verdict**。**诚实降级**（绝不假绿）：无 DDL / 图含环 / 无有效预测 / coverage·history 太弱 / 双通道严重分歧（>0.25）/ RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`（**绝不退 throughput 冒充 resource-aware**）；`now≥DDL` 且未完成 → `overdue`。band 阈值为 **explicitly uncalibrated 保守起点**（`calibration_status:"uncalibrated-conservative"`·待 labeled 语料校准）。
+
+  引擎（`@ccm/engine`）新增：`empiricalCdfAtOrBefore(sortedSamples, target)`（经验 CDF·on-time 概率载重·二分 O(log n)）+ `rcpspInTrialMc(board, params, opts)`（资源约束 MC·**堆化 serial SGS**·indeg-ready min-heap + slot min-heap·O(V log V)/trial·注入 wip 资源约束·复用现成 CPM 的 min-slack/LFT 优先规则）+ `computeDeadlineRisk(board, opts)`（§4.3 verdict SSOT）；`estimateDagMonteCarlo`/`throughputMonteCarlo` 现暴露升序样本（`makespanSamplesSorted`/`daysSamplesSorted`·零算法重写）。CLI 侧 `estimate deadline-risk` 复用引擎 `buildMcParams` + `readDeadline`（D2）；latency 降档阶梯（trials 2000→1000→500→unknown）按 DAG 规模埋好（防极端大图·别真限时）。纯只读零写（runRead），hook 只搬运不重算（红线 3）。
+
+- 707c2e5: feat: add kimi-code (Moonshot AI Kimi Code CLI) as a 4th supported harness (MVP)
+
+  - Harness registry: new `kimiCodeAdapter` (`ccm harness list` now reports `kimi-code`,
+    detects `kimi` binary / `$KIMI_CODE_HOME`; account pool + external statusline unsupported,
+    plugin distribution supported via managed-dir install).
+  - Worker driver: `ccm worker help/run --harness kimi-code` passes argv straight through to the
+    `kimi` executable (`kimi -p ... --output-format stream-json`); adds `KIMI_CODE_HOME` to the
+    worker child env allow-list and a `kimi` executable-resolution branch (`CCM_KIMI_BIN`/`KIMI_BIN`/PATH).
+  - Board model (`@ccm/engine`): `owner.harness` and `agents[].harness` enums gain `kimi-code`;
+    `FMT-HARNESS` / `FMT-AGENTS` messages updated accordingly.
+  - Final stable engine contracts include Kimi's managed rolling-window usage evidence;
+    account pools and external statusline capabilities stay unsupported.
+
+- 33a47f9: 新增显式同步 tracked transport `ccm worker dispatch`，同时保持 `ccm worker run` 为零 board 副作用的 raw transport。新命令要求 idempotency key，只写 board 的 `agents[]`：在既有 board lock 内完成 prepare/唯一 claim/真实 spawn PID bind + agent-side task link/session identity 单调升级/sanitized terminal/reconciliation；绝不改 task status、handle、routing attempt 或 acceptance，也不持久化 prompt、stdin、secret、environment、完整 provider argv 或 provider output。
+
+  四个 harness 都提供真实 PID tracking；Codex 仅从已声明 `--json` transport 的 `thread.started.thread_id`、Kimi 仅从已声明 `--output-format stream-json` transport 的 `session.resume_hint.session_id` 升级 session/transcript/attach。Claude Code 可从显式 `--session-id`，或已声明 `--output-format json|stream-json` transport 的严格 `type=result / session_id` 信封取得 session identity，继而定位 transcript 并生成 `claude --resume <sid>` resume attach；绝不从任意模型文本猜身份，未观察到 session 证据时仍保持 PID-only，identity/attach 为 typed unavailable。显式 `--transcript` 指向已存在、可读的路径时，transcript 可独立为 typed supported；只有没有可读的显式 `--transcript` 时，transcript 才为 typed unavailable。Cursor 的 native session identity、SQLite transcript 与 exact attach 保持 typed unsupported，但显式 `--transcript` / `CURSOR_TRANSCRIPT_PATH` 可提供 raw transcript stream；无可读路径时仍可登记、stream 诚实为 none。claim 后 PID 前崩溃绝不自动重发；bind 失败取消并 reap owned process tree；terminal tracking failure 胜过 worker exit 0。`@ccm/engine` 新增 TrackedDispatch aggregate、BoardWriteAuthority/DispatchKey/TaskRef/RuntimeHandle value objects 及 additive `agents[].dispatch` lint/model 合约。
+
+  Capability evidence 只允许 unavailable 与同值 supported 之间单调收敛；unsupported 与两者不可比，冲突 supported transcript/attach 也会 durable reconciliation。已落盘 closing replay 与 live terminal 使用同一套有界 persistence/reconciliation fallback，失败 receipt 只报告真正 durable 的 aggregate。
+
+- 1c2e8ec: usage/quota 输出层重构(agent-facing 正确性 + 工效学):
+  - **cursor 多池**:`GetCurrentPeriodUsage` 的 first-party 与 usage-based/spend-limit 池不再塌成一个数,`UsageSignal` 新增 `pools[]`(named·`kind:first_party|usage_based`)承载多池,`billing_period` 保留兼容;machine-wide TARGETS 分列 cursor 两池;provider-model-facts 标注模型 → 池归属。
+  - **codex 按模型池**:`normalizeCodexRateLimits` 解析 `rateLimitsByLimitId`,每模型独立配额池透传(此前只读 legacy 顶层 primary/secondary·丢弃 per-model)。
+  - **machine-wide refresh_hint**:`safeQuotaReading` 新增可选 hint 字段,unavailable/expired target 携带同源可执行提示(含 agent_authorized/authorization),不再只有不透明 reason_codes。
+  - **agent-parse-proof**:`usage show` 新增顶层 plain-language `agent_summary`,一句话给出状态+可执行动作,消费 agent naive 读即得正确结论(此前窗口嵌 `current.*`、顶层空易致误判)。
+  - doc 锁步:using-ccm command-catalog + pacing-and-estimation usage-signals 补 kimi-code、多池/hint/agent_summary 描述。全 additive·现有消费方字段语义不变。
+
 ## 0.22.0-rc.4
 
 ## 0.22.0-rc.3

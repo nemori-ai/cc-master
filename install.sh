@@ -17,7 +17,7 @@
 #   # 各自 pin 指定版本（两 flag 均可选、各自缺省解析为本线最新）：
 #   curl -fsSL …/install.sh | bash -s -- --ccm-version ccm-v0.11.0 --plugin-version v0.10.1
 #   # 本地克隆后直接跑：
-#   bash install.sh [--ccm-version ccm-vX.Y.Z] [--plugin-version vX.Y.Z] [--harness claude-code|codex|cursor|auto] [--all-harnesses]
+#   bash install.sh [--ccm-version ccm-vX.Y.Z] [--plugin-version vX.Y.Z] [--harness claude-code|codex|cursor|kimi-code|auto] [--all-harnesses]
 #
 # 版本 flag（均可选）：
 #   --ccm-version <ccm-vX.Y.Z>    钉 ccm 二进制的版本（缺省 → 解析 ccm-v* 线最新）
@@ -44,6 +44,7 @@
 #      - Claude Code：用 claude CLI 持久安装（marketplace add/update + plugin install/update）
 #      - Codex：注册本地 Codex plugin marketplace。
 #      - Cursor：复制到 ~/.cursor/plugins/local/cc-master（local plugin 面，对齐 probe D9）。
+#      - Kimi Code：复制到 $KIMI_CODE_HOME/plugins/managed/cc-master，并原子更新 installed.json。
 #
 # 设计纪律：dual-OS（macOS/Linux·BSD/GNU 都跑）· set -euo pipefail · 错误 trap ·
 #   幂等可重跑 · 失败有意义的中文报错。
@@ -804,6 +805,7 @@ abspath_dir() { ( cd "$1" && pwd ); }
 #   - Claude Code：可识别、支持 pluginDistribution（claude plugin marketplace/install）。
 #   - Codex：可识别、支持本地 Codex plugin 注册；命令入口由 plugin 分发的 skill（`$cc-master-*`）承载。
 #   - Cursor：可识别（~/.cursor 或 cursor CLI）、支持 local plugin 复制到 ~/.cursor/plugins/local/。
+#   - Kimi Code：可识别（$KIMI_CODE_HOME 或 kimi CLI）、支持 managed plugin + installed.json 注册。
 normalize_harness() {
   local raw="${1:-auto}" h
   h="$(printf '%s' "$raw" | tr '[:upper:]_' '[:lower:]-')"

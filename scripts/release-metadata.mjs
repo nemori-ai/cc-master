@@ -74,15 +74,30 @@ function normalizeSummary(line) {
   return summary;
 }
 
-function extractSummary(changelogText, contract) {
+function extractSection(changelogText, contract) {
   if (typeof changelogText !== 'string') fail('changelog text must be a string');
-  const lines = changelogText.replaceAll('\r\n', '\n').split('\n');
+  const lines = changelogText
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
+    .split('\n')
+    .map((line) => line.replace(/[\t ]+$/u, ''));
   const sectionIndex = lines.findIndex((line) => contract.section(contract.version).test(line));
   if (sectionIndex < 0) {
     fail(`changelog ${contract.changelogPath} has no section for ${contract.version}`);
   }
-  for (const line of lines.slice(sectionIndex + 1)) {
-    if (/^## (?!#)/u.test(line)) break;
+  const nextSectionOffset = lines.slice(sectionIndex + 1).findIndex((line) => /^## (?!#)/u.test(line));
+  const sectionEnd = nextSectionOffset < 0 ? lines.length : sectionIndex + 1 + nextSectionOffset;
+  const sectionLines = lines.slice(sectionIndex + 1, sectionEnd);
+  while (sectionLines[0]?.trim() === '') sectionLines.shift();
+  while (sectionLines.at(-1)?.trim() === '') sectionLines.pop();
+  if (sectionLines.length === 0) {
+    fail(`changelog ${contract.changelogPath} needs release content for ${contract.version}`);
+  }
+  return sectionLines.join('\n');
+}
+
+function extractSummary(section, contract) {
+  for (const line of section.split('\n')) {
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('### ')) continue;
     return normalizeSummary(trimmed);
@@ -90,16 +105,16 @@ function extractSummary(changelogText, contract) {
   fail(`changelog ${contract.changelogPath} needs a concise summary line for ${contract.version}`);
 }
 
-function expectedBodyPattern(metadata) {
+function expectedBodyPattern(metadata, releaseContent) {
   const tag = escapeRegExp(metadata.tag);
   const changelogPath = escapeRegExp(metadata.changelogPath);
   return new RegExp(
-    `^${escapeRegExp(metadata.summary)}\\n\\nSee \\[CHANGELOG\\]\\(https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/blob/${tag}/${changelogPath}\\)\\.$`,
+    `^${escapeRegExp(releaseContent)}\\n\\nSee \\[CHANGELOG\\]\\(https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/blob/${tag}/${changelogPath}\\)\\.$`,
     'u',
   );
 }
 
-export function validateReleaseMetadata(metadata) {
+export function validateReleaseMetadata(metadata, { changelogText } = {}) {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     fail('metadata must be an object');
   }
@@ -125,8 +140,19 @@ export function validateReleaseMetadata(metadata) {
   }
   if (typeof metadata.summary !== 'string') fail('summary must be a string');
   normalizeSummary(metadata.summary);
-  if (typeof metadata.body !== 'string' || !expectedBodyPattern(metadata).test(metadata.body)) {
-    fail('body must be exactly one summary line, one blank line, and a tag-pinned See CHANGELOG link');
+  const source = changelogText ?? readFileSync(path.join(repoRoot, contract.changelogPath), 'utf8');
+  const section = extractSection(source, contract);
+  const expectedSummary = extractSummary(section, contract);
+  if (metadata.summary !== expectedSummary) {
+    fail(`summary must match the first content line in ${contract.changelogPath} for ${contract.version}`);
+  }
+  const releaseContent = contract.prerelease ? expectedSummary : section;
+  if (typeof metadata.body !== 'string' || !expectedBodyPattern(metadata, releaseContent).test(metadata.body)) {
+    fail(
+      contract.prerelease
+        ? 'RC body must be exactly one summary line, one blank line, and a tag-pinned See CHANGELOG link'
+        : 'stable body must contain the complete changelog section, one blank line, and a tag-pinned See CHANGELOG link',
+    );
   }
   return metadata;
 }
@@ -137,20 +163,25 @@ export function planReleaseMetadata({ tag, repository, changelogText } = {}) {
     fail('repository must use the owner/name form');
   }
   const source = changelogText ?? readFileSync(path.join(repoRoot, contract.changelogPath), 'utf8');
-  const summary = extractSummary(source, contract);
+  const section = extractSection(source, contract);
+  const summary = extractSummary(section, contract);
   const title = `${contract.productName} ${contract.version}`;
-  const body = `${summary}\n\nSee [CHANGELOG](https://github.com/${repository}/blob/${tag}/${contract.changelogPath}).`;
-  return validateReleaseMetadata({
-    tag,
-    family: contract.family,
-    productName: contract.productName,
-    version: contract.version,
-    title,
-    prerelease: contract.prerelease,
-    summary,
-    changelogPath: contract.changelogPath,
-    body,
-  });
+  const releaseContent = contract.prerelease ? summary : section;
+  const body = `${releaseContent}\n\nSee [CHANGELOG](https://github.com/${repository}/blob/${tag}/${contract.changelogPath}).`;
+  return validateReleaseMetadata(
+    {
+      tag,
+      family: contract.family,
+      productName: contract.productName,
+      version: contract.version,
+      title,
+      prerelease: contract.prerelease,
+      summary,
+      changelogPath: contract.changelogPath,
+      body,
+    },
+    { changelogText: source },
+  );
 }
 
 function parseArguments(argv) {

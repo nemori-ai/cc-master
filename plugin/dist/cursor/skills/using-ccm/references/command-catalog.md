@@ -1,7 +1,7 @@
 # ccm 命令面机械参考（command catalog）
 
 > 纯机械参考：命令、positional、flag、例子、`--json` 形状、exit code。状态机转移语义、字段三档纪律、`--set` 用法判断等判断型内容见 SKILL.md，本文不复述。
-> 基准版本：`ccm 0.22.0-rc.2` + 当前 Unreleased runtime supply chain。
+> 基准版本：`ccm 0.22.0` stable runtime supply chain。
 
 ## 目录（TOC）
 

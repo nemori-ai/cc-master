@@ -1,7 +1,7 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.20.1-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.20.1)
-[![ccm](https://img.shields.io/badge/ccm-v0.21.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.21.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.21.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.21.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.22.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.22.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20Kimi-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
 [![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
@@ -50,7 +50,7 @@ cc-master takes all of that off your hands, like a project lead who can actually
 - **🌐 Use the whole machine as a worker pool.** The orchestrator is not confined to its origin harness: it can inventory installed Claude Code, Codex, Cursor IDE, Cursor Agent, and kimi-code surfaces, inspect a target CLI's real help, and explicitly run a session-bound worker through `ccm worker`. The origin session still owns the decision and independently verifies the result.
 - **🔮 It tells you when you'll finish before it starts.** It runs thousands of simulations and gives you odds — *"50% chance Wednesday, 95% chance Friday"* — and flags which step is most likely to slip. That used to be a project manager with a spreadsheet for an afternoon. Now it's one command, milliseconds.
 - **💰 It makes budget decisions visible.** Cached machine-wide posture and selected-target usage advice help it choose a pace; missing, stale, or unknown signals stay unknown. If spending authority or headroom is unclear, it should slow down or ask rather than invent certainty.
-- **⚡ It manages limits instead of ignoring them.** Claude Code can switch to another account only under an existing policy or explicit authorization. Codex paces against its 7-day hard window (rolling 24 hours is advisory); Cursor uses its subscription **billing period**; kimi-code exposes no CLI quota signal at all, so it is not paced against any window. Codex, Cursor, and kimi-code do not auto-switch accounts.
+- **⚡ It manages limits instead of ignoring them.** Claude Code can switch to another account only under an existing policy or explicit authorization. Codex paces against its 7-day hard window (rolling 24 hours is advisory); Cursor uses its subscription **billing period**; and ccm reads kimi-code's managed rolling 5-hour and 7-day usage windows. Codex, Cursor, and kimi-code do not auto-switch accounts.
 - **🧠 It keeps a durable ledger.** The board records the goal revision, tasks, decisions, and registered runtime agents across context resets and explicit session handoffs. A resume still reconciles live evidence; durability does not mean every child process survives the handoff.
 - **🙋 It only asks you about the things that matter.** Small calls it makes itself; only when something genuinely needs you does it stop, lay out the context, and wait for your word.
 - **🏁 It has an explicit completion gate.** Before it wraps, it checks the current Goal Contract revision point by point: is every piece actually done, did it ask you everything it should have, and did anything quietly die in the background? A terminal worker is evidence, not automatic task acceptance.
@@ -66,7 +66,7 @@ The intended experience is one clear idea at the start, then a small number of w
 - **It figures out the order first**: the strings have to be pulled out and the framework wired up before any language can be translated. So it does the groundwork, then fans out all 6 languages **at once**.
 - **Groundwork gets the better (pricier, steadier) AI; the translations get the cheap one** — saving money without cutting quality. It does the math wherever the math matters.
 - Halfway through, **a question only you can answer comes up**: "Product terms — translate them, or keep them in English?" It **notes it for you and moves on**, while every other language keeps going.
-- As it runs, **quota gets tight** — cached posture and selected-target advice tell it to slow down; on Claude Code an already authorized account policy may offer another account, while Codex and Cursor stay on their current login and kimi-code has no quota signal to pace against.
+- As it runs, **quota gets tight** — cached posture and selected-target advice tell it to slow down; on Claude Code an already authorized account policy may offer another account, while Codex, Cursor, and kimi-code stay on their current login.
 - **When you come back**, the board shows what finished, what was independently checked, and whether your product-term decision is still blocking acceptance.
 
 Start to finish, you said one sentence and made one decision.
@@ -87,9 +87,9 @@ cc-master is a **multi-agent-harness plugin system** built from three things: a 
 
 The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, `cc-master-plugin-cursor-<version>.zip`, and `cc-master-plugin-kimi-code-<version>.zip`.
 
-We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, Cursor, and kimi-code, while the global `ccm` process boundary exposes the same machine-wide inventory, cached quota posture, model-policy view, raw worker wrapper, and Agent Registry to every origin. The kimi-code adapter ships the distributed skills, host-native namespaced commands, and core orchestration hooks; it does not have custom subagent roles, a Workflow equivalent, a batch-boundary event, or any CLI quota signal. Cursor IDE plugin and Cursor Agent CLI are separate surfaces: installing or authenticating one does not prove the other is available. Board and registered-agent status live in `ccm` and its read-only web viewer. **The exact current / partial / target boundary lives in the [Feature Manual](design_docs/feature-manual.md) and the [cross-harness capability model](design_docs/cross-harness-orchestration-capability-model.md)** — the README deliberately does not reproduce either matrix.
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, Cursor, and kimi-code, while the global `ccm` process boundary exposes the same machine-wide inventory, cached quota posture, model-policy view, raw worker wrapper, and Agent Registry to every origin. The kimi-code adapter ships the distributed skills, host-native namespaced commands, and core orchestration hooks; ccm can read its managed rolling usage windows, but the adapter has no custom subagent roles, Workflow equivalent, batch-boundary event, account pool, external statusline, or mid-flight pacing hook. Cursor IDE plugin and Cursor Agent CLI are separate surfaces: installing or authenticating one does not prove the other is available. Board and registered-agent status live in `ccm` and its read-only web viewer. **The current product boundary lives in the [Feature Manual](design_docs/feature-manual.md); the [cross-harness capability model](design_docs/cross-harness-orchestration-capability-model.md) is the longitudinal maturity and target-design ledger** — the README deliberately reproduces neither.
 
-The current cross-harness worker is intentionally narrow: `ccm worker help` resolves the installed target CLI's real agent-command help, and `ccm worker run` forwards caller-selected arguments, stdin, and cwd while managing one bounded synchronous, session-bound process. It is not automatic routing or fallback, a normalized provider API, a durable daemon, or a safety certification. Likewise, `ccm agent` is an observability registry for recording, linking, probing, and viewing workers; it does not spawn them. Model-policy entries are candidates and advisories until live qualification and admission evidence says otherwise.
+The current cross-harness worker is intentionally narrow: `ccm worker help` resolves the installed target CLI's real agent-command help; `ccm worker run` is the raw, zero-board-side-effect transport; and `ccm worker dispatch` wraps one local session-bound run with Agent Registry create/bind/link/terminal bookkeeping so the actor can appear in the Web Viewer. Dispatch is synchronous, so the caller still owns the outer background handle, and it never marks the board task accepted. This is not automatic routing or fallback, a normalized provider API, a durable daemon, or a safety certification. Likewise, `ccm agent` remains the observability registry and does not itself spawn workers. Model-policy entries are candidates and advisories until live qualification and admission evidence says otherwise.
 
 For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
 
@@ -123,10 +123,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.21.0 --plugin-version v0.20.1
+  --ccm-version ccm-v0.22.0 --plugin-version v0.21.0
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.21.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.22.0
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -184,8 +184,8 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 - **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load); kimi-code: `cc-master:as-master-orchestrator <goal>` or `cc-master:as-master-orchestrator --resume`. Fresh runs frame and check a Goal Contract before creating tasks; resume checks the current revision and Goal Brief before dispatch.
 - **Discover the machine** — `ccm harness list --machine-wide --json` lists supported harnesses and their separate execution surfaces. `ccm quota status --machine-wide --json` reads their cached quota posture without refreshing providers.
 - **Choose a model role** — `ccm model-policy show --task <task-taxonomy> --json` presents the shared O / T1 / T2 / T3 role view and evidence; candidate entries are advisory, not certified or automatically selected.
-- **Inspect / run a worker** — `ccm worker help --harness <codex|claude-code|cursor-agent>` reads the installed target's real agent-command help. Then explicitly run `ccm worker run --harness <...> --cwd /abs/repo -- <provider argv...>`; ccm does not invent provider flags or a fallback chain.
-- **See registered workers** — `ccm agent list --json` shows the board's runtime roster and lifecycle evidence. Registration and probing improve observability; they do not spawn a worker or mark its parent task done.
+- **Inspect / run a worker** — `ccm worker help --harness <codex|claude-code|cursor-agent|kimi-code>` reads the installed target's real agent-command help. Use `ccm worker run` for raw zero-board-side-effect transport; use `ccm worker dispatch --board … --task … --idempotency-key …` when the actor must be registered, linked, and visible while it runs. Both forward target-native arguments; ccm does not invent provider flags or a fallback chain.
+- **See registered workers** — `ccm agent list --json` shows the board's runtime roster and lifecycle evidence; `ccm web-viewer open` can tail the transcript evidence that a registered harness exposes. Registration and terminal state improve observability; they never mark the parent task accepted.
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
 - **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart` (OS-assigned port by default; survives `ccm upgrade` when the service was already wanted).
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`; kimi-code: `cc-master:discuss <decision>`. Use it when a decision is waiting on you.
@@ -206,7 +206,7 @@ Running several orchestrations at once? Every live board in your home is one cli
 ## Go deeper
 
 - **Everything it can do, with honest status** → [Feature Manual](design_docs/feature-manual.md)
-- **Cross-harness current / partial / target boundary** → [Capability model](design_docs/cross-harness-orchestration-capability-model.md)
+- **Cross-harness maturity levels, historical slices, and target design** → [Capability model](design_docs/cross-harness-orchestration-capability-model.md)
 - **Contributors / architecture, start here** → [`AGENTS.md`](AGENTS.md)
 - **Full design** → [`design_docs/spec.md`](design_docs/spec.md)
 
