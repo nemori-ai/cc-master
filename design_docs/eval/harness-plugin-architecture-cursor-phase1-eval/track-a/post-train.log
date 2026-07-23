@@ -1,0 +1,103 @@
+Evaluating: 当你设计、审查或重构 cc-master / 类似项目的多 agent harness plugin adapter 时使用——尤其是新增 host、Cursor IDE plugin、SAP/PHIP、Capability Card / hook CONTRACT、Track A / Track B、N-host parity、source-to-adapter 与 host-specific path/hook/command 差异。Triggers: 新增/修复/审查 host adapter，给跨 skills/hooks/commands/ccm 的 capability intent 建模，判断 Cursor IDE plugin 的能力等价与显式降级。Do NOT use when 只实现投影脚本（adapter-projection-engineering）、只做打包/发布（plugin-release-engineering）、只改一个 skill body（cc-master-skillsmith），或只设计不改 plugin adapter 的 cross-harness headless CLI worker transport；后者属于 Phase 2 / 对应 transport 设计。
+Results: 5/10 passed
+  [FAIL] rate=0/3 expected=True: 三个 harness 对 plugin root token、skill discovery 和 hook registration 的机制
+  [FAIL] rate=0/3 expected=True: 这个插件原来只支持 Claude Code，现在要同时支持 Codex、Cursor 和未来第四个 harness。canonical 语义
+  [FAIL] rate=1/3 expected=True: 我在 review 一个第三 host adapter：作者把 Claude Code hook event 按名字逐个映射过去，但目标 h
+  [FAIL] rate=0/3 expected=True: 我要把 cc-master 的 Cursor adapter 从‘看起来能生成’推进到可发布：skills 能直接投影，但 reinject
+  [PASS] rate=0/3 expected=False: source/dist 边界和每个 host 的 strategy 都已经定好了，现在 `sync-plugin-dist.sh --hos
+  [FAIL] rate=0/3 expected=True: 准备给现有 Claude/Codex/Cursor 插件加第四个 harness。新增前我想先盘点 skills、hooks、command
+  [PASS] rate=0/3 expected=False: 我要给 `master-orchestrator-guide` 的纪律段加一条 Rationalization Table，并压力测试 ag
+  [PASS] rate=0/3 expected=False: Cursor adapter 已经发布了，我只想把 README 和 README_zh 里‘即将支持 Cursor’改成真实安装命令，并确
+  [PASS] rate=0/3 expected=False: 三个 host 的 dist 都已验证完成，我现在只需要从现有 `plugin/dist/<host>` 打包 release zip、更新
+  [PASS] rate=0/3 expected=False: 我想实现一个 cross-harness worker dispatcher：在 Codex 主会话里 shell out 到 Claude
+{
+  "skill_name": "harness-plugin-architecture",
+  "description": "\u5f53\u4f60\u8bbe\u8ba1\u3001\u5ba1\u67e5\u6216\u91cd\u6784 cc-master / \u7c7b\u4f3c\u9879\u76ee\u7684\u591a agent harness plugin adapter \u65f6\u4f7f\u7528\u2014\u2014\u5c24\u5176\u662f\u65b0\u589e host\u3001Cursor IDE plugin\u3001SAP/PHIP\u3001Capability Card / hook CONTRACT\u3001Track A / Track B\u3001N-host parity\u3001source-to-adapter \u4e0e host-specific path/hook/command \u5dee\u5f02\u3002Triggers: \u65b0\u589e/\u4fee\u590d/\u5ba1\u67e5 host adapter\uff0c\u7ed9\u8de8 skills/hooks/commands/ccm \u7684 capability intent \u5efa\u6a21\uff0c\u5224\u65ad Cursor IDE plugin \u7684\u80fd\u529b\u7b49\u4ef7\u4e0e\u663e\u5f0f\u964d\u7ea7\u3002Do NOT use when \u53ea\u5b9e\u73b0\u6295\u5f71\u811a\u672c\uff08adapter-projection-engineering\uff09\u3001\u53ea\u505a\u6253\u5305/\u53d1\u5e03\uff08plugin-release-engineering\uff09\u3001\u53ea\u6539\u4e00\u4e2a skill body\uff08cc-master-skillsmith\uff09\uff0c\u6216\u53ea\u8bbe\u8ba1\u4e0d\u6539 plugin adapter \u7684 cross-harness headless CLI worker transport\uff1b\u540e\u8005\u5c5e\u4e8e Phase 2 / \u5bf9\u5e94 transport \u8bbe\u8ba1\u3002",
+  "results": [
+    {
+      "query": "\u4e09\u4e2a harness \u5bf9 plugin root token\u3001skill discovery \u548c hook registration \u7684\u673a\u5236\u90fd\u4e0d\u540c\u3002\u6211\u9700\u8981\u8bbe\u8ba1 source-to-adapter \u67b6\u6784\uff0c\u540c\u65f6\u4fdd\u8bc1 runtime skill \u4e0d\u5939\u5e26\u67d0\u4e2a host \u7684 path token\uff1b\u8fd9\u7c7b host fact \u548c rewrite \u8be5\u653e\u54ea\u91cc\uff1f",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "\u8fd9\u4e2a\u63d2\u4ef6\u539f\u6765\u53ea\u652f\u6301 Claude Code\uff0c\u73b0\u5728\u8981\u540c\u65f6\u652f\u6301 Codex\u3001Cursor \u548c\u672a\u6765\u7b2c\u56db\u4e2a harness\u3002canonical \u8bed\u4e49\u3001per-host strategy\u3001host-native manifest\u3001hooks contract \u4e0e generated dist \u5e94\u8be5\u600e\u6837\u5206\u5c42\uff0c\u624d\u4e0d\u4f1a\u6bcf\u52a0\u4e00\u4e2a host \u5c31 fork \u4e00\u4efd\uff1f",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "\u6211\u5728 review \u4e00\u4e2a\u7b2c\u4e09 host adapter\uff1a\u4f5c\u8005\u628a Claude Code hook event \u6309\u540d\u5b57\u9010\u4e2a\u6620\u5c04\u8fc7\u53bb\uff0c\u4f46\u76ee\u6807 host \u7684 stop \u662f follow-up\u3001compaction \u4e0d\u80fd\u6ce8\u5165\u4e0a\u4e0b\u6587\u3002\u5e94\u8be5\u6309\u4ec0\u4e48\u5951\u7ea6\u5224\u65ad\u8fd9\u662f\u7b49\u4ef7\u9002\u914d\u3001\u663e\u5f0f\u964d\u7ea7\uff0c\u8fd8\u662f\u4e0d\u652f\u6301\uff1f",
+      "should_trigger": true,
+      "trigger_rate": 0.3333333333333333,
+      "triggers": 1,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "\u6211\u8981\u628a cc-master \u7684 Cursor adapter \u4ece\u2018\u770b\u8d77\u6765\u80fd\u751f\u6210\u2019\u63a8\u8fdb\u5230\u53ef\u53d1\u5e03\uff1askills \u80fd\u76f4\u63a5\u6295\u5f71\uff0c\u4f46 reinject\u3001stop \u548c PostToolBatch \u90fd\u6ca1\u6709 1:1 \u8bed\u4e49\u3002plugin/src\u3001Capability Card\u3001hook CONTRACT \u548c plugin/dist/cursor \u4e4b\u95f4\u7684\u67b6\u6784\u8fb9\u754c\u5e94\u8be5\u600e\u4e48\u5b9a\uff1f",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "source/dist \u8fb9\u754c\u548c\u6bcf\u4e2a host \u7684 strategy \u90fd\u5df2\u7ecf\u5b9a\u597d\u4e86\uff0c\u73b0\u5728 `sync-plugin-dist.sh --host cursor` \u751f\u6210\u7ed3\u679c\u4e0d\u5e42\u7b49\u3001\u6f0f\u4e86 executable bit\u3002\u8bf7\u76f4\u63a5\u4fee\u6539\u6295\u5f71\u811a\u672c\u548c\u6d4b\u8bd5\u628a drift \u4fee\u6389\u3002",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "\u51c6\u5907\u7ed9\u73b0\u6709 Claude/Codex/Cursor \u63d2\u4ef6\u52a0\u7b2c\u56db\u4e2a harness\u3002\u65b0\u589e\u524d\u6211\u60f3\u5148\u76d8\u70b9 skills\u3001hooks\u3001commands\u3001manifest\u3001CLI install \u4e0e release package \u7684 projection surface\uff0c\u5e76\u7ed9\u8de8 surface capability \u5efa host-neutral acceptance\uff0c\u5177\u4f53\u67b6\u6784\u6d41\u7a0b\u662f\u4ec0\u4e48\uff1f",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "\u6211\u8981\u7ed9 `master-orchestrator-guide` \u7684\u7eaa\u5f8b\u6bb5\u52a0\u4e00\u6761 Rationalization Table\uff0c\u5e76\u538b\u529b\u6d4b\u8bd5 agent \u4f1a\u4e0d\u4f1a\u5728 deadline \u4e0b\u7ed5\u8fc7\u5b83\uff1b\u4e0d\u6d89\u53ca host adapter \u6216 projection\u3002skill body \u5e94\u8be5\u600e\u4e48\u6539\uff1f",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Cursor adapter \u5df2\u7ecf\u53d1\u5e03\u4e86\uff0c\u6211\u53ea\u60f3\u628a README \u548c README_zh \u91cc\u2018\u5373\u5c06\u652f\u6301 Cursor\u2019\u6539\u6210\u771f\u5b9e\u5b89\u88c5\u547d\u4ee4\uff0c\u5e76\u786e\u4fdd\u4e2d\u82f1\u6587 feature claim \u4e00\u81f4\u3002",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "\u4e09\u4e2a host \u7684 dist \u90fd\u5df2\u9a8c\u8bc1\u5b8c\u6210\uff0c\u6211\u73b0\u5728\u53ea\u9700\u8981\u4ece\u73b0\u6709 `plugin/dist/<host>` \u6253\u5305 release zip\u3001\u66f4\u65b0 marketplace metadata\u3001bump \u7248\u672c\u5e76\u8dd1\u53d1\u5e03\u95e8\u3002\u53d1\u5e03\u6d41\u7a0b\u600e\u4e48\u505a\uff1f",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "\u6211\u60f3\u5b9e\u73b0\u4e00\u4e2a cross-harness worker dispatcher\uff1a\u5728 Codex \u4e3b\u4f1a\u8bdd\u91cc shell out \u5230 Claude/Cursor CLI\uff0c\u6839\u636e\u4efb\u52a1\u590d\u6742\u5ea6\u3001\u6a21\u578b\u4ef7\u683c\u548c\u914d\u989d\u9009\u62e9 worker\uff0c\u5e76\u56de\u6536\u7ed3\u679c\u3002\u5b83\u4e0d\u6539\u4efb\u4f55 plugin adapter\u3001hook\u3001manifest \u6216 source/dist \u6295\u5f71\uff1b\u6267\u884c\u534f\u8bae\u548c\u8def\u7531 schema \u600e\u4e48\u8bbe\u8ba1\uff1f",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 5,
+    "failed": 5
+  }
+}

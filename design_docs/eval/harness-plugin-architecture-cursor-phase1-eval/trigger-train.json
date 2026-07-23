@@ -1,0 +1,42 @@
+[
+  {
+    "query": "我要把 cc-master 的 Cursor adapter 从‘看起来能生成’推进到可发布：skills 能直接投影，但 reinject、stop 和 PostToolBatch 都没有 1:1 语义。plugin/src、Capability Card、hook CONTRACT 和 plugin/dist/cursor 之间的架构边界应该怎么定？",
+    "should_trigger": true
+  },
+  {
+    "query": "这个插件原来只支持 Claude Code，现在要同时支持 Codex、Cursor 和未来第四个 harness。canonical 语义、per-host strategy、host-native manifest、hooks contract 与 generated dist 应该怎样分层，才不会每加一个 host 就 fork 一份？",
+    "should_trigger": true
+  },
+  {
+    "query": "我在 review 一个第三 host adapter：作者把 Claude Code hook event 按名字逐个映射过去，但目标 host 的 stop 是 follow-up、compaction 不能注入上下文。应该按什么契约判断这是等价适配、显式降级，还是不支持？",
+    "should_trigger": true
+  },
+  {
+    "query": "三个 harness 对 plugin root token、skill discovery 和 hook registration 的机制都不同。我需要设计 source-to-adapter 架构，同时保证 runtime skill 不夹带某个 host 的 path token；这类 host fact 和 rewrite 该放哪里？",
+    "should_trigger": true
+  },
+  {
+    "query": "准备给现有 Claude/Codex/Cursor 插件加第四个 harness。新增前我想先盘点 skills、hooks、commands、manifest、CLI install 与 release package 的 projection surface，并给跨 surface capability 建 host-neutral acceptance，具体架构流程是什么？",
+    "should_trigger": true
+  },
+  {
+    "query": "source/dist 边界和每个 host 的 strategy 都已经定好了，现在 `sync-plugin-dist.sh --host cursor` 生成结果不幂等、漏了 executable bit。请直接修改投影脚本和测试把 drift 修掉。",
+    "should_trigger": false
+  },
+  {
+    "query": "三个 host 的 dist 都已验证完成，我现在只需要从现有 `plugin/dist/<host>` 打包 release zip、更新 marketplace metadata、bump 版本并跑发布门。发布流程怎么做？",
+    "should_trigger": false
+  },
+  {
+    "query": "我要给 `master-orchestrator-guide` 的纪律段加一条 Rationalization Table，并压力测试 agent 会不会在 deadline 下绕过它；不涉及 host adapter 或 projection。skill body 应该怎么改？",
+    "should_trigger": false
+  },
+  {
+    "query": "Cursor adapter 已经发布了，我只想把 README 和 README_zh 里‘即将支持 Cursor’改成真实安装命令，并确保中英文 feature claim 一致。",
+    "should_trigger": false
+  },
+  {
+    "query": "我想实现一个 cross-harness worker dispatcher：在 Codex 主会话里 shell out 到 Claude/Cursor CLI，根据任务复杂度、模型价格和配额选择 worker，并回收结果。它不改任何 plugin adapter、hook、manifest 或 source/dist 投影；执行协议和路由 schema 怎么设计？",
+    "should_trigger": false
+  }
+]

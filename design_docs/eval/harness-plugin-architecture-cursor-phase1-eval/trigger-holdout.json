@@ -1,0 +1,18 @@
+[
+  {
+    "query": "Cursor 事实页一处还写 projection 是 sketch，兼容矩阵却写 adapter 已发布；同时 Track B capability 没有同名 hook。我正在维护多 harness plugin 架构，应该先以什么 SSOT 和等价类收口，再决定 adapter delta？",
+    "should_trigger": true
+  },
+  {
+    "query": "两个 harness 都暴露 `stop` 事件，但一个能 hard block，另一个只能自动提交 followup message。我要判断能否共享实现，还是应拆 host mechanism 并用 compensating behavior 保持用户可见意图；这属于哪套插件架构纪律？",
+    "should_trigger": true
+  },
+  {
+    "query": "Cursor 的 `ccm usage advise` 返回 billing-period 信号时数值不对。我只需要定位 `cursor-usage.ts` 的 API 解析 bug、补单测，不改 plugin adapter 边界、Capability Card 或 projection。",
+    "should_trigger": false
+  },
+  {
+    "query": "我要新增一个分发 runtime skill，主要工作是写 canonical SKILL.md 的心智模型、Rationalization Table 和行为 eval；现有所有 host 都先按既定 copy strategy 自动投影。",
+    "should_trigger": false
+  }
+]
