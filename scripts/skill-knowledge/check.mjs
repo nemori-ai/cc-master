@@ -10,6 +10,7 @@ import {
   SOURCE_SCHEMA_VERSION,
 } from './contracts.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
+import { buildAndValidateGraph } from './graph.mjs';
 import {
   validateAuthoredDocument,
   validatorFreshness,
@@ -262,11 +263,6 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
     );
   }
 
-  // Capability is executable only while committed standalone validators match source schema
-  // bytes. K0 stays envelope-only but still reports debt when validators are missing/stale.
-  // K1+ always fails loud (even with an empty inventory) so drift cannot silent-pass.
-  // SKG_SCHEMA_REPO_ROOT lets integrity probes inject an isolated schema fixture without
-  // mutating checked-in design_docs schemas (production leaves the env unset).
   const freshnessRoot =
     typeof process.env.SKG_SCHEMA_REPO_ROOT === 'string' && process.env.SKG_SCHEMA_REPO_ROOT.length > 0
       ? path.resolve(process.env.SKG_SCHEMA_REPO_ROOT)
@@ -317,6 +313,13 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
     );
   }
 
+  let graphHash = null;
+  if (stage !== 'K0' && documents > 0 && freshness.available) {
+    const graphResult = buildAndValidateGraph({ repoRoot, sourceRoot: source });
+    diagnostics.push(...graphResult.diagnostics);
+    graphHash = graphResult.graph?.graph_hash ?? null;
+  }
+
   const exitCode = selectExitCode(diagnostics);
   const publicDiagnostics = diagnostics.map(outputDiagnostic);
   const summary = {
@@ -337,6 +340,7 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
       stage,
       source_root: sourceRoot,
       summary,
+      ...(graphHash ? { graph_hash: graphHash } : {}),
       capabilities: { ...CAPABILITIES },
       diagnostics: publicDiagnostics,
     },

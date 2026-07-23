@@ -303,10 +303,14 @@ test('SKG-K1-CLI-01: contract capabilities for the walking skeleton are truthful
   assert.equal(contracts.CAPABILITIES.markdown_binding, true);
   assert.equal(contracts.CAPABILITIES.canonical_source_inventory, true);
   assert.equal(contracts.CAPABILITIES.canonical_graph_hash, true);
+  assert.equal(contracts.CAPABILITIES.graph_invariants, true);
+  assert.equal(contracts.CAPABILITIES.hop_analysis, true);
+  assert.equal(contracts.CAPABILITIES.entry_surface_binding, true);
+  assert.equal(contracts.CAPABILITIES.derived_freshness, true);
+  assert.equal(contracts.CAPABILITIES.semantic_coverage, true);
   assert.equal(contracts.CAPABILITIES.deterministic_budget_estimator, true);
-  // Explicitly still out of this slice:
+  assert.equal(contracts.CAPABILITIES.host_portability_probe, true);
   assert.equal(contracts.CAPABILITIES.typed_change_transactions, true);
-  assert.equal(contracts.CAPABILITIES.host_portability_probe, false);
 
   const result = runCli(['contract', '--json']);
   assert.equal(result.status, 0, result.stderr);
@@ -316,6 +320,8 @@ test('SKG-K1-CLI-01: contract capabilities for the walking skeleton are truthful
   assert.equal(body.capabilities.canonical_source_inventory, true);
   assert.equal(body.capabilities.canonical_graph_hash, true);
   assert.equal(body.capabilities.deterministic_budget_estimator, true);
+  assert.equal(body.capabilities.host_portability_probe, true);
+  assert.equal(body.capabilities.typed_change_transactions, true);
 });
 
 test('SKG-K1-CLI-02: K0 no longer claims schema validator debt once standalone validators exist', () => {
@@ -329,8 +335,9 @@ test('SKG-K1-CLI-02: K0 no longer claims schema validator debt once standalone v
   );
   assert.equal(
     body.diagnostics.some((diagnostic) => diagnostic.code === 'SKG-COVERAGE-EMPTY'),
-    true,
+    false,
   );
+  assert.ok(body.summary.documents >= 5);
 });
 
 test('SKG-K1-HASH-04: sha256 helper matches node crypto for normalized bytes', async () => {

@@ -13,6 +13,7 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 | 编写或验证 authored graph source | [schemas/knowledge-source.schema.json](schemas/knowledge-source.schema.json) |
 | 编写或验证语义变更事务 | [schemas/knowledge-change.schema.json](schemas/knowledge-change.schema.json) |
 | 看一套最小但完整的 source 示例 | [examples/](examples/) |
+| 查四 host anchor/path/partial/stub 冻结合同与 fixture | [fixtures/host-portability/](fixtures/host-portability/) |
 | 追溯近一年官方规范、论文与工程证据 | [../research/skill_knowledge_graph/README.md](../research/skill_knowledge_graph/README.md) |
 | 理解为何选 Git-native JSON + Markdown，而不选数据库 | [../../adrs/ADR-038-git-native-skill-knowledge-graph.md](../../adrs/ADR-038-git-native-skill-knowledge-graph.md) |
 
@@ -28,15 +29,13 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 
 ## 当前成熟度
 
-当前完成 **K0 executable outer contract**：
+当前是 **K1 pilot**：
 
-- 架构、source/change/output schema、示例、治理门与 K0→K3 晋级条件已经确定；
-- K1 实现前的 `C1`–`C14` hardening contract 已进入 specification、Schema、CLI registry 与 examples；
-- `plugin/src/knowledge/` 已成为正式 authored source root，但 inventory 有意为空并报告 debt；
-- `node scripts/skill-knowledge.mjs contract --json` 提供机器可读 capability registry；
-- `check --stage K0 --json` 已接入无第三方依赖的 content tests 与 GitHub Actions；
-- 未实现的 `compile/report/path/explain/change` 均 fail closed（exit 10）。
+- `plugin/src/knowledge/` 已落真实 inventory：**1** admitted skill、**3 modules / 9 points**，绑定 canonical Markdown marker/span；
+- `check` / `contract` / `report` / `path` / `explain` 已实现（K1 pilot 查询面 + capability registry）；
+- standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仅 authored navigation plane）；
+- 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI host integration；
+- typed change transactions 已交付：`change begin → validate → apply` 冻结 scope/base/hash，验证闭合集合并以 rollback-safe publication 写入 immutable ledger；
+- `compile`、`check --host` 或 `check --base`、`report --host` 仍 exit 10。
 
-合同冻结不等于能力实现。完整 JSON Schema instance validator、真实 pilot inventory、Markdown binding、图不变式、类型化编辑器、
-projection 与 hop analysis 仍属于 K1+。在 K3 全覆盖验收之前，不得对外声称八个分发 skill 已满足
-全图有向直径 `≤ 3`。
+未来项只留真实缺口：`runtime_projection`、`behavioral_evidence_tracking`，以及 `check --host` CLI 接线与四 host projection compile。在 K3 全覆盖验收之前，不得对外声称八个分发 skill 已满足全图有向直径 `≤ 3`。

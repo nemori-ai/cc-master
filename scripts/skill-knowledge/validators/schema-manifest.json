@@ -3,12 +3,12 @@
   "schemas": {
     "knowledge-source.schema.json": "6920e0532d209ff63d96e0ca824f06c5a5e8a343714a824c3b62d5810a557f3d",
     "knowledge-change.schema.json": "5838ebe14ada2356843728b457a886c3dbbdcce34052bc5132a67a4b74a16928",
-    "knowledge-cli-output.schema.json": "44dd42936aea7abf7deb1717aab19924f097b9f764eb078e0528c95f5a7ae12e"
+    "knowledge-cli-output.schema.json": "9b2a9892e33d5401f76d103a8536ee501b5dd874993b46e5191e0a774700ef9a"
   },
-  "fingerprint": "58d87586d8b6dbb1d2ab72d1fd754a16371d69b6f06434c5177277f520710373",
+  "fingerprint": "2f0e10244faad75d6d43d6773f35494ceb4c27f16425896f58261521c90a0dd6",
   "bundles": {
-    "validate-source.cjs": "d8547cd483ac0ddeb73785eadd6537cb55b39772d6a51484afdd427ecba90213",
-    "validate-change.cjs": "ff6f2aa855a79a37b74f862043b3fff21719e371f7e446ff1cca3aa429f6f0a4",
-    "validate-output.cjs": "04b5e54894d7ebbe53601ac839c3dae2583583108a0fda50b9f50a22e478b9f8"
+    "validate-source.cjs": "b394f1bb0f4894582008e78ea692dea7a75b26aeecc9dd6d1daf62d2bf24bc13",
+    "validate-change.cjs": "0a072e032847e864f8419db228fa0e39263817277ff506adfd0d9528640fd233",
+    "validate-output.cjs": "6a2bd2b3acf444711c507decdf66f3557ce61c7df2949e2e752cd6152da19d17"
   }
 }

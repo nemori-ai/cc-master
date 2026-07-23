@@ -4,7 +4,14 @@ export const SOURCE_SCHEMA_VERSION = 'cc-master/skill-knowledge-source/v1alpha1'
 export const CHANGE_SCHEMA_VERSION = 'cc-master/skill-knowledge-change/v1alpha1';
 export const DEFAULT_SOURCE_ROOT = 'plugin/src/knowledge';
 
-export const IMPLEMENTED_COMMANDS = Object.freeze(['change', 'check', 'contract']);
+export const IMPLEMENTED_COMMANDS = Object.freeze([
+  'change',
+  'check',
+  'contract',
+  'explain',
+  'path',
+  'report',
+]);
 export const DECLARED_COMMANDS = Object.freeze([
   'change',
   'check',
@@ -107,6 +114,10 @@ export const HARDENING_CONTRACT = Object.freeze({
   }),
   C9: Object.freeze({
     hosts: Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']),
+    worker_allowlist: Object.freeze(['codex', 'cursor']),
+    payload_modes: Object.freeze(['canonical', 'partial', 'stub']),
+    anchor_form: 'explicit-html-id',
+    path_policy: 'relative-final-host-path',
   }),
   C10: Object.freeze({ changed_scope_base_option: '--base', immutable_chain: true }),
   C11: Object.freeze({ k2_allows_partial: false }),
@@ -147,20 +158,22 @@ export const CAPABILITIES = Object.freeze({
   source_json_parse: true,
   source_envelope_validation: true,
   global_id_uniqueness: true,
-  // K1-03 walking skeleton: standalone Draft 2020-12 validators + IR/hash/marker/inventory.
+  // K1 pilot: standalone validators + IR/hash/marker/inventory + authored-graph query.
   full_json_schema_validation: true,
   markdown_binding: true,
-  graph_invariants: false,
+  graph_invariants: true,
   runtime_projection: false,
-  hop_analysis: false,
+  hop_analysis: true,
   typed_change_transactions: true,
-  entry_surface_binding: false,
+  entry_surface_binding: true,
   canonical_source_inventory: true,
-  derived_freshness: false,
+  derived_freshness: true,
   canonical_graph_hash: true,
   deterministic_budget_estimator: true,
-  host_portability_probe: false,
-  semantic_coverage: false,
+  // HUB four-host fixture probe + C9 contract delivered; check --host CLI still exit 10.
+  host_portability_probe: true,
+  // K1 pilot semantic coverage over admitted three-module inventory.
+  semantic_coverage: true,
   behavioral_evidence_tracking: false,
 });
 
