@@ -9,6 +9,7 @@ import {
 } from './contracts.mjs';
 import { diagnostic, failureEnvelope } from './diagnostics.mjs';
 import { runCheck } from './check.mjs';
+import { runCompile } from './compile.mjs';
 import { assertReportFormat, runExplain, runPath, runReport } from './query.mjs';
 
 const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
@@ -16,10 +17,11 @@ const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
 Commands:
   contract [--json]
   check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
+  compile [--source <dir>] [--host <host>] [--check] [--json]
   report [--source <dir>] [--format json|markdown] [--host <host>] [--json]
   path --from <id> --to <id> --host <host> [--source <dir>] [--json]
   explain <id-or-code> [--source <dir>] [--json]
-  compile|change [--json]   Declared; unavailable in K1 pilot
+  change [--json]   Declared; unavailable in K1 pilot
 
 Global:
   --help
@@ -49,6 +51,32 @@ function parseCheckOptions(args) {
       options.base = args[index];
     } else {
       throw new Error(`unknown check argument: ${token}`);
+    }
+  }
+  return options;
+}
+
+function parseCompileOptions(args) {
+  const options = {
+    source: undefined,
+    host: undefined,
+    check: false,
+    json: false,
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === '--json') options.json = true;
+    else if (token === '--check') options.check = true;
+    else if (token === '--source') {
+      index += 1;
+      if (!args[index]) throw new Error('--source requires a directory');
+      options.source = args[index];
+    } else if (token === '--host') {
+      index += 1;
+      if (!args[index]) throw new Error('--host requires a host');
+      options.host = args[index];
+    } else {
+      throw new Error(`unknown compile argument: ${token}`);
     }
   }
   return options;
@@ -137,6 +165,17 @@ function renderHuman(body) {
       `skill-knowledge explain ${body.explain_target}`,
       `kind: ${body.entity.kind}; id: ${body.entity.id}`,
     ].join('\n');
+  }
+  if (body.result_kind === 'compile') {
+    const lines = [
+      `skill-knowledge compile: ${body.ok ? 'OK' : 'FAILED'} (${body.compile_mode})`,
+      `hosts: ${(body.hosts ?? []).join(', ')}`,
+    ];
+    if (body.graph_hash) lines.push(`graph_hash: ${body.graph_hash}`);
+    for (const item of body.diagnostics ?? []) {
+      lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
+    }
+    return lines.join('\n');
   }
   return body.diagnostics
     .map((item) => `${item.severity.toUpperCase()} ${item.code}: ${item.message}`)
@@ -232,6 +271,24 @@ export function main(argv = process.argv.slice(2)) {
       stage: options.stage,
     });
     emit(result.body, options.json);
+    return result.exitCode;
+  }
+
+  if (command === 'compile') {
+    let options;
+    try {
+      options = parseCompileOptions(argv.slice(argv.indexOf(command) + 1));
+    } catch (error) {
+      emit(usageFailure(command, error.message), json);
+      return EXIT_CODES.usage;
+    }
+    const result = runCompile({
+      repoRoot,
+      source: options.source,
+      host: options.host,
+      check: options.check,
+    });
+    emit(result.body, options.json || json);
     return result.exitCode;
   }
 

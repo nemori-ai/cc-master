@@ -348,4 +348,10 @@ if (host === 'kimi-code') {
 }
 NODE
 
+# Knowledge graph post-pass: compile runtime atlas/module routers + point anchors/nav into
+# the just-projected host dist. Dev-only toolkit stays in scripts/; never copy into hooks.
+if [ "${SURFACE}" = "all" ] || [ "${SURFACE}" = "skills" ]; then
+  node scripts/skill-knowledge.mjs compile --host "${HOST}" --json >/dev/null
+fi
+
 echo "sync-plugin-dist: ${SRC} --adapt ${HOST}${SURFACE:+ (${SURFACE})} -> ${DST}"

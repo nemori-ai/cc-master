@@ -61,6 +61,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.contract_version, 'v1alpha1');
   assert.deepEqual(body.implemented_commands, [
     'check',
+    'compile',
     'contract',
     'explain',
     'path',
@@ -106,7 +107,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.semantic_coverage, true);
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
   assert.equal(body.capabilities.hop_analysis, true);
-  assert.equal(body.capabilities.runtime_projection, false);
+  assert.equal(body.capabilities.runtime_projection, true);
   assert.equal(body.capabilities.typed_change_transactions, false);
   assert.deepEqual(Object.keys(body.hardening_contract),
     Array.from({ length: 14 }, (_, index) => `C${index + 1}`));
@@ -230,16 +231,14 @@ test('SKG-CLI-06: K1 with envelope-only source fails full schema validation loud
     );
   }));
 
-test('SKG-CLI-07: compile/change and unavailable check options still fail closed with exit 10', () => {
-  for (const command of ['compile', 'change']) {
-    const result = runCli([command, '--json']);
-    assert.equal(result.status, 10, `${command}: ${result.stderr}`);
-    const body = parseJson(result);
-    assert.equal(body.ok, false);
-    assert.equal(body.command, command);
-    assert.equal(body.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
-    assert.equal(body.diagnostics[0].witness.command, command);
-  }
+test('SKG-CLI-07: change and unavailable check options still fail closed with exit 10', () => {
+  const change = runCli(['change', '--json']);
+  assert.equal(change.status, 10, `change: ${change.stderr}`);
+  const changeBody = parseJson(change);
+  assert.equal(changeBody.ok, false);
+  assert.equal(changeBody.command, 'change');
+  assert.equal(changeBody.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
+  assert.equal(changeBody.diagnostics[0].witness.command, 'change');
 
   for (const [option, value] of [
     ['--host', 'codex'],
@@ -663,7 +662,7 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
     /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
     'README must state real inventory is 3 modules / 9 points',
   );
-  for (const command of ['check', 'contract', 'report', 'path', 'explain']) {
+  for (const command of ['check', 'contract', 'compile', 'report', 'path', 'explain']) {
     assert.match(
       designReadme,
       new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
@@ -672,13 +671,18 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay trut
   }
   assert.match(
     designReadme,
-    /(check|contract|report|path|explain)[\s\S]{0,200}(已实现|implemented)/i,
-    'README must state check/contract/report/path/explain are implemented',
+    /(check|contract|compile|report|path|explain)[\s\S]{0,200}(已实现|implemented)/i,
+    'README must state check/contract/compile/report/path/explain are implemented',
   );
   assert.match(
     designReadme,
-    /`?compile`?[\s\S]{0,120}`?change`?[\s\S]{0,160}exit\s*10/i,
-    'README must keep compile/change as exit 10',
+    /`?change`?[\s\S]{0,160}exit\s*10/i,
+    'README must keep change as exit 10',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /`?compile`?[\s\S]{0,80}`?change`?[\s\S]{0,80}exit\s*10/,
+    'must not keep compile bundled with change as exit 10',
   );
   assert.match(
     designReadme,

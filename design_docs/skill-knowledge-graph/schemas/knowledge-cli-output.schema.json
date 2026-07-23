@@ -27,6 +27,7 @@
       "enum": [
         "contract",
         "check",
+        "compile",
         "report",
         "path",
         "explain",
@@ -36,6 +37,21 @@
     "graph_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "compile_mode": {
+      "enum": [
+        "write",
+        "check"
+      ]
+    },
+    "hosts": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "host_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/compileHostResult"
+      }
     },
     "path_query": {
       "$ref": "#/$defs/pathQuery"
@@ -264,6 +280,30 @@
       "if": {
         "properties": {
           "result_kind": {
+            "const": "compile"
+          },
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "result_kind",
+          "ok"
+        ]
+      },
+      "then": {
+        "required": [
+          "compile_mode",
+          "hosts",
+          "host_results",
+          "diagnostics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
             "const": "check"
           }
         },
@@ -341,6 +381,114 @@
         "minLength": 1
       },
       "uniqueItems": true
+    },
+    "hopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "witness": {
+          "type": "object"
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "compileHostResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "ok",
+        "mode",
+        "artifacts",
+        "enabled_edges",
+        "point_anchors",
+        "hop_report",
+        "budgets",
+        "executed_checks"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "enabled_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "point_anchors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hop_report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H1",
+            "H2",
+            "H3",
+            "H4"
+          ],
+          "properties": {
+            "H1": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H2": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H3": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H4": {
+              "$ref": "#/$defs/hopGate"
+            }
+          }
+        },
+        "budgets": {
+          "type": "object"
+        },
+        "executed_checks": {
+          "$ref": "#/$defs/stringSet"
+        }
+      }
     },
     "capabilities": {
       "type": "object",

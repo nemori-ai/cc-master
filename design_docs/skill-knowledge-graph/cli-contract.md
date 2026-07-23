@@ -34,13 +34,13 @@ node scripts/skill-knowledge.mjs <command> [options]
 |---|---|---|
 | `contract [--json]` | implemented | 返回能力、plane、operation、invariant 与 exit-code registry |
 | `check [--source <dir>] [--stage K0\|K1\|K2\|K3] [--host <host>] [--base <git-ref>] [--json]` | implemented-k1-pilot | K0 只执行 scaffold；K1+ 对 pilot source 跑 schema + binding + inventory + graph invariants。`--host/--base` 仍 exit 10 |
-| `compile [--host <host>] [--check]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED`（四 host projection 非本切片） |
+| `compile [--host <host>] [--check] [--json]` | implemented-k1-pilot | 四 host runtime projection + final surface verifier；`result_kind=compile`；`--check` 对已提交 dist 做 byte drift 门 |
 | `report [--format json\|markdown] [--host <host>] [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=report`；分轨 `structural_status` / `behavioral_evidence_status`；含 graph hash、counts、witness、remediation。`--host` 仍 exit 10 |
 | `path --from <id> --to <id> --host <host> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=path`；在 **authored navigation plane**（`runtime.enabled_by_default`）上 BFS；对不存在 / 歧义 / 不可达 fail closed，带 shortest-path witness |
 | `explain <id-or-code> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=explain`；解释 entity 或 diagnostic code；歧义 / 缺失 fail closed |
 | `change begin\|validate\|apply` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
 
-`compile` / `change` / `check --host|--base` / `report --host` 仍为 declared-unavailable，存在是为了冻结 vocabulary 并让 agent fail loud。K1 pilot 的 `path`/`hop_analysis` **不声称** final-host projection hop（`runtime_projection` 仍为 `false`）。
+`change` / `check --host|--base` / `report --host` 仍为 declared-unavailable。K1 pilot 的 authored `path`/`hop_analysis` **不替代** final-host H1–H4（那由 `compile` + `runtime_projection=true` 证明）。
 
 ## 2. JSON envelope
 
@@ -64,17 +64,17 @@ node scripts/skill-knowledge.mjs <command> [options]
 {
   "schema": "cc-master/skill-knowledge-cli/v1alpha1",
   "ok": false,
-  "command": "compile",
+  "command": "change",
   "result_kind": "diagnostic",
   "contract_version": "v1alpha1",
   "diagnostics": [
     {
       "severity": "error",
       "code": "SKG-CAPABILITY-NOT-IMPLEMENTED",
-      "message": "compile is declared but not implemented in K1 pilot",
+      "message": "change is declared but not implemented in K1 pilot",
       "location": "scripts/skill-knowledge.mjs",
       "witness": {
-        "command": "compile",
+        "command": "change",
         "stage": "K1"
       },
       "remediation": "Implement the next admitted slice; do not treat this command as successful."
@@ -155,7 +155,7 @@ JSON 结果必须包含：
   "full_json_schema_validation": true,
   "markdown_binding": true,
   "graph_invariants": true,
-  "runtime_projection": false,
+  "runtime_projection": true,
   "hop_analysis": true,
   "typed_change_transactions": false,
   "entry_surface_binding": true,
@@ -183,14 +183,13 @@ binding / inventory / authority / edge / pin-budget / entry-surface 不变式。
 诚实区分：probe 模块已交付 ≠ `check --host` CLI 已接线；带 `--host`/`--base` 的 `check`
 以及 `report --host` 仍 exit 10。
 
+`runtime_projection` 为 **true**：`compile` 已接通四 host final surface；H1–H4 由 compile
+verifier 在真实 link/anchor 上证明。authored `path` 仍只覆盖 authored navigation plane。
+
 仍为 `false`、留给后续切片的 capability：
 
 - `behavioral_evidence_tracking`
-- `runtime_projection`
 - `typed_change_transactions`
-
-`hop_analysis` 在本切片仅覆盖 authored navigation plane（见上表 `path`）；不得据此声称
-final-host H1–H4 已过门。
 
 ## 4. K0 `check`
 
@@ -255,7 +254,7 @@ loud、exit 10，不把 envelope check 冒充 full validation。
     "full_json_schema_validation": true,
     "markdown_binding": true,
     "graph_invariants": true,
-    "runtime_projection": false,
+    "runtime_projection": true,
     "hop_analysis": true,
     "typed_change_transactions": false,
     "entry_surface_binding": true,

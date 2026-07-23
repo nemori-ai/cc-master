@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
+import { withIsolatedSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cliPath = path.join(repoRoot, 'scripts', 'skill-knowledge.mjs');
@@ -46,16 +47,16 @@ function withTempSource(callback) {
   return result;
 }
 
-function displayRepoPath(target) {
-  const relative = path.relative(repoRoot, target);
+function displayRepoPath(target, root = repoRoot) {
+  const relative = path.relative(root, target);
   if (relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..') {
     return relative.split(path.sep).join('/');
   }
   return path.resolve(target);
 }
 
-function copyPilotSource(targetRoot) {
-  const sourceRoot = path.join(repoRoot, 'plugin/src/knowledge');
+function copyPilotSource(targetRoot, sourceRepoRoot = repoRoot) {
+  const sourceRoot = path.join(sourceRepoRoot, 'plugin/src/knowledge');
   const walk = (from, to) => {
     fs.mkdirSync(to, { recursive: true });
     for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
@@ -72,7 +73,7 @@ function copyPilotSource(targetRoot) {
   const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
   for (const ref of portfolio.skills ?? []) {
     const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-    ref.manifest = displayRepoPath(path.join(targetRoot, suffix));
+    ref.manifest = displayRepoPath(path.join(targetRoot, suffix), sourceRepoRoot);
   }
   fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
 
@@ -80,7 +81,7 @@ function copyPilotSource(targetRoot) {
   const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
   for (const ref of skill.modules ?? []) {
     const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-    ref.manifest = displayRepoPath(path.join(targetRoot, suffix));
+    ref.manifest = displayRepoPath(path.join(targetRoot, suffix), sourceRepoRoot);
   }
   fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
 }
@@ -501,26 +502,25 @@ test('SKG-PILOT-07: ownership tree rejects bad refs, orphans, multiply-owned, an
   }));
 
 test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even after unbound refresh', async () => {
-  const inventory = await import('../../scripts/skill-knowledge/inventory.mjs');
-  const markers = await import('../../scripts/skill-knowledge/markers.mjs');
-  const skillMdPath = path.join(
-    repoRoot,
-    'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md',
-  );
-  const otherPath = path.join(
-    repoRoot,
-    'plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md',
-  );
-  const originalOther = fs.readFileSync(otherPath, 'utf8');
-  const skillText = fs.readFileSync(skillMdPath, 'utf8');
-  const extracted = markers.extractMarkers(skillText, 'SKILL.md');
-  assert.equal(extracted.ok, true);
-  const span = extracted.spans.find((item) => item.point_id === 'point:conduct.never-play');
-  assert.ok(span);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot: isoRoot, runCli: isoCli }) => {
+    const inventory = await import('../../scripts/skill-knowledge/inventory.mjs');
+    const markers = await import('../../scripts/skill-knowledge/markers.mjs');
+    const skillMdPath = path.join(
+      isoRoot,
+      'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md',
+    );
+    const otherPath = path.join(
+      isoRoot,
+      'plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md',
+    );
+    const skillText = fs.readFileSync(skillMdPath, 'utf8');
+    const extracted = markers.extractMarkers(skillText, 'SKILL.md');
+    assert.equal(extracted.ok, true);
+    const span = extracted.spans.find((item) => item.point_id === 'point:conduct.never-play');
+    assert.ok(span);
 
-  try {
     await withTempSource(async (sourceRoot) => {
-      copyPilotSource(sourceRoot);
+      copyPilotSource(sourceRoot, isoRoot);
       const duplicateBlock = [
         '',
         '<!-- ccm:k:start point:conduct.never-play -->',
@@ -528,6 +528,7 @@ test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even aft
         '<!-- ccm:k:end point:conduct.never-play -->',
         '',
       ].join('\n');
+      const originalOther = fs.readFileSync(otherPath, 'utf8');
       fs.writeFileSync(otherPath, `${originalOther.trimEnd()}\n${duplicateBlock}`);
 
       const skillPath = path.join(
@@ -536,7 +537,7 @@ test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even aft
       );
       const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
       const otherEntry = skill.canonical_source_inventory.find(
-        (entry) => entry.path === displayRepoPath(otherPath),
+        (entry) => entry.path === displayRepoPath(otherPath, isoRoot),
       );
       assert.ok(otherEntry);
       const otherText = fs.readFileSync(otherPath, 'utf8');
@@ -548,7 +549,7 @@ test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even aft
       );
       fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
 
-      const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
+      const result = isoCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
       assert.equal(result.status, 4, result.stdout);
       const body = parseJson(result);
       assertValidCliOutput(body, 'duplicate marker check');
@@ -556,9 +557,7 @@ test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even aft
         body.diagnostics.some((item) => item.code === 'SKG-MARKER-DUPLICATE-GLOBAL'),
       );
     });
-  } finally {
-    fs.writeFileSync(otherPath, originalOther);
-  }
+  });
 });
 
 test('SKG-PILOT-09: CLI host/format enums fail closed with machine diagnostics', async () => {

@@ -139,7 +139,7 @@ package_one() {
   pkg="${stage}/cc-master"
   mkdir -p "$pkg"
 
-  local include_dirs=( skills hooks docs agents bin )
+  local include_dirs=( skills hooks docs agents bin knowledge )
   local root_manifest_file=""
   if [ "$host" = "claude-code" ]; then
     include_dirs=( .claude-plugin commands "${include_dirs[@]}" )

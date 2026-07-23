@@ -32,9 +32,10 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 当前是 **K1 pilot**：
 
 - `plugin/src/knowledge/` 已落真实 inventory：**1** admitted skill、**3 modules / 9 points**，绑定 canonical Markdown marker/span；
-- `check` / `contract` / `report` / `path` / `explain` 已实现（K1 pilot 查询面 + capability registry）；
-- standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仅 authored navigation plane）；
-- 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI host integration；
-- `compile` / `change`、`check --host` 或 `check --base`、`report --host` 仍 exit 10。
+- `check` / `contract` / `compile` / `report` / `path` / `explain` 已实现（K1 pilot 查询面 + 四 host runtime projection）；
+- standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仍覆盖 authored navigation plane；final-host H1–H4 由 `compile` 证明）；
+- 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI `check --host` integration；
+- `runtime_projection=true`：`compile` 写入 `plugin/dist/<host>/knowledge/` 与 skill nav/anchors，final verifier 只计真实可点击边；
+- `change`、`check --host` 或 `check --base`、`report --host` 仍 exit 10。
 
-未来项只留真实缺口：`runtime_projection`、`typed_change_transactions`、`behavioral_evidence_tracking`，以及 `check --host` CLI 接线与四 host projection compile。在 K3 全覆盖验收之前，不得对外声称八个分发 skill 已满足全图有向直径 `≤ 3`。
+未来项只留真实缺口：`typed_change_transactions`、`behavioral_evidence_tracking`，以及 `check --host` CLI 接线。在 K3 全覆盖验收之前，不得对外声称八个分发 skill 已满足全图有向直径 `≤ 3`。

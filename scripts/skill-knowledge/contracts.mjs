@@ -6,6 +6,7 @@ export const DEFAULT_SOURCE_ROOT = 'plugin/src/knowledge';
 
 export const IMPLEMENTED_COMMANDS = Object.freeze([
   'check',
+  'compile',
   'contract',
   'explain',
   'path',
@@ -161,7 +162,7 @@ export const CAPABILITIES = Object.freeze({
   full_json_schema_validation: true,
   markdown_binding: true,
   graph_invariants: true,
-  runtime_projection: false,
+  runtime_projection: true,
   hop_analysis: true,
   typed_change_transactions: false,
   entry_surface_binding: true,

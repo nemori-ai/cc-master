@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-master-orchestrator-guide"></a>
 ---
 name: master-orchestrator-guide
 description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, coordinating several background agents / workflows toward one large goal，或要跨 Claude Code、Codex、Cursor、Kimi Code 的统一 worker pool 按任务角色选择 O/T1/T2/T3 候选与 fail-closed fallback — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、只看当前 origin 的模型、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。Do NOT use when 你只需要查询 ccm 命令语法或解释事实字段；操作面归 using-ccm，事实消费归 pacing-and-estimation。'
@@ -75,9 +76,16 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 七镜头（The seven lenses）——操作哲学
 
+<a id="ccm-k-point-conduct-never-play"></a>
 <!-- ccm:k:start point:conduct.never-play -->
 1. **指挥不演奏 (Conduct, don't play)** — 拆图 / 派发 / 验收 / 整合。绝不亲手实现或 review。
 <!-- ccm:k:end point:conduct.never-play -->
+<!-- ccm:k:nav:start point:conduct.never-play -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
+- [operationalizes: 红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines)
+<!-- ccm:k:nav:end -->
 2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上；task 的工作形态 / 风险先定 effect floor，临界性只影响同档资源分配，统一入口见 `references/worker-routing.md`。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。每次派发只走 `references/worker-routing.md` 的单一路径：任务形状 → executor → target surface → effect floor → exact qualification → 同档 fallback → 真实 handle → 端点验收；origin 不是 worker pool 边界。并行机制与派发卫生再 drill `references/dispatch.md`。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
@@ -95,6 +103,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 红线（Red lines）——完整体
 
+<a id="ccm-k-point-conduct-red-lines"></a>
 <!-- ccm:k:start point:conduct.red-lines -->
 §① 给过你这些底线的**摘要**；这里是完整体，含唯一例外与理由。
 
@@ -107,9 +116,16 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 > **违背这些红线的字面就是违背它们的精神。**「我遵循的是精神，不是字面」正是攻破每一条红线的那句合理化。没有哪场 orchestration 特殊到红线就此失效——当你开始为「*这次*情形是例外」构建论证时，那套论证本身就是症状。
 <!-- ccm:k:end point:conduct.red-lines -->
-
+<!-- ccm:k:nav:start point:conduct.red-lines -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
+- [contrasts_with: 离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium)
+- [applies_to: 端点验收 procedure](./references/resume-verify.md#ccm-k-point-verification-endpoint-procedure)
+<!-- ccm:k:nav:end -->
 ### 坏编排有一个名字：离席（deserting the podium）
 
+<a id="ccm-k-point-conduct-deserting-podium"></a>
 <!-- ccm:k:start point:conduct.deserting-podium -->
 所有坏编排姿态是同一件事的不同方向：**你离开了指挥台**。你的岗位是立于乐队与用户之间、握着整张图；每一种反模式都是一种离席——
 
@@ -120,7 +136,11 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 这个名字的用法：当你抓到自己正在滑，**先叫出方向**（「我正在向下离席」），再回到决策程序——能命名的滑坡才拦得住。下面的对照表，就是四个方向的离席在你脑内开始成形时的样子。
 <!-- ccm:k:end point:conduct.deserting-podium -->
-
+<!-- ccm:k:nav:start point:conduct.deserting-podium -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
+<!-- ccm:k:nav:end -->
 ### Rationalization Table（合理化对照表）—— 借口，与真相
 
 当你抓到以下某个念头正在成形，它不是一个计划——它是一条红线即将被跨越。给它命名，然后回到决策程序。

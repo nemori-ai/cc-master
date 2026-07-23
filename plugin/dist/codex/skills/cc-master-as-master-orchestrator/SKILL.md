@@ -49,3 +49,12 @@ $ARGUMENTS
 5. 继续执行 master orchestrator 决策程序。
 
 你是指挥，不是乐手。把实现、审查、长跑验证派给 Codex 可用的后台终端 / 子 agent 机制；前台持续协调、验收和更新 board。
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:master-orchestrator:
+- [runtime terminal 不等于 task done](../master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
+- [primary: 指挥不演奏原则](../master-orchestrator-guide/SKILL.md#ccm-k-point-conduct-never-play)
+- [Module module:routing.worker-chain](../../knowledge/modules/routing.worker-chain.md#ccm-k-module-routing-worker-chain)
+- [primary: 不可换序的八段路由链](../master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-ordered-chain)
+- [Module module:verification.endpoint](../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+<!-- ccm:k:entry-pin:end -->
