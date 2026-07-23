@@ -723,8 +723,17 @@ function resolveSourceNode(host, relativePath, markdown, linkIndex, graph) {
 /**
  * Scan projected Markdown for misplaced / duplicate point|module anchors.
  */
-function validateAnchorPlacements({ host, graph, surface, repoRoot, diagnostics }) {
-  const payloadRoot = path.join(repoRoot, 'plugin/dist', host);
+function validateAnchorPlacements({
+  host,
+  graph,
+  surface,
+  repoRoot,
+  diagnostics,
+  payloadRoot = null,
+}) {
+  const hostRoot = payloadRoot
+    ? path.resolve(payloadRoot)
+    : path.join(repoRoot, 'plugin/dist', host);
   const seenPointAnchors = new Map();
   const seenModuleAnchors = new Map();
 
@@ -743,7 +752,7 @@ function validateAnchorPlacements({ host, graph, surface, repoRoot, diagnostics 
   }
 
   for (const relative of [...files].sort()) {
-    const absolute = path.join(payloadRoot, relative);
+    const absolute = path.join(hostRoot, relative);
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) continue;
     const markdown = fs.readFileSync(absolute, 'utf8');
     const inspection = inspectHtmlAnchorIds(markdown);
@@ -859,8 +868,17 @@ function validateAnchorPlacements({ host, graph, surface, repoRoot, diagnostics 
 /**
  * Verify H1–H4 against the enabled runtime edge list + authored graph metadata.
  * Binding paths are part of identity: fragment-only matches are rejected.
+ *
+ * Optional `payloadRoot` remaps physical reads to a candidate host root while
+ * logical host-relative paths stay unchanged (public CLI omits it → live dist).
  */
-export function verifyHopContracts({ host, graph, surface, repoRoot }) {
+export function verifyHopContracts({
+  host,
+  graph,
+  surface,
+  repoRoot,
+  payloadRoot = null,
+}) {
   const diagnostics = [];
   const hopPolicy = graph.portfolio?.hop_policy ?? {};
   const adjacency = new Map();
@@ -868,17 +886,26 @@ export function verifyHopContracts({ host, graph, surface, repoRoot }) {
     if (!adjacency.has(id)) adjacency.set(id, new Set());
   };
 
-  const payloadRoot = path.join(repoRoot, 'plugin/dist', host);
+  const hostRoot = payloadRoot
+    ? path.resolve(payloadRoot)
+    : path.join(repoRoot, 'plugin/dist', host);
   const markdownCache = new Map();
   const readMarkdown = (relative) => {
     if (markdownCache.has(relative)) return markdownCache.get(relative);
-    const absolute = path.join(payloadRoot, relative);
+    const absolute = path.join(hostRoot, relative);
     const text = fs.existsSync(absolute) ? fs.readFileSync(absolute, 'utf8') : '';
     markdownCache.set(relative, text);
     return text;
   };
 
-  validateAnchorPlacements({ host, graph, surface, repoRoot, diagnostics });
+  validateAnchorPlacements({
+    host,
+    graph,
+    surface,
+    repoRoot,
+    diagnostics,
+    payloadRoot: hostRoot,
+  });
 
   for (const edge of surface.enabled_edge_list ?? []) {
     const fromRel = edge.from_file.split(path.sep).join('/');

@@ -8,7 +8,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "d5430cdd7b2345681bb87ce546e03b377f6ddbd7b9869d1eeb107a51f231583b",
+            "SKILL.md": "3b8bf33bc242827d779b63d5ad518dc885f0f5cac46188d37b14369e076e6a05",
             "references/async-hitl.md": "57d269b2b91bcfcf4c656cb3e4b7e6e605c20b504ecc92beef99dac7f9e2d1c8",
             "references/board.md": "19cbcdb4bc43302f170b7449c938d8bc3473b37d7e0cc8285c543a2aac37a299",
             "references/cost-decisions.md": "a0aee1ba59dffd34ede23e022c49d117bed9427e8c3d80cebd6c7f1c4f25eeed",
@@ -20,8 +20,8 @@
             "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "9fc08e81cf02b6b1bcf62fd642728971911e0bde0b9ab62e22d5cf9ac7ae315f",
-            "references/worker-routing.md": "d1c61f258e8bb6ddac377557726910aea12abcd6b8f2ca76a45857685628dc79",
+            "references/resume-verify.md": "e388bbd558e756282aeb86207cd0a4571d5260fdb5918a70755db7ba92e09adc",
+            "references/worker-routing.md": "0ee89e19008bb50eba9ba60548add23d5d5e91cc5873abac4f4dfeed6eb6cce9",
             "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
           }
         },
@@ -53,7 +53,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "289df958adc1e0b24264bd77148fc239d40b7c32beb0eedbade0e0bde55233ba",
+            "SKILL.md": "4c385f2315ce314baedd7c7ca2526975aed92da4c0ad5cc29a902c187c1c63fd",
             "references/async-hitl.md": "4a56ab3e551879e654747c54c9b22f9b221e92e526f5bd0f4de8a3acceef8a62",
             "references/board.md": "5d96b0df290d78b93ed50315724d45f8770ee897506107c7c77310ad9789ccba",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -63,8 +63,8 @@
             "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "d3cbd96279ea29a155b3ab59c54a5da085a4d6344c6f49c9400344c93ae24f04",
-            "references/worker-routing.md": "68c1ff02bd2d6d6d8922e4d3d4a8b56890964813fe05ab49b7a47fb41adefd1f"
+            "references/resume-verify.md": "5bdf147ce2d5f7be3894a2ad8bf122b683013681b572d62861e46f2fe086ff1f",
+            "references/worker-routing.md": "d77b5094a66ed29598381ce6990f8d2d56740e95c602856957aac6ed4e72868e"
           }
         },
         "pacing-and-estimation": {
@@ -94,7 +94,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "c25c63941e9209ccdce6d646aea23c4809a7ce791b56dcc9d7d06902fca3660d",
+            "SKILL.md": "62a077280cb11309f16583674d7de12ca27c50e7fabbc440d1e1941b693feeba",
             "references/async-hitl.md": "622768b1f2ed0ccab493b78b057b91594b15242c2c3f7426866dfd8234c5f41b",
             "references/board.md": "4d5fb019b42e1852b2ab62ca811532e951742c38b8c764f8d6072f6dff44f5e5",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -104,8 +104,8 @@
             "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "5cbb3489d0bc28c07f4bb8f945dcb8bc3d4c96876e7386e64778fc91ebdfe044",
-            "references/worker-routing.md": "a5869ff1d2b3c4c464662354bdfc512e56b6a178c3729302e21c945c1270e383"
+            "references/resume-verify.md": "2787fd0c55169e169c726e45c7c8f2a60a55cf3305905f8c024957a4332d4295",
+            "references/worker-routing.md": "78b82a0f0e8e06154c690bdd091f111f0759b924de09b37eb2449e5e0077e781"
           }
         },
         "pacing-and-estimation": {
@@ -135,7 +135,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "c57a9dbfa8bfbaf73ff7ed5f979fd4c21bf575218a16ee0790818837833f8153",
+            "SKILL.md": "a369670422d35b199f8246a1d2848a0b3df2961d4c3b65873ff915e9ca859eed",
             "references/async-hitl.md": "f435d6abdcd7f524f847817b2308405b6fc9a4f6e6e7de7e758b676bfea27c35",
             "references/board.md": "9f906fa3e5254a699b082c8923be75438741fe401c99e832050acd87b4b0f558",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -146,8 +146,8 @@
             "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "f1062b6119cc9b8318006f860497c20f979c1d0253da509ea959cf0495e866a2",
-            "references/worker-routing.md": "093da4e725c0ebe5173e76044793ce7e271284a3942b566567c82777751cda68"
+            "references/resume-verify.md": "9629efef351f0603593131213d8d00377841396645ca568e50e0b19982a159c2",
+            "references/worker-routing.md": "b061249da7e84f6452683c5ee0585a2315cb5134f4be17795afc1f4dd49e07fd"
           }
         },
         "pacing-and-estimation": {

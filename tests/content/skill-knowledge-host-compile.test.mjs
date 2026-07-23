@@ -164,10 +164,10 @@ function listCompileTempBackupNames(rootAbsolute) {
   return hits;
 }
 
-function snapshotKnowledgeTree(host) {
-  const root = path.join(repoRoot, 'plugin/dist', host, 'knowledge');
+function snapshotKnowledgeTree(host, root = repoRoot) {
+  const knowledgeRoot = path.join(root, 'plugin/dist', host, 'knowledge');
   const files = [];
-  if (!fs.existsSync(root)) return { root, files: [], digest: '' };
+  if (!fs.existsSync(knowledgeRoot)) return { root: knowledgeRoot, files: [], digest: '' };
   const visit = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
       a.name.localeCompare(b.name),
@@ -176,21 +176,21 @@ function snapshotKnowledgeTree(host) {
       if (entry.isDirectory()) visit(target);
       else if (entry.isFile()) {
         files.push({
-          path: path.relative(root, target).split(path.sep).join('/'),
+          path: path.relative(knowledgeRoot, target).split(path.sep).join('/'),
           bytes: fs.readFileSync(target),
         });
       }
     }
   };
-  visit(root);
+  visit(knowledgeRoot);
   const digest = files
     .map((item) => `${item.path}:${item.bytes.toString('hex')}`)
     .join('\n');
-  return { root, files, digest };
+  return { root: knowledgeRoot, files, digest };
 }
 
-function snapshotPointNavSnippets(host) {
-  const skillRoot = path.join(repoRoot, 'plugin/dist', host, 'skills/master-orchestrator-guide');
+function snapshotPointNavSnippets(host, root = repoRoot) {
+  const skillRoot = path.join(root, 'plugin/dist', host, 'skills/master-orchestrator-guide');
   const snippets = [];
   const visit = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
@@ -226,144 +226,156 @@ test('SKG-COMPILE-01: contract flips runtime_projection and lists compile+change
 });
 
 test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves host-native entry/token divergence', async () => {
-  const body = parseJson(runCli(['compile', '--json']));
-  assert.equal(body.ok, true, JSON.stringify(body.diagnostics, null, 2));
-  assertValidCliOutput(body, 'compile success');
-  assert.equal(body.command, 'compile');
-  assert.equal(body.result_kind, 'compile');
-  assert.equal(body.compile_mode, 'write');
-  assert.deepEqual(body.hosts, [...PRODUCT_HOSTS]);
-  assert.equal(body.host_results.length, PRODUCT_HOSTS.length);
+  await withIsolatedSkillKnowledgeRepo(
+    async ({ repoRoot: isoRoot, runCli: isoCli }) => {
+      const body = parseJson(isoCli(['compile', '--json']));
+      assert.equal(body.ok, true, JSON.stringify(body.diagnostics, null, 2));
+      assertValidCliOutput(body, 'compile success');
+      assert.equal(body.command, 'compile');
+      assert.equal(body.result_kind, 'compile');
+      assert.equal(body.compile_mode, 'write');
+      assert.deepEqual(body.hosts, [...PRODUCT_HOSTS]);
+      assert.equal(body.host_results.length, PRODUCT_HOSTS.length);
 
-  const {
-    countEnabledRuntimeEdges,
-  } = await import('../../scripts/skill-knowledge/compile/surface-verifier.mjs');
-  const { entrySurfaceToDistPath } = await import('../../scripts/skill-knowledge/compile/paths.mjs');
-  const { buildAndValidateGraph } = await import('../../scripts/skill-knowledge/graph.mjs');
-  const { executeHostTokenContract } = await import(
-    '../../scripts/skill-knowledge/host-portability/adapter-contract.mjs'
-  );
+      const {
+        countEnabledRuntimeEdges,
+      } = await import('../../scripts/skill-knowledge/compile/surface-verifier.mjs');
+      const { entrySurfaceToDistPath } = await import('../../scripts/skill-knowledge/compile/paths.mjs');
+      const { buildAndValidateGraph } = await import('../../scripts/skill-knowledge/graph.mjs');
+      const { executeHostTokenContract } = await import(
+        '../../scripts/skill-knowledge/host-portability/adapter-contract.mjs'
+      );
 
-  const graph = buildAndValidateGraph({
-    repoRoot,
-    sourceRoot: 'plugin/src/knowledge',
-  }).graph;
-  assert.deepEqual(
-    graph.points.map((point) => point.id).sort(),
-    [...EXPECTED_POINT_IDS],
-    'authored point identities must be exactly the K1 pilot set',
-  );
+      const graph = buildAndValidateGraph({
+        repoRoot: isoRoot,
+        sourceRoot: 'plugin/src/knowledge',
+      }).graph;
+      assert.deepEqual(
+        graph.points.map((point) => point.id).sort(),
+        [...EXPECTED_POINT_IDS],
+        'authored point identities must be exactly the K1 pilot set',
+      );
 
-  const knowledgeDigests = new Map();
-  const nativeFingerprints = new Map();
+      const knowledgeDigests = new Map();
+      const nativeFingerprints = new Map();
 
-  for (const host of PRODUCT_HOSTS) {
-    const result = body.host_results.find((item) => item.host === host);
-    assert.ok(result, `missing host_results for ${host}`);
-    assert.equal(result.ok, true, `${host}: ${JSON.stringify(result)}`);
-    assert.equal(result.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} enabled edge count`);
-    assert.equal(result.point_anchors, EXPECTED_POINT_IDS.length, `${host} point anchors`);
+      for (const host of PRODUCT_HOSTS) {
+        const result = body.host_results.find((item) => item.host === host);
+        assert.ok(result, `missing host_results for ${host}`);
+        assert.equal(result.ok, true, `${host}: ${JSON.stringify(result)}`);
+        assert.equal(result.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} enabled edge count`);
+        assert.equal(result.point_anchors, EXPECTED_POINT_IDS.length, `${host} point anchors`);
 
-    for (const gate of ['H1', 'H2', 'H3', 'H4']) {
-      assert.equal(result.hop_report[gate].ok, true, `${host} ${gate}`);
-      assert.ok(result.hop_report[gate].witness, `${host} ${gate} witness`);
-      assert.ok(result.hop_report[gate].remediation, `${host} ${gate} remediation`);
-    }
+        for (const gate of ['H1', 'H2', 'H3', 'H4']) {
+          assert.equal(result.hop_report[gate].ok, true, `${host} ${gate}`);
+          assert.ok(result.hop_report[gate].witness, `${host} ${gate} witness`);
+          assert.ok(result.hop_report[gate].remediation, `${host} ${gate} remediation`);
+        }
 
-    const knowledge = snapshotKnowledgeTree(host);
-    assert.ok(knowledge.files.length > 0, `${host} knowledge tree`);
-    knowledgeDigests.set(host, knowledge.digest);
+        const knowledge = snapshotKnowledgeTree(host, isoRoot);
+        assert.ok(knowledge.files.length > 0, `${host} knowledge tree`);
+        knowledgeDigests.set(host, knowledge.digest);
 
-    const payloadRoot = path.join(repoRoot, 'plugin/dist', host);
-    const skillDirs = (graph.skills ?? []).map(
-      (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
-    );
-    const scopedRoots = ['knowledge', ...skillDirs];
-    for (const entry of graph.entries ?? []) {
-      for (const surfaceSpec of entry.surfaces ?? []) {
-        if (surfaceSpec.host !== host) continue;
-        const distRel = entrySurfaceToDistPath(host, surfaceSpec.source_file);
-        if (!distRel) continue;
-        const relative = distRel.replace(`plugin/dist/${host}/`, '');
-        if (!scopedRoots.includes(relative)) scopedRoots.push(relative);
+        const payloadRoot = path.join(isoRoot, 'plugin/dist', host);
+        const skillDirs = (graph.skills ?? []).map(
+          (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
+        );
+        const scopedRoots = ['knowledge', ...skillDirs];
+        for (const entry of graph.entries ?? []) {
+          for (const surfaceSpec of entry.surfaces ?? []) {
+            if (surfaceSpec.host !== host) continue;
+            const distRel = entrySurfaceToDistPath(host, surfaceSpec.source_file);
+            if (!distRel) continue;
+            const relative = distRel.replace(`plugin/dist/${host}/`, '');
+            if (!scopedRoots.includes(relative)) scopedRoots.push(relative);
+          }
+        }
+        const surface = countEnabledRuntimeEdges({
+          host,
+          payloadRoot,
+          repoRoot: isoRoot,
+          mode: 'canonical',
+          scopedRoots,
+        });
+        assert.equal(surface.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} reparsed edges`);
+        const breakdown = {};
+        for (const edge of surface.enabled_edge_list) {
+          const key = classifyEnabledEdge(edge);
+          breakdown[key] = (breakdown[key] ?? 0) + 1;
+        }
+        assert.deepEqual(breakdown, { ...EXPECTED_EDGE_CLASS_BREAKDOWN }, `${host} edge-class breakdown`);
+
+        const entry = (graph.entries ?? [])[0];
+        const surfaceSpec = (entry?.surfaces ?? []).find((item) => item.host === host);
+        assert.ok(surfaceSpec, `${host} entry surface`);
+        const entryDist = entrySurfaceToDistPath(host, surfaceSpec.source_file);
+        assert.ok(entryDist, `${host} entry dist path`);
+        const entryRel = entryDist.replace(`plugin/dist/${host}/`, '');
+        const entryText = fs.readFileSync(path.join(isoRoot, entryDist), 'utf8');
+        const pinBlock = extractEntryPinBlock(entryText);
+        assert.ok(pinBlock.length > 0, `${host} entry pin block`);
+
+        const tokenContract = executeHostTokenContract(host);
+        assert.equal(tokenContract.ok, true, `${host} token contract`);
+        // Fingerprint must NOT bake host labels, host path prefixes, or token-contract:<host> tags.
+        const nativeFingerprint = JSON.stringify({
+          entry_surface_relpath: entryRel,
+          entry_pin_sha256: sha256Text(pinBlock),
+          token_contract_facts: tokenContract.path_tokens,
+        });
+        assert.equal(
+          nativeFingerprints.has(nativeFingerprint),
+          false,
+          `host-native fingerprint collided for ${host}; evidence must come from entry path/content + resolved token facts`,
+        );
+        nativeFingerprints.set(nativeFingerprint, host);
       }
-    }
-    const surface = countEnabledRuntimeEdges({
-      host,
-      payloadRoot,
-      repoRoot,
-      mode: 'canonical',
-      scopedRoots,
-    });
-    assert.equal(surface.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} reparsed edges`);
-    const breakdown = {};
-    for (const edge of surface.enabled_edge_list) {
-      const key = classifyEnabledEdge(edge);
-      breakdown[key] = (breakdown[key] ?? 0) + 1;
-    }
-    assert.deepEqual(breakdown, { ...EXPECTED_EDGE_CLASS_BREAKDOWN }, `${host} edge-class breakdown`);
 
-    const entry = (graph.entries ?? [])[0];
-    const surfaceSpec = (entry?.surfaces ?? []).find((item) => item.host === host);
-    assert.ok(surfaceSpec, `${host} entry surface`);
-    const entryDist = entrySurfaceToDistPath(host, surfaceSpec.source_file);
-    assert.ok(entryDist, `${host} entry dist path`);
-    const entryRel = entryDist.replace(`plugin/dist/${host}/`, '');
-    const entryText = fs.readFileSync(path.join(repoRoot, entryDist), 'utf8');
-    const pinBlock = extractEntryPinBlock(entryText);
-    assert.ok(pinBlock.length > 0, `${host} entry pin block`);
-
-    const tokenContract = executeHostTokenContract(host);
-    assert.equal(tokenContract.ok, true, `${host} token contract`);
-    // Fingerprint must NOT bake host labels, host path prefixes, or token-contract:<host> tags.
-    const nativeFingerprint = JSON.stringify({
-      entry_surface_relpath: entryRel,
-      entry_pin_sha256: sha256Text(pinBlock),
-      token_contract_facts: tokenContract.path_tokens,
-    });
-    assert.equal(
-      nativeFingerprints.has(nativeFingerprint),
-      false,
-      `host-native fingerprint collided for ${host}; evidence must come from entry path/content + resolved token facts`,
-    );
-    nativeFingerprints.set(nativeFingerprint, host);
-  }
-
-  assert.equal(nativeFingerprints.size, PRODUCT_HOSTS.length);
-  // Shared knowledge bytes across hosts are allowed and honestly accepted.
-  assert.equal(
-    new Set(knowledgeDigests.values()).size,
-    1,
-    'K1 pilot knowledge routers are host-shared byte-identical; anti-relabel must not require knowledge forks',
+      assert.equal(nativeFingerprints.size, PRODUCT_HOSTS.length);
+      // Shared knowledge bytes across hosts are allowed and honestly accepted.
+      assert.equal(
+        new Set(knowledgeDigests.values()).size,
+        1,
+        'K1 pilot knowledge routers are host-shared byte-identical; anti-relabel must not require knowledge forks',
+      );
+    },
+    { warmHosts: [...PRODUCT_HOSTS] },
   );
 });
 
 test('SKG-COMPILE-03: same source compile is byte-identical twice; --check stays green', () => {
-  const first = parseJson(runCli(['compile', '--json']));
-  assert.equal(first.ok, true);
-  const before = Object.fromEntries(PRODUCT_HOSTS.map((host) => [host, snapshotKnowledgeTree(host)]));
-  const beforeNav = Object.fromEntries(
-    PRODUCT_HOSTS.map((host) => [host, snapshotPointNavSnippets(host)]),
+  withIsolatedSkillKnowledgeRepo(
+    ({ repoRoot: isoRoot, runCli: isoCli }) => {
+      const first = parseJson(isoCli(['compile', '--json']));
+      assert.equal(first.ok, true);
+      const before = Object.fromEntries(
+        PRODUCT_HOSTS.map((host) => [host, snapshotKnowledgeTree(host, isoRoot)]),
+      );
+      const beforeNav = Object.fromEntries(
+        PRODUCT_HOSTS.map((host) => [host, snapshotPointNavSnippets(host, isoRoot)]),
+      );
+
+      const second = parseJson(isoCli(['compile', '--json']));
+      assert.equal(second.ok, true);
+      assert.equal(first.graph_hash, second.graph_hash);
+
+      for (const host of PRODUCT_HOSTS) {
+        const after = snapshotKnowledgeTree(host, isoRoot);
+        assert.equal(after.digest, before[host].digest, `${host} knowledge tree must be byte-identical`);
+        assert.deepEqual(
+          snapshotPointNavSnippets(host, isoRoot).map((item) => item.text),
+          beforeNav[host].map((item) => item.text),
+          `${host} injected nav/anchors must be byte-identical`,
+        );
+      }
+
+      const check = parseJson(isoCli(['compile', '--check', '--json']));
+      assert.equal(check.ok, true, JSON.stringify(check.diagnostics, null, 2));
+      assert.equal(check.compile_mode, 'check');
+      assertValidCliOutput(check, 'compile --check');
+    },
+    { warmHosts: [...PRODUCT_HOSTS] },
   );
-
-  const second = parseJson(runCli(['compile', '--json']));
-  assert.equal(second.ok, true);
-  assert.equal(first.graph_hash, second.graph_hash);
-
-  for (const host of PRODUCT_HOSTS) {
-    const after = snapshotKnowledgeTree(host);
-    assert.equal(after.digest, before[host].digest, `${host} knowledge tree must be byte-identical`);
-    assert.deepEqual(
-      snapshotPointNavSnippets(host).map((item) => item.text),
-      beforeNav[host].map((item) => item.text),
-      `${host} injected nav/anchors must be byte-identical`,
-    );
-  }
-
-  const check = parseJson(runCli(['compile', '--check', '--json']));
-  assert.equal(check.ok, true, JSON.stringify(check.diagnostics, null, 2));
-  assert.equal(check.compile_mode, 'check');
-  assertValidCliOutput(check, 'compile --check');
 });
 
 test('SKG-COMPILE-04: final verifier counts only real clickable edges; prose/heading/stub do not count', async () => {
@@ -438,7 +450,7 @@ test('SKG-COMPILE-04: final verifier counts only real clickable edges; prose/hea
 
 test('SKG-COMPILE-05: broken link / malformed / duplicate / path-token / drift mutations fail closed', () => {
   withIsolatedSkillKnowledgeRepo(({ repoRoot: isoRoot, runCli: isoCli }) => {
-    assert.equal(parseJson(isoCli(['compile', '--json'])).ok, true);
+    assert.equal(parseJson(isoCli(['compile', '--host', 'claude-code', '--json'])).ok, true);
 
     const atlas = path.join(isoRoot, 'plugin/dist/claude-code/knowledge/atlas.md');
     const original = fs.readFileSync(atlas, 'utf8');
@@ -491,19 +503,25 @@ test('SKG-COMPILE-05: broken link / malformed / duplicate / path-token / drift m
           item.code === 'SKG-PROJECTION-DRIFT',
       ),
     );
-  });
+  }, { warmHosts: ['claude-code'] });
 });
 
 test('SKG-COMPILE-06: per-host compile and unknown host / check --host remain honest', () => {
-  const one = parseJson(runCli(['compile', '--host', 'codex', '--json']));
-  assert.equal(one.ok, true);
-  assert.deepEqual(one.hosts, ['codex']);
-  assertValidCliOutput(one, 'compile --host codex');
+  withIsolatedSkillKnowledgeRepo(
+    ({ runCli: isoCli }) => {
+      const one = parseJson(isoCli(['compile', '--host', 'codex', '--json']));
+      assert.equal(one.ok, true);
+      assert.deepEqual(one.hosts, ['codex']);
+      assertValidCliOutput(one, 'compile --host codex');
 
-  const unknown = parseJson(runCli(['compile', '--host', 'windsurf', '--json']));
-  assert.equal(unknown.ok, false);
-  assert.equal(unknown.diagnostics[0].code, 'SKG-HOST-UNKNOWN');
+      const unknown = parseJson(isoCli(['compile', '--host', 'windsurf', '--json']));
+      assert.equal(unknown.ok, false);
+      assert.equal(unknown.diagnostics[0].code, 'SKG-HOST-UNKNOWN');
+    },
+    { warmHosts: ['codex'] },
+  );
 
+  // Readonly capability probes against the shared HUB (no write compile).
   const changeUsage = runCli(['change', '--json']);
   assert.equal(changeUsage.status, 2, 'bare change is usage, not capability-unavailable');
   assert.equal(parseJson(changeUsage).diagnostics[0].code, 'SKG-USAGE');
@@ -515,13 +533,18 @@ test('SKG-COMPILE-06: per-host compile and unknown host / check --host remain ho
 
 test('SKG-COMPILE-07: sync-plugin-dist post-pass keeps knowledge in package allowlist and out of hooks', () => {
   const sync = fs.readFileSync(path.join(repoRoot, 'scripts/sync-plugin-dist.sh'), 'utf8');
+  const hostSurface = fs.readFileSync(
+    path.join(repoRoot, 'scripts/skill-knowledge/sync-host-surface.cjs'),
+    'utf8',
+  );
+  // Full sync owns candidate-root compile inside sync-host-surface (no live post-pass).
   assert.match(
-    sync,
-    /skill-knowledge\.mjs\s+compile|skill-knowledge\/compile/,
-    'sync-plugin-dist must invoke knowledge compile post-pass',
+    `${sync}\n${hostSurface}`,
+    /skill-knowledge\.mjs\s+compile|skill-knowledge\/compile|compile-candidate-host/,
+    'sync-plugin-dist / host-surface must invoke knowledge compile',
   );
   assert.doesNotMatch(
-    sync,
+    `${sync}\n${hostSurface}`,
     /cp .*skill-knowledge\.mjs.*hooks|hooks\/.*skill-knowledge/,
     'must not ship compile toolkit into runtime hooks',
   );
@@ -666,7 +689,7 @@ test('SKG-COMPILE-09: wrong-file point anchor placement fails binding verificati
       ),
       `expected binding diagnostic, got ${JSON.stringify(codes)}`,
     );
-  });
+  }, { warmHosts: ['claude-code'] });
 });
 
 test('SKG-COMPILE-10: knowledge dir is an exact-managed tree (extra/stale + symlink escape)', () => {
@@ -708,7 +731,7 @@ test('SKG-COMPILE-10: knowledge dir is an exact-managed tree (extra/stale + syml
     const writeLink = parseJson(isoCli(['compile', '--host', 'claude-code', '--json']));
     assert.equal(writeLink.ok, true, JSON.stringify(writeLink.diagnostics, null, 2));
     assert.equal(fs.existsSync(escapeLink), false, 'write must remove escape symlink');
-  });
+  }, { warmHosts: ['claude-code'] });
 });
 
 test('SKG-COMPILE-12: knowledge root / modules external symlink must not write outside (fail-without-touch)', () => {
@@ -793,7 +816,7 @@ test('SKG-COMPILE-12: knowledge root / modules external symlink must not write o
       const check = parseJson(isoCli(['compile', '--host', host, '--check', '--json']));
       assert.equal(check.ok, true, JSON.stringify(check.diagnostics, null, 2));
     });
-  });
+  }, { warmHosts: ['claude-code'] });
 });
 
 test('SKG-COMPILE-13: plugin/dist or plugin external symlink fails closed (repo trust root)', () => {
@@ -843,7 +866,7 @@ test('SKG-COMPILE-13: plugin/dist or plugin external symlink fails closed (repo 
     // Restore a real plugin/dist via fresh isolated warm path is unnecessary —
     // mutation A lives in withTempDir and leaves the iso tree with a dangling
     // or restored state. Re-copy isolation for mutation B.
-  });
+  }, { warmHosts: ['claude-code'] });
 
   withIsolatedSkillKnowledgeRepo(({ repoRoot: isoRoot, runCli }) => {
     const warm = runCli(['compile', '--host', 'claude-code', '--json']);
@@ -872,42 +895,48 @@ test('SKG-COMPILE-13: plugin/dist or plugin external symlink fails closed (repo 
       assert.deepEqual(listCompileTempBackupNames(externalRoot), []);
       assert.equal(fs.lstatSync(pluginInRepo).isSymbolicLink(), true);
     });
-  });
+  }, { warmHosts: ['claude-code'] });
 });
 
 test('SKG-COMPILE-11: emitted entry pin / routers end with exactly one trailing newline', () => {
-  const body = parseJson(runCli(['compile', '--json']));
-  assert.equal(body.ok, true, JSON.stringify(body.diagnostics, null, 2));
+  withIsolatedSkillKnowledgeRepo(
+    ({ repoRoot: isoRoot, runCli: isoCli }) => {
+      const body = parseJson(isoCli(['compile', '--json']));
+      assert.equal(body.ok, true, JSON.stringify(body.diagnostics, null, 2));
 
-  for (const host of PRODUCT_HOSTS) {
-    const knowledge = snapshotKnowledgeTree(host);
-    for (const file of knowledge.files) {
-      const text = file.bytes.toString('utf8');
-      assert.ok(text.endsWith('\n'), `${host}/${file.path} must end with newline`);
-      assert.equal(
-        text.endsWith('\n\n'),
-        false,
-        `${host}/${file.path} must not end with double newline`,
-      );
-    }
+      for (const host of PRODUCT_HOSTS) {
+        const knowledge = snapshotKnowledgeTree(host, isoRoot);
+        for (const file of knowledge.files) {
+          const text = file.bytes.toString('utf8');
+          assert.ok(text.endsWith('\n'), `${host}/${file.path} must end with newline`);
+          assert.equal(
+            text.endsWith('\n\n'),
+            false,
+            `${host}/${file.path} must not end with double newline`,
+          );
+        }
 
-    const entryCandidates = [
-      path.join(repoRoot, `plugin/dist/${host}/commands/as-master-orchestrator.md`),
-      path.join(repoRoot, `plugin/dist/${host}/skills/cc-master-as-master-orchestrator/SKILL.md`),
-    ];
-    for (const candidate of entryCandidates) {
-      if (!fs.existsSync(candidate)) continue;
-      const text = fs.readFileSync(candidate, 'utf8');
-      if (!text.includes('ccm:k:entry-pin:end')) continue;
-      assert.ok(text.endsWith('\n'), `${candidate} must end with newline`);
-      assert.equal(
-        text.endsWith('\n\n'),
-        false,
-        `${candidate} must not end with double newline (entry pin template)`,
-      );
-    }
-  }
+        const entryCandidates = [
+          path.join(isoRoot, `plugin/dist/${host}/commands/as-master-orchestrator.md`),
+          path.join(isoRoot, `plugin/dist/${host}/skills/cc-master-as-master-orchestrator/SKILL.md`),
+        ];
+        for (const candidate of entryCandidates) {
+          if (!fs.existsSync(candidate)) continue;
+          const text = fs.readFileSync(candidate, 'utf8');
+          if (!text.includes('ccm:k:entry-pin:end')) continue;
+          assert.ok(text.endsWith('\n'), `${candidate} must end with newline`);
+          assert.equal(
+            text.endsWith('\n\n'),
+            false,
+            `${candidate} must not end with double newline (entry pin template)`,
+          );
+        }
+      }
+    },
+    { warmHosts: [...PRODUCT_HOSTS] },
+  );
 
+  // Readonly checked-in dist hygiene (no write compile on shared HUB).
   const diffCheck = spawnSync('git', ['diff', '--check', '--', 'plugin/dist'], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -915,6 +944,6 @@ test('SKG-COMPILE-11: emitted entry pin / routers end with exactly one trailing 
   assert.equal(
     diffCheck.status,
     0,
-    `git diff --check must be green after compile:\n${diffCheck.stdout}\n${diffCheck.stderr}`,
+    `git diff --check must be green on checked-in dist:\n${diffCheck.stdout}\n${diffCheck.stderr}`,
   );
 });

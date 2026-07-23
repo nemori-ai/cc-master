@@ -15,6 +15,7 @@ import {
   countEnabledRuntimeEdges,
   verifyHopContracts,
 } from './compile/surface-verifier.mjs';
+import { resolveTrustedCandidateHostDist } from './compile/trusted-host-dist.mjs';
 import { estimateBudget } from './hash.mjs';
 
 function publicDiagnostics(diagnostics) {
@@ -80,13 +81,22 @@ function checkRouterBudgets(host, graph, artifacts, diagnostics) {
   };
 }
 
-function compileOneHost({ host, graph, repoRoot, checkOnly }) {
+function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = null }) {
   const diagnostics = [];
-  const built = buildHostArtifacts({ host, graph, repoRoot });
+  const built = buildHostArtifacts({
+    host,
+    graph,
+    repoRoot,
+    hostDistAbsolute,
+  });
   diagnostics.push(...built.diagnostics);
 
+  const candidateHostRoots = hostDistAbsolute
+    ? { [host]: path.resolve(hostDistAbsolute) }
+    : null;
+
   if (checkOnly) {
-    const drift = diffArtifacts(repoRoot, built.artifacts);
+    const drift = diffArtifacts(repoRoot, built.artifacts, { candidateHostRoots });
     if (drift.length > 0) {
       diagnostics.push(
         diagnostic({
@@ -102,7 +112,7 @@ function compileOneHost({ host, graph, repoRoot, checkOnly }) {
     }
   } else if (diagnostics.every((item) => item.severity !== 'error')) {
     try {
-      writeArtifacts(repoRoot, built.artifacts);
+      writeArtifacts(repoRoot, built.artifacts, { candidateHostRoots });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const codeMatch = message.match(/^(SKG-COMPILE-[A-Z0-9-]+):/);
@@ -121,7 +131,9 @@ function compileOneHost({ host, graph, repoRoot, checkOnly }) {
     }
   }
 
-  const payloadRoot = path.join(repoRoot, 'plugin/dist', host);
+  const payloadRoot = hostDistAbsolute
+    ? path.resolve(hostDistAbsolute)
+    : path.join(repoRoot, 'plugin/dist', host);
   const skillDirs = (graph.skills ?? []).map(
     (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
   );
@@ -149,6 +161,7 @@ function compileOneHost({ host, graph, repoRoot, checkOnly }) {
     graph,
     surface,
     repoRoot,
+    payloadRoot,
   });
   diagnostics.push(...hops.diagnostics);
 
@@ -182,6 +195,12 @@ export function runCompile({
   source = DEFAULT_SOURCE_ROOT,
   host = undefined,
   check = false,
+  /**
+   * Internal-only: absolute candidate host root for a single-host compile.
+   * Must not be exposed by public CLI argv. Sync orchestration uses this so
+   * compile targets whole-host staging before live publish.
+   */
+  candidateHostRoot = undefined,
 }) {
   const hosts = host ? [host] : [...PRODUCT_HOSTS];
   if (host && !HARDENING_CONTRACT.C9.hosts.includes(host)) {
@@ -205,6 +224,69 @@ export function runCompile({
         diagnostics: publicDiagnostics([item]),
       },
     };
+  }
+
+  if (candidateHostRoot) {
+    if (!host || hosts.length !== 1) {
+      const item = diagnostic({
+        severity: 'error',
+        code: 'SKG-COMPILE-CANDIDATE-USAGE',
+        message: 'candidateHostRoot requires exactly one --host',
+        location: 'argv',
+        witness: { host: host ?? null },
+        remediation: 'Internal sync must pass a single host with candidateHostRoot.',
+        exitCode: EXIT_CODES.usage,
+      });
+      return {
+        exitCode: EXIT_CODES.usage,
+        body: {
+          schema: OUTPUT_SCHEMA,
+          ok: false,
+          command: 'compile',
+          result_kind: 'diagnostic',
+          contract_version: CONTRACT_VERSION,
+          diagnostics: publicDiagnostics([item]),
+        },
+      };
+    }
+  }
+
+  // Trust-check candidate BEFORE any path concat / exists / lstat / read /
+  // loader / overlay / verifier against that root. Single helper owner.
+  let trustedCandidateHostRoot = null;
+  if (candidateHostRoot) {
+    try {
+      const trust = resolveTrustedCandidateHostDist(repoRoot, host, candidateHostRoot);
+      trustedCandidateHostRoot = trust.hostDistAbsolute;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const codeMatch = message.match(/^(SKG-COMPILE-[A-Z0-9-]+):/);
+      const item = diagnostic({
+        severity: 'error',
+        code: codeMatch?.[1] ?? 'SKG-COMPILE-CANDIDATE-INVALID',
+        message,
+        location: 'candidateHostRoot',
+        witness: {
+          host,
+          candidateHostRoot: path.resolve(candidateHostRoot),
+          error: message,
+        },
+        remediation:
+          'Pass a real controlled sibling plugin/dist/<host>.write-<stamp> under the repo; refuse escape / namespace / symlink aliases.',
+        exitCode: EXIT_CODES.projection,
+      });
+      return {
+        exitCode: EXIT_CODES.projection,
+        body: {
+          schema: OUTPUT_SCHEMA,
+          ok: false,
+          command: 'compile',
+          result_kind: 'diagnostic',
+          contract_version: CONTRACT_VERSION,
+          diagnostics: publicDiagnostics([item]),
+        },
+      };
+    }
   }
 
   const built = buildAndValidateGraph({ repoRoot, sourceRoot: source });
@@ -244,6 +326,8 @@ export function runCompile({
       graph: built.graph,
       repoRoot,
       checkOnly: check,
+      hostDistAbsolute:
+        trustedCandidateHostRoot && item === host ? trustedCandidateHostRoot : null,
     });
     hostResults.push({
       host: result.host,

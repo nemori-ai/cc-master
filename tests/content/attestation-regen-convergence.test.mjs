@@ -1,54 +1,40 @@
-// Regression for issue #163: the sanctioned attestation-regen entry must converge a legitimate
-// change to an attested skill's file set, where a naive `sync` alone deadlocks.
+// Regression for issue #163 / K1-06: the sanctioned attestation-regen entry must converge a
+// legitimate change to an attested skill's file set, where a naive `sync` alone deadlocks.
 //
-// Mechanism under test: the update-*-attestations scripts recompute the SHA-256 registries by
-// projecting the CANONICAL source through the shared projection SSOT (project-skill.cjs), not by
-// reading the already-published plugin/dist tree. Because sync refuses to publish an attested tree
-// until it matches the registry, reading dist to regenerate the registry can never move a changed
-// attested skill forward (stale dist ⇄ stale registry). Projecting canonical dissolves that cycle;
-// the assert-on sync then independently re-proves dist == registry == canonical.
+// Mechanism under test: update-*-attestations recompute SHA-256 registries by projecting CANONICAL
+// → raw SAP → shared compiler-owned final skill overlay → fingerprint final runtime skill tree —
+// never by reading checked-in plugin/dist. sync asserts the same final tree before publish.
 //
-// The fixture is an isolated temp repo (plugin/src/skills + facts + the attestation scripts) so the
-// test never touches the real worktree and needs no git.
+// Fixture: isolated temp repo copy (skill-knowledge-isolated-repo helper) so the test never touches
+// the real worktree and has enough surface for overlay + attestation.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import {
+  copyMinimalSkillKnowledgeRepo,
+} from './helpers/skill-knowledge-isolated-repo.mjs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import guidanceAttestation from '../../scripts/provider-guidance-attestation.cjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const PROBES = [
-  // provider-guidance-only attested skill:
-  { skill: 'master-orchestrator-guide', file: 'references/zzz-regen-probe.md' },
-  // dual-attested (provider-guidance + pacing read-only) skill: exercises both registries at once:
+  // Knowledge-graph-covered skills (master-orchestrator-guide) cannot gain arbitrary
+  // canonical markdown without inventory/coverage updates; probe attested skills
+  // outside authored graph coverage so the deadlock surfaces at attestation.
+  { skill: 'using-ccm', file: 'references/zzz-regen-probe.md' },
   { skill: 'pacing-and-estimation', file: 'references/zzz-regen-probe.md' },
-];
-const SCRIPTS = [
-  'sync-plugin-dist.sh',
-  'project-skill.cjs',
-  'pacing-read-only-capability.cjs',
-  'pacing-read-only-attestation.cjs',
-  'provider-guidance-attestation.cjs',
-  'update-provider-guidance-attestations.cjs',
-  'update-pacing-read-only-attestations.cjs',
 ];
 const PG_REGISTRY = 'plugin/src/skills/provider-guidance-runtime.json';
 const PACE_REGISTRY = 'plugin/src/skills/pacing-and-estimation/read-only-capability.json';
 
 const fixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-attest-regen-'));
-  mkdirSync(join(root, 'plugin/src'), { recursive: true });
-  mkdirSync(join(root, 'ccm/apps/cli/src'), { recursive: true });
-  mkdirSync(join(root, 'scripts'), { recursive: true });
-  cpSync(join(ROOT, 'plugin/src/skills'), join(root, 'plugin/src/skills'), { recursive: true });
-  cpSync(
-    join(ROOT, 'ccm/apps/cli/src/provider-model-facts.json'),
-    join(root, 'ccm/apps/cli/src/provider-model-facts.json'),
-  );
-  for (const script of SCRIPTS) cpSync(join(ROOT, 'scripts', script), join(root, 'scripts', script));
+  copyMinimalSkillKnowledgeRepo(root);
   return root;
 };
 
@@ -58,7 +44,6 @@ const syncSkills = (root, host) =>
     encoding: 'utf8',
   });
 
-// Assert-on sync for every host — the untouched safety net. Passing proves dist == registry.
 const syncAll = (root, label) => {
   for (const host of HOSTS) {
     const result = syncSkills(root, host);
@@ -70,7 +55,6 @@ const syncAll = (root, label) => {
   }
 };
 
-// The sanctioned regen: recompute both registries straight from canonical projection.
 const regen = (root) => {
   for (const script of [
     'update-provider-guidance-attestations.cjs',
@@ -91,7 +75,6 @@ test('regen on a clean tree is a faithful no-op (registries byte-stable)', () =>
     regen(root);
     assert.equal(readFileSync(join(root, PG_REGISTRY), 'utf8'), before.pg, 'provider-guidance registry must be unchanged');
     assert.equal(readFileSync(join(root, PACE_REGISTRY), 'utf8'), before.pace, 'pacing read-only registry must be unchanged');
-    // And the committed registries must still assert clean against a fresh projection.
     syncAll(root, 'clean-tree');
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -101,10 +84,8 @@ test('regen on a clean tree is a faithful no-op (registries byte-stable)', () =>
 test('sanctioned regen converges an added attested file that naive sync deadlocks on', () => {
   const root = fixture();
   try {
-    // Baseline: the copied registries already assert clean.
     syncAll(root, 'baseline');
 
-    // Legitimately add a new attested canonical file to two attested skills.
     for (const probe of PROBES) {
       writeFileSync(
         join(root, `plugin/src/skills/${probe.skill}/canonical/${probe.file}`),
@@ -112,7 +93,6 @@ test('sanctioned regen converges an added attested file that naive sync deadlock
       );
     }
 
-    // Reproduce the deadlock: naive sync alone must reject the new tree (registry has no such file).
     const naive = syncSkills(root, 'claude-code');
     assert.notEqual(naive.status, 0, 'naive sync must fail before regen (chicken-and-egg)');
     assert.match(
@@ -121,11 +101,9 @@ test('sanctioned regen converges an added attested file that naive sync deadlock
       'the deadlock must surface as an attestation file-set mismatch',
     );
 
-    // Sanctioned regen from canonical, then assert-on sync for every host must now pass.
     regen(root);
     syncAll(root, 'post-regen');
 
-    // Convergence: every host's dist carries the new files; both registries record their digests.
     for (const host of HOSTS) {
       for (const probe of PROBES) {
         assert.ok(
@@ -139,7 +117,22 @@ test('sanctioned regen converges an added attested file that naive sync deadlock
     assert.match(pgReg, /zzz-regen-probe\.md/u, 'provider-guidance registry must record the new attested files');
     assert.match(paceReg, /zzz-regen-probe\.md/u, 'pacing read-only registry must record the new attested file');
 
-    // Idempotence: a second regen reaches the same fixed point (no drift).
+    // Final runtime manifest assert: registry digests match published final skill trees.
+    const registry = guidanceAttestation.loadProviderGuidanceRegistry(
+      join(root, PG_REGISTRY),
+      root,
+    );
+    for (const host of HOSTS) {
+      for (const skill of ['master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm']) {
+        guidanceAttestation.assertProviderGuidanceRuntimeTree(
+          registry,
+          host,
+          skill,
+          join(root, `plugin/dist/${host}/skills/${skill}`),
+        );
+      }
+    }
+
     regen(root);
     assert.equal(readFileSync(join(root, PG_REGISTRY), 'utf8'), pgReg, 'regen must be idempotent (provider-guidance)');
     assert.equal(readFileSync(join(root, PACE_REGISTRY), 'utf8'), paceReg, 'regen must be idempotent (pacing read-only)');

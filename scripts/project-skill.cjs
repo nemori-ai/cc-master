@@ -12,17 +12,17 @@
 // stale) and update read the stale dist (registry stayed stale) — a sync↔update deadlock.
 //
 // The fix dissolves the circular dependency at its root: registry regeneration now projects the
-// canonical source itself (via planSkillProjection + applySkillProjection here) and fingerprints
-// that fresh projection, instead of reading dist. sync uses the exact same two functions to build
-// the dist it asserts, so a registry recomputed from a fresh projection always matches what sync
-// projects. There is a single projection implementation — the update path and the assert path can
-// never drift.
+// canonical source itself (via planSkillProjection + applySkillProjection here), applies the
+// shared compiler-owned final skill overlay, and fingerprints that final runtime skill tree —
+// never reading checked-in dist. sync uses the same pipeline (raw SAP → final overlay → assert)
+// before publish, so registry and dist stay lockstep on final compiled skills.
 //
 // This module performs NO attestation assert and NO dist rename. Callers decide: sync asserts the
 // projected tree against the committed registry then renames staging into dist; the update scripts
 // project into a scratch dir purely to fingerprint it. sync's assert-on gate is therefore never
 // weakened or bypassed — it stays exactly as it was and remains the CI safety net.
 
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
@@ -369,8 +369,63 @@ function applySkillProjection(plan, targetDir) {
   }
 }
 
+/**
+ * Apply compiler-owned final skill overlays onto a raw SAP skill tree.
+ * Shared by sync staging (assert-before-publish) and attestation updaters
+ * (fingerprint final runtime skills — never checked-in dist, never raw SAP alone).
+ *
+ * Requires an explicit stagingRoot that contains skillTree. Parses structured
+ * bridge JSON and refuses skipped/error results.
+ */
+function applyFinalSkillOverlay({ repoRoot, host, skill, skillTree, stagingRoot }) {
+  const script = path.join(repoRoot, 'scripts/skill-knowledge/apply-final-skill-overlay.mjs');
+  if (!fs.existsSync(script)) {
+    throw new Error(`missing final skill overlay helper ${script}`);
+  }
+  if (!stagingRoot) {
+    throw new Error(`final skill overlay requires stagingRoot for ${host}/${skill}`);
+  }
+  const result = spawnSync(
+    process.execPath,
+    [
+      script,
+      '--repo-root',
+      repoRoot,
+      '--host',
+      host,
+      '--skill',
+      skill,
+      '--staging-root',
+      stagingRoot,
+      '--skill-tree',
+      skillTree,
+    ],
+    { encoding: 'utf8' },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `final skill overlay failed for ${host}/${skill}: ${result.stderr || result.stdout || `exit ${result.status}`}`,
+    );
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(String(result.stdout || '').trim().split('\n').filter(Boolean).at(-1));
+  } catch (error) {
+    throw new Error(
+      `final skill overlay returned non-JSON for ${host}/${skill}: ${result.stdout}`,
+    );
+  }
+  if (!parsed || parsed.ok !== true || parsed.skipped) {
+    throw new Error(
+      `final skill overlay refused for ${host}/${skill}: ${JSON.stringify(parsed)}`,
+    );
+  }
+  return parsed;
+}
+
 module.exports = {
   SKILL_DIST_EXCLUDES,
+  applyFinalSkillOverlay,
   applySkillProjection,
   copyCanonicalIncludes,
   copyDir,

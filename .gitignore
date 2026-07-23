@@ -1,6 +1,11 @@
 # test scratch (hook tests create temp project dirs)
 .tmp-*/
 tests/**/.tmp-*/
+# controlled attestation / updater staging only (unknown .tmp content stays visible)
+/.tmp/ccm-provider-guidance-*/
+/.tmp/ccm-pacing-read-only-*/
+# whole-host sync staging siblings under plugin/dist (K1-06 v9; bak stays visible)
+/plugin/dist/*.write-*/
 # OS / editor
 .DS_Store
 *.swp

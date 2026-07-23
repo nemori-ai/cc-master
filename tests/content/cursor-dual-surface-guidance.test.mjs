@@ -1,7 +1,5 @@
 import {
-  cpSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -13,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import pacingAttestation from '../../scripts/pacing-read-only-attestation.cjs';
+import { copyMinimalSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
@@ -25,25 +24,10 @@ const HOLDOUTS = [
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
+/** Hostile-mutant temp repo: stable allowlist closure for real production sync/attestor. */
 const makeProjectionFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-guidance-mutant-'));
-  mkdirSync(join(root, 'plugin/src'), { recursive: true });
-  mkdirSync(join(root, 'scripts'), { recursive: true });
-  mkdirSync(join(root, 'ccm/apps/cli/src'), { recursive: true });
-  cpSync(join(ROOT, 'plugin/src/skills'), join(root, 'plugin/src/skills'), { recursive: true });
-  cpSync(
-    join(ROOT, 'ccm/apps/cli/src/provider-model-facts.json'),
-    join(root, 'ccm/apps/cli/src/provider-model-facts.json'),
-  );
-  for (const script of [
-    'sync-plugin-dist.sh',
-    'project-skill.cjs',
-    'pacing-read-only-capability.cjs',
-    'pacing-read-only-attestation.cjs',
-    'provider-guidance-attestation.cjs',
-  ]) {
-    cpSync(join(ROOT, 'scripts', script), join(root, 'scripts', script));
-  }
+  copyMinimalSkillKnowledgeRepo(root);
   return root;
 };
 

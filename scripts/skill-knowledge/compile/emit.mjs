@@ -3,78 +3,35 @@ import path from 'node:path';
 import { normalizePointAnchor } from '../host-portability/anchors.mjs';
 import { estimateBudget } from '../hash.mjs';
 import {
-  PRODUCT_HOSTS,
   atlasDistPath,
   canonicalBindingToDistPath,
   entrySurfaceToDistPath,
   moduleAnchorId,
   moduleRouterDistPath,
   posixRelative,
-  skillAnchorId,
 } from './paths.mjs';
+import {
+  applyEntryPinOverlay,
+  applyPointOverlaysToSkillMarkdown,
+  applySkillLevelAnchor,
+  ensureTrailingNewline,
+  inspectCompilerOwnedOverlay,
+  stripCompilerOwnedOverlay,
+} from './skill-overlay.mjs';
+import {
+  assertSafeCompileHostId,
+  isInsideRoot,
+  lstatOrNull,
+  resolveTrustedCandidateHostDist,
+  resolveTrustedHostDist,
+  tryRealpath,
+} from './trusted-host-dist.mjs';
 
-const NAV_END = '<!-- ccm:k:nav:end -->';
-const ENTRY_PIN_START = '<!-- ccm:k:entry-pin:start -->';
-const ENTRY_PIN_END = '<!-- ccm:k:entry-pin:end -->';
-const ANCHOR_LINE_RE = /^<a id="ccm-k-point-[a-z0-9-]+"><\/a>\s*$/;
-const KNOWN_HOSTS = new Set(PRODUCT_HOSTS);
-
-function stripGeneratedBlocks(text) {
-  let next = text.replace(
-    /<!--\s*ccm:k:nav:start(?:\s+point:[a-z0-9][a-z0-9.-]*)?\s*-->[\s\S]*?<!--\s*ccm:k:nav:end\s*-->\n*/g,
-    '',
-  );
-  // Also strip malformed open nav comments left by older emitters (missing -->).
-  next = next.replace(
-    /<!--\s*ccm:k:nav:start\s+point:[a-z0-9][a-z0-9.-]*\s*\n[\s\S]*?<!--\s*ccm:k:nav:end\s*-->\n*/g,
-    '',
-  );
-  next = next.replace(
-    new RegExp(`${ENTRY_PIN_START}[\\s\\S]*?${ENTRY_PIN_END}\\n*`, 'g'),
-    '',
-  );
-  // Strip previously injected point anchors that sit immediately before start markers.
-  const lines = next.split('\n');
-  const cleaned = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const nextLine = lines[index + 1] ?? '';
-    if (ANCHOR_LINE_RE.test(line) && /<!--\s*ccm:k:start\s+point:/.test(nextLine)) {
-      continue;
-    }
-    cleaned.push(line);
-  }
-  return cleaned.join('\n');
-}
-
-function ensureTrailingNewline(text) {
-  return `${String(text).replace(/\n+$/u, '')}\n`;
-}
-
-function isInsideRoot(candidate, root) {
-  const candidateResolved = path.resolve(candidate);
-  const rootResolved = path.resolve(root);
-  return (
-    candidateResolved === rootResolved ||
-    candidateResolved.startsWith(`${rootResolved}${path.sep}`)
-  );
-}
-
-function tryRealpath(target) {
-  try {
-    return fs.realpathSync(target);
-  } catch {
-    return null;
-  }
-}
-
-function lstatOrNull(target) {
-  try {
-    return fs.lstatSync(target);
-  } catch {
-    return null;
-  }
-}
+export {
+  assertSafeCompileHostId,
+  resolveTrustedCandidateHostDist,
+  resolveTrustedHostDist,
+};
 
 function hostDistPrefix(relativePath) {
   const normalized = relativePath.split(path.sep).join('/');
@@ -113,83 +70,26 @@ function collectHostDistRoots(artifacts) {
 }
 
 /**
- * Validate host id against the frozen C9 set. Rejects traversal / dot / dotdot.
- * Never treats the host string as a filesystem path segment beyond a single name.
+ * Map a logical distRel (plugin/dist/<host>/...) to a physical absolute path.
+ * When trust.hostDistAbsolute differs from the conventional live root, rewrite.
  */
-export function assertSafeCompileHostId(host) {
-  const value = String(host ?? '');
-  if (
-    value.length === 0 ||
-    value === '.' ||
-    value === '..' ||
-    value.includes('\0') ||
-    value.includes('/') ||
-    value.includes('\\') ||
-    value.includes('..')
-  ) {
-    throw new Error(`SKG-COMPILE-HOST-TRAVERSAL: refusing host id ${JSON.stringify(host)}`);
+export function resolveLogicalDistAbsolute(repoRoot, distRel, trust) {
+  const host = hostIdFromDistRelative(distRel);
+  if (!host) {
+    throw new Error(`SKG-COMPILE-PATH-UNSCOPED: ${distRel}`);
   }
-  if (!KNOWN_HOSTS.has(value)) {
-    throw new Error(`SKG-COMPILE-HOST-UNKNOWN: host is outside the frozen C9 set: ${value}`);
+  if (!trust || trust.host !== host) {
+    throw new Error(`SKG-COMPILE-TRUST-HOST-MISMATCH: ${distRel}`);
   }
-  return value;
-}
-
-/**
- * Resolve plugin/dist/<host> under repoRoot with repo realpath as the sole trust root.
- *
- * Check order (fail closed on first violation):
- *   1. repoRoot realpath (trust root)
- *   2. lstat plugin
- *   3. lstat plugin/dist
- *   4. lstat plugin/dist/<known-host>
- *   5. hostDist realpath must stay inside repo realpath
- *
- * Never uses hostDist realpath itself as the containment SSOT.
- */
-export function resolveTrustedHostDist(repoRoot, host) {
-  const safeHost = assertSafeCompileHostId(host);
-  const repoAbsolute = path.resolve(repoRoot);
-  const repoReal = tryRealpath(repoAbsolute);
-  if (!repoReal) {
-    throw new Error(`SKG-COMPILE-REPO-REALPATH: cannot realpath repo root ${repoAbsolute}`);
+  const prefix = `plugin/dist/${host}`;
+  const normalized = String(distRel).split(path.sep).join('/');
+  if (normalized !== prefix && !normalized.startsWith(`${prefix}/`)) {
+    throw new Error(`SKG-COMPILE-PATH-UNSCOPED: ${distRel}`);
   }
-
-  const segments = ['plugin', 'dist', safeHost];
-  let cursor = repoAbsolute;
-  for (const segment of segments) {
-    cursor = path.join(cursor, segment);
-    const stat = lstatOrNull(cursor);
-    if (!stat) {
-      throw new Error(`SKG-COMPILE-ANCESTOR-MISSING: ${cursor}`);
-    }
-    if (stat.isSymbolicLink()) {
-      throw new Error(
-        `SKG-COMPILE-ANCESTOR-SYMLINK: refusing to traverse symlink ancestor ${cursor}`,
-      );
-    }
-    if (!stat.isDirectory()) {
-      throw new Error(`SKG-COMPILE-ANCESTOR-NOT-DIR: ${cursor}`);
-    }
-  }
-
-  const hostDistReal = tryRealpath(cursor);
-  if (!hostDistReal) {
-    throw new Error(`SKG-COMPILE-HOST-DIST-REALPATH: ${cursor}`);
-  }
-  if (!isInsideRoot(hostDistReal, repoReal)) {
-    throw new Error(
-      `SKG-COMPILE-HOST-DIST-OUTSIDE-REPO: host dist realpath ${hostDistReal} escapes repo ${repoReal}`,
-    );
-  }
-
-  return {
-    host: safeHost,
-    repoAbsolute,
-    repoReal,
-    hostDistAbsolute: cursor,
-    hostDistReal,
-  };
+  const underHost = normalized === prefix ? '' : normalized.slice(prefix.length + 1);
+  return underHost
+    ? path.join(trust.hostDistAbsolute, ...underHost.split('/'))
+    : trust.hostDistAbsolute;
 }
 
 /**
@@ -380,10 +280,13 @@ function enumerateManagedTree(rootAbsolute) {
 /**
  * Replace an exact-managed knowledge tree via sibling temp directory inside the
  * verified host dist. Existing managed-root symlinks are unlinked (not followed).
+ *
+ * Logical managedRootRelative stays `plugin/dist/<host>/knowledge`; physical
+ * location is derived from trust.hostDistAbsolute (live or candidate staging).
  */
 function replaceManagedKnowledgeTree(repoRoot, managedRootRelative, knowledgeArtifacts, trust) {
   const hostDistAbsolute = trust.hostDistAbsolute;
-  const managedAbsolute = path.join(repoRoot, managedRootRelative);
+  const managedAbsolute = resolveLogicalDistAbsolute(repoRoot, managedRootRelative, trust);
   // Parent must be safe; managed root itself may be a symlink we are about to replace.
   assertPathInsideTrustedHostDist(path.dirname(managedAbsolute), trust);
   if (!isInsideRoot(managedAbsolute, hostDistAbsolute)) {
@@ -479,14 +382,29 @@ function linkLine(label, fromFile, toFile, fragment) {
 /**
  * Build deterministic in-memory artifacts for one host from an accepted authored graph.
  * Does not touch disk; caller writes or diffs.
+ *
+ * Optional `hostDistAbsolute` (candidate staging root) remaps physical reads while
+ * logical artifact keys stay `plugin/dist/<host>/...` for link calculation.
  */
-export function buildHostArtifacts({ host, graph, repoRoot }) {
+export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = null }) {
   const artifacts = new Map();
   const diagnostics = [];
   const atlasPath = atlasDistPath(host);
   const modules = [...graph.modules].sort((a, b) => a.id.localeCompare(b.id));
   const points = [...graph.points].sort((a, b) => a.id.localeCompare(b.id));
   const pointById = new Map(points.map((point) => [point.id, point]));
+
+  const trust = hostDistAbsolute
+    ? {
+        host,
+        hostDistAbsolute: path.resolve(hostDistAbsolute),
+      }
+    : {
+        host,
+        hostDistAbsolute: path.join(path.resolve(repoRoot), 'plugin/dist', host),
+      };
+
+  const physicalFor = (distRel) => resolveLogicalDistAbsolute(repoRoot, distRel, trust);
 
   // --- atlas ---
   const atlasLines = [
@@ -582,7 +500,7 @@ export function buildHostArtifacts({ host, graph, repoRoot }) {
       });
       continue;
     }
-    const absolute = path.join(repoRoot, distRel);
+    const absolute = physicalFor(distRel);
     if (!fs.existsSync(absolute)) {
       diagnostics.push({
         severity: 'error',
@@ -596,94 +514,60 @@ export function buildHostArtifacts({ host, graph, repoRoot }) {
       continue;
     }
     if (!filesTouched.has(distRel)) {
-      filesTouched.set(distRel, stripGeneratedBlocks(fs.readFileSync(absolute, 'utf8')));
+      // Keep existing bytes intact for strict plan-match (never lenient pre-strip).
+      filesTouched.set(distRel, fs.readFileSync(absolute, 'utf8'));
     }
   }
 
   for (const [distRel, rawText] of filesTouched) {
-    let text = rawText;
     const filePoints = points.filter((point) => pointDistPath(host, point) === distRel);
-    for (const point of filePoints) {
-      const anchor = normalizePointAnchor(point.id);
-      const startMarker = `<!-- ccm:k:start ${point.id} -->`;
-      const endMarker = `<!-- ccm:k:end ${point.id} -->`;
-      if (!text.includes(startMarker) || !text.includes(endMarker)) {
-        diagnostics.push({
-          severity: 'error',
-          code: 'SKG-COMPILE-MARKER-MISSING',
-          message: `Projected Markdown missing markers for ${point.id}`,
-          location: distRel,
-          witness: { host, point: point.id },
-          remediation: 'Restore ccm:k markers from canonical source before compile.',
-          exit_code: 5,
-        });
-        continue;
-      }
-      // Anchor immediately before start marker (outside span).
-      text = text.replace(
-        startMarker,
-        `${anchor.html}\n${startMarker}`,
+    const skillName = distRel.match(
+      new RegExp(`^plugin/dist/${host}/skills/([^/]+)/`),
+    )?.[1];
+    const skillId =
+      skillName &&
+      distRel === `plugin/dist/${host}/skills/${skillName}/SKILL.md` &&
+      (graph.skills ?? []).some((item) => item.id === `skill:${skillName}`)
+        ? `skill:${skillName}`
+        : null;
+    try {
+      // Strict: existing overlays must equal current plan; raw staging may receive a fresh plan.
+      inspectCompilerOwnedOverlay(rawText);
+      artifacts.set(
+        distRel,
+        applyPointOverlaysToSkillMarkdown({
+          text: rawText,
+          host,
+          graph,
+          distRel,
+          pointsForFile: filePoints,
+          skillId,
+        }),
       );
-
-      const navLines = [
-        `<!-- ccm:k:nav:start ${point.id} -->`,
-        'Knowledge navigation:',
-      ];
-      navLines.push(linkLine('Knowledge atlas', distRel, atlasPath, ''));
-      const moduleId = point.module_id;
-      if (moduleId) {
-        const routerPath = moduleRouterDistPath(host, moduleId);
-        navLines.push(
-          linkLine(
-            `Module ${moduleId}`,
-            distRel,
-            routerPath,
-            `#${moduleAnchorId(moduleId)}`,
-          ),
-        );
-      }
-      if (point.authority?.role !== 'canonical' && point.authority?.canonical) {
-        const canonical = pointById.get(point.authority.canonical);
-        if (canonical) {
-          const target = pointDistPath(host, canonical);
-          const targetAnchor = normalizePointAnchor(canonical.id);
-          navLines.push(
-            linkLine(
-              `Canonical: ${canonical.title || canonical.id}`,
-              distRel,
-              target,
-              targetAnchor.fragment,
-            ),
-          );
-        }
-      }
-      const outbound = (graph.adjacency.get(point.id) ?? []).slice().sort((a, b) => {
-        const byTo = a.to.localeCompare(b.to);
-        if (byTo !== 0) return byTo;
-        return a.edge_id.localeCompare(b.edge_id);
+    } catch (error) {
+      const code = error?.code;
+      diagnostics.push({
+        severity: 'error',
+        code:
+          code === 'SKG-OVERLAY-MARKER-MISSING'
+            ? 'SKG-COMPILE-MARKER-MISSING'
+            : code === 'SKG-OVERLAY-UNKNOWN-NAV' ||
+                code === 'SKG-OVERLAY-PLAN-MISMATCH' ||
+                code === 'SKG-OVERLAY-MALFORMED'
+              ? 'SKG-COMPILE-SKILL-OVERLAY'
+              : 'SKG-COMPILE-SKILL-OVERLAY',
+        message: error instanceof Error ? error.message : String(error),
+        location: distRel,
+        witness: {
+          host,
+          error: error instanceof Error ? error.message : String(error),
+          overlay_code: code ?? null,
+        },
+        remediation:
+          'Refuse silent strip: restore raw SAP or exact current-plan overlays before compile.',
+        exit_code: 5,
       });
-      for (const edge of outbound) {
-        const targetPoint = pointById.get(edge.to);
-        if (!targetPoint) continue;
-        const target = pointDistPath(host, targetPoint);
-        const targetAnchor = normalizePointAnchor(targetPoint.id);
-        navLines.push(
-          linkLine(
-            `${edge.type}: ${targetPoint.title || targetPoint.id}`,
-            distRel,
-            target,
-            targetAnchor.fragment,
-          ),
-        );
-      }
-      navLines.push(NAV_END);
-      const navBlock = `${navLines.join('\n')}\n`;
-      text = text.replace(
-        new RegExp(`${endMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n*`),
-        `${endMarker}\n${navBlock}`,
-      );
     }
-    artifacts.set(distRel, ensureTrailingNewline(text));
   }
 
   // --- entry pins on projected entry surfaces ---
@@ -703,7 +587,7 @@ export function buildHostArtifacts({ host, graph, repoRoot }) {
         });
         continue;
       }
-      const absolute = path.join(repoRoot, distRel);
+      const absolute = physicalFor(distRel);
       if (!fs.existsSync(absolute)) {
         diagnostics.push({
           severity: 'error',
@@ -716,64 +600,53 @@ export function buildHostArtifacts({ host, graph, repoRoot }) {
         });
         continue;
       }
-      let text = stripGeneratedBlocks(fs.readFileSync(absolute, 'utf8'));
-      const pinLines = [ENTRY_PIN_START, `Knowledge entry pins for ${entry.id}:`];
-      for (const target of surface.targets ?? []) {
-        const point = pointById.get(target.point);
-        if (!point) continue;
-        const targetPath = pointDistPath(host, point);
-        const anchor = normalizePointAnchor(point.id);
-        pinLines.push(linkLine(point.title || point.id, distRel, targetPath, anchor.fragment));
-      }
-      // Pin relevant critical/primary points and their module routers for H3/H4.
-      for (const module of modules) {
-        if (!(module.access?.relevant_entries ?? []).includes(entry.id)) continue;
-        const routerPath = moduleRouterDistPath(host, module.id);
-        pinLines.push(
-          linkLine(
-            `Module ${module.id}`,
+      try {
+        artifacts.set(
+          distRel,
+          applyEntryPinOverlay({
+            text: fs.readFileSync(absolute, 'utf8'),
+            host,
+            entry,
+            graph,
             distRel,
-            routerPath,
-            `#${moduleAnchorId(module.id)}`,
-          ),
+          }),
         );
-        for (const primaryId of module.access.primary_points ?? []) {
-          if ((surface.targets ?? []).some((item) => item.point === primaryId)) continue;
-          const point = pointById.get(primaryId);
-          if (!point) continue;
-          // Critical must be ≤1 hop: direct pin. Primary may also be direct for deterministic ≤2.
-          if (module.access?.class === 'critical' || module.access?.class === 'primary') {
-            const targetPath = pointDistPath(host, point);
-            const anchor = normalizePointAnchor(point.id);
-            pinLines.push(
-              linkLine(
-                `${module.access.class}: ${point.title || point.id}`,
-                distRel,
-                targetPath,
-                anchor.fragment,
-              ),
-            );
-          }
-        }
+      } catch (error) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'SKG-COMPILE-ENTRY-OVERLAY',
+          message: error instanceof Error ? error.message : String(error),
+          location: distRel,
+          witness: { host, entry: entry.id },
+          remediation: 'Fix malformed compiler-owned entry-pin overlays before compile.',
+          exit_code: 5,
+        });
       }
-      pinLines.push(ENTRY_PIN_END);
-      text = `${ensureTrailingNewline(text)}${pinLines.join('\n')}`;
-      artifacts.set(distRel, ensureTrailingNewline(text));
     }
   }
 
   // Skill-level anchor on SKILL.md for C9 skill pattern completeness.
+  // When the skill file was already materialized above with skillId, skip.
   const skill = graph.skills[0];
   if (skill) {
     const skillPath = `plugin/dist/${host}/skills/${skill.id.replace(/^skill:/, '')}/SKILL.md`;
-    if (artifacts.has(skillPath) || fs.existsSync(path.join(repoRoot, skillPath))) {
-      let text = artifacts.get(skillPath);
-      if (!text) text = stripGeneratedBlocks(fs.readFileSync(path.join(repoRoot, skillPath), 'utf8'));
-      const skillAnchor = `<a id="${skillAnchorId(skill.id)}"></a>`;
-      if (!text.includes(skillAnchor)) {
-        text = `${skillAnchor}\n${text}`;
+    if (!artifacts.has(skillPath) && fs.existsSync(physicalFor(skillPath))) {
+      try {
+        const raw = fs.readFileSync(physicalFor(skillPath), 'utf8');
+        inspectCompilerOwnedOverlay(raw);
+        const base = stripCompilerOwnedOverlay(raw);
+        artifacts.set(skillPath, applySkillLevelAnchor({ text: base, skillId: skill.id }));
+      } catch (error) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'SKG-COMPILE-SKILL-OVERLAY',
+          message: error instanceof Error ? error.message : String(error),
+          location: skillPath,
+          witness: { host, skill: skill.id },
+          remediation: 'Fix malformed compiler-owned skill overlays before compile.',
+          exit_code: 5,
+        });
       }
-      artifacts.set(skillPath, ensureTrailingNewline(text));
     }
   }
 
@@ -790,7 +663,18 @@ export function buildHostArtifacts({ host, graph, repoRoot }) {
   return { artifacts, diagnostics, budgetReport };
 }
 
-export function writeArtifacts(repoRoot, artifacts) {
+/**
+ * Write compiled artifacts.
+ *
+ * Optional `candidateHostRoots`: map host id → absolute candidate host root
+ * (whole-host staging). When set, physical writes go there; logical keys stay
+ * `plugin/dist/<host>/...`. Public CLI omits this (live root only).
+ *
+ * Candidate roots must already have been entry-validated by runCompile via
+ * resolveTrustedCandidateHostDist; this late path only re-asserts by calling
+ * that same helper (single validator owner).
+ */
+export function writeArtifacts(repoRoot, artifacts, { candidateHostRoots = null } = {}) {
   const written = [];
   const sorted = [...artifacts.entries()].sort(([left], [right]) => left.localeCompare(right));
 
@@ -801,7 +685,10 @@ export function writeArtifacts(repoRoot, artifacts) {
     if (!host) {
       throw new Error(`SKG-COMPILE-PATH-UNSCOPED: ${hostDistRelative}`);
     }
-    const trust = resolveTrustedHostDist(repoRoot, host);
+    const candidate = candidateHostRoots?.[host] ?? null;
+    const trust = candidate
+      ? resolveTrustedCandidateHostDist(repoRoot, host, candidate)
+      : resolveTrustedHostDist(repoRoot, host);
     trustByHost.set(host, trust);
   }
 
@@ -814,7 +701,7 @@ export function writeArtifacts(repoRoot, artifacts) {
     if (!trust) {
       throw new Error(`SKG-COMPILE-MANAGED-HOST: missing trust for ${managedRoot}`);
     }
-    const managedAbsolute = path.join(repoRoot, managedRoot);
+    const managedAbsolute = resolveLogicalDistAbsolute(repoRoot, managedRoot, trust);
     assertPathInsideTrustedHostDist(path.dirname(managedAbsolute), trust);
     const managedStat = lstatOrNull(managedAbsolute);
     if (managedStat && !managedStat.isSymbolicLink() && !managedStat.isDirectory()) {
@@ -828,7 +715,7 @@ export function writeArtifacts(repoRoot, artifacts) {
       throw new Error(`SKG-COMPILE-PATH-UNSCOPED: ${relative}`);
     }
     const trust = trustByHost.get(host);
-    const absolute = path.join(repoRoot, relative);
+    const absolute = resolveLogicalDistAbsolute(repoRoot, relative, trust);
     assertPathInsideTrustedHostDist(path.dirname(absolute), trust);
   }
 
@@ -852,7 +739,7 @@ export function writeArtifacts(repoRoot, artifacts) {
     if (knowledgeManagedRoot(relative)) continue;
     const host = hostIdFromDistRelative(relative);
     const trust = trustByHost.get(host);
-    const absolute = path.join(repoRoot, relative);
+    const absolute = resolveLogicalDistAbsolute(repoRoot, relative, trust);
     assertPathInsideTrustedHostDist(path.dirname(absolute), trust);
     // If the leaf itself is a symlink, unlink the node before writing (never follow).
     const leafStat = lstatOrNull(absolute);
@@ -869,12 +756,29 @@ export function writeArtifacts(repoRoot, artifacts) {
   return written.sort((left, right) => left.path.localeCompare(right.path));
 }
 
-export function diffArtifacts(repoRoot, artifacts) {
+export function diffArtifacts(repoRoot, artifacts, { candidateHostRoots = null } = {}) {
   const drift = [];
+  const trustByHost = new Map();
+  for (const hostDistRelative of collectHostDistRoots(artifacts)) {
+    const host = hostIdFromDistRelative(hostDistRelative);
+    if (!host) continue;
+    const candidate = candidateHostRoots?.[host] ?? null;
+    trustByHost.set(
+      host,
+      candidate
+        ? resolveTrustedCandidateHostDist(repoRoot, host, candidate)
+        : resolveTrustedHostDist(repoRoot, host),
+    );
+  }
+
   for (const [relative, contents] of [...artifacts.entries()].sort(([left], [right]) =>
     left.localeCompare(right),
   )) {
-    const absolute = path.join(repoRoot, relative);
+    const host = hostIdFromDistRelative(relative);
+    const trust = trustByHost.get(host);
+    const absolute = trust
+      ? resolveLogicalDistAbsolute(repoRoot, relative, trust)
+      : path.join(repoRoot, relative);
     const stat = lstatOrNull(absolute);
     if (!stat) {
       drift.push({ path: relative, kind: 'missing' });
@@ -891,7 +795,11 @@ export function diffArtifacts(repoRoot, artifacts) {
   }
 
   for (const managedRoot of collectManagedRoots(artifacts)) {
-    const managedAbsolute = path.join(repoRoot, managedRoot);
+    const host = hostIdFromDistRelative(managedRoot);
+    const trust = trustByHost.get(host);
+    const managedAbsolute = trust
+      ? resolveLogicalDistAbsolute(repoRoot, managedRoot, trust)
+      : path.join(repoRoot, managedRoot);
     const expected = new Set(
       [...artifacts.keys()]
         .filter((item) => item === managedRoot || item.startsWith(`${managedRoot}/`))
@@ -912,4 +820,8 @@ export function diffArtifacts(repoRoot, artifacts) {
   return drift;
 }
 
-export { NAV_END, ENTRY_PIN_START, ENTRY_PIN_END };
+export {
+  ENTRY_PIN_END,
+  ENTRY_PIN_START,
+  NAV_END,
+} from './skill-overlay.mjs';
