@@ -10,6 +10,7 @@
 - **Host-correct native-subagent discovery** — Claude Code resolves `subagents/agent-<agentId>.jsonl` from the parent session JSONL, while Kimi Code resolves `agents/<agentId>/wire.jsonl` from `agents/main/wire.jsonl` and parses its typed wire events.
 - **No parent-event leakage** — when a derived child transcript does not exist yet, the stream remains honestly unavailable instead of falling back to the parent transcript and attributing orchestrator/main events to the child.
 - **Web Viewer fallback clarity** — the agent inspector mirrors the server-side reason and recovery path instead of reporting every unbound source as an unsupported agent type.
+- **Concurrent bootstrap recovery on macOS** — two cold activations can now reclaim the same dead native-materializer bootstrap without the losing reclaimer treating the winner's exact `1 → 0` unlink transition as tampering. Any inode, size, mode, owner, flags, or modification-time change still fails closed.
 
 ### Compatibility
 

@@ -400,6 +400,27 @@ static int ccm_materializer_publish_link_converged(
 #endif
 }
 
+/* Two dead-bootstrap reclaimers can open the same sealed file before either
+ * unlinks it. If one wins the unlink before the other fstat(2), the losing
+ * descriptor observes the same immutable inode with the sole 1 -> 0 link
+ * transition. No other revision change is eligible for convergence. */
+static int ccm_materializer_bootstrap_unlink_converged(
+    const struct stat *left, const struct stat *right) {
+  if (!ccm_materializer_same_object_identity(left, right) ||
+      left->st_size != right->st_size || left->st_nlink != 1 ||
+      right->st_nlink != 0) {
+    return 0;
+  }
+#if defined(__APPLE__)
+  return left->st_flags == right->st_flags &&
+         left->st_mtimespec.tv_sec == right->st_mtimespec.tv_sec &&
+         left->st_mtimespec.tv_nsec == right->st_mtimespec.tv_nsec;
+#else
+  return left->st_mtim.tv_sec == right->st_mtim.tv_sec &&
+         left->st_mtim.tv_nsec == right->st_mtim.tv_nsec;
+#endif
+}
+
 static int ccm_materializer_read_exact(int fd, unsigned char *bytes, size_t length) {
   size_t offset = 0;
   while (offset < length) {
@@ -858,8 +879,14 @@ static int ccm_materializer_recover_bootstraps(
             errno = saved;
             return -1;
           }
-          if (!ccm_materializer_same_file_revision(&bootstrap_path,
-                                                   &opened_bootstrap)) {
+          int revision_matches =
+              ccm_materializer_same_file_revision(&bootstrap_path,
+                                                  &opened_bootstrap);
+          int unlink_converged =
+              !revision_matches &&
+              ccm_materializer_bootstrap_unlink_converged(
+                  &bootstrap_path, &opened_bootstrap);
+          if (!revision_matches && !unlink_converged) {
             close(bootstrap_fd);
             close(instance_fd);
             errno = EAGAIN;

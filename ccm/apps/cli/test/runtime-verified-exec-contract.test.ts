@@ -90,6 +90,34 @@ test('materializer bootstrap lifecycle has native self-clean and dead-owner reco
   assert.match(materializerSource, /unlinkat\s*\([^;]+AT_REMOVEDIR/);
 });
 
+test('bootstrap recovery accepts only the exact concurrent 1-to-0 unlink convergence', () => {
+  const convergenceStart = materializerSource.indexOf(
+    'static int ccm_materializer_bootstrap_unlink_converged(',
+  );
+  const convergenceEnd = materializerSource.indexOf(
+    '\nstatic int ccm_materializer_read_exact',
+    convergenceStart,
+  );
+  assert.notEqual(convergenceStart, -1);
+  assert.notEqual(convergenceEnd, -1);
+  const convergence = materializerSource.slice(convergenceStart, convergenceEnd);
+  assert.match(convergence, /ccm_materializer_same_object_identity/);
+  assert.match(convergence, /left->st_size\s*!=\s*right->st_size/);
+  assert.match(convergence, /left->st_nlink\s*!=\s*1/);
+  assert.match(convergence, /right->st_nlink\s*!=\s*0/);
+  assert.match(convergence, /st_mtimespec|st_mtim/);
+
+  const recoveryStart = materializerSource.indexOf(
+    'static int ccm_materializer_recover_bootstraps(',
+  );
+  const recoveryEnd = materializerSource.indexOf(
+    '\n/* Returns -1 when argv does not select materializer mode. */',
+    recoveryStart,
+  );
+  const recovery = materializerSource.slice(recoveryStart, recoveryEnd);
+  assert.match(recovery, /ccm_materializer_bootstrap_unlink_converged/);
+});
+
 test('final verification rechecks only the exact valid-publisher hard-link convergence once', () => {
   const convergenceStart = materializerSource.indexOf(
     'static int ccm_materializer_publish_link_converged(',
