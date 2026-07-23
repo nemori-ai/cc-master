@@ -28,6 +28,7 @@
         "contract",
         "check",
         "report",
+        "change",
         "diagnostic"
       ]
     },
@@ -138,6 +139,11 @@
       "type": "string",
       "minLength": 1
     },
+    "action": {"enum": ["begin", "validate", "apply"]},
+    "workspace": {"$ref": "#/$defs/repoPath"},
+    "ledger_path": {"$ref": "#/$defs/repoPath"},
+    "result_graph_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "validation": {"type": "object"},
     "diagnostics": {
       "type": "array",
       "items": {
@@ -146,6 +152,10 @@
     }
   },
   "allOf": [
+    {
+      "if": {"properties": {"result_kind": {"const": "change"}}, "required": ["result_kind"]},
+      "then": {"required": ["action", "diagnostics"]}
+    },
     {
       "if": {
         "properties": {

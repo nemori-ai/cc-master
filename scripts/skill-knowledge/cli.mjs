@@ -8,13 +8,22 @@ import {
 } from './contracts.mjs';
 import { diagnostic, failureEnvelope, outputDiagnostic } from './diagnostics.mjs';
 import { runCheck } from './check.mjs';
+import {
+  applyTransaction,
+  beginTransaction,
+  publicTransactionResult,
+  validateTransaction,
+} from './transactions.mjs';
 
 const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
 
 Commands:
   contract [--json]
   check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
-  compile|report|path|explain|change [--json]   Declared; unavailable in K0
+  change begin --op <${'add|wording|refine|move|split|merge|transfer_owner|deprecate|retire'}> --scope <path...> --base <git-ref> [--json]
+  change validate <workspace> [--json]
+  change apply <workspace> [--json]
+  compile|report|path|explain [--json]   Declared; unavailable
 
 Global:
   --help
@@ -49,6 +58,33 @@ function parseCheckOptions(args) {
   return options;
 }
 
+function parseChangeOptions(args) {
+  const [action, ...rest] = args;
+  if (!['begin', 'validate', 'apply'].includes(action)) throw new Error('change requires begin, validate, or apply');
+  const options = { action, json: false, op: undefined, scope: [], base: undefined, workspace: undefined };
+  if (action === 'validate' || action === 'apply') {
+    for (const token of rest) {
+      if (token === '--json') options.json = true;
+      else if (!options.workspace) options.workspace = token;
+      else throw new Error(`unknown change ${action} argument: ${token}`);
+    }
+    if (!options.workspace) throw new Error(`change ${action} requires a workspace`);
+    return options;
+  }
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index];
+    if (token === '--json') options.json = true;
+    else if (token === '--op') { index += 1; if (!rest[index]) throw new Error('--op requires an operation'); options.op = rest[index]; }
+    else if (token === '--base') { index += 1; if (!rest[index]) throw new Error('--base requires a git ref'); options.base = rest[index]; }
+    else if (token === '--scope') {
+      while (rest[index + 1] && !rest[index + 1].startsWith('--')) { index += 1; options.scope.push(rest[index]); }
+      if (options.scope.length === 0) throw new Error('--scope requires one or more paths');
+    } else throw new Error(`unknown change begin argument: ${token}`);
+  }
+  if (!options.op || !options.base || options.scope.length === 0) throw new Error('change begin requires --op, --scope, and --base');
+  return options;
+}
+
 function renderHuman(body) {
   if (body.result_kind === 'contract') {
     return [
@@ -66,6 +102,13 @@ function renderHuman(body) {
     for (const item of body.diagnostics) {
       lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
     }
+    return lines.join('\n');
+  }
+  if (body.result_kind === 'change') {
+    const lines = [`skill-knowledge change ${body.action}: ${body.ok ? 'OK' : 'FAILED'}`];
+    if (body.workspace) lines.push(`workspace: ${body.workspace}`);
+    if (body.ledger_path) lines.push(`ledger: ${body.ledger_path}`);
+    for (const item of body.diagnostics) lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
     return lines.join('\n');
   }
   return body.diagnostics
@@ -161,6 +204,20 @@ export function main(argv = process.argv.slice(2)) {
       stage: options.stage,
     });
     emit(result.body, options.json);
+    return result.exitCode;
+  }
+
+  if (command === 'change') {
+    let options;
+    try { options = parseChangeOptions(argv.slice(argv.indexOf(command) + 1)); }
+    catch (error) { emit(usageFailure(command, error.message), json); return EXIT_CODES.usage; }
+    const workspace = path.resolve(repoRoot, options.workspace ?? '.');
+    const result = options.action === 'begin'
+      ? beginTransaction({ repoRoot, operation: options.op, scope: options.scope, base: options.base })
+      : options.action === 'validate'
+        ? validateTransaction({ repoRoot, workspace })
+        : applyTransaction({ repoRoot, workspace });
+    emit(publicTransactionResult(options.action, result, repoRoot), options.json);
     return result.exitCode;
   }
 

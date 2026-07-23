@@ -59,7 +59,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.command, 'contract');
   assert.equal(body.result_kind, 'contract');
   assert.equal(body.contract_version, 'v1alpha1');
-  assert.deepEqual(body.implemented_commands, ['check', 'contract']);
+  assert.deepEqual(body.implemented_commands, ['change', 'check', 'contract']);
   assert.deepEqual(body.declared_commands, [
     'change',
     'check',
@@ -211,7 +211,7 @@ test('SKG-CLI-06: K1 with envelope-only source fails full schema validation loud
   }));
 
 test('SKG-CLI-07: declared but unavailable commands fail closed with exit 10', () => {
-  for (const command of ['compile', 'report', 'path', 'explain', 'change']) {
+  for (const command of ['compile', 'report', 'path', 'explain']) {
     const result = runCli([command, '--json']);
     assert.equal(result.status, 10, `${command}: ${result.stderr}`);
     const body = parseJson(result);

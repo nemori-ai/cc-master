@@ -28,8 +28,10 @@ estimator、marker/source-map 与 inventory attestation 模块；`contract --jso
 为 `true`。生成物携带 source schema SHA-256 fingerprint 与三份 emitted CJS bundle 的
 SHA-256（`validators/schema-manifest.json`）；`validatorsAvailable()` / `check` 在 schema
 bytes 或 bundle bytes 漂移时 fail closed（不加载被篡改的 validator），并提供
-`generate-validators.mjs --check` 做无副作用 CI 门。typed change transactions 与 host
-portability probe 仍未实现，相关命令/`--host`/`--base` 继续 exit 10。
+`generate-validators.mjs --check` 做无副作用 CI 门。K1 typed change transaction 已交付：
+`change begin → validate → apply` 在 ignored candidate workspace 冻结 scope/base/hash、验证九类
+closed operation，并在 rollback-safe atomic publication 后追加 immutable ledger。host portability probe
+与 `check --host/--base` 仍未实现，继续 exit 10。
 
 不要把 design examples 复制到这里冒充已盘点完成的 runtime knowledge。
 

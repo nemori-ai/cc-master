@@ -38,7 +38,7 @@ node scripts/skill-knowledge.mjs <command> [options]
 | `report [--format json\|markdown] [--host <host>]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
 | `path --from <id> --to <id> [--host <host>]` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
 | `explain <diagnostic-or-entity>` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
-| `change begin\|validate\|apply` | declared | exit 10，`SKG-CAPABILITY-NOT-IMPLEMENTED` |
+| `change begin\|validate\|apply` | implemented-k1 | ignored candidate workspace 中的 typed change transaction |
 
 Declared 命令存在是为了冻结 vocabulary 和让 agent fail loud，不代表对应能力已经交付。
 
@@ -151,7 +151,7 @@ JSON 结果必须包含：
   "graph_invariants": false,
   "runtime_projection": false,
   "hop_analysis": false,
-  "typed_change_transactions": false,
+  "typed_change_transactions": true,
   "entry_surface_binding": false,
   "canonical_source_inventory": true,
   "derived_freshness": false,
@@ -182,7 +182,6 @@ K1+ `check` 才对 authored documents 执行完整 Draft 2020-12 校验。
 - `graph_invariants`
 - `runtime_projection`
 - `hop_analysis`
-- `typed_change_transactions`
 
 ## 4. K0 `check`
 
@@ -249,7 +248,7 @@ loud、exit 10，不把 envelope check 冒充 full validation。
     "graph_invariants": false,
     "runtime_projection": false,
     "hop_analysis": false,
-    "typed_change_transactions": false,
+    "typed_change_transactions": true,
     "entry_surface_binding": false,
     "canonical_source_inventory": true,
     "derived_freshness": false,
@@ -298,13 +297,16 @@ loud、exit 10，不把 envelope check 冒充 full validation。
 `change begin --op <type> --scope <path...> --base <git-ref>` 创建 ignored workspace，并冻结 resolved
 base ref、base graph hash 与 scope file hashes。agent 只编辑 `candidate/`。
 
-`change validate <workspace>` 必须对完整 candidate graph 与四 host projection 验证，计算 result graph
-hash、deterministic semantic diff 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
+`change validate <workspace>` 必须对完整 candidate graph 的 schema、marker/binding、membership、authority、admission、edge endpoint、inventory freshness 与 typed-operation precondition 验证，计算 result graph
+hash 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
 全部通过才产生 `candidate_valid: true`。
 
 `change apply <workspace>` 必须重验 accepted scope 后全有或全无写入；成功写入后才 finalized immutable
 change record。任一 scope stale/dirty/写失败都拒绝部分写入和 ledger finalize。closed operation set 保持：
 `add / wording / refine / move / split / merge / transfer_owner / deprecate / retire`。
+
+K1 transaction 不实现 runtime projection 或 final-host hop analysis；这些仍由后续 compilation slice
+交付，不能被 `change` 的成功输出声称为已验证。
 
 未来 `report` envelope 的 `result_kind` 为 `report`，并同时含：
 
