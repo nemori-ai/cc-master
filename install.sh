@@ -913,7 +913,9 @@ selected_harnesses() {
     return
   fi
 
-  normalized="$(normalize_harness "$requested")" || die "未知 harness：$requested（支持：auto / claude-code / codex / cursor / kimi-code）。"
+  # bash 3.2（stock macOS /bin/bash）会把 $var 后紧跟的多字节中文标点并进变量名 → set -u 下 unbound
+  # variable 崩溃；变量引用后接中文标点一律用 ${var} 花括号形式（下同）。
+  normalized="$(normalize_harness "$requested")" || die "未知 harness：${requested}（支持：auto / claude-code / codex / cursor / kimi-code）。"
   if [ "$normalized" = "auto" ]; then
     detect_installed_harnesses
   else
@@ -933,7 +935,7 @@ log_harness_inventory() {
 install_plugin_claude_code() {
   local plugin_root="$1" bin marketplaces_json existing_path plugin_list reinstall
   bin="$(claude_bin)"
-  command -v "$bin" >/dev/null 2>&1 || die "找不到 Claude Code CLI：$bin。Claude Code plugin 安装需要它（要求 ≥ v2.1.195）。"
+  command -v "$bin" >/dev/null 2>&1 || die "找不到 Claude Code CLI：${bin}。Claude Code plugin 安装需要它（要求 ≥ v2.1.195）。"
 
   marketplaces_json="$("$bin" plugin marketplace list --json 2>/dev/null || printf '[]')"
   existing_path="$(printf '%s' "$marketplaces_json" | node -e '
@@ -1050,7 +1052,7 @@ install_plugin_cursor() {
 
   [ -f "$dest/.cursor-plugin/plugin.json" ] \
     || die "Cursor 安装后校验失败：缺 $dest/.cursor-plugin/plugin.json。"
-  ok "Cursor 插件已安装：$dest。重开 Cursor Agent session 后 hooks/rules/skills 生效。"
+  ok "Cursor 插件已安装：${dest}。重开 Cursor Agent session 后 hooks/rules/skills 生效。"
 }
 
 # kimi-code managed plugin install (K1 probe): copy unpacked adapter → $KIMI_CODE_HOME/plugins/managed/cc-master
@@ -1113,7 +1115,7 @@ NODE
     die "写 kimi-code installed.json 失败：$installed_json"
   fi
 
-  ok "kimi-code 插件已安装：$managed_root（installed.json 已登记）。重开 kimi session 后 skills/commands/hooks 生效。"
+  ok "kimi-code 插件已安装：${managed_root}（installed.json 已登记）。重开 kimi session 后 skills/commands/hooks 生效。"
 }
 
 # ── 双线版本 tag 解析 ──────────────────────────────────────────────────────────────────────────────
@@ -1283,7 +1285,7 @@ log "② 安装 cc-master 插件 …"
 log_harness_inventory
 
 REQUESTED_HARNESS_RAW="${HARNESS_TARGET:-${CC_MASTER_HARNESS:-${CC_MASTER_HOST:-${CCM_HOST:-${CC_MASTER_HARNESS_HOST:-auto}}}}}"
-REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：$REQUESTED_HARNESS_RAW（支持：auto / claude-code / codex / cursor / kimi-code）。"
+REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：${REQUESTED_HARNESS_RAW}（支持：auto / claude-code / codex / cursor / kimi-code）。"
 EXPLICIT_SINGLE_HARNESS=0
 [ "$ALL_HARNESSES" = "0" ] && [ "$REQUESTED_HARNESS_NORMALIZED" != "auto" ] && EXPLICIT_SINGLE_HARNESS=1
 

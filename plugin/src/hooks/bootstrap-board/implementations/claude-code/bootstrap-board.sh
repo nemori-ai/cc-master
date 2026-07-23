@@ -661,7 +661,9 @@ capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_B
 if [ "$capability_ok" != 'yes' ]; then
   ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
   [ -n "$ccm_version" ] || ccm_version='unknown'
-  inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 ARM 所需能力（installed: $ccm_version；required: $CCM_BOARD_PATH_CAPABILITY + $CCM_GOAL_CONTRACT_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建、真实 init 或 resume owner mutation 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt; 或 --resume。</directive>"
+  # ${var} 花括号必须：bash 3.2（stock macOS /bin/bash）会把 $var 后紧跟的多字节中文标点并进变量名，
+  # 导致展开成空 + 标点变乱码（消息丢 version 信息）。
+  inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 ARM 所需能力（installed: ${ccm_version}；required: $CCM_BOARD_PATH_CAPABILITY + ${CCM_GOAL_CONTRACT_CAPABILITY}；minimum release: ccm ${CCM_BOARD_PATH_MIN_VERSION}）。本次已在任何 legacy migration、目录创建、真实 init 或 resume owner mutation 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt; 或 --resume。</directive>"
   exit 0
 fi
 # 一次性、非破坏的旧布局迁移：把旧 per-repo $CLAUDE_PROJECT_DIR/.claude/cc-master/*.board.json 复制进
