@@ -34,7 +34,20 @@ node scripts/skill-knowledge.mjs explain <id-or-code> --json
 
 Implemented capabilities (see `contract --json`): schema validation, markdown binding, canonical
 source inventory attestation, derived authority freshness, graph invariants, entry-surface
-binding, authored-plane hop analysis, canonical graph hash, budget estimator.
+binding, authored-plane hop analysis, semantic coverage over the admitted pilot inventory,
+canonical graph hash, budget estimator.
+
+K1-03 已交付 standalone Draft 2020-12 validators、source loader、canonical/span hash、budget
+estimator、marker/source-map 与 inventory attestation 模块；`contract --json` 中对应 capability
+为 `true`。生成物携带 source schema SHA-256 fingerprint 与三份 emitted CJS bundle 的
+SHA-256（`validators/schema-manifest.json`）；`validatorsAvailable()` / `check` 在 schema
+bytes 或 bundle bytes 漂移时 fail closed（不加载被篡改的 validator），并提供
+`generate-validators.mjs --check` 做无副作用 CI 门。
+
+K1-04 四 host fixture probe + frozen adapter contract 已落地：`host_portability_probe`
+capability=`true`。但 `check --host` CLI 集成尚未接通，带 `--host`/`--base` 的调用与
+typed change transactions（`typed_change_transactions=false`）一样继续 exit 10——probe
+模块已交付不等于 CLI flag 已接线。
 
 Still declared-unavailable (exit 10): `compile`, `change`, `check --host|--base`, `report --host`.
 Do not treat authored-plane `path` results as final-host H1–H4 proof.

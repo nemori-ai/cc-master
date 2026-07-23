@@ -71,11 +71,11 @@ node scripts/skill-knowledge.mjs <command> [options]
     {
       "severity": "error",
       "code": "SKG-CAPABILITY-NOT-IMPLEMENTED",
-      "message": "compile is declared but not implemented in K0",
+      "message": "compile is declared but not implemented in K1 pilot",
       "location": "scripts/skill-knowledge.mjs",
       "witness": {
         "command": "compile",
-        "stage": "K0"
+        "stage": "K1"
       },
       "remediation": "Implement the next admitted slice; do not treat this command as successful."
     }
@@ -128,7 +128,13 @@ JSON 结果必须包含：
   "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"]},
   "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
   "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
-  "C9": {"hosts": ["claude-code", "codex", "cursor", "kimi-code"]},
+  "C9": {
+    "hosts": ["claude-code", "codex", "cursor", "kimi-code"],
+    "worker_allowlist": ["codex", "cursor"],
+    "payload_modes": ["canonical", "partial", "stub"],
+    "anchor_form": "explicit-html-id",
+    "path_policy": "relative-final-host-path"
+  },
   "C10": {"changed_scope_base_option": "--base", "immutable_chain": true},
   "C11": {"k2_allows_partial": false},
   "C12": {"report_tracks": ["structural_status", "behavioral_evidence_status"]},
@@ -157,7 +163,7 @@ JSON 结果必须包含：
   "derived_freshness": true,
   "canonical_graph_hash": true,
   "deterministic_budget_estimator": true,
-  "host_portability_probe": false,
+  "host_portability_probe": true,
   "semantic_coverage": true,
   "behavioral_evidence_tracking": false
 }
@@ -173,9 +179,12 @@ CI 用无副作用的 `node scripts/skill-knowledge/generate-validators.mjs --ch
 K1+ `check` 才对 authored documents 执行完整 Draft 2020-12 校验，并在 pilot source 上跑
 binding / inventory / authority / edge / pin-budget / entry-surface 不变式。
 
+`host_portability_probe` 为 **true**：C9 四 host fixture probe + frozen adapter contract 已落地。
+诚实区分：probe 模块已交付 ≠ `check --host` CLI 已接线；带 `--host`/`--base` 的 `check`
+以及 `report --host` 仍 exit 10。
+
 仍为 `false`、留给后续切片的 capability：
 
-- `host_portability_probe`
 - `behavioral_evidence_tracking`
 - `runtime_projection`
 - `typed_change_transactions`
@@ -254,7 +263,7 @@ loud、exit 10，不把 envelope check 冒充 full validation。
     "derived_freshness": true,
     "canonical_graph_hash": true,
     "deterministic_budget_estimator": true,
-    "host_portability_probe": false,
+    "host_portability_probe": true,
     "semantic_coverage": true,
     "behavioral_evidence_tracking": false
   },

@@ -113,6 +113,10 @@ export const HARDENING_CONTRACT = Object.freeze({
   }),
   C9: Object.freeze({
     hosts: Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']),
+    worker_allowlist: Object.freeze(['codex', 'cursor']),
+    payload_modes: Object.freeze(['canonical', 'partial', 'stub']),
+    anchor_form: 'explicit-html-id',
+    path_policy: 'relative-final-host-path',
   }),
   C10: Object.freeze({ changed_scope_base_option: '--base', immutable_chain: true }),
   C11: Object.freeze({ k2_allows_partial: false }),
@@ -165,7 +169,9 @@ export const CAPABILITIES = Object.freeze({
   derived_freshness: true,
   canonical_graph_hash: true,
   deterministic_budget_estimator: true,
-  host_portability_probe: false,
+  // HUB four-host fixture probe + C9 contract delivered; check --host CLI still exit 10.
+  host_portability_probe: true,
+  // K1 pilot semantic coverage over admitted three-module inventory.
   semantic_coverage: true,
   behavioral_evidence_tracking: false,
 });

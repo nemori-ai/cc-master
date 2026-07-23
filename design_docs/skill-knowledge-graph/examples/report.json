@@ -38,7 +38,7 @@
     "derived_freshness": true,
     "canonical_graph_hash": true,
     "deterministic_budget_estimator": true,
-    "host_portability_probe": false,
+    "host_portability_probe": true,
     "semantic_coverage": true,
     "behavioral_evidence_tracking": false
   },

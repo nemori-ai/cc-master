@@ -309,9 +309,9 @@ test('SKG-K1-CLI-01: contract capabilities for the walking skeleton are truthful
   assert.equal(contracts.CAPABILITIES.derived_freshness, true);
   assert.equal(contracts.CAPABILITIES.semantic_coverage, true);
   assert.equal(contracts.CAPABILITIES.deterministic_budget_estimator, true);
+  assert.equal(contracts.CAPABILITIES.host_portability_probe, true);
   // Explicitly still out of this slice:
   assert.equal(contracts.CAPABILITIES.typed_change_transactions, false);
-  assert.equal(contracts.CAPABILITIES.host_portability_probe, false);
 
   const result = runCli(['contract', '--json']);
   assert.equal(result.status, 0, result.stderr);

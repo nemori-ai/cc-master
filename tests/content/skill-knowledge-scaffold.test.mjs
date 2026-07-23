@@ -102,7 +102,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.derived_freshness, true);
   assert.equal(body.capabilities.canonical_graph_hash, true);
   assert.equal(body.capabilities.deterministic_budget_estimator, true);
-  assert.equal(body.capabilities.host_portability_probe, false);
+  assert.equal(body.capabilities.host_portability_probe, true);
   assert.equal(body.capabilities.semantic_coverage, true);
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
   assert.equal(body.capabilities.hop_analysis, true);
@@ -129,6 +129,14 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'cursor',
     'kimi-code',
   ]);
+  assert.deepEqual(body.hardening_contract.C9.worker_allowlist, ['codex', 'cursor']);
+  assert.deepEqual(body.hardening_contract.C9.payload_modes, [
+    'canonical',
+    'partial',
+    'stub',
+  ]);
+  assert.equal(body.hardening_contract.C9.anchor_form, 'explicit-html-id');
+  assert.equal(body.hardening_contract.C9.path_policy, 'relative-final-host-path');
   assert.equal(body.hardening_contract.C14.runtime_skill_count, 8);
   assert.equal(body.hardening_contract.C14.governance_meta_skill_is_runtime, false);
 });
@@ -596,6 +604,165 @@ test('SKG-DOC-01: K0 check success sample uses the executable capability map', (
   assert.deepEqual(
     documented.diagnostics.map((diagnostic) => diagnostic.code).sort(),
     check.diagnostics.map((diagnostic) => diagnostic.code).sort(),
+  );
+});
+
+test('SKG-DOC-02: knowledge CONTRACT, examples README, and design docs stay truthful about K1', () => {
+  const knowledgeContract = fs.readFileSync(
+    path.join(repoRoot, 'plugin', 'src', 'knowledge', 'CONTRACT.md'),
+    'utf8',
+  );
+  const examplesReadme = fs.readFileSync(path.join(examplesRoot, 'README.md'), 'utf8');
+  const designReadme = fs.readFileSync(
+    path.join(repoRoot, 'design_docs', 'skill-knowledge-graph', 'README.md'),
+    'utf8',
+  );
+  const cliContract = fs.readFileSync(
+    path.join(repoRoot, 'design_docs', 'skill-knowledge-graph', 'cli-contract.md'),
+    'utf8',
+  );
+
+  // Host portability: four-host fixture probe is delivered (capability=true); check --host CLI is not.
+  assert.doesNotMatch(
+    knowledgeContract,
+    /host\s+portability\s+probe\s+仍未实现/i,
+    'must not claim the four-host fixture probe itself is unimplemented',
+  );
+  assert.match(
+    knowledgeContract,
+    /host_portability_probe[\s\S]{0,160}true|capability\s*=\s*true[\s\S]{0,160}host|四\s*host[\s\S]{0,120}(fixture\s+)?probe[\s\S]{0,80}(已|true)/i,
+    'must state four-host fixture probe / host_portability_probe=true is delivered',
+  );
+  assert.match(
+    knowledgeContract,
+    /(--host|check\s+--host)[\s\S]{0,120}(exit\s*10|仍未|尚未|未接通|未接线|not\s+yet|not\s+wired)/i,
+    'must keep the undelivered fact: check --host CLI integration still exit 10',
+  );
+
+  // Standalone Draft 2020-12 validators (three bundles) are delivered; forbid stale "not yet" claims.
+  assert.doesNotMatch(
+    examplesReadme,
+    /`?full_json_schema_validation`?\s*仍未实现/i,
+    'must not claim full_json_schema_validation is still unimplemented',
+  );
+  assert.doesNotMatch(
+    examplesReadme,
+    /未来\s*full\s+validator\s*交付/i,
+    'must not treat standalone Draft 2020-12 validators as future-only delivery',
+  );
+  assert.match(
+    examplesReadme,
+    /standalone\s+Draft\s+2020-12\s+validator|full_json_schema_validation[\s\S]{0,80}true|三份\s*(emitted\s+)?CJS\s+bundle|validators?\s+(已|already)/i,
+    'must acknowledge standalone Draft 2020-12 validators / three bundles are landed',
+  );
+
+  // design_docs README: current maturity is K1 pilot with real inventory + delivered query surface.
+  assert.match(designReadme, /K1\s+pilot/i, 'README must state current maturity is K1 pilot');
+  assert.match(
+    designReadme,
+    /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
+    'README must state real inventory is 3 modules / 9 points',
+  );
+  for (const command of ['check', 'contract', 'report', 'path', 'explain']) {
+    assert.match(
+      designReadme,
+      new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
+      `README must mention implemented command ${command}`,
+    );
+  }
+  assert.match(
+    designReadme,
+    /(check|contract|report|path|explain)[\s\S]{0,200}(已实现|implemented)/i,
+    'README must state check/contract/report/path/explain are implemented',
+  );
+  assert.match(
+    designReadme,
+    /`?compile`?[\s\S]{0,120}`?change`?[\s\S]{0,160}exit\s*10/i,
+    'README must keep compile/change as exit 10',
+  );
+  assert.match(
+    designReadme,
+    /(check\s+--host|--host|--base)[\s\S]{0,160}exit\s*10/i,
+    'README must keep check --host/--base as exit 10',
+  );
+  assert.match(
+    designReadme,
+    /report\s+--host[\s\S]{0,120}exit\s*10/i,
+    'README must keep report --host as exit 10',
+  );
+  assert.match(
+    designReadme,
+    /四\s*host[\s\S]{0,120}(fixture\s+)?probe[\s\S]{0,120}(已|交付|landed|delivered)/i,
+    'README must state four-host fixture probe is delivered',
+  );
+  assert.match(
+    designReadme,
+    /(不等于|≠|not\s+(equal|the\s+same|equivalent)|probe[\s\S]{0,80}≠)[\s\S]{0,120}(CLI|check\s+--host|host\s+integration)/i,
+    'README must distinguish fixture probe from CLI host integration',
+  );
+  assert.match(
+    designReadme,
+    /standalone\s+(Draft\s+2020-12\s+)?validators?|Draft\s+2020-12\s+validators?/i,
+    'README must acknowledge standalone validators are delivered',
+  );
+  assert.match(
+    designReadme,
+    /Markdown\s+binding|markdown_binding/i,
+    'README must acknowledge Markdown binding is delivered',
+  );
+  assert.match(
+    designReadme,
+    /graph\s+invariants?|graph_invariants/i,
+    'README must acknowledge graph invariants are delivered',
+  );
+  assert.match(
+    designReadme,
+    /(authored[\s-]+plane\s+)?hop\s+analysis|hop_analysis/i,
+    'README must acknowledge authored hop analysis is delivered',
+  );
+  // Forbid stale K0 maturity claims that contradict the admitted pilot.
+  assert.doesNotMatch(
+    designReadme,
+    /当前完成\s+\*\*K0\s+executable\s+outer\s+contract\*\*/i,
+    'must not present K0 outer contract as current maturity',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /inventory\s+有意为空|为空并报告\s*debt/i,
+    'must not claim inventory is intentionally empty',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /未实现的\s*`?compile\/report\/path\/explain`?/i,
+    'must not claim report/path/explain are still unimplemented',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /真实\s+pilot\s+inventory[\s\S]{0,80}仍属于\s*K1\+|完整\s+JSON\s+Schema[\s\S]{0,80}仍属于\s*K1\+/i,
+    'must not list delivered validators/pilot inventory as future-only K1+ work',
+  );
+
+  // cli-contract unavailable sample must mirror live K1 pilot wording (exit/capability unchanged).
+  const unavailableSample = cliContract.match(
+    /失败也使用同一\s*envelope：\s*```json\n([\s\S]*?)\n```/,
+  );
+  assert.ok(unavailableSample, 'cli-contract must keep a machine-readable unavailable envelope sample');
+  const documentedFailure = JSON.parse(unavailableSample[1]);
+  assert.equal(documentedFailure.diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
+  assert.match(
+    documentedFailure.diagnostics[0].message,
+    /\bK1\b/,
+    'unavailable sample message must say K1, not stale K0',
+  );
+  assert.doesNotMatch(
+    documentedFailure.diagnostics[0].message,
+    /\bK0\b/,
+    'unavailable sample message must not say K0',
+  );
+  assert.equal(
+    documentedFailure.diagnostics[0].witness.stage,
+    'K1',
+    'unavailable sample witness.stage must be K1',
   );
 });
 

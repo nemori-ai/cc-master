@@ -1,8 +1,8 @@
 /**
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-cli-output.schema.json
- * Source-schema-sha256: e99ac44fac5d9468b253f9798e51017f9baa36cf665958f7f65b6ff8a1ee4005
- * Schema-fingerprint: 676df7d2e4be240e53f772fab8253e166efd810f081c81af8bd96c29f4904856
+ * Source-schema-sha256: 94b7e13c16c40bdaf1f50188ad98ac2b6afddf15ffd1e06271269d79f36b8be7
+ * Schema-fingerprint: 4c09573dd92271cbe572e0dbfa415a73439ee7d07d49c58a73cd47c1a8425f40
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";
@@ -90,10 +90,10 @@ var require_equal = __commonJS({
 // raw/validate-output.cjs
 module.exports = validate20;
 module.exports.default = validate20;
-var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "report", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "skills"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "skills": { "type": "string", "minLength": 1 } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "improvement_claim": { "type": "string", "minLength": 1 }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
+var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "report", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "skills"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "skills": { "type": "string", "minLength": 1 } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "improvement_claim": { "type": "string", "minLength": 1 }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
 var schema35 = { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } };
 var schema49 = { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } };
-var schema50 = { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } };
+var schema50 = { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } };
 var schema51 = { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } };
 var schema54 = { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } };
 var func1 = require_ucs2length().default;
@@ -4079,43 +4079,35 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            for (const key16 in data115) {
-              if (!(key16 === "hosts")) {
-                const err287 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key16 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err287];
-                } else {
-                  vErrors.push(err287);
-                }
-                errors++;
+            if (data115.worker_allowlist === void 0) {
+              const err287 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "worker_allowlist" }, message: "must have required property 'worker_allowlist'" };
+              if (vErrors === null) {
+                vErrors = [err287];
+              } else {
+                vErrors.push(err287);
               }
+              errors++;
             }
-            if (data115.hosts !== void 0) {
-              if (!func0(data115.hosts, schema50.properties.C9.properties.hosts.const)) {
-                const err288 = { instancePath: instancePath + "/hardening_contract/C9/hosts", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/hosts/const", keyword: "const", params: { allowedValue: schema50.properties.C9.properties.hosts.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err288];
-                } else {
-                  vErrors.push(err288);
-                }
-                errors++;
+            if (data115.payload_modes === void 0) {
+              const err288 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "payload_modes" }, message: "must have required property 'payload_modes'" };
+              if (vErrors === null) {
+                vErrors = [err288];
+              } else {
+                vErrors.push(err288);
               }
+              errors++;
             }
-          } else {
-            const err289 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err289];
-            } else {
-              vErrors.push(err289);
+            if (data115.anchor_form === void 0) {
+              const err289 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "anchor_form" }, message: "must have required property 'anchor_form'" };
+              if (vErrors === null) {
+                vErrors = [err289];
+              } else {
+                vErrors.push(err289);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-        if (data90.C10 !== void 0) {
-          let data117 = data90.C10;
-          if (data117 && typeof data117 == "object" && !Array.isArray(data117)) {
-            if (data117.changed_scope_base_option === void 0) {
-              const err290 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "changed_scope_base_option" }, message: "must have required property 'changed_scope_base_option'" };
+            if (data115.path_policy === void 0) {
+              const err290 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "path_policy" }, message: "must have required property 'path_policy'" };
               if (vErrors === null) {
                 vErrors = [err290];
               } else {
@@ -4123,18 +4115,20 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            if (data117.immutable_chain === void 0) {
-              const err291 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "immutable_chain" }, message: "must have required property 'immutable_chain'" };
-              if (vErrors === null) {
-                vErrors = [err291];
-              } else {
-                vErrors.push(err291);
+            for (const key16 in data115) {
+              if (!(key16 === "hosts" || key16 === "worker_allowlist" || key16 === "payload_modes" || key16 === "anchor_form" || key16 === "path_policy")) {
+                const err291 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key16 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err291];
+                } else {
+                  vErrors.push(err291);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key17 in data117) {
-              if (!(key17 === "changed_scope_base_option" || key17 === "immutable_chain")) {
-                const err292 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key17 }, message: "must NOT have additional properties" };
+            if (data115.hosts !== void 0) {
+              if (!func0(data115.hosts, schema50.properties.C9.properties.hosts.const)) {
+                const err292 = { instancePath: instancePath + "/hardening_contract/C9/hosts", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/hosts/const", keyword: "const", params: { allowedValue: schema50.properties.C9.properties.hosts.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err292];
                 } else {
@@ -4143,9 +4137,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data117.changed_scope_base_option !== void 0) {
-              if ("--base" !== data117.changed_scope_base_option) {
-                const err293 = { instancePath: instancePath + "/hardening_contract/C10/changed_scope_base_option", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/changed_scope_base_option/const", keyword: "const", params: { allowedValue: "--base" }, message: "must be equal to constant" };
+            if (data115.worker_allowlist !== void 0) {
+              if (!func0(data115.worker_allowlist, schema50.properties.C9.properties.worker_allowlist.const)) {
+                const err293 = { instancePath: instancePath + "/hardening_contract/C9/worker_allowlist", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/worker_allowlist/const", keyword: "const", params: { allowedValue: schema50.properties.C9.properties.worker_allowlist.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err293];
                 } else {
@@ -4154,9 +4148,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data117.immutable_chain !== void 0) {
-              if (true !== data117.immutable_chain) {
-                const err294 = { instancePath: instancePath + "/hardening_contract/C10/immutable_chain", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/immutable_chain/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
+            if (data115.payload_modes !== void 0) {
+              if (!func0(data115.payload_modes, schema50.properties.C9.properties.payload_modes.const)) {
+                const err294 = { instancePath: instancePath + "/hardening_contract/C9/payload_modes", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/payload_modes/const", keyword: "const", params: { allowedValue: schema50.properties.C9.properties.payload_modes.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err294];
                 } else {
@@ -4165,75 +4159,73 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-          } else {
-            const err295 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err295];
-            } else {
-              vErrors.push(err295);
-            }
-            errors++;
-          }
-        }
-        if (data90.C11 !== void 0) {
-          let data120 = data90.C11;
-          if (data120 && typeof data120 == "object" && !Array.isArray(data120)) {
-            if (data120.k2_allows_partial === void 0) {
-              const err296 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/required", keyword: "required", params: { missingProperty: "k2_allows_partial" }, message: "must have required property 'k2_allows_partial'" };
-              if (vErrors === null) {
-                vErrors = [err296];
-              } else {
-                vErrors.push(err296);
-              }
-              errors++;
-            }
-            for (const key18 in data120) {
-              if (!(key18 === "k2_allows_partial")) {
-                const err297 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key18 }, message: "must NOT have additional properties" };
+            if (data115.anchor_form !== void 0) {
+              if ("explicit-html-id" !== data115.anchor_form) {
+                const err295 = { instancePath: instancePath + "/hardening_contract/C9/anchor_form", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/anchor_form/const", keyword: "const", params: { allowedValue: "explicit-html-id" }, message: "must be equal to constant" };
                 if (vErrors === null) {
-                  vErrors = [err297];
+                  vErrors = [err295];
                 } else {
-                  vErrors.push(err297);
+                  vErrors.push(err295);
                 }
                 errors++;
               }
             }
-            if (data120.k2_allows_partial !== void 0) {
-              if (false !== data120.k2_allows_partial) {
-                const err298 = { instancePath: instancePath + "/hardening_contract/C11/k2_allows_partial", schemaPath: "#/$defs/hardeningContract/properties/C11/properties/k2_allows_partial/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
+            if (data115.path_policy !== void 0) {
+              if ("relative-final-host-path" !== data115.path_policy) {
+                const err296 = { instancePath: instancePath + "/hardening_contract/C9/path_policy", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/path_policy/const", keyword: "const", params: { allowedValue: "relative-final-host-path" }, message: "must be equal to constant" };
                 if (vErrors === null) {
-                  vErrors = [err298];
+                  vErrors = [err296];
                 } else {
-                  vErrors.push(err298);
+                  vErrors.push(err296);
                 }
                 errors++;
               }
             }
           } else {
-            const err299 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err297 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err299];
+              vErrors = [err297];
             } else {
-              vErrors.push(err299);
+              vErrors.push(err297);
             }
             errors++;
           }
         }
-        if (data90.C12 !== void 0) {
-          let data122 = data90.C12;
-          if (data122 && typeof data122 == "object" && !Array.isArray(data122)) {
-            if (data122.report_tracks === void 0) {
-              const err300 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/required", keyword: "required", params: { missingProperty: "report_tracks" }, message: "must have required property 'report_tracks'" };
+        if (data90.C10 !== void 0) {
+          let data121 = data90.C10;
+          if (data121 && typeof data121 == "object" && !Array.isArray(data121)) {
+            if (data121.changed_scope_base_option === void 0) {
+              const err298 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "changed_scope_base_option" }, message: "must have required property 'changed_scope_base_option'" };
               if (vErrors === null) {
-                vErrors = [err300];
+                vErrors = [err298];
               } else {
-                vErrors.push(err300);
+                vErrors.push(err298);
               }
               errors++;
             }
-            for (const key19 in data122) {
-              if (!(key19 === "report_tracks")) {
-                const err301 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key19 }, message: "must NOT have additional properties" };
+            if (data121.immutable_chain === void 0) {
+              const err299 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "immutable_chain" }, message: "must have required property 'immutable_chain'" };
+              if (vErrors === null) {
+                vErrors = [err299];
+              } else {
+                vErrors.push(err299);
+              }
+              errors++;
+            }
+            for (const key17 in data121) {
+              if (!(key17 === "changed_scope_base_option" || key17 === "immutable_chain")) {
+                const err300 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key17 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err300];
+                } else {
+                  vErrors.push(err300);
+                }
+                errors++;
+              }
+            }
+            if (data121.changed_scope_base_option !== void 0) {
+              if ("--base" !== data121.changed_scope_base_option) {
+                const err301 = { instancePath: instancePath + "/hardening_contract/C10/changed_scope_base_option", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/changed_scope_base_option/const", keyword: "const", params: { allowedValue: "--base" }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err301];
                 } else {
@@ -4242,9 +4234,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data122.report_tracks !== void 0) {
-              if (!func0(data122.report_tracks, schema50.properties.C12.properties.report_tracks.const)) {
-                const err302 = { instancePath: instancePath + "/hardening_contract/C12/report_tracks", schemaPath: "#/$defs/hardeningContract/properties/C12/properties/report_tracks/const", keyword: "const", params: { allowedValue: schema50.properties.C12.properties.report_tracks.const }, message: "must be equal to constant" };
+            if (data121.immutable_chain !== void 0) {
+              if (true !== data121.immutable_chain) {
+                const err302 = { instancePath: instancePath + "/hardening_contract/C10/immutable_chain", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/immutable_chain/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err302];
                 } else {
@@ -4254,7 +4246,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
             }
           } else {
-            const err303 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err303 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
               vErrors = [err303];
             } else {
@@ -4263,11 +4255,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data90.C13 !== void 0) {
-          let data124 = data90.C13;
+        if (data90.C11 !== void 0) {
+          let data124 = data90.C11;
           if (data124 && typeof data124 == "object" && !Array.isArray(data124)) {
-            if (data124.research_supersession_required === void 0) {
-              const err304 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/required", keyword: "required", params: { missingProperty: "research_supersession_required" }, message: "must have required property 'research_supersession_required'" };
+            if (data124.k2_allows_partial === void 0) {
+              const err304 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/required", keyword: "required", params: { missingProperty: "k2_allows_partial" }, message: "must have required property 'k2_allows_partial'" };
               if (vErrors === null) {
                 vErrors = [err304];
               } else {
@@ -4275,9 +4267,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            for (const key20 in data124) {
-              if (!(key20 === "research_supersession_required")) {
-                const err305 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key20 }, message: "must NOT have additional properties" };
+            for (const key18 in data124) {
+              if (!(key18 === "k2_allows_partial")) {
+                const err305 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key18 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err305];
                 } else {
@@ -4286,9 +4278,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data124.research_supersession_required !== void 0) {
-              if (true !== data124.research_supersession_required) {
-                const err306 = { instancePath: instancePath + "/hardening_contract/C13/research_supersession_required", schemaPath: "#/$defs/hardeningContract/properties/C13/properties/research_supersession_required/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
+            if (data124.k2_allows_partial !== void 0) {
+              if (false !== data124.k2_allows_partial) {
+                const err306 = { instancePath: instancePath + "/hardening_contract/C11/k2_allows_partial", schemaPath: "#/$defs/hardeningContract/properties/C11/properties/k2_allows_partial/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err306];
                 } else {
@@ -4298,7 +4290,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
             }
           } else {
-            const err307 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err307 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
               vErrors = [err307];
             } else {
@@ -4307,11 +4299,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data90.C14 !== void 0) {
-          let data126 = data90.C14;
+        if (data90.C12 !== void 0) {
+          let data126 = data90.C12;
           if (data126 && typeof data126 == "object" && !Array.isArray(data126)) {
-            if (data126.runtime_skill_count === void 0) {
-              const err308 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "runtime_skill_count" }, message: "must have required property 'runtime_skill_count'" };
+            if (data126.report_tracks === void 0) {
+              const err308 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/required", keyword: "required", params: { missingProperty: "report_tracks" }, message: "must have required property 'report_tracks'" };
               if (vErrors === null) {
                 vErrors = [err308];
               } else {
@@ -4319,18 +4311,20 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            if (data126.governance_meta_skill_is_runtime === void 0) {
-              const err309 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "governance_meta_skill_is_runtime" }, message: "must have required property 'governance_meta_skill_is_runtime'" };
-              if (vErrors === null) {
-                vErrors = [err309];
-              } else {
-                vErrors.push(err309);
+            for (const key19 in data126) {
+              if (!(key19 === "report_tracks")) {
+                const err309 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key19 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err309];
+                } else {
+                  vErrors.push(err309);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key21 in data126) {
-              if (!(key21 === "runtime_skill_count" || key21 === "governance_meta_skill_is_runtime")) {
-                const err310 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key21 }, message: "must NOT have additional properties" };
+            if (data126.report_tracks !== void 0) {
+              if (!func0(data126.report_tracks, schema50.properties.C12.properties.report_tracks.const)) {
+                const err310 = { instancePath: instancePath + "/hardening_contract/C12/report_tracks", schemaPath: "#/$defs/hardeningContract/properties/C12/properties/report_tracks/const", keyword: "const", params: { allowedValue: schema50.properties.C12.properties.report_tracks.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err310];
                 } else {
@@ -4339,90 +4333,84 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data126.runtime_skill_count !== void 0) {
-              if (8 !== data126.runtime_skill_count) {
-                const err311 = { instancePath: instancePath + "/hardening_contract/C14/runtime_skill_count", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/runtime_skill_count/const", keyword: "const", params: { allowedValue: 8 }, message: "must be equal to constant" };
+          } else {
+            const err311 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err311];
+            } else {
+              vErrors.push(err311);
+            }
+            errors++;
+          }
+        }
+        if (data90.C13 !== void 0) {
+          let data128 = data90.C13;
+          if (data128 && typeof data128 == "object" && !Array.isArray(data128)) {
+            if (data128.research_supersession_required === void 0) {
+              const err312 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/required", keyword: "required", params: { missingProperty: "research_supersession_required" }, message: "must have required property 'research_supersession_required'" };
+              if (vErrors === null) {
+                vErrors = [err312];
+              } else {
+                vErrors.push(err312);
+              }
+              errors++;
+            }
+            for (const key20 in data128) {
+              if (!(key20 === "research_supersession_required")) {
+                const err313 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key20 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
-                  vErrors = [err311];
+                  vErrors = [err313];
                 } else {
-                  vErrors.push(err311);
+                  vErrors.push(err313);
                 }
                 errors++;
               }
             }
-            if (data126.governance_meta_skill_is_runtime !== void 0) {
-              if (false !== data126.governance_meta_skill_is_runtime) {
-                const err312 = { instancePath: instancePath + "/hardening_contract/C14/governance_meta_skill_is_runtime", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/governance_meta_skill_is_runtime/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
+            if (data128.research_supersession_required !== void 0) {
+              if (true !== data128.research_supersession_required) {
+                const err314 = { instancePath: instancePath + "/hardening_contract/C13/research_supersession_required", schemaPath: "#/$defs/hardeningContract/properties/C13/properties/research_supersession_required/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
                 if (vErrors === null) {
-                  vErrors = [err312];
+                  vErrors = [err314];
                 } else {
-                  vErrors.push(err312);
+                  vErrors.push(err314);
                 }
                 errors++;
               }
             }
           } else {
-            const err313 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err315 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err313];
+              vErrors = [err315];
             } else {
-              vErrors.push(err313);
+              vErrors.push(err315);
             }
             errors++;
           }
         }
-      } else {
-        const err314 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-        if (vErrors === null) {
-          vErrors = [err314];
-        } else {
-          vErrors.push(err314);
-        }
-        errors++;
-      }
-    }
-    if (data.structural_status !== void 0) {
-      let data129 = data.structural_status;
-      if (data129 && typeof data129 == "object" && !Array.isArray(data129)) {
-        if (data129.state === void 0) {
-          const err315 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/required", keyword: "required", params: { missingProperty: "state" }, message: "must have required property 'state'" };
-          if (vErrors === null) {
-            vErrors = [err315];
-          } else {
-            vErrors.push(err315);
-          }
-          errors++;
-        }
-        for (const key22 in data129) {
-          if (!(key22 === "state" || key22 === "counts" || key22 === "graph_hash")) {
-            const err316 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key22 }, message: "must NOT have additional properties" };
-            if (vErrors === null) {
-              vErrors = [err316];
-            } else {
-              vErrors.push(err316);
+        if (data90.C14 !== void 0) {
+          let data130 = data90.C14;
+          if (data130 && typeof data130 == "object" && !Array.isArray(data130)) {
+            if (data130.runtime_skill_count === void 0) {
+              const err316 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "runtime_skill_count" }, message: "must have required property 'runtime_skill_count'" };
+              if (vErrors === null) {
+                vErrors = [err316];
+              } else {
+                vErrors.push(err316);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-        if (data129.state !== void 0) {
-          let data130 = data129.state;
-          if (!(data130 === "pass" || data130 === "fail" || data130 === "debt" || data130 === "not_run")) {
-            const err317 = { instancePath: instancePath + "/structural_status/state", schemaPath: "#/$defs/structuralStatus/properties/state/enum", keyword: "enum", params: { allowedValues: schema51.properties.state.enum }, message: "must be equal to one of the allowed values" };
-            if (vErrors === null) {
-              vErrors = [err317];
-            } else {
-              vErrors.push(err317);
+            if (data130.governance_meta_skill_is_runtime === void 0) {
+              const err317 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "governance_meta_skill_is_runtime" }, message: "must have required property 'governance_meta_skill_is_runtime'" };
+              if (vErrors === null) {
+                vErrors = [err317];
+              } else {
+                vErrors.push(err317);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-        if (data129.counts !== void 0) {
-          let data131 = data129.counts;
-          if (data131 && typeof data131 == "object" && !Array.isArray(data131)) {
-            for (const key23 in data131) {
-              let data132 = data131[key23];
-              if (!(typeof data132 == "number" && (!(data132 % 1) && !isNaN(data132)))) {
-                const err318 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            for (const key21 in data130) {
+              if (!(key21 === "runtime_skill_count" || key21 === "governance_meta_skill_is_runtime")) {
+                const err318 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key21 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err318];
                 } else {
@@ -4430,56 +4418,148 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 }
                 errors++;
               }
-              if (typeof data132 == "number") {
-                if (data132 < 0 || isNaN(data132)) {
-                  const err319 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+            }
+            if (data130.runtime_skill_count !== void 0) {
+              if (8 !== data130.runtime_skill_count) {
+                const err319 = { instancePath: instancePath + "/hardening_contract/C14/runtime_skill_count", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/runtime_skill_count/const", keyword: "const", params: { allowedValue: 8 }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err319];
+                } else {
+                  vErrors.push(err319);
+                }
+                errors++;
+              }
+            }
+            if (data130.governance_meta_skill_is_runtime !== void 0) {
+              if (false !== data130.governance_meta_skill_is_runtime) {
+                const err320 = { instancePath: instancePath + "/hardening_contract/C14/governance_meta_skill_is_runtime", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/governance_meta_skill_is_runtime/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err320];
+                } else {
+                  vErrors.push(err320);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err321 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err321];
+            } else {
+              vErrors.push(err321);
+            }
+            errors++;
+          }
+        }
+      } else {
+        const err322 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        if (vErrors === null) {
+          vErrors = [err322];
+        } else {
+          vErrors.push(err322);
+        }
+        errors++;
+      }
+    }
+    if (data.structural_status !== void 0) {
+      let data133 = data.structural_status;
+      if (data133 && typeof data133 == "object" && !Array.isArray(data133)) {
+        if (data133.state === void 0) {
+          const err323 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/required", keyword: "required", params: { missingProperty: "state" }, message: "must have required property 'state'" };
+          if (vErrors === null) {
+            vErrors = [err323];
+          } else {
+            vErrors.push(err323);
+          }
+          errors++;
+        }
+        for (const key22 in data133) {
+          if (!(key22 === "state" || key22 === "counts" || key22 === "graph_hash")) {
+            const err324 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key22 }, message: "must NOT have additional properties" };
+            if (vErrors === null) {
+              vErrors = [err324];
+            } else {
+              vErrors.push(err324);
+            }
+            errors++;
+          }
+        }
+        if (data133.state !== void 0) {
+          let data134 = data133.state;
+          if (!(data134 === "pass" || data134 === "fail" || data134 === "debt" || data134 === "not_run")) {
+            const err325 = { instancePath: instancePath + "/structural_status/state", schemaPath: "#/$defs/structuralStatus/properties/state/enum", keyword: "enum", params: { allowedValues: schema51.properties.state.enum }, message: "must be equal to one of the allowed values" };
+            if (vErrors === null) {
+              vErrors = [err325];
+            } else {
+              vErrors.push(err325);
+            }
+            errors++;
+          }
+        }
+        if (data133.counts !== void 0) {
+          let data135 = data133.counts;
+          if (data135 && typeof data135 == "object" && !Array.isArray(data135)) {
+            for (const key23 in data135) {
+              let data136 = data135[key23];
+              if (!(typeof data136 == "number" && (!(data136 % 1) && !isNaN(data136)))) {
+                const err326 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                if (vErrors === null) {
+                  vErrors = [err326];
+                } else {
+                  vErrors.push(err326);
+                }
+                errors++;
+              }
+              if (typeof data136 == "number") {
+                if (data136 < 0 || isNaN(data136)) {
+                  const err327 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
                   if (vErrors === null) {
-                    vErrors = [err319];
+                    vErrors = [err327];
                   } else {
-                    vErrors.push(err319);
+                    vErrors.push(err327);
                   }
                   errors++;
                 }
               }
             }
           } else {
-            const err320 = { instancePath: instancePath + "/structural_status/counts", schemaPath: "#/$defs/structuralStatus/properties/counts/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err328 = { instancePath: instancePath + "/structural_status/counts", schemaPath: "#/$defs/structuralStatus/properties/counts/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err320];
+              vErrors = [err328];
             } else {
-              vErrors.push(err320);
+              vErrors.push(err328);
             }
             errors++;
           }
         }
-        if (data129.graph_hash !== void 0) {
-          let data133 = data129.graph_hash;
-          if (typeof data133 === "string") {
-            if (!pattern4.test(data133)) {
-              const err321 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
+        if (data133.graph_hash !== void 0) {
+          let data137 = data133.graph_hash;
+          if (typeof data137 === "string") {
+            if (!pattern4.test(data137)) {
+              const err329 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
               if (vErrors === null) {
-                vErrors = [err321];
+                vErrors = [err329];
               } else {
-                vErrors.push(err321);
+                vErrors.push(err329);
               }
               errors++;
             }
           } else {
-            const err322 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+            const err330 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/type", keyword: "type", params: { type: "string" }, message: "must be string" };
             if (vErrors === null) {
-              vErrors = [err322];
+              vErrors = [err330];
             } else {
-              vErrors.push(err322);
+              vErrors.push(err330);
             }
             errors++;
           }
         }
       } else {
-        const err323 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err331 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err323];
+          vErrors = [err331];
         } else {
-          vErrors.push(err323);
+          vErrors.push(err331);
         }
         errors++;
       }
@@ -4491,181 +4571,91 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
       }
     }
     if (data.improvement_claim !== void 0) {
-      let data135 = data.improvement_claim;
-      if (typeof data135 === "string") {
-        if (func1(data135) < 1) {
-          const err324 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+      let data139 = data.improvement_claim;
+      if (typeof data139 === "string") {
+        if (func1(data139) < 1) {
+          const err332 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
-            vErrors = [err324];
+            vErrors = [err332];
           } else {
-            vErrors.push(err324);
+            vErrors.push(err332);
           }
           errors++;
         }
       } else {
-        const err325 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err333 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err325];
+          vErrors = [err333];
         } else {
-          vErrors.push(err325);
+          vErrors.push(err333);
         }
         errors++;
       }
     }
     if (data.diagnostics !== void 0) {
-      let data136 = data.diagnostics;
-      if (Array.isArray(data136)) {
-        const len8 = data136.length;
+      let data140 = data.diagnostics;
+      if (Array.isArray(data140)) {
+        const len8 = data140.length;
         for (let i13 = 0; i13 < len8; i13++) {
-          let data137 = data136[i13];
-          if (data137 && typeof data137 == "object" && !Array.isArray(data137)) {
-            if (data137.severity === void 0) {
-              const err326 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
+          let data141 = data140[i13];
+          if (data141 && typeof data141 == "object" && !Array.isArray(data141)) {
+            if (data141.severity === void 0) {
+              const err334 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
               if (vErrors === null) {
-                vErrors = [err326];
+                vErrors = [err334];
               } else {
-                vErrors.push(err326);
+                vErrors.push(err334);
               }
               errors++;
             }
-            if (data137.code === void 0) {
-              const err327 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
+            if (data141.code === void 0) {
+              const err335 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
               if (vErrors === null) {
-                vErrors = [err327];
+                vErrors = [err335];
               } else {
-                vErrors.push(err327);
+                vErrors.push(err335);
               }
               errors++;
             }
-            if (data137.message === void 0) {
-              const err328 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
+            if (data141.message === void 0) {
+              const err336 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
               if (vErrors === null) {
-                vErrors = [err328];
+                vErrors = [err336];
               } else {
-                vErrors.push(err328);
+                vErrors.push(err336);
               }
               errors++;
             }
-            if (data137.location === void 0) {
-              const err329 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
+            if (data141.location === void 0) {
+              const err337 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
               if (vErrors === null) {
-                vErrors = [err329];
+                vErrors = [err337];
               } else {
-                vErrors.push(err329);
+                vErrors.push(err337);
               }
               errors++;
             }
-            if (data137.witness === void 0) {
-              const err330 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
+            if (data141.witness === void 0) {
+              const err338 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
               if (vErrors === null) {
-                vErrors = [err330];
+                vErrors = [err338];
               } else {
-                vErrors.push(err330);
+                vErrors.push(err338);
               }
               errors++;
             }
-            if (data137.remediation === void 0) {
-              const err331 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
+            if (data141.remediation === void 0) {
+              const err339 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
               if (vErrors === null) {
-                vErrors = [err331];
+                vErrors = [err339];
               } else {
-                vErrors.push(err331);
+                vErrors.push(err339);
               }
               errors++;
             }
-            for (const key24 in data137) {
+            for (const key24 in data141) {
               if (!(key24 === "severity" || key24 === "code" || key24 === "message" || key24 === "location" || key24 === "witness" || key24 === "remediation")) {
-                const err332 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key24 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err332];
-                } else {
-                  vErrors.push(err332);
-                }
-                errors++;
-              }
-            }
-            if (data137.severity !== void 0) {
-              let data138 = data137.severity;
-              if (!(data138 === "error" || data138 === "warning" || data138 === "debt" || data138 === "info")) {
-                const err333 = { instancePath: instancePath + "/diagnostics/" + i13 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema54.properties.severity.enum }, message: "must be equal to one of the allowed values" };
-                if (vErrors === null) {
-                  vErrors = [err333];
-                } else {
-                  vErrors.push(err333);
-                }
-                errors++;
-              }
-            }
-            if (data137.code !== void 0) {
-              let data139 = data137.code;
-              if (typeof data139 === "string") {
-                if (!pattern14.test(data139)) {
-                  const err334 = { instancePath: instancePath + "/diagnostics/" + i13 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
-                  if (vErrors === null) {
-                    vErrors = [err334];
-                  } else {
-                    vErrors.push(err334);
-                  }
-                  errors++;
-                }
-              } else {
-                const err335 = { instancePath: instancePath + "/diagnostics/" + i13 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err335];
-                } else {
-                  vErrors.push(err335);
-                }
-                errors++;
-              }
-            }
-            if (data137.message !== void 0) {
-              let data140 = data137.message;
-              if (typeof data140 === "string") {
-                if (func1(data140) < 1) {
-                  const err336 = { instancePath: instancePath + "/diagnostics/" + i13 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-                  if (vErrors === null) {
-                    vErrors = [err336];
-                  } else {
-                    vErrors.push(err336);
-                  }
-                  errors++;
-                }
-              } else {
-                const err337 = { instancePath: instancePath + "/diagnostics/" + i13 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err337];
-                } else {
-                  vErrors.push(err337);
-                }
-                errors++;
-              }
-            }
-            if (data137.location !== void 0) {
-              let data141 = data137.location;
-              if (typeof data141 === "string") {
-                if (func1(data141) < 1) {
-                  const err338 = { instancePath: instancePath + "/diagnostics/" + i13 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-                  if (vErrors === null) {
-                    vErrors = [err338];
-                  } else {
-                    vErrors.push(err338);
-                  }
-                  errors++;
-                }
-              } else {
-                const err339 = { instancePath: instancePath + "/diagnostics/" + i13 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err339];
-                } else {
-                  vErrors.push(err339);
-                }
-                errors++;
-              }
-            }
-            if (data137.witness !== void 0) {
-              let data142 = data137.witness;
-              if (!(data142 && typeof data142 == "object" && !Array.isArray(data142))) {
-                const err340 = { instancePath: instancePath + "/diagnostics/" + i13 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+                const err340 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key24 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err340];
                 } else {
@@ -4674,44 +4664,134 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data137.remediation !== void 0) {
-              let data143 = data137.remediation;
+            if (data141.severity !== void 0) {
+              let data142 = data141.severity;
+              if (!(data142 === "error" || data142 === "warning" || data142 === "debt" || data142 === "info")) {
+                const err341 = { instancePath: instancePath + "/diagnostics/" + i13 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema54.properties.severity.enum }, message: "must be equal to one of the allowed values" };
+                if (vErrors === null) {
+                  vErrors = [err341];
+                } else {
+                  vErrors.push(err341);
+                }
+                errors++;
+              }
+            }
+            if (data141.code !== void 0) {
+              let data143 = data141.code;
               if (typeof data143 === "string") {
-                if (func1(data143) < 1) {
-                  const err341 = { instancePath: instancePath + "/diagnostics/" + i13 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                if (!pattern14.test(data143)) {
+                  const err342 = { instancePath: instancePath + "/diagnostics/" + i13 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
                   if (vErrors === null) {
-                    vErrors = [err341];
+                    vErrors = [err342];
                   } else {
-                    vErrors.push(err341);
+                    vErrors.push(err342);
                   }
                   errors++;
                 }
               } else {
-                const err342 = { instancePath: instancePath + "/diagnostics/" + i13 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                const err343 = { instancePath: instancePath + "/diagnostics/" + i13 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
                 if (vErrors === null) {
-                  vErrors = [err342];
+                  vErrors = [err343];
                 } else {
-                  vErrors.push(err342);
+                  vErrors.push(err343);
+                }
+                errors++;
+              }
+            }
+            if (data141.message !== void 0) {
+              let data144 = data141.message;
+              if (typeof data144 === "string") {
+                if (func1(data144) < 1) {
+                  const err344 = { instancePath: instancePath + "/diagnostics/" + i13 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err344];
+                  } else {
+                    vErrors.push(err344);
+                  }
+                  errors++;
+                }
+              } else {
+                const err345 = { instancePath: instancePath + "/diagnostics/" + i13 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err345];
+                } else {
+                  vErrors.push(err345);
+                }
+                errors++;
+              }
+            }
+            if (data141.location !== void 0) {
+              let data145 = data141.location;
+              if (typeof data145 === "string") {
+                if (func1(data145) < 1) {
+                  const err346 = { instancePath: instancePath + "/diagnostics/" + i13 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err346];
+                  } else {
+                    vErrors.push(err346);
+                  }
+                  errors++;
+                }
+              } else {
+                const err347 = { instancePath: instancePath + "/diagnostics/" + i13 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err347];
+                } else {
+                  vErrors.push(err347);
+                }
+                errors++;
+              }
+            }
+            if (data141.witness !== void 0) {
+              let data146 = data141.witness;
+              if (!(data146 && typeof data146 == "object" && !Array.isArray(data146))) {
+                const err348 = { instancePath: instancePath + "/diagnostics/" + i13 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+                if (vErrors === null) {
+                  vErrors = [err348];
+                } else {
+                  vErrors.push(err348);
+                }
+                errors++;
+              }
+            }
+            if (data141.remediation !== void 0) {
+              let data147 = data141.remediation;
+              if (typeof data147 === "string") {
+                if (func1(data147) < 1) {
+                  const err349 = { instancePath: instancePath + "/diagnostics/" + i13 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err349];
+                  } else {
+                    vErrors.push(err349);
+                  }
+                  errors++;
+                }
+              } else {
+                const err350 = { instancePath: instancePath + "/diagnostics/" + i13 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err350];
+                } else {
+                  vErrors.push(err350);
                 }
                 errors++;
               }
             }
           } else {
-            const err343 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err351 = { instancePath: instancePath + "/diagnostics/" + i13, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err343];
+              vErrors = [err351];
             } else {
-              vErrors.push(err343);
+              vErrors.push(err351);
             }
             errors++;
           }
         }
       } else {
-        const err344 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
+        const err352 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
         if (vErrors === null) {
-          vErrors = [err344];
+          vErrors = [err352];
         } else {
-          vErrors.push(err344);
+          vErrors.push(err352);
         }
         errors++;
       }
@@ -4719,22 +4799,22 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
     if (props0 !== true) {
       for (const key25 in data) {
         if (!props0 || !props0[key25]) {
-          const err345 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key25 }, message: "must NOT have unevaluated properties" };
+          const err353 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key25 }, message: "must NOT have unevaluated properties" };
           if (vErrors === null) {
-            vErrors = [err345];
+            vErrors = [err353];
           } else {
-            vErrors.push(err345);
+            vErrors.push(err353);
           }
           errors++;
         }
       }
     }
   } else {
-    const err346 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+    const err354 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
     if (vErrors === null) {
-      vErrors = [err346];
+      vErrors = [err354];
     } else {
-      vErrors.push(err346);
+      vErrors.push(err354);
     }
     errors++;
   }
