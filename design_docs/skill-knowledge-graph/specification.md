@@ -544,8 +544,11 @@ canonical graph hash v1 使用以下规范：
    `result_graph_sha256`；`base_graph_sha256`、`parent_change`、scope、operations 与 evidence 仍纳入该 digest。
    genesis 没有 head 时使用显式 `null`。这样 result hash 绑定 ledger 内容但不存在固定点计算。
 3. 排除 generated router/nav、source map、dist、绝对路径、mtime/时间戳与诊断展示字段。
-4. object key 按 Unicode code point 升序；作为 identity set 的数组按 entity ID 升序；`operations`、
-   procedure order、`when/avoid_when` 等有语义顺序的数组保留 authored order。
+4. object key 按 Unicode code point 升序；contract 声明的 identity-set 数组（`skills` /
+   `modules` / `points` / `edges` / `entries` / `canonical_source_inventory` 等，见
+   `hardening_contract.C6.identity_set_fields`）按稳定 entity ID（inventory 条目按 `path`）升序；
+   `operations`、procedure order、`when/avoid_when` 等语义顺序数组（见
+   `C6.semantic_order_fields`）保留 authored order，不得排序。
 5. 序列化为无额外空白的 UTF-8 JSON，随后计算 lowercase hexadecimal SHA-256。
 
 算法版本 `cc-master/skill-knowledge-canonical-graph-hash/v1`、span hash 版本

@@ -88,13 +88,14 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.source_json_parse, true);
   assert.equal(body.capabilities.source_envelope_validation, true);
   assert.equal(body.capabilities.global_id_uniqueness, true);
-  assert.equal(body.capabilities.full_json_schema_validation, false);
+  assert.equal(body.capabilities.full_json_schema_validation, true);
+  assert.equal(body.capabilities.markdown_binding, true);
   assert.equal(body.capabilities.graph_invariants, false);
   assert.equal(body.capabilities.entry_surface_binding, false);
-  assert.equal(body.capabilities.canonical_source_inventory, false);
+  assert.equal(body.capabilities.canonical_source_inventory, true);
   assert.equal(body.capabilities.derived_freshness, false);
-  assert.equal(body.capabilities.canonical_graph_hash, false);
-  assert.equal(body.capabilities.deterministic_budget_estimator, false);
+  assert.equal(body.capabilities.canonical_graph_hash, true);
+  assert.equal(body.capabilities.deterministic_budget_estimator, true);
   assert.equal(body.capabilities.host_portability_probe, false);
   assert.equal(body.capabilities.semantic_coverage, false);
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
@@ -109,6 +110,10 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.deepEqual(body.hardening_contract.C6.change_head_digest_excludes, [
     'result_graph_sha256',
   ]);
+  assert.ok(body.hardening_contract.C6.identity_set_fields.includes('points'));
+  assert.ok(body.hardening_contract.C6.identity_set_fields.includes('canonical_source_inventory'));
+  assert.ok(body.hardening_contract.C6.semantic_order_fields.includes('operations'));
+  assert.ok(body.hardening_contract.C6.semantic_order_fields.includes('recognition_cues'));
   assert.deepEqual(body.hardening_contract.C9.hosts, [
     'claude-code',
     'codex',
@@ -119,7 +124,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.hardening_contract.C14.governance_meta_skill_is_runtime, false);
 });
 
-test('SKG-CLI-02: K0 check reports empty inventory and unavailable validator as debt, not success theatre', () => {
+test('SKG-CLI-02: K0 check reports empty inventory debt once validators are available', () => {
   const result = runCli(['check', '--stage', 'K0', '--json']);
   assert.equal(result.status, 0, result.stderr);
   const body = parseJson(result);
@@ -132,10 +137,11 @@ test('SKG-CLI-02: K0 check reports empty inventory and unavailable validator as 
   assert.equal(body.source_root, 'plugin/src/knowledge');
   assert.equal(body.summary.documents, 0);
   assert.equal(body.summary.errors, 0);
-  assert.equal(body.summary.debts, 2);
+  assert.equal(body.summary.debts, 1);
+  assert.equal(body.capabilities.full_json_schema_validation, true);
   assert.deepEqual(
     body.diagnostics.map((diagnostic) => diagnostic.code).sort(),
-    ['SKG-COVERAGE-EMPTY', 'SKG-SCHEMA-VALIDATOR-UNAVAILABLE'],
+    ['SKG-COVERAGE-EMPTY'],
   );
 });
 
@@ -185,7 +191,7 @@ test('SKG-CLI-05: K1 turns empty coverage into a hard failure', () =>
     assert.equal(body.diagnostics[0].severity, 'error');
   }));
 
-test('SKG-CLI-06: K1 with source fails loud while full schema validation is unavailable', () =>
+test('SKG-CLI-06: K1 with envelope-only source fails full schema validation loudly', () =>
   withTempSource((sourceRoot) => {
     const source = {
       schema_version: 'cc-master/skill-knowledge-source/v1alpha1',
@@ -194,13 +200,13 @@ test('SKG-CLI-06: K1 with source fails loud while full schema validation is unav
     };
     fs.writeFileSync(path.join(sourceRoot, 'portfolio.json'), `${JSON.stringify(source)}\n`);
     const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-    assert.equal(result.status, 10);
+    assert.equal(result.status, 3);
     const body = parseJson(result);
 
     assert.equal(body.ok, false);
     assert.equal(
       body.diagnostics.find((diagnostic) => diagnostic.severity === 'error').code,
-      'SKG-SCHEMA-VALIDATOR-UNAVAILABLE',
+      'SKG-SCHEMA-INVALID',
     );
   }));
 

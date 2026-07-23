@@ -1,0 +1,14 @@
+{
+  "algorithm": "cc-master/skill-knowledge-schema-fingerprint/v1",
+  "schemas": {
+    "knowledge-source.schema.json": "6920e0532d209ff63d96e0ca824f06c5a5e8a343714a824c3b62d5810a557f3d",
+    "knowledge-change.schema.json": "5838ebe14ada2356843728b457a886c3dbbdcce34052bc5132a67a4b74a16928",
+    "knowledge-cli-output.schema.json": "54d8335ee32e75c479791db9060a623edf433ffe3db4b4fdac814edeb0b6a973"
+  },
+  "fingerprint": "20f5e6ea7de070c8e19f2c1c6ccc16feefab2dbc3c960e5da333433769af6236",
+  "bundles": {
+    "validate-source.cjs": "a29e335f3d07a4756dc66bf43dca313c13770514bc80f6bf05e838477e31cf8b",
+    "validate-change.cjs": "9e97d22c56525f61d8bb01b98c5c277a56fa76cc23baa4dd7da25c5eff99337b",
+    "validate-output.cjs": "bb7fd6c68823c4f84f663a08800863ed7dd516deeb6cca2b373c287d293c1d90"
+  }
+}
