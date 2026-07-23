@@ -337,8 +337,8 @@ async function invokeRun(input: {
   }
 }
 
-test('registry freezes one raw worker namespace with help and run', () => {
-  assert.deepEqual(Object.keys(REGISTRY.worker ?? {}).sort(), ['help', 'run']);
+test('registry preserves raw help/run and adds tracked dispatch without changing raw contracts', () => {
+  assert.deepEqual(Object.keys(REGISTRY.worker ?? {}).sort(), ['dispatch', 'help', 'run']);
   assert.deepEqual(REGISTRY.worker?.help?.options.harness?.enum, [
     'codex',
     'claude-code',
@@ -352,6 +352,8 @@ test('registry freezes one raw worker namespace with help and run', () => {
   assert.equal(REGISTRY.worker?.run?.options.cwd?.required, false);
   assert.match(REGISTRY.worker?.run?.options['timeout-ms']?.desc ?? '', /50\.\.7200000/u);
   assert.equal(REGISTRY.dispatch, undefined);
+  assert.equal(REGISTRY.worker?.dispatch?.options['idempotency-key']?.required, true);
+  assert.equal(REGISTRY.worker?.dispatch?.options.task?.required, true);
 });
 
 test('worker help defaults to agent scope and root scope launches executable help', async () => {

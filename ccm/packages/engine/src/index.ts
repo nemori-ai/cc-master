@@ -540,6 +540,30 @@ export {
   settingsPath as statuslineSettingsPath,
   uninstallStatusline,
 } from './statusline/index.js';
+export type {
+  AttachCapability,
+  AttachInstruction,
+  CapabilityResult,
+  DispatchPhase,
+  RuntimeHandleRecord,
+  TrackedAgentRecord,
+  TrackedDispatchCapabilities,
+  TrackedDispatchErrorCode,
+  TrackedDispatchMetadata,
+  TranscriptRef,
+  WorkerTerminalFact,
+} from './tracked-dispatch.js';
+export {
+  BoardIdentity,
+  BoardWriteAuthority,
+  DispatchKey,
+  RuntimeHandle,
+  sessionAttachInstruction,
+  TaskRef,
+  TRACKED_DISPATCH_METADATA_SCHEMA,
+  TrackedDispatch,
+  TrackedDispatchError,
+} from './tracked-dispatch.js';
 // ── usage/（ADR-015 配速 + 历史语料·plan §7）──────────────────────────────────────────────────────
 // 历史语料 loader（home 跨板·多层收缩·recency）
 export type {

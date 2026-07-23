@@ -20,7 +20,7 @@ const model = { ENUMS, FIELDS, TIERS };
 // ── 覆盖全部 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers·0.10.0 加 statusline·加 upgrade 自升级·harness inventory·ADR-029 加 web-viewer）──────
 const EXPECTED: Record<string, string[]> = {
   capability: ['check', 'list', 'negotiate'],
-  worker: ['help', 'run'],
+  worker: ['dispatch', 'help', 'run'],
   provider: ['facts', 'inspect'],
   'model-policy': ['show', 'advise'],
   orchestrator: ['context'],

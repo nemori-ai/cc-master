@@ -14,13 +14,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import * as webViewer from '../src/handlers/web-viewer.js';
+import {
+  harnessId,
+  type WorkerExecutionDirectory,
+  type WorkerExecutionFace,
+} from '../src/harnesses/capability-model.js';
 import { readVersion } from '../src/help.js';
 import * as io from '../src/io.js';
+import type { ProviderRuntime } from '../src/provider-runtime.js';
 import { run } from '../src/router.js';
 import {
   __resetWebViewerAppDistTestHooks,
   __setWebViewerAppDistTestHooks,
 } from '../src/web-viewer-app-dist.js';
+import type { WorkerProcessRequest, WorkerProcessResult } from '../src/worker-process.js';
 
 const EXIT = io.EXIT;
 const SID = 'wv-test-session';
@@ -165,6 +172,88 @@ function httpText(args: {
     req.on('error', reject);
     req.end();
   });
+}
+
+async function dispatchTrackedFixture(input: {
+  home: string;
+  boardPath: string;
+  harness: 'codex' | 'claude-code' | 'cursor-agent' | 'kimi-code';
+  task: string;
+  key: string;
+  pid: number;
+  providerArgv: string[];
+  identityLine?: string;
+  transcript?: string;
+  env?: Record<string, string | undefined>;
+}): Promise<Record<string, unknown>> {
+  const face: WorkerExecutionFace = {
+    executionModes: ['headless-cli'],
+    async execute(request: WorkerProcessRequest, observer): Promise<WorkerProcessResult> {
+      observer?.onStarted?.({ pid: input.pid });
+      if (input.identityLine) observer?.onStdoutText?.(`${input.identityLine}\n`);
+      return {
+        schema: 'ccm/worker-process-result/v1',
+        harness: request.descriptor.harness,
+        executable: `/fixture/${request.descriptor.harness}`,
+        argv: [...request.providerArgv],
+        cwd: request.cwd,
+        state: 'exited',
+        exit_code: 0,
+        signal: null,
+        stdout: input.identityLine ? `${input.identityLine}\n` : '',
+        stderr: '',
+        stdout_bytes: Buffer.byteLength(input.identityLine ?? ''),
+        stderr_bytes: 0,
+        truncated: { stdout: false, stderr: false },
+        timed_out: false,
+        cancelled: false,
+        reaped: true,
+        duration_ms: 5,
+        cleanup: { temporary_resources_removed: true },
+        error: null,
+      };
+    },
+  };
+  const binding = { harnessId: harnessId(input.harness), face };
+  const directory: WorkerExecutionDirectory = {
+    candidatesFor: (mode) => (mode === 'headless-cli' ? [binding] : []),
+    forHarness: (candidate, mode) =>
+      candidate === input.harness && mode === 'headless-cli' ? binding : undefined,
+  };
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const args = [
+    'worker',
+    'dispatch',
+    '--board',
+    input.boardPath,
+    '--harness',
+    input.harness,
+    '--task',
+    input.task,
+    '--idempotency-key',
+    input.key,
+    '--intent',
+    `viewer fixture ${input.harness}`,
+    '--cwd',
+    join(input.home, '..'),
+    ...(input.transcript ? ['--transcript', input.transcript] : []),
+    '--',
+    ...input.providerArgv,
+  ];
+  const code = await run(args, {
+    env: {
+      HOME: join(input.home, '..'),
+      CC_MASTER_HOME: input.home,
+      ...input.env,
+    },
+    out: (text) => stdout.push(text),
+    err: (text) => stderr.push(text),
+    providerRuntime: {} as ProviderRuntime,
+    workerExecutionDirectory: directory,
+  });
+  assert.equal(code, EXIT.OK, `${input.harness}: ${stderr.join('')}`);
+  return JSON.parse(stdout.join('')) as Record<string, unknown>;
 }
 
 test('router exposes web-viewer namespace and status --json reports stopped without a service', () => {
@@ -2545,6 +2634,196 @@ test('serve merges resolvable attempt.agent_ref into node agent_refs; run-store 
     await httpJson({ port, path: '/_ccm/shutdown', token: 'ar-token', method: 'POST' }).catch(
       () => {},
     );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('tracked worker dispatch projects every harness into viewer joins and archived streams', async () => {
+  const home = mkHome();
+  const workspace = join(home, '..');
+  const tasks: Array<{ id: string; title: string; status: string; deps: string[] }> = [
+    { id: 'CLAUDE', title: 'Claude tracked stream', status: 'ready', deps: [] },
+    { id: 'CODEX', title: 'Codex tracked stream', status: 'ready', deps: [] },
+    { id: 'KIMI', title: 'Kimi tracked stream', status: 'ready', deps: [] },
+    { id: 'CURSOR-RAW', title: 'Cursor external raw stream', status: 'ready', deps: [] },
+    { id: 'CURSOR-NONE', title: 'Cursor honest no-stream', status: 'ready', deps: [] },
+  ];
+  const boardPath = seedBoard(home, { tasks });
+
+  const claudeConfig = join(workspace, 'claude-config');
+  const claudeSid = 'claude-session-viewer-175';
+  const claudeTranscript = join(claudeConfig, 'projects', 'fixture-slug', `${claudeSid}.jsonl`);
+  mkdirSync(join(claudeTranscript, '..'), { recursive: true });
+  writeFileSync(
+    claudeTranscript,
+    '{"type":"assistant","timestamp":"2026-07-22T09:00:00Z","message":{"role":"assistant","content":"claude archived answer"}}\n',
+  );
+
+  const codexHome = join(workspace, 'codex-home');
+  const codexSid = 'thr-viewer-175';
+  const codexTranscript = join(
+    codexHome,
+    'sessions',
+    '2026',
+    '07',
+    '22',
+    `rollout-fixture-${codexSid}.jsonl`,
+  );
+  mkdirSync(join(codexTranscript, '..'), { recursive: true });
+  writeFileSync(
+    codexTranscript,
+    '{"timestamp":"2026-07-22T09:00:00Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"codex archived answer"}]}}\n',
+  );
+
+  const kimiHome = join(workspace, 'kimi-home');
+  const kimiSid = 'session_viewer_175';
+  const kimiTranscript = join(
+    kimiHome,
+    'sessions',
+    'fixture-workspace',
+    kimiSid,
+    'agents',
+    'main',
+    'wire.jsonl',
+  );
+  mkdirSync(join(kimiTranscript, '..'), { recursive: true });
+  writeFileSync(
+    kimiTranscript,
+    '{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"kimi archived prompt"}],"toolCalls":[]},"time":1784701200000}\n',
+  );
+
+  const cursorEnvTranscript = join(workspace, 'cursor-env.log');
+  const cursorExplicitTranscript = join(workspace, 'cursor-explicit.log');
+  writeFileSync(cursorEnvTranscript, 'cursor env line must lose precedence\n');
+  writeFileSync(cursorExplicitTranscript, 'cursor archived raw line\n');
+
+  await dispatchTrackedFixture({
+    home,
+    boardPath,
+    harness: 'claude-code',
+    task: 'CLAUDE',
+    key: 'viewer-claude',
+    pid: 51_001,
+    providerArgv: [
+      '--print',
+      '--session-id',
+      claudeSid,
+      '--output-format',
+      'stream-json',
+      'fixture',
+    ],
+    identityLine: JSON.stringify({ type: 'result', subtype: 'success', session_id: claudeSid }),
+    env: { CLAUDE_CONFIG_DIR: claudeConfig },
+  });
+  await dispatchTrackedFixture({
+    home,
+    boardPath,
+    harness: 'codex',
+    task: 'CODEX',
+    key: 'viewer-codex',
+    pid: 51_002,
+    providerArgv: ['exec', '--json', 'fixture'],
+    identityLine: JSON.stringify({ type: 'thread.started', thread_id: codexSid }),
+    env: { CODEX_HOME: codexHome },
+  });
+  await dispatchTrackedFixture({
+    home,
+    boardPath,
+    harness: 'kimi-code',
+    task: 'KIMI',
+    key: 'viewer-kimi',
+    pid: 51_003,
+    providerArgv: ['-p', 'fixture', '--output-format', 'stream-json'],
+    identityLine: JSON.stringify({
+      role: 'meta',
+      type: 'session.resume_hint',
+      session_id: kimiSid,
+    }),
+    env: { KIMI_CODE_HOME: kimiHome },
+  });
+  await dispatchTrackedFixture({
+    home,
+    boardPath,
+    harness: 'cursor-agent',
+    task: 'CURSOR-RAW',
+    key: 'viewer-cursor-raw',
+    pid: 51_004,
+    providerArgv: ['--print', 'fixture'],
+    transcript: cursorExplicitTranscript,
+    env: { CURSOR_TRANSCRIPT_PATH: cursorEnvTranscript },
+  });
+  await dispatchTrackedFixture({
+    home,
+    boardPath,
+    harness: 'cursor-agent',
+    task: 'CURSOR-NONE',
+    key: 'viewer-cursor-none',
+    pid: 51_005,
+    providerArgv: ['--print', 'fixture'],
+  });
+
+  const { statePath } = writeServeState(home, 'wv_tracked_streams', 'tracked-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    const vm = await httpJson({ port, path: '/view-model.json', token: 'tracked-token' });
+    assert.equal(vm.status, 200);
+    assert.equal(vm.body.agents.length, 5);
+    assert.deepEqual(
+      new Set(vm.body.agents.map((agent: { harness: string }) => agent.harness)),
+      new Set(['claude-code', 'codex', 'kimi-code', 'cursor-agent']),
+    );
+    assert.ok(
+      vm.body.agents.every((agent: { state: string }) => agent.state === 'terminal'),
+      'running→terminal keeps every tracked agent in the archived roster',
+    );
+
+    const agentsByTask = new Map<string, string>();
+    for (const node of vm.body.graph.nodes as Array<{ id: string; agent_refs: string[] }>) {
+      if (node.agent_refs.length === 1) agentsByTask.set(node.id, node.agent_refs[0] as string);
+    }
+    for (const task of tasks) {
+      assert.ok(agentsByTask.has(task.id), `${task.id}: node.agent_refs preserves attribution`);
+      const detail = await httpJson({
+        port,
+        path: `/agent.json?agent=${agentsByTask.get(task.id)}`,
+        token: 'tracked-token',
+      });
+      assert.equal(detail.status, 200, task.id);
+      assert.equal(detail.body.linked_tasks[0].task_id, task.id);
+      assert.equal(detail.body.agent.lifecycle.state, 'terminal');
+    }
+
+    const expectedStreams = new Map([
+      ['CLAUDE', { kind: 'transcript', event: 'assistant', text: 'claude archived answer' }],
+      ['CODEX', { kind: 'transcript', event: 'assistant', text: 'codex archived answer' }],
+      ['KIMI', { kind: 'transcript', event: 'user', text: 'kimi archived prompt' }],
+      ['CURSOR-RAW', { kind: 'transcript', event: 'raw', text: 'cursor archived raw line' }],
+      ['CURSOR-NONE', { kind: 'none', event: null, text: null }],
+    ]);
+    for (const [taskIdValue, expected] of expectedStreams) {
+      const stream = await httpJson({
+        port,
+        path: `/agent-stream.json?agent=${agentsByTask.get(taskIdValue)}`,
+        token: 'tracked-token',
+      });
+      assert.equal(stream.status, 200, taskIdValue);
+      assert.equal(stream.body.source.kind, expected.kind, taskIdValue);
+      if (expected.event) {
+        assert.equal(stream.body.events[0].kind, expected.event, taskIdValue);
+        assert.equal(stream.body.events[0].text, expected.text, taskIdValue);
+      } else {
+        assert.equal(stream.body.mode, 'none', taskIdValue);
+        assert.ok(stream.body.source.reason, taskIdValue);
+        assert.deepEqual(stream.body.events, [], taskIdValue);
+      }
+    }
+  } finally {
+    await httpJson({
+      port,
+      path: '/_ccm/shutdown',
+      token: 'tracked-token',
+      method: 'POST',
+    }).catch(() => {});
   }
   assert.equal(await servePromise, EXIT.OK);
 });

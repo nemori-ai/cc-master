@@ -46,7 +46,7 @@ test('M5 anti-fork gate: quota catalog and collector routing have no parallel ta
   assert.match(usageReading, /findMachineQuotaReading\([\s\S]{0,300}machineQuota/);
 });
 
-test('M5 composition gate: #188 owns executable harness worker capabilities', () => {
+test('M5 composition gate: #188 owns executable harness capabilities and #175 consumes its port', () => {
   for (const module of BUILT_IN_HARNESS_MODULES) {
     assert.deepEqual(Object.keys(module.capabilities).sort(), [
       'account-management',
@@ -74,4 +74,24 @@ test('M5 composition gate: #188 owns executable harness worker capabilities', ()
   assert.match(model, /interface\s+WorkerExecutionFace\b/);
   assert.doesNotMatch(model, /boardRepo|board\.owner|dispatch_state|worker_state/);
   assert.doesNotMatch(source('worker-process.ts'), /interface\s+WorkerExecutionFace\b/);
+  assert.match(
+    source('tracked-worker-dispatcher.ts'),
+    /from\s+'\.\/harnesses\/capability-model\.js'/,
+  );
+  assert.doesNotMatch(source('handlers/worker.ts'), /rawWorkerExecutionFace/);
+  assert.match(source('handlers/worker.ts'), /workerExecutionDirectory/);
+  assert.match(source('handlers/worker.ts'), /runWorkerProcess/);
+});
+
+test('tracked dispatch and viewer share the existing transcript locator and stream builder', () => {
+  const identity = source('worker-identity.ts');
+  const dispatcher = source('tracked-worker-dispatcher.ts');
+  const viewer = source('handlers/web-viewer.ts');
+
+  assert.match(identity, /import\s+\{\s*locateTranscriptFile\s*\}\s+from\s+'\.\/agent-probe\.js'/);
+  assert.match(identity, /locateTranscriptFile\(/);
+  assert.doesNotMatch(identity, /buildAgentStream/);
+  assert.doesNotMatch(dispatcher, /locateTranscriptFile|buildAgentStream/);
+  assert.match(viewer, /import\s+\{\s*AGENT_STREAM_SCHEMA,\s*buildAgentStream\s*\}/);
+  assert.match(viewer, /buildAgentStream\(/);
 });

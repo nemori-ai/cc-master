@@ -1274,7 +1274,162 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
 //   ④ type/harness ∈ 闭合枚举；⑤ handle.kind / lifecycle.state / probe.observed / probe.method ∈ 闭合枚举
 //   （present 才校验）；⑥ intent 为字符串；⑦ 时间锚（launch.created_at / lifecycle.registered_at·ended_at /
 //   probe.last_probe_at·as_of）若存在须严格 ISO；⑧ links[] 若存在须是数组、每条 {task_id:非空字符串}；
-//   ⑨ account_ref / quota_pool_ref 若存在须为 null 或字符串（只存 ref 不存数值·预留位）。
+//   ⑨ account_ref / quota_pool_ref 若存在须为 null 或字符串（只存 ref 不存数值·预留位）；
+//   ⑩ dispatch（若存在）须满足 tracked-dispatch v1 的状态/evidence/capability 形状。
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function isAbsolutePortablePath(value: unknown): value is string {
+  return isNonEmptyString(value) && (value.startsWith('/') || /^[A-Za-z]:[\\/]/u.test(value));
+}
+
+function lintDispatchCapability(
+  capability: unknown,
+  kind: 'identity' | 'transcript' | 'attach',
+  label: string,
+  emit: Emit,
+): void {
+  if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
+    emit('FMT-AGENTS', `${label}.${kind} 必须是 typed capability result 对象。`);
+    return;
+  }
+  const result = capability as Record<string, unknown>;
+  if (!['supported', 'unsupported', 'unavailable'].includes(String(result.status))) {
+    emit(
+      'FMT-AGENTS',
+      `${label}.${kind}.status 应 ∈ {supported, unsupported, unavailable}（当前：${JSON.stringify(result.status)}）。`,
+    );
+    return;
+  }
+  if (result.status !== 'supported') {
+    if (!isNonEmptyString(result.reason)) {
+      emit(
+        'FMT-AGENTS',
+        `${label}.${kind}.${String(result.status)} 必须带非空 reason，不能用空串冒充能力。`,
+      );
+    }
+    return;
+  }
+  if (!result.value || typeof result.value !== 'object' || Array.isArray(result.value)) {
+    emit('FMT-AGENTS', `${label}.${kind}.supported 必须带合法 value。`);
+    return;
+  }
+  const value = result.value as Record<string, unknown>;
+  if (kind === 'identity') {
+    if (value.kind !== 'session-id' || !isNonEmptyString(value.value)) {
+      emit('FMT-AGENTS', `${label}.identity.value 必须是非空 session-id。`);
+    }
+  } else if (kind === 'transcript') {
+    if (!isAbsolutePortablePath(value.path)) {
+      emit('FMT-AGENTS', `${label}.transcript.value.path 必须是非空绝对路径。`);
+    }
+  } else {
+    if (value.kind !== 'session-resume' || Object.keys(value).length !== 1) {
+      emit(
+        'FMT-AGENTS',
+        `${label}.attach.value 只能持久化 {kind:"session-resume"}；exact argv 只属于临时 CLI receipt。`,
+      );
+    }
+  }
+}
+
+function lintTrackedDispatch(dispatch: unknown, label: string, emit: Emit): void {
+  if (!dispatch || typeof dispatch !== 'object' || Array.isArray(dispatch)) {
+    emit('FMT-AGENTS', `${label}.dispatch 若存在须为对象。`);
+    return;
+  }
+  const d = dispatch as Record<string, unknown>;
+  if (d.schema !== 'ccm/tracked-dispatch-metadata/v1') {
+    emit('FMT-AGENTS', `${label}.dispatch.schema 必须是 ccm/tracked-dispatch-metadata/v1。`);
+  }
+  if (!isNonEmptyString(d.key) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(d.key)) {
+    emit('FMT-AGENTS', `${label}.dispatch.key 必须是合法的显式幂等键。`);
+  }
+  if (typeof d.request_digest !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(d.request_digest)) {
+    emit('FMT-AGENTS', `${label}.dispatch.request_digest 必须是 sha256:<64 hex>。`);
+  }
+  const phases = [
+    'prepared',
+    'launch-claimed',
+    'bound',
+    'closing',
+    'closed',
+    'reconciliation-required',
+  ];
+  if (!phases.includes(String(d.phase))) {
+    emit('FMT-AGENTS', `${label}.dispatch.phase 非法（当前：${JSON.stringify(d.phase)}）。`);
+  }
+  if (!isNonEmptyString(d.task_id)) {
+    emit('FMT-AGENTS', `${label}.dispatch.task_id 必须是非空字符串。`);
+  }
+  if (
+    d.runtime_pid !== undefined &&
+    (!Number.isSafeInteger(d.runtime_pid) || Number(d.runtime_pid) <= 0)
+  ) {
+    emit('FMT-AGENTS', `${label}.dispatch.runtime_pid 若存在须为正整数。`);
+  }
+  if (d.claim !== undefined) {
+    if (!d.claim || typeof d.claim !== 'object' || Array.isArray(d.claim)) {
+      emit('FMT-AGENTS', `${label}.dispatch.claim 若存在须为对象。`);
+    } else {
+      const claim = d.claim as Record<string, unknown>;
+      if (!isNonEmptyString(claim.token))
+        emit('FMT-AGENTS', `${label}.dispatch.claim.token 必须非空。`);
+      if (badTimestamp(claim.claimed_at))
+        emit('FMT-AGENTS', `${label}.dispatch.claim.claimed_at 必须是严格 ISO UTC。`);
+      if (!Number.isSafeInteger(claim.launcher_pid) || Number(claim.launcher_pid) <= 0) {
+        emit('FMT-AGENTS', `${label}.dispatch.claim.launcher_pid 必须是正整数。`);
+      }
+    }
+  }
+  if (!Array.isArray(d.evidence)) {
+    emit('FMT-AGENTS', `${label}.dispatch.evidence 必须是数组。`);
+  } else {
+    for (let i = 0; i < d.evidence.length; i++) {
+      const raw = d.evidence[i];
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        emit('FMT-AGENTS', `${label}.dispatch.evidence[${i}] 必须是对象。`);
+        continue;
+      }
+      const evidence = raw as Record<string, unknown>;
+      if (!['pid', 'session-id', 'task-id'].includes(String(evidence.kind))) {
+        emit('FMT-AGENTS', `${label}.dispatch.evidence[${i}].kind 非法。`);
+      }
+      if (!isNonEmptyString(evidence.value) || !isNonEmptyString(evidence.source)) {
+        emit('FMT-AGENTS', `${label}.dispatch.evidence[${i}] 的 value/source 必须非空。`);
+      }
+      if (badTimestamp(evidence.captured_at)) {
+        emit('FMT-AGENTS', `${label}.dispatch.evidence[${i}].captured_at 必须是严格 ISO UTC。`);
+      }
+    }
+  }
+  if (!d.capabilities || typeof d.capabilities !== 'object' || Array.isArray(d.capabilities)) {
+    emit('FMT-AGENTS', `${label}.dispatch.capabilities 必须是对象。`);
+  } else {
+    const caps = d.capabilities as Record<string, unknown>;
+    lintDispatchCapability(caps.identity, 'identity', `${label}.dispatch.capabilities`, emit);
+    lintDispatchCapability(caps.transcript, 'transcript', `${label}.dispatch.capabilities`, emit);
+    lintDispatchCapability(caps.attach, 'attach', `${label}.dispatch.capabilities`, emit);
+  }
+  if (typeof d.reconciliation_required !== 'boolean') {
+    emit('FMT-AGENTS', `${label}.dispatch.reconciliation_required 必须是 boolean。`);
+  }
+  if (d.reconciliation_required === true && !isNonEmptyString(d.reconciliation_reason)) {
+    emit('FMT-AGENTS', `${label}.dispatch.reconciliation_reason 在需对账时必须非空。`);
+  }
+  if (d.terminal !== undefined) {
+    if (!d.terminal || typeof d.terminal !== 'object' || Array.isArray(d.terminal)) {
+      emit('FMT-AGENTS', `${label}.dispatch.terminal 若存在须为对象。`);
+    } else {
+      const terminal = d.terminal as Record<string, unknown>;
+      if (!isNonEmptyString(terminal.state) || badTimestamp(terminal.observed_at)) {
+        emit('FMT-AGENTS', `${label}.dispatch.terminal 须含非空 state 与严格 ISO observed_at。`);
+      }
+    }
+  }
+}
+
 function lintAgents(board: BoardLike, emit: Emit): void {
   const ag = board.agents;
   if (ag === undefined || ag === null) return;
@@ -1454,6 +1609,7 @@ function lintAgents(board: BoardLike, emit: Emit): void {
         );
       }
     }
+    if (a.dispatch !== undefined) lintTrackedDispatch(a.dispatch, label, emit);
   }
 }
 

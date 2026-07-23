@@ -13,9 +13,10 @@
   - [Exit codes](#exit-codes)
   - [JSON 信封](#json-信封)
 - [跨 harness 主动查询目标事实](#跨-harness-主动查询目标事实)
-- [namespace worker（session-bound raw wrapper MVP）](#namespace-workersession-bound-raw-wrapper-mvp)
+- [namespace worker（raw transport + tracked dispatch）](#namespace-workerraw-transport--tracked-dispatch)
   - [worker help](#worker-help)
   - [worker run](#worker-run)
+  - [worker dispatch](#worker-dispatch)
 - [namespace model-policy（统一模型角色与排序 advisory）](#namespace-model-policy统一模型角色与排序-advisory)
   - [model-policy show](#model-policy-show)
   - [model-policy advise](#model-policy-advise)
@@ -207,7 +208,7 @@ ccm <alias> [args] [flags]
 
 | ns | 职责 |
 |---|---|
-| `worker` | 查看 resolver 选中的真实 agent-command help，或显式启动一次四 harness session-bound raw wrapper |
+| `worker` | 查看真实 agent-command help；`run` 是无 board 副作用的同步 raw transport，`dispatch` 是只写 `agents[]` 的同步 tracked transport |
 | `provider` | 模型事实 snapshot 查询与 provider candidate 检查；facts 零 live probe，inspect 另走准入门 |
 | `model-policy` | 四 provider 共用的模型角色 / provider 事实 / 社区 affinity 分层视图，以及对已 qualification 候选的纯排序 advisory |
 | `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
@@ -312,7 +313,7 @@ ccm <alias> [args] [flags]
 
 ## 跨 harness 主动查询目标事实
 
-这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → 经 origin 后台机制显式 raw dispatch → 记真实后台 handle**；其中没有一步会自动替 orchestrator 启动 worker。
+这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → orchestrator 显式选择 raw transport 或 tracked transport**。事实查询与 advice 都不会启动 worker；只有调用者明确执行 `worker run|dispatch` 才会启动。
 
 ### 1. 发现与目标事实
 
@@ -347,7 +348,7 @@ ccm quota preflight --input <json|@file|-> --json
   字段如何解释查 [pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md)；是否派发归
   `master-orchestrator-guide`。
 
-### 2. advise 与显式 raw dispatch
+### 2. advise 与显式 dispatch
 
 若 task 已有 planning/routing policy 且拿到了匹配 board revision 的 frozen context，可先跑：
 
@@ -357,17 +358,20 @@ ccm route advise <task-id> --context <json|@file|-> --origin <origin-harness> --
 
 它永远是 pure shadow advice：输出固定 `spawned:false`，不 reserve、不建 attempt、不写 board。no-route / unknown / stale 不是“请自行猜一个候选”，而是 fail closed；即使得到 selected candidate，也仍须由 orchestrator 显式决定是否派发。
 
-真正的最小 dispatch 是：让 **origin harness 自己的后台 terminal / Shell 机制**启动下列同步 raw wrapper，并保存 origin 机制立即返回的 job/session/process handle：
+只要无 board side effect 的原始同步 transport 时，用 `worker run`。若需要 ccm 原子跟踪真实 PID、agent-side task link、可证 session 身份和 terminal，用 `worker dispatch`：
 
 ```bash
 ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> --cwd /abs/repo -- <按 worker help 组装的完整 provider argv...>
+ccm worker dispatch --board /abs/run.board.json --harness <codex|claude-code|cursor-agent|kimi-code> --task <task-id> --idempotency-key <key> --intent <safe-summary> --cwd /abs/repo [--transcript /abs/worker.log] -- <完整 provider argv...>
 ```
 
-`worker run` 逐项透传 argv/stdin/cwd，管理 child 到 terminal，但它本身同步等待、不会返回 running handle、不会 route/fallback/选模型/切号，也不会自动写 board。**可 recon 的后台 handle 来自 origin harness 的后台机制；最终的 `ccm/worker-process-result/v1` terminal envelope 不是 running handle。**先真派发并拿到该 handle；若 board 已 opt in routing contract、selection evidence 也满足专属 gate，再用 `task route-bind` 原子记 selection/attempt/handle。只用 legacy lifecycle 时按既有 handle/status 记账，不为追求字段完整而伪造 selection。**记 task handle 只是 task/attempt 一侧的账**——同一次跨 harness 派发还要按**凡派发皆登记**把这个 runtime worker 登进本板 `agents[]` 花名册：`ccm agent create` → 拿到真实 handle 后 `bind` → `link <id> --task <task-id>`，让花名册 / viewer / resume 后的自己都看得见谁在跑（命令面见本文 [namespace agent](#namespace-agentagent-registry登记探测读取)，字段取值与它同 task `executor` 的分层见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)）。
+两者都逐项透传 argv/stdin/cwd、同步监督 child 到 terminal，且都不会 route/fallback/选模型/切号。区别只在跟踪边界：`run` 永远不写 board；`dispatch` 只在 `agents[]` 建 tracked aggregate，绝不改 task status/handle/routing attempt/acceptance。若 board 已 opt in routing contract，`dispatch` 也不会替你调用 `task route-bind` 或生成 selection evidence；父 task 的路由、状态与验收仍走原专属 gate。
+
+若选择 `worker run` 承载长时 worker，**后台 handle 来自 origin harness**：必须由 origin harness 的后台 terminal / Shell 机制包住它，`worker run` 自己**不会返回 running handle**。其 `ccm/worker-process-result/v1` 只是 terminal 结果，**不是 running handle**。`worker dispatch` 同样是同步 supervision，不会伪装 detach；需要外层异步时仍由 origin 机制持有后台 job，但 board 中 tracked runtime handle 来自实际 child PID / 已证 session identity，不是该外层 job。
 
 ---
 
-## namespace worker（session-bound raw wrapper MVP）
+## namespace worker（raw transport + tracked dispatch）
 
 ### worker help
 
@@ -419,6 +423,23 @@ ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path
 - 命令同步等待 child terminal，并管理 timeout、cancel、输出上限与自己创建的 process tree；它不跨
   parent exit、handoff 或 ccm update 存活。launcher 关闭后若留下一个短命的 owned helper（cursor-agent 曾见），会给它一个宽裕的 reap 窗口自然退出并保留完整 transcript。Cursor 若只剩已识别的持久 service tree——已解析版本目录下精确的 `node index.js worker-server`，可带 Cursor 为它启动且严格绑定当前 home npm cache 的 `typescript-language-server --stdio` 服务链——则把这些 provider service 排除出本次 request ownership；worker-server 缺席、进程枚举失败、空快照、混有任一其它成员或任一非上述签名的存活树都继续 fail-closed（TERM→KILL + `owned_tree_survived`）。该 reap 窗口默认 5000 ms，可用环境变量 `CCM_WORKER_REAP_TIMEOUT_MS`（100..60000）在慢机器上放宽。
 - 要把它用于长时后台 worker，必须由 origin harness 的后台 terminal / Shell 机制包住本命令；可 recon handle 是该 origin 机制返回的 job/session/process handle。最终 `ccm/worker-process-result/v1` 是 terminal 结果，不是 running handle，也不能倒推出 provider task acceptance。
+
+### worker dispatch
+
+```text
+ccm worker dispatch [--board <path>] --harness <codex|claude-code|cursor-agent|kimi-code> --task <task-id> --idempotency-key <key> --intent <safe-summary> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] [--transcript <absolute-path>] -- <provider argv...>
+```
+
+- `dispatch` 复用 `run` 的 provider resolver、argv/stdin/cwd 透传、超时/输出上限和 owned process-tree supervisor，但**不是 detach**：命令同步监督到 terminal 才返回。要让 shell 调用本身后台化，仍由 origin harness 的后台 terminal/Shell 机制承载；ccm 不伪造 durable job。
+- `--task` 必须指向所选 board 的现有 task；它只产生 `agents[].links[]`，**绝不**改 task 的 `status`、`handle`、`routing.attempts` 或 `acceptance`。`--intent` 会持久化，必须是安全、非敏感摘要。
+- `--idempotency-key` 必填。首次调用在 board lock 内 `prepare` 再唯一 `claim`；同 key + 同 request digest 精确 replay，不再 spawn；同 key + 不同 digest 硬冲突。digest 只覆盖非敏感结构：harness/task/canonical cwd/timeout/output ceiling/stdin mode/provider argv 数量；prompt、argv 内容、stdin 与 environment 既不落 board，也不哈希进可持久的 digest。业务幂等语义完全由调用方显式 key 承担；换了语义请求就必须换 key。
+- `--transcript` 可显式登记一个已存在、可读的绝对 transcript 路径；它是有意 board-visible 的只读 stream 证据，也进入 request digest。显式路径优先于 Cursor 的 `CURSOR_TRANSCRIPT_PATH`；两者都复用 agent viewer 既有的 transcript locator，Cursor 以 `raw` 事件 tail。两者都没有或不可读时，Cursor roster/detail 与 task join 仍完整保留，stream 诚实返回 `source.kind="none"`，不伪造 transcript。
+- 状态机是 `prepared → launch-claimed → bound → closing → closed`，异常分支为 `reconciliation-required`。spawn 后只接受运行时返回的真实正 PID；PID evidence、`lifecycle:running` 与 agent-side task link 在同一次 board lock mutation 内落盘。任何“running 但无真实 PID evidence”的记录都会被 aggregate 拒绝。
+- claim 已成功但 PID 尚未绑定时 launcher 崩溃，下一次 replay 只会落 `reconciliation-required / ambiguous-launch`，**绝不自动重发**。PID bind 写失败时 supervisor 会取消并 reap 自己拥有的完整 process tree；live terminal 与已持久化 `closing` replay 的 terminal tracking 都走同一套有界重试 + durable reconciliation fallback，仍失败则 tracking failure 胜过 worker exit 0，且 receipt 只声称最新真正落盘的 phase/reconciliation 状态。
+- 四个 harness 都保证 PID tracking。只在现有实证允许时单调升级身份：Codex 仅在调用方声明 `--json` transport 时从 JSONL `thread.started.thread_id` 升 `session-id`，可定位 `rollout-*-<sid>.jsonl`，attach 为 `codex resume <sid>`；Kimi 仅在 `--output-format stream-json` 时从 `session.resume_hint.session_id` 升级，可定位 `sessions/.../<sid>/agents/main/wire.jsonl`，attach 为 `kimi -S <sid>`；Claude Code 可从显式 `--session-id` 立即取得身份，或仅在 `--output-format json|stream-json` 时从严格的 `type=result / session_id` 信封取得身份，再定位 `projects/.../<sid>.jsonl`，attach 为 `claude --resume <sid>`。它们都不从任意模型文本猜 session id。Exact attach 的 cwd/argv 只在本次 CLI receipt 与聚合校验期间短暂存在；board 只保存 typed `{kind:"session-resume"}` 能力类，不保存 argv。Cursor native identity / SQLite transcript / exact attach 仍为未证实能力；外部 transcript 路径只提供 raw stream，不伪造 Cursor session identity。`unavailable` 明确表示「能力受支持，但本次尚未观察/定位到值」，绝不用空串冒充。
+- capability evidence 使用偏序而非总序：只有 `unavailable ≤ supported(同一 canonical value)`；`supported → unavailable` 保留已落盘 canonical value，重复同值幂等。`unsupported` 是「能力不支持」的负声明，与 `unavailable` / `supported` 都不可比；`unsupported ↔ unavailable`、`unsupported ↔ supported` 一律 `evidence_conflict` 并由 repository 持久化 `reconciliation-required`，不覆盖旧证据。同 session 的不同 transcript 绝对路径或不同 canonical attach cwd/argv 同样冲突；attach 原文完成比较后立即丢弃，仍不落 board。相同 degraded status 的 reason 只是诊断文本，不是证据身份，重复时保留首个 durable reason。
+- board 只持久化安全生命周期事实：key/digest/phase、PID/session evidence、typed capability、terminal exit/signal/error code/reaped。它不持久化 prompt、stdin、secret、environment、完整 provider argv 或 provider output。命令仍以 `ccm/tracked-worker-dispatch-result/v1` 返回本次 worker terminal envelope；exact replay 不可能重放未持久化的 provider output。
+- agent `closed/terminal` 只说明 worker 进程生命周期收口，**不等于 task done，也不证明 parent acceptance**。消费者验收 result/artifact 后，才可经 task 自己的专属命令推进。
 
 ---
 
