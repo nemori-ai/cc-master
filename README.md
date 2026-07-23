@@ -1,12 +1,16 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.21.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.21.0)
-[![ccm](https://img.shields.io/badge/ccm-v0.22.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.22.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.22.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.22.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.23.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.23.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20Kimi-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
-[![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
+[![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-D97706)](LICENSE)
 
 > 中文见 [README_zh.md](README_zh.md)。
+
+> **License:** source-available for noncommercial use only. The public license
+> does not permit reselling this project or using it as a company product or
+> commercial service. See [Licensing](LICENSING.md).
 
 **Give it a big goal — and a budget. Then go do something else.**
 
@@ -123,10 +127,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.22.0 --plugin-version v0.21.0
+  --ccm-version ccm-v0.23.0 --plugin-version v0.22.0
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.22.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.23.0
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -216,4 +220,7 @@ Running several orchestrations at once? Every live board in your home is one cli
 
 Standing on the shoulders of those who came before: [Claude Code](https://code.claude.com/docs/en/workflows) (Anthropic), [claude-code-workflow-creator](https://github.com/ray-amjad/claude-code-workflow-creator), [superpowers](https://github.com/obra/superpowers), [claude-code-workflow-orchestration](https://github.com/barkain/claude-code-workflow-orchestration).
 
-[MIT](LICENSE) © 2026 cc-master contributors
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Commercial use is not permitted by the public license. See the
+[licensing guide](LICENSING.md) and [name and trademark policy](TRADEMARKS.md).
+© 2026 cc-master contributors.

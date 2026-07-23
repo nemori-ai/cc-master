@@ -1,6 +1,6 @@
 {
   "name": "cc-master",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "description": "Turn a kimi-code session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
   "commands": "./commands/",
@@ -10,7 +10,7 @@
   "author": {
     "name": "cc-master contributors"
   },
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "interface": {
     "displayName": "cc-master",
     "shortDescription": "Long-horizon master orchestrator adapter",

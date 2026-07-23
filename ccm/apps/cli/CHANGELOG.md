@@ -1,5 +1,23 @@
 # ccm
 
+## 0.23.0
+
+> **Noncommercial license boundary release** — the first ccm release under
+> PolyForm Noncommercial 1.0.0, paired with cc-master plugin `v0.22.0`.
+
+### Minor Changes
+
+- Establish the first ccm release under PolyForm Noncommercial 1.0.0. `ccm-v0.23.0`
+  is the explicit noncommercial license boundary; ccm `0.22.1` and earlier
+  releases retain the MIT terms shipped with them. This release changes licensing
+  and distribution metadata only, with no board-schema, engine-API, or runtime
+  behavior change.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ccm/engine@0.23.0
+
 ## 0.22.1
 
 > **Accurate cross-harness agent-stream attribution and native-subagent discovery.** This patch release is paired with cc-master plugin `v0.21.1`.

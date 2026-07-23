@@ -1,12 +1,15 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.21.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.21.0)
-[![ccm](https://img.shields.io/badge/ccm-v0.22.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.22.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.22.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.22.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.23.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.23.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20Kimi-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
-[![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
+[![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-D97706)](LICENSE)
 
 > For English, see [README.md](README.md)。
+
+> **许可说明：**本项目源代码可见，但仅授权非商业用途。公共协议不允许重新包装销售，也不允许
+> 把本项目当作公司产品或商业服务使用。详见[许可说明](LICENSING.md)。
 
 **给它一个大目标，和一份预算。然后去忙你自己的。**
 
@@ -123,10 +126,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …或分别 pin 某条线的版本——两个 flag 各自可选、各自独立，
 # 省掉哪个、哪个就解析为本线最新：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.22.0 --plugin-version v0.21.0
+  --ccm-version ccm-v0.23.0 --plugin-version v0.22.0
 
 # 只 pin 一条线、另一条留最新（例如锁住 ccm、插件取最新）：
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.22.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.23.0
 
 # 显式指定 harness，或分发到本机所有已安装且支持的 harness：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -216,4 +219,6 @@ cc-master:as-master-orchestrator <你的目标>
 
 站在先行者的肩膀上：[Claude Code](https://code.claude.com/docs/en/workflows)（Anthropic）、[claude-code-workflow-creator](https://github.com/ray-amjad/claude-code-workflow-creator)、[superpowers](https://github.com/obra/superpowers)、[claude-code-workflow-orchestration](https://github.com/barkain/claude-code-workflow-orchestration)。
 
-[MIT](LICENSE) © 2026 cc-master contributors
+本项目以 [PolyForm Noncommercial License 1.0.0](LICENSE) 提供源代码；公共协议不允许
+商业使用。另见[许可说明](LICENSING.md)和[名称与标识政策](TRADEMARKS.md)。
+© 2026 cc-master contributors。

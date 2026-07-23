@@ -1,5 +1,18 @@
 # @ccm/engine
 
+## 0.23.0
+
+> **Noncommercial license boundary release** — version-locked with the ccm CLI
+> `0.23.0` and paired with cc-master plugin `v0.22.0`.
+
+### Minor Changes
+
+- Establish the first ccm release under PolyForm Noncommercial 1.0.0. `ccm-v0.23.0`
+  is the explicit noncommercial license boundary; ccm `0.22.1` and earlier
+  releases retain the MIT terms shipped with them. This release changes licensing
+  and distribution metadata only, with no board-schema, engine-API, or runtime
+  behavior change.
+
 ## 0.22.1
 
 > Version synchronized with the `ccm` CLI fixed group. This patch changes transcript discovery and Web Viewer diagnostics in the CLI package only; the engine API, board model, and validation semantics are unchanged.

@@ -106,27 +106,27 @@ test('stable metadata validation rejects a truncated changelog-derived body', ()
 });
 
 test('the current plugin and ccm stable tags plan against their real release sections', () => {
-  const plugin = planReleaseMetadata({ tag: 'v0.21.0', repository: cases.repository });
-  assert.equal(plugin.title, 'cc-master plugin v0.21.0');
+  const plugin = planReleaseMetadata({ tag: 'v0.22.0', repository: cases.repository });
+  assert.equal(plugin.title, 'cc-master plugin v0.22.0');
   assert.equal(plugin.prerelease, false);
-  assert.match(plugin.body, /### Highlights/u);
-  assert.match(plugin.body, /### Compatibility and known boundaries/u);
-  assert.doesNotMatch(plugin.body, /^## \[0\.21\.0-rc\.4\]/mu);
+  assert.match(plugin.body, /### Changed/u);
+  assert.match(plugin.body, /### Compatibility and upgrade/u);
+  assert.match(plugin.body, /Plugin `v0\.22\.0` and ccm `ccm-v0\.23\.0` are the first releases/u);
+  assert.doesNotMatch(plugin.body, /^## \[0\.21\.1\]/mu);
   assert.match(
     plugin.body,
-    /blob\/v0\.21\.0\/CHANGELOG\.md\)\.$/u,
+    /blob\/v0\.22\.0\/CHANGELOG\.md\)\.$/u,
   );
 
-  const ccm = planReleaseMetadata({ tag: 'ccm-v0.22.0', repository: cases.repository });
-  assert.equal(ccm.title, 'ccm v0.22.0');
+  const ccm = planReleaseMetadata({ tag: 'ccm-v0.23.0', repository: cases.repository });
+  assert.equal(ccm.title, 'ccm v0.23.0');
   assert.equal(ccm.prerelease, false);
-  assert.match(ccm.body, /### Highlights/u);
-  assert.match(ccm.body, /The complete changeset ledger follows/u);
-  assert.match(ccm.body, /### Patch Changes/u);
-  assert.doesNotMatch(ccm.body, /^## 0\.22\.0-rc\.4$/mu);
+  assert.match(ccm.body, /### Minor Changes/u);
+  assert.match(ccm.body, /first ccm release under PolyForm Noncommercial 1\.0\.0/u);
+  assert.doesNotMatch(ccm.body, /^## 0\.22\.1$/mu);
   assert.match(
     ccm.body,
-    /blob\/ccm-v0\.22\.0\/ccm\/apps\/cli\/CHANGELOG\.md\)\.$/u,
+    /blob\/ccm-v0\.23\.0\/ccm\/apps\/cli\/CHANGELOG\.md\)\.$/u,
   );
 });
 
@@ -183,8 +183,8 @@ test('CLI emits GitHub outputs without contacting GitHub', async () => {
 
 test('CLI plans both current stable tags from the repository changelogs', () => {
   for (const [tag, title] of [
-    ['v0.21.0', 'cc-master plugin v0.21.0'],
-    ['ccm-v0.22.0', 'ccm v0.22.0'],
+    ['v0.22.0', 'cc-master plugin v0.22.0'],
+    ['ccm-v0.23.0', 'ccm v0.23.0'],
   ]) {
     const metadata = JSON.parse(
       execFileSync(

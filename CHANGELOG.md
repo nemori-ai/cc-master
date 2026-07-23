@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-07-23
+
+> **Noncommercial license boundary release** — the first cc-master plugin
+> release under the PolyForm Noncommercial License 1.0.0, paired with
+> **ccm-v0.23.0**.
+
+### Changed
+
+- Replaced the MIT license for new revisions with the
+  [PolyForm Noncommercial License 1.0.0](LICENSE). The project is now
+  source-available for noncommercial use; the public license does not permit
+  commercial use, repackaging for sale, or adoption as a for-profit product.
+- Added bilingual licensing guidance and a name/trademark policy; synchronized
+  all plugin and ccm package metadata; and made plugin archives and ccm releases
+  distribute the applicable license documents. Previously published MIT
+  revisions retain their original rights.
+
+### Compatibility and upgrade
+
+- This release changes licensing only. It does not change the board schema,
+  runtime behavior, or supported harnesses.
+- Plugin `v0.22.0` and ccm `ccm-v0.23.0` are the first releases under PolyForm
+  Noncommercial 1.0.0. Plugin `v0.21.1`, ccm `ccm-v0.22.1`, and earlier
+  releases remain available under the MIT terms shipped with them.
+- Install `ccm-v0.23.0` before plugin `v0.22.0` when upgrading the two lines
+  separately.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/v0.22.0/install.sh | \
+  bash -s -- --ccm-version ccm-v0.23.0 --plugin-version v0.22.0 --all-harnesses
+```
+
 ## [0.21.1] — 2026-07-23
 
 > **Cross-harness transcript integrity and macOS installer compatibility** — patch release paired with **ccm-v0.22.1**; upgrade `ccm` first.
@@ -840,7 +872,9 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/nemori-ai/cc-master/compare/v0.21.1...v0.22.0
+[0.21.1]: https://github.com/nemori-ai/cc-master/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/nemori-ai/cc-master/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/nemori-ai/cc-master/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...v0.20.0
