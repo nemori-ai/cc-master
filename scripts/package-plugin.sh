@@ -181,6 +181,26 @@ package_one() {
   elif [ "$host" = "kimi-code" ]; then
     [ -f "${pkg}/kimi.plugin.json" ] || die "缺 kimi.plugin.json——kimi-code 制品不会是合法 plugin"
     [ -d "${pkg}/commands" ] || die "缺 commands/"
+    [ -d "${pkg}/hooks" ] || die "缺 hooks/——kimi.plugin.json 已注册运行时 hooks，不能发布悬空命令"
+    KIMI_MANIFEST="${pkg}/kimi.plugin.json" KIMI_PACKAGE_ROOT="${pkg}" node <<'NODE' \
+      || die "kimi.plugin.json 引用的 hook 文件未完整进入制品"
+const { existsSync, readFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+const manifest = JSON.parse(readFileSync(process.env.KIMI_MANIFEST, 'utf8'));
+const hooks = Array.isArray(manifest.hooks) ? manifest.hooks : [];
+if (hooks.length === 0) throw new Error('kimi.plugin.json has no hooks');
+for (const [index, hook] of hooks.entries()) {
+  const command = typeof hook.command === 'string' ? hook.command : '';
+  const refs = [...command.matchAll(/\$KIMI_PLUGIN_ROOT\/([^"\s]+)/g)].map((match) => match[1]);
+  if (refs.length === 0) throw new Error(`hooks[${index}] has no package-root reference`);
+  for (const relative of refs) {
+    if (!existsSync(join(process.env.KIMI_PACKAGE_ROOT, relative))) {
+      throw new Error(`hooks[${index}] references missing ${relative}`);
+    }
+  }
+}
+NODE
   else
     [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
   fi

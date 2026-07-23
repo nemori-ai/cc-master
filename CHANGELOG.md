@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-07-23
+
+> **Four-harness orchestration, deadline-aware delivery, and tracked workers** — stable release paired with **ccm-v0.22.0**; upgrade `ccm` first.
+
+### Highlights
+
+- **Four installable harness adapters** — Claude Code, Codex, Cursor, and Kimi Code now ship as separately validated artifacts from one source-to-adapter version line. Kimi Code gains native commands, projected runtime skills, lifecycle hooks, managed-directory installation, and the same stable plugin version as the other hosts.
+- **Deadline-aware orchestration** — the master guidance treats a delivery deadline as first-class Goal Contract evidence, plans backward from it, surfaces risk instead of silently cutting scope, and consumes the paired `ccm` deadline verdicts without reimplementing their calculations in plugin hooks or prose.
+- **Tracked workers that remain observable** — the distributed guidance now prefers `ccm worker dispatch` when a runtime actor must be registered and bound to a board task, while preserving `ccm worker run` as the raw, zero-board-side-effect transport. With the paired ccm release, registered agents appear in the Web Viewer and expose whatever transcript/attach evidence their harness can prove.
+- **One cross-harness routing contract** — candidate qualification, effect floors, same-tier fallback, outer background handles, terminal reconciliation, and parent acceptance now have one host-aware owner instead of subtly different copies across skills.
+
+### Orchestration and runtime guidance
+
+- Added Kimi Code to the machine-wide worker-pool, model-policy, quota, pacing, registration, resume, review, and handoff narratives while keeping host-specific event and credential limitations explicit.
+- Closed both halves of the runtime-agent lifecycle: every real dispatch is registered and linked, and every harvested actor is explicitly terminalled; agent settlement never substitutes for task acceptance.
+- Added the outside-in validity discipline: load-bearing assumptions must be tested against external facts before they justify large or irreversible investment.
+- Reconciled `master-orchestrator-guide`, `using-ccm`, and `pacing-and-estimation` with the shipped four-harness CLI contracts, including multi-pool usage, parse-proof summaries, provider refresh hints, and the tracked-dispatch boundary.
+- Added repository worktree discipline for isolated implementation, single-committer integration, endpoint verification, and post-merge cleanup.
+
+### Adapter architecture and packaging
+
+- Replaced parallel hard-coded harness lists with adapter-owned capability providers, discovery strategies, lifecycle services, and a shared catalog. Unsupported and partial capabilities remain typed rather than inferred from host names.
+- Added capability-card-to-code and host-coverage mutation tests so a declared unsupported state, missing adapter payload, stale projection, or false N-host claim cannot pass from documentation alone.
+- Regenerated and attested all four host projections from `plugin/src`; manifest versions, source/dist trees, pacing facts, provider guidance, hook parity, and capability parity are mechanically checked for drift.
+- Added the fourth release asset, `cc-master-plugin-kimi-code-v0.21.0.zip`, alongside the Claude Code, Codex, and Cursor archives and the shared `SHA256SUMS` manifest.
+
+### Reliability and release integrity
+
+- Fixed Codex nested `apply_patch` envelope normalization so ordinary non-board patches are not misclassified as board writes; rootedness, symlink, and true board-mutation guards remain fail-closed.
+- Refreshed provider/model facts from current official sources and made freshness, unknowns, entitlement boundaries, and automatic-selection blockers visible instead of treating catalog presence as live admission.
+- Removed distributed-skill self-containment drift, synchronized historical design errata to current truth sources, and added exact command/contract tests for the four-host projections.
+- Made every pull request report the required ccm CI check, documented merge-after-green discipline, and added release metadata validation shared by both release workflows.
+- Stable GitHub release notes are now generated from the complete matching changelog section; RC notes remain intentionally concise. The planner rejects altered titles, prerelease flags, truncated stable bodies, and non-tag-pinned changelog links.
+- Made Kimi Code packaging fail closed over the manifest's runtime hook references; the local packager and release workflow now reject a zip whose `hooks/` tree or referenced launcher/core file is missing.
+- Refreshed the Feature Manual as the current product index and recast the cross-harness capability model as a dated maturity/target ledger, eliminating stale three-origin and fixed-rule-count claims from the stable documentation path.
+- **Repository/ccm CI boundary:** added Turbo mutation tests and cache inputs for harness contracts and shared source dependencies, preventing the paired ccm validation consumed by this plugin release from staying stale-green after cross-package changes.
+
+### Compatibility and known boundaries
+
+- Requires Node.js 22 or newer and the paired `ccm-v0.22.0` for the new CLI contracts. Existing plugin and ccm version lines remain independent.
+- Dynamic workflow authoring remains Claude Code-only. Codex and Cursor ship explicit unsupported stubs; Kimi Code has no workflow event surface.
+- Kimi Code has no ccm account pool, external statusline, cached-context injection, or mid-flight pacing hook. Cursor transcript streaming remains partial unless an explicit readable external transcript is supplied. Codex, Cursor, and Kimi Code never auto-switch accounts.
+- `ccm worker dispatch` registers and closes runtime actors only; it does not change task status, routing attempts, review verdicts, or acceptance. Durable remote workers and universal provider sandboxing remain outside this release.
+
+### Upgrade
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/v0.21.0/install.sh | \
+  bash -s -- --ccm-version ccm-v0.22.0 --plugin-version v0.21.0 --all-harnesses
+```
+
 ## [0.21.0-rc.4] — 2026-07-23
 
 > **Tracked worker dispatch + adapter-owned harness capability/routing core (release candidate)** — pairs with **ccm-v0.22.0-rc.4**.
@@ -770,7 +821,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/nemori-ai/cc-master/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/nemori-ai/cc-master/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...v0.19.0

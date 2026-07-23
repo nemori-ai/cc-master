@@ -177,6 +177,9 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
   assert.match(card, /no OK output.*exact model.*payer.*live task success.*unproven/isu);
   assert.match(card, /Cursor.*live canary.*exact host\/version.*partial.*external provider-compatibility/isu);
   assert.match(card, /does not transfer.*another OS.*kernel.*Cursor version/isu);
+  assert.match(card, /ccm 0\.22\.0.*resolves.*historical Cursor wrapper failure/isu);
+  assert.match(card, /all four harnesses.*resolver\/help\/run\/PID-lifecycle.*worker dispatch/isu);
+  assert.match(card, /does not turn hermetic coverage.*live entitlement.*automatic route eligibility/isu);
   assert.match(card, /post-MVP.*no-daemon.*await-helper.*natural-drain grace/isu);
   assert.match(card, /must not relax.*whole owned process group.*gone/isu);
   for (const pattern of [RAW_HELP, RAW_RUN, ...NORMALIZED_PROVIDER_ADAPTER]) {
@@ -188,10 +191,10 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
 
   const gap = read('design_docs/cross-harness-orchestration-capability-model.md');
   assert.match(gap, /Provider execution \|[^\n]*raw wrapper[^\n]*current/iu);
-  assert.match(gap, /Provider execution \|[^\n]*Codex[^\n]*Claude Code[^\n]*live probe[^\n]*pass/iu);
-  assert.match(gap, /Provider execution \|[^\n]*Cursor[^\n]*owned_tree_survived[^\n]*partial/iu);
-  assert.match(gap, /Provider execution \|[^\n]*whole group gone[^\n]*(?:no|无) OK output/iu);
-  assert.match(gap, /normalized.*provider adapter[^\n]*target/iu);
+  assert.match(gap, /Provider execution \|[^\n]*Claude Code[^\n]*Codex[^\n]*Cursor Agent[^\n]*Kimi Code[^\n]*四 harness[^\n]*current/iu);
+  assert.match(gap, /Provider execution \|[^\n]*worker dispatch[^\n]*tracked registry lifecycle/iu);
+  assert.match(gap, /Provider execution \|[^\n]*Cursor native identity\/SQLite transcript unsupported[^\n]*显式可读 transcript/iu);
+  assert.match(gap, /Provider execution \|[^\n]*automatic route\/fallback[^\n]*normalized automatic route\/admission/iu);
 });
 
 test('cached shadow routing does not disable or authorize the explicit wrapper', () => {

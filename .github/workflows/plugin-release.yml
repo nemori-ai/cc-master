@@ -89,8 +89,9 @@ jobs:
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/rules"
 
-      # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ dir; commands project
-      # host-native. hooks/ ships once the kimi PHIP adapter lands (registered inline in the manifest).
+      # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ dir; commands and
+      # hooks both project host-native. Because the manifest registers hook commands inline, hooks/
+      # is a load-bearing package contract rather than an optional directory.
       - name: Validate kimi-code packaged adapter
         run: |
           DEST="$(mktemp -d)"
@@ -98,6 +99,7 @@ jobs:
           test -f "${DEST}/cc-master/kimi.plugin.json"
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/commands"
+          test -d "${DEST}/cc-master/hooks"
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact

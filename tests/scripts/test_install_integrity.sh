@@ -318,6 +318,7 @@ make_plugin_fixture() {
     claude-code) manifest=".claude-plugin/marketplace.json" ;;
     codex) manifest=".codex-plugin/plugin.json" ;;
     cursor) manifest=".cursor-plugin/plugin.json" ;;
+    kimi-code) manifest="kimi.plugin.json" ;;
     *) fail "unknown fixture host $host" ;;
   esac
   mkdir -p "$root/$(dirname "$manifest")" "$root/bin" "$root/assets"
@@ -344,7 +345,7 @@ transactional_publish plugin:claude-code "$restricted_source" "$restricted_targe
   || fail "plugin publication must preserve nested owner-only directory modes"
 pass "plugin publication preserves packaged owner-only directory modes"
 
-for host in claude-code codex cursor; do
+for host in claude-code codex cursor kimi-code; do
   plugin_parent="$tmp/plugin targets/$host/含 空格"
   plugin_target="$plugin_parent/cc-master"
   plugin_new="$tmp/plugin candidates/$host/new"
@@ -379,7 +380,7 @@ for host in claude-code codex cursor; do
 done
 pass "all host plugin trees use recoverable atomic pointers and preserve modes/symlinks"
 
-for host in claude-code codex cursor; do
+for host in claude-code codex cursor kimi-code; do
   for fault_case in "cleanup" "activation,rollback,cleanup"; do
     fault_slug="${fault_case//,/-}"
     recovery_parent="$tmp/plugin recovery/$host/$fault_slug"
@@ -424,7 +425,7 @@ for host in claude-code codex cursor; do
 done
 pass "all host plugin rollback/cleanup mutations keep current pointers and previous versions runnable"
 
-for host in claude-code codex cursor; do
+for host in claude-code codex cursor kimi-code; do
   pointer_barrier_parent="$tmp/plugin rollback barrier/$host"
   pointer_barrier_target="$pointer_barrier_parent/cc-master"
   pointer_barrier_old="$pointer_barrier_parent/old-source"
@@ -455,7 +456,7 @@ for host in claude-code codex cursor; do
   [ "$(json_get "$tmp/plugin-$host-rollback-barrier.err" durability_barrier)" = "rollback-barrier" ] \
     || fail "$host rollback barrier failure must name the failed durability boundary"
 done
-pass "all three host pointer rollbacks require a parent-directory durability barrier before cleanup"
+pass "all four host pointer rollbacks require a parent-directory durability barrier before cleanup"
 
 legacy_barrier_parent="$tmp/plugin legacy barriers/cursor"
 legacy_barrier_target="$legacy_barrier_parent/cc-master"
@@ -553,6 +554,44 @@ PATH="$PATH" \
 grep -q '"activation":"atomic-rename"' "$tmp/e2e.err" || fail "main must report binary publish state"
 grep -q '"activation":"atomic-version-pointer"' "$tmp/e2e.err" || fail "main must report plugin publish state"
 pass "offline installer endpoint uses transactional publisher for SEA and Cursor plugin trees"
+
+# The fourth release artifact must also survive the complete installer path: generic host store,
+# Kimi managed plugin pointer, and installed.json registration all resolve to the same published tree.
+e2e_kimi_package="$e2e/kimi package"
+e2e_kimi_home="$e2e_home/.kimi-code"
+e2e_kimi_managed="$e2e_kimi_home/plugins/managed/cc-master"
+mkdir -p "$e2e_kimi_package"
+make_plugin_fixture "$e2e_kimi_package/cc-master" kimi-code "e2e-new-kimi"
+( cd "$e2e_kimi_package" && zip -qry "$e2e_assets/cc-master-plugin-kimi-code-v9.9.9.zip" cc-master )
+{
+  printf '%s  %s\n' "$(sha256_file "$e2e_assets/ccm-$platform")" "ccm-$platform"
+  printf '%s  %s\n' "$(sha256_file "$e2e_assets/cc-master-plugin-kimi-code-v9.9.9.zip")" \
+    "cc-master-plugin-kimi-code-v9.9.9.zip"
+} >"$e2e_assets/SHA256SUMS"
+
+HOME="$e2e_home" \
+KIMI_CODE_HOME="$e2e_kimi_home" \
+PREFIX="$e2e_prefix" \
+CC_MASTER_PLUGIN_DIR="$e2e_store" \
+CC_MASTER_INSTALL_LOCAL="$e2e_assets" \
+PATH="$PATH" \
+  bash ./install.sh --ccm-version ccm-v9.9.9 --plugin-version v9.9.9 --harness kimi-code \
+  >"$tmp/e2e-kimi.out" 2>"$tmp/e2e-kimi.err"
+
+[ -L "$e2e_kimi_managed" ] || fail "main Kimi managed target must be a version pointer"
+[ -f "$e2e_kimi_managed/kimi.plugin.json" ] || fail "main must activate Kimi manifest through publisher"
+[ -L "$e2e_store/kimi-code/cc-master" ] || fail "main generic Kimi host tree must be a version pointer"
+node - "$e2e_kimi_home/plugins/installed.json" "$e2e_kimi_managed" <<'NODE' \
+  || fail "Kimi installed.json must register the published managed tree"
+const fs = require('node:fs');
+const path = require('node:path');
+const [file, managed] = process.argv.slice(2);
+const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+const entry = doc.plugins?.find((plugin) => plugin?.id === 'cc-master');
+if (!entry || entry.enabled !== true || entry.source !== 'local-path') process.exit(1);
+if (path.resolve(entry.root) !== path.resolve(managed)) process.exit(1);
+NODE
+pass "offline installer endpoint publishes and registers the Kimi managed plugin"
 
 # Re-run from a different source candidate with an injected production fault. The command must fail,
 # and both endpoint artifacts from the successful install above remain runnable.

@@ -101,7 +101,9 @@ test('canonical guide documents proven Claude identity enrichment without guessi
 });
 
 test('release notes match the implemented Claude tracked-dispatch contract', () => {
-  for (const path of ['ccm/.changeset/tracked-worker-dispatch.md', 'CHANGELOG.md']) {
+  // Changesets are intentionally consumed when a stable version is prepared.
+  // Validate the durable release ledger rather than a pre-release input file.
+  for (const path of ['ccm/apps/cli/CHANGELOG.md', 'CHANGELOG.md']) {
     const body = read(path);
     assertClaudeTrackedIdentityContract(body, path);
     assertClaudeIndependentTranscriptContract(body, path);

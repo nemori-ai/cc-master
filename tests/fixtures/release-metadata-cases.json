@@ -44,7 +44,7 @@
         "prerelease": false,
         "summary": "Stable plugin release.",
         "changelogPath": "CHANGELOG.md",
-        "body": "Stable plugin release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/v1.2.3/CHANGELOG.md)."
+        "body": "> Stable plugin release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/v1.2.3/CHANGELOG.md)."
       }
     },
     {
@@ -59,7 +59,7 @@
         "prerelease": false,
         "summary": "Stable ccm release.",
         "changelogPath": "ccm/apps/cli/CHANGELOG.md",
-        "body": "Stable ccm release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/ccm-v1.2.3/ccm/apps/cli/CHANGELOG.md)."
+        "body": "### Patch Changes\n\n- Stable ccm release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/ccm-v1.2.3/ccm/apps/cli/CHANGELOG.md)."
       }
     }
   ],

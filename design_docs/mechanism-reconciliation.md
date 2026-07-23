@@ -41,6 +41,7 @@
 | `scripts/eval-trigger.sh` | 跑 skill-creator Track A 触发准确率 eval 的薄包装 | （无 skill prose 引用；dev 流，见 AGENTS.md §8） | 2026-06-21 |
 | `scripts/eval-benchmark.sh` | 跑 skill-creator Track B benchmark 聚合步的薄包装 | （无 skill prose 引用；dev 流，见 AGENTS.md §8） | 2026-06-21 |
 | `scripts/skill-lint.sh` | 对每个 SKILL.md 跑静态 prose-lint 的 checker（四 check），绝不改文件 | （无 skill prose 引用；dev 流，见 AGENTS.md §6/§12） | 2026-06-21 |
+| `scripts/release-metadata.mjs` | 从 tag family 与对应 changelog section 推导并复验 title / prerelease / body；RC 只发摘要，正式版必须携带完整 section 与 tag-pinned CHANGELOG 链接 | `.claude/skills/plugin-release-engineering/SKILL.md` | 2026-07-23 |
 
 ---
 
