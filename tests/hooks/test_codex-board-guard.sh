@@ -59,8 +59,18 @@ json_input_wrapped_patch_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"input":%s}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
 }
 
+# Codex 0.145.0 PreToolUse apply_patch carrier: tool_input is {command: <patch string>}.
+# The shared Codex normalizer must collapse it to {patch:string} before classification.
+json_command_wrapped_patch_payload() {
+  printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"command":%s}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
 json_normalized_input_wrapped_patch_payload() {
   printf '{"harness":"codex","event":"pre-tool-use","session":{"id":"%s","role":"unknown"},"tool":{"name":"apply_patch","input":{"input":%s}}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
+json_normalized_command_wrapped_patch_payload() {
+  printf '{"harness":"codex","event":"pre-tool-use","session":{"id":"%s","role":"unknown"},"tool":{"name":"apply_patch","input":{"command":%s}}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
 }
 
 json_normalized_apply_patch_payload() {
@@ -809,6 +819,167 @@ run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" '{"input
 assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch non-string carrier -> fail closed"
 run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" '{"input":"not a patch envelope"}')" "$H" "$H"
 assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch malformed patch -> fail closed"
+rm -rf "$H"
+
+# Codex 0.145.0 apply_patch carrier {command: <patch string>}. Ordinary non-board Add/Update must
+# allow (relative + absolute); real board targets deny; non-string command fails closed. Legacy
+# bare/{patch}/{input} carriers above stay covered separately.
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+PATCH="*** Begin Patch
+*** Add File: $H/command-absolute-add.txt
++ordinary
+*** End Patch"
+run_pretool "$(json_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H"
+assert_eq "" "$HOOK_OUT" "0.145 command carrier apply_patch ordinary absolute Add -> allow"
+
+PATCH='*** Begin Patch
+*** Add File: command-relative-add.txt
++ordinary
+*** End Patch'
+run_pretool_in_cwd "$(json_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "0.145 command carrier apply_patch ordinary relative Add -> allow"
+
+printf 'before\n' > "$H/command-absolute-update.txt"
+PATCH="*** Begin Patch
+*** Update File: $H/command-absolute-update.txt
+@@
+-before
++after
+*** End Patch"
+run_pretool "$(json_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H"
+assert_eq "" "$HOOK_OUT" "0.145 command carrier apply_patch ordinary absolute Update -> allow"
+
+printf 'before\n' > "$H/command-relative-update.txt"
+PATCH='*** Begin Patch
+*** Update File: command-relative-update.txt
+@@
+-before
++after
+*** End Patch'
+run_pretool_in_cwd "$(json_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "0.145 command carrier apply_patch ordinary relative Update -> allow"
+
+PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+run_pretool "$(json_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "0.145 command carrier apply_patch real board target -> block"
+
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" '{"command":42}')" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "0.145 command carrier non-string -> fail closed"
+rm -rf "$H"
+
+# Same {command} carrier must work on the direct-core boundary (launcher-only normalization is not enough).
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+PATCH="*** Begin Patch
+*** Add File: $H/direct-core-command-absolute-add.txt
++ordinary
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq 0 "$HOOK_RC" "direct-core 0.145 command carrier absolute Add -> rc 0"
+assert_eq "" "$HOOK_OUT" "direct-core 0.145 command carrier ordinary absolute Add -> allow"
+
+PATCH='*** Begin Patch
+*** Add File: direct-core-command-relative-add.txt
++ordinary
+*** End Patch'
+run_pretool_core_in_cwd "$(json_normalized_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core 0.145 command carrier ordinary relative Add -> allow"
+
+printf 'before\n' > "$H/direct-core-command-absolute-update.txt"
+PATCH="*** Begin Patch
+*** Update File: $H/direct-core-command-absolute-update.txt
+@@
+-before
++after
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core 0.145 command carrier ordinary absolute Update -> allow"
+
+printf 'before\n' > "$H/direct-core-command-relative-update.txt"
+PATCH='*** Begin Patch
+*** Update File: direct-core-command-relative-update.txt
+@@
+-before
++after
+*** End Patch'
+run_pretool_core_in_cwd "$(json_normalized_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core 0.145 command carrier ordinary relative Update -> allow"
+
+PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_command_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core 0.145 command carrier real board target -> block"
+
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" '{"command":42}')" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core 0.145 command carrier non-string -> fail closed"
+rm -rf "$H"
+
+# Mixed recognized carriers (patch/input/command) form one validated set. First-wins alias
+# selection must not bypass fail-closed: any non-string among present aliases, or conflicting
+# string values, denies. Identical string values across aliases are an unambiguous contract and
+# normalize to {patch} (same as a single carrier).
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+BENIGN_PATCH="*** Begin Patch
+*** Add File: $H/mixed-carrier-benign.txt
++ordinary
+*** End Patch"
+BOARD_PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+OTHER_BENIGN_PATCH="*** Begin Patch
+*** Add File: $H/mixed-carrier-other.txt
++other
+*** End Patch"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[2]}))' "$BENIGN_PATCH" "$BOARD_PATCH")"
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" "$INPUT")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "mixed patch benign + command board -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:42}))' "$BENIGN_PATCH")"
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" "$INPUT")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "mixed patch benign + command non-string -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[2]}))' "$BENIGN_PATCH" "$OTHER_BENIGN_PATCH")"
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" "$INPUT")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "mixed patch + command conflicting strings -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[1]}))' "$BENIGN_PATCH")"
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" "$INPUT")" "$H"
+assert_eq "" "$HOOK_OUT" "identical patch + command strings -> allow as {patch}"
+
+# Direct-core boundary must enforce the same validated-set rule (not launcher-only).
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[2]}))' "$BENIGN_PATCH" "$BOARD_PATCH")"
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" "$INPUT")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core mixed patch benign + command board -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:42}))' "$BENIGN_PATCH")"
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" "$INPUT")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core mixed patch benign + command non-string -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[2]}))' "$BENIGN_PATCH" "$OTHER_BENIGN_PATCH")"
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" "$INPUT")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core mixed patch + command conflicting strings -> fail closed"
+
+INPUT="$(node -e 'process.stdout.write(JSON.stringify({patch:process.argv[1],command:process.argv[1]}))' "$BENIGN_PATCH")"
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" "$INPUT")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core identical patch + command strings -> allow as {patch}"
 rm -rf "$H"
 
 # Unarmed: allow silently.

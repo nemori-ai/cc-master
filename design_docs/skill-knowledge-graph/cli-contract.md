@@ -125,7 +125,7 @@ JSON 结果必须包含：
   "C3": {"derived_fields": ["canonical", "review_policy", "reviewed_canonical_sha256"]},
   "C4": {"accepted_skill_requires_admission": true},
   "C5": {"change_workflow": ["begin", "validate", "apply"], "workspace_root": ".skill-knowledge/workspaces/<change-id>"},
-  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"]},
+  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"]},
   "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
   "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
   "C9": {
@@ -145,32 +145,52 @@ JSON 结果必须包含：
 
 数组顺序是 contract 输出顺序；消费者不得按 object key 的序号推断语义。
 
-`capabilities` 在 K0 必须诚实声明：
+`capabilities` 在当前 walking skeleton 必须诚实声明已交付能力：
 
 ```json
 {
   "source_json_parse": true,
   "source_envelope_validation": true,
   "global_id_uniqueness": true,
-  "full_json_schema_validation": false,
-  "markdown_binding": false,
+  "full_json_schema_validation": true,
+  "markdown_binding": true,
   "graph_invariants": false,
   "runtime_projection": false,
   "hop_analysis": false,
-  "typed_change_transactions": false
+  "typed_change_transactions": false,
+  "entry_surface_binding": false,
+  "canonical_source_inventory": true,
+  "derived_freshness": false,
+  "canonical_graph_hash": true,
+  "deterministic_budget_estimator": true,
+  "host_portability_probe": true,
+  "semantic_coverage": false,
+  "behavioral_evidence_tracking": false
 }
 ```
 
-K1 hardening capabilities；当前实现状态以 `contract --json` 的 `capabilities` 为准：
+K0 `check` 仍只执行 envelope/id 扫描（不跑完整 JSON Schema），但一旦 standalone validator
+已提交进仓且与 source schema bytes 的 fingerprint 以及 emitted CJS bundle digests 一致，
+`full_json_schema_validation` 必须为 `true`，且不得再报告
+`SKG-SCHEMA-VALIDATOR-UNAVAILABLE` / `SKG-SCHEMA-VALIDATOR-STALE` debt。
+schema bytes 或任一 validator bundle bytes 漂移/被篡改时 `validatorsAvailable()` 必须为
+false（fail closed，不加载被篡改代码），K0 记 debt、K1+ fail loud（exit 10）。
+CI 用无副作用的 `node scripts/skill-knowledge/generate-validators.mjs --check` 卡漂移。
+K1+ `check` 才对 authored documents 执行完整 Draft 2020-12 校验。
 
-- `entry_surface_binding`（仍 false，直到 entry surface binding 落地）
-- `canonical_source_inventory`（仍 false）
-- `derived_freshness`（仍 false）
-- `canonical_graph_hash`（仍 false）
-- `deterministic_budget_estimator`（仍 false）
-- `host_portability_probe`（**true**：C9 四 host fixture probe + frozen adapter contract 已落地）
-- `semantic_coverage`（仍 false）
-- `behavioral_evidence_tracking`（仍 false）
+`host_portability_probe` 为 **true**：C9 四 host fixture probe + frozen adapter contract 已落地。
+
+仍为 `false`、留给后续切片的 capability：
+
+- `entry_surface_binding`
+- `derived_freshness`
+- `semantic_coverage`
+- `behavioral_evidence_tracking`
+- `graph_invariants`
+- `runtime_projection`
+- `hop_analysis`
+- `typed_change_transactions`
+
 
 ## 4. K0 `check`
 
@@ -204,9 +224,9 @@ K0 `check --host` 或 `check --base` 必须返回 exit 10 和
 检查。`--base` 只在 K1+ 解释 PR changed scope，routine full check 的 coverage denominator 始终是
 Git 中全部 canonical Markdown。
 
-零 authored JSON 在 K0 是 `debt`、exit 0；在 K1+ 是 hard failure、exit 4。若 K1+ 已有
-documents，但 full schema validator 尚未交付，则 fail loud、exit 10，不把 envelope check 冒充
-full validation。
+零 authored JSON 在 K0 是 `debt`、exit 0；在 K1+ 是 hard failure、exit 4。K1+ 对已有
+documents 执行 committed standalone Draft 2020-12 validator；若 validator 文件缺失则 fail
+loud、exit 10，不把 envelope check 冒充 full validation。
 
 成功报告：
 
@@ -226,23 +246,23 @@ full validation。
     "module": 0,
     "change": 0,
     "errors": 0,
-    "debts": 2
+    "debts": 1
   },
   "capabilities": {
     "source_json_parse": true,
     "source_envelope_validation": true,
     "global_id_uniqueness": true,
-    "full_json_schema_validation": false,
-    "markdown_binding": false,
+    "full_json_schema_validation": true,
+    "markdown_binding": true,
     "graph_invariants": false,
     "runtime_projection": false,
     "hop_analysis": false,
     "typed_change_transactions": false,
     "entry_surface_binding": false,
-    "canonical_source_inventory": false,
+    "canonical_source_inventory": true,
     "derived_freshness": false,
-    "canonical_graph_hash": false,
-    "deterministic_budget_estimator": false,
+    "canonical_graph_hash": true,
+    "deterministic_budget_estimator": true,
     "host_portability_probe": true,
     "semantic_coverage": false,
     "behavioral_evidence_tracking": false
@@ -258,18 +278,6 @@ full validation。
         "stage": "K0"
       },
       "remediation": "Start the admitted K1 pilot; do not create an empty portfolio that claims coverage."
-    },
-    {
-      "severity": "debt",
-      "code": "SKG-SCHEMA-VALIDATOR-UNAVAILABLE",
-      "message": "Full JSON Schema instance validation is declared but not executable in K0.",
-      "location": "design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json",
-      "witness": {
-        "full_json_schema_validation": false,
-        "envelope_validation": true,
-        "stage": "K0"
-      },
-      "remediation": "Generate and commit the standalone Draft 2020-12 validator; do not equate envelope checks with schema validation."
     }
   ]
 }

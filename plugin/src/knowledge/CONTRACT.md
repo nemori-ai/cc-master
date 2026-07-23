@@ -1,6 +1,6 @@
 # Skill knowledge source root
 
-> Status: **K0 scaffold — inactive inventory**
+> Status: **K1 walking skeleton — validators/IR available; inventory still empty**
 >
 > This directory is an authored maintainer source root, not runtime prose and not a distributed
 > knowledge claim.
@@ -23,15 +23,19 @@ node scripts/skill-knowledge.mjs check --stage K0
 
 它必须报告 `SKG-COVERAGE-EMPTY` debt，但返回成功。K1 开始，同一缺口升级为 hard failure。
 
-K1 source 被接纳前还必须满足 specification 的 `C1`–`C14` hardening contract：EntryNode 绑定真实
-host surface；SkillNode 盘点 Git 中全部 canonical Markdown 并保存 reviewed-unbound hash；derived
-authority 保存 canonical review hash；accepted SkillNode 有 admission；finalized changes 通过 ignored
-workspace 的 `begin → validate → apply` 流程形成 base/result/parent hash chain。四 host 固定为
-`claude-code / codex / cursor / kimi-code`。
+K1-03 已交付 standalone Draft 2020-12 validators、source loader、canonical/span hash、budget
+estimator、marker/source-map 与 inventory attestation 模块；`contract --json` 中对应 capability
+为 `true`。生成物携带 source schema SHA-256 fingerprint 与三份 emitted CJS bundle 的
+SHA-256（`validators/schema-manifest.json`）；`validatorsAvailable()` / `check` 在 schema
+bytes 或 bundle bytes 漂移时 fail closed（不加载被篡改的 validator），并提供
+`generate-validators.mjs --check` 做无副作用 CI 门。
 
-`skill-knowledge contract --json` 的 `hardening_contract` 是上述字段的机器可读 registry，但 capability
-仍为 false 时只表示 vocabulary 已冻结。不得因 registry 存在就声称 marker/hash/projection/change 已实现；
-尚未实现的命令和 `check --host/--base` 必须 exit 10。
+K1-04 四 host fixture probe + frozen adapter contract 已落地：`host_portability_probe`
+capability=`true`。但 `check --host` CLI 集成尚未接通，带 `--host`/`--base` 的调用与
+typed change transactions（`typed_change_transactions=false`）一样继续 exit 10——probe
+模块已交付不等于 CLI flag 已接线。
+
+不要把 design examples 复制到这里冒充已盘点完成的 runtime knowledge。
 
 规范与机器合同：
 
@@ -40,5 +44,3 @@ workspace 的 `begin → validate → apply` 流程形成 base/result/parent has
 - `design_docs/skill-knowledge-graph/schemas/knowledge-change.schema.json`
 - `design_docs/skill-knowledge-graph/schemas/knowledge-cli-output.schema.json`
 - `design_docs/skill-knowledge-graph/cli-contract.md`
-
-不要把 design examples 复制到这里冒充已盘点完成的 runtime knowledge。

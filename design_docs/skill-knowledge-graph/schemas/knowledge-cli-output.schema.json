@@ -467,7 +467,9 @@
           "required": [
             "algorithm",
             "authored_manifest_kinds",
-            "change_head_digest_excludes"
+            "change_head_digest_excludes",
+            "identity_set_fields",
+            "semantic_order_fields"
           ],
           "properties": {
             "algorithm": {
@@ -483,6 +485,41 @@
             "change_head_digest_excludes": {
               "const": [
                 "result_graph_sha256"
+              ]
+            },
+            "identity_set_fields": {
+              "const": [
+                "skills",
+                "modules",
+                "points",
+                "edges",
+                "entries",
+                "canonical_source_inventory",
+                "inventory",
+                "entry_modules",
+                "relevant_entries",
+                "primary_points",
+                "point_ids"
+              ]
+            },
+            "semantic_order_fields": {
+              "const": [
+                "operations",
+                "when",
+                "avoid_when",
+                "recognition_cues",
+                "includes",
+                "excludes",
+                "unresolved_coverage_debt",
+                "evidence",
+                "verifiers",
+                "targets",
+                "results",
+                "edge_rewrites",
+                "surfaces",
+                "host_coverage",
+                "runtime_hosts",
+                "scope"
               ]
             }
           }
