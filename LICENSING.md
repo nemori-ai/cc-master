@@ -82,13 +82,19 @@ service as the official cc-master project. See [`TRADEMARKS.md`](TRADEMARKS.md).
 This change is prospective. Commit
 [`49a9c6a6ff88c282be8d6c6f89669d7c99af1278`](https://github.com/nemori-ai/cc-master/commit/49a9c6a6ff88c282be8d6c6f89669d7c99af1278)
 is the last repository revision published under the previous MIT license.
+Plugin `v0.22.0` and ccm `ccm-v0.23.0` are the first releases under PolyForm
+Noncommercial 1.0.0. Plugin `v0.21.1`, ccm `ccm-v0.22.1`, and all earlier
+release tags retain the license terms supplied with those releases.
 Versions, commits, and copies already received under MIT keep the rights granted
 by that license; this change does not retroactively revoke them. Newer revisions
 are governed by the license supplied with those revisions.
 
 本次变更只向后生效。提交
 [`49a9c6a6ff88c282be8d6c6f89669d7c99af1278`](https://github.com/nemori-ai/cc-master/commit/49a9c6a6ff88c282be8d6c6f89669d7c99af1278)
-是最后一个按原 MIT 协议发布的仓库版本。此前已经按 MIT 获得的版本、提交和副本继续享有
+是最后一个按原 MIT 协议发布的仓库版本。plugin `v0.22.0` 与 ccm
+`ccm-v0.23.0` 是首批采用 PolyForm Noncommercial
+1.0.0 的正式版本；plugin `v0.21.1`、ccm `ccm-v0.22.1` 及更早的 release tag
+继续适用其发布时随附的许可条款。此前已经按 MIT 获得的版本、提交和副本继续享有
 MIT 已授予的权利，本次变更不会追溯撤销这些权利。后续版本以其随附的协议为准。
 
 ## Third-party material / 第三方材料

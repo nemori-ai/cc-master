@@ -64,6 +64,8 @@ test('public documentation states the source-available noncommercial boundary in
   assert.match(guide, /not an OSI-approved open\s+source license/u);
   assert.match(guide, /最后一个按原 MIT 协议发布/u);
   assert.match(guide, /49a9c6a6ff88c282be8d6c6f89669d7c99af1278/u);
+  assert.match(guide, /Plugin `v0\.22\.0` and ccm `ccm-v0\.23\.0` are the first releases/u);
+  assert.match(guide, /plugin `v0\.22\.0` 与 ccm\s+`ccm-v0\.23\.0` 是首批采用/u);
   assert.match(marks, /you may\s+not:[\s\S]*brand a fork/iu);
   assert.match(marks, /不得.*把本项目伪装成你自己的原创产品/su);
 });
