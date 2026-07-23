@@ -10,6 +10,11 @@ import {
   SOURCE_SCHEMA_VERSION,
 } from './contracts.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
+import {
+  validateAuthoredDocument,
+  validatorFreshness,
+  validatorsAvailable,
+} from './schema.mjs';
 
 const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module']);
 const STAGES = new Set(['K0', 'K1', 'K2', 'K3']);
@@ -204,6 +209,32 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
 
     const envelope = validateEnvelope(document, location, diagnostics);
     if (!envelope) continue;
+
+    if (stage !== 'K0' && validatorsAvailable()) {
+      const schemaResult = validateAuthoredDocument(
+        document,
+        envelope.kind === 'change' ? 'change' : 'source',
+      );
+      if (!schemaResult.ok) {
+        diagnostics.push(
+          diagnostic({
+            severity: 'error',
+            code: 'SKG-SCHEMA-INVALID',
+            message: `Authored knowledge failed Draft 2020-12 schema validation: ${location}`,
+            location,
+            witness: {
+              kind: envelope.kind,
+              errors: schemaResult.errors.slice(0, 8),
+              stage,
+            },
+            remediation:
+              'Align the document with the normative knowledge schema; envelope checks are not full validation.',
+            exitCode: 3,
+          }),
+        );
+      }
+    }
+
     documents += 1;
     counts[envelope.kind] += 1;
     const locations = identities.get(envelope.id) ?? [];
@@ -231,13 +262,25 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
     );
   }
 
-  if (stage === 'K0' || documents > 0) {
+  // Capability is executable only while committed standalone validators match source schema
+  // bytes. K0 stays envelope-only but still reports debt when validators are missing/stale.
+  // K1+ always fails loud (even with an empty inventory) so drift cannot silent-pass.
+  // SKG_SCHEMA_REPO_ROOT lets integrity probes inject an isolated schema fixture without
+  // mutating checked-in design_docs schemas (production leaves the env unset).
+  const freshnessRoot =
+    typeof process.env.SKG_SCHEMA_REPO_ROOT === 'string' && process.env.SKG_SCHEMA_REPO_ROOT.length > 0
+      ? path.resolve(process.env.SKG_SCHEMA_REPO_ROOT)
+      : repoRoot;
+  const freshness = validatorFreshness(freshnessRoot);
+  if (!freshness.available) {
+    const stale = freshness.reason === 'stale';
     diagnostics.push(
       diagnostic({
         severity: stage === 'K0' ? 'debt' : 'error',
-        code: 'SKG-SCHEMA-VALIDATOR-UNAVAILABLE',
-        message:
-          stage === 'K0'
+        code: stale ? 'SKG-SCHEMA-VALIDATOR-STALE' : 'SKG-SCHEMA-VALIDATOR-UNAVAILABLE',
+        message: stale
+          ? 'Committed standalone validators are stale relative to source schema bytes.'
+          : stage === 'K0'
             ? 'Full JSON Schema instance validation is declared but not executable in K0.'
             : `${stage} cannot pass until the committed standalone schema validator is implemented.`,
         location: SCHEMAS.source,
@@ -245,9 +288,13 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
           full_json_schema_validation: false,
           envelope_validation: true,
           stage,
+          reason: freshness.reason,
+          committed_fingerprint: freshness.committed?.fingerprint ?? null,
+          current_fingerprint: freshness.current?.fingerprint ?? null,
         },
-        remediation:
-          'Generate and commit the standalone Draft 2020-12 validator; do not equate envelope checks with schema validation.',
+        remediation: stale
+          ? 'Regenerate validators with node scripts/skill-knowledge/generate-validators.mjs and commit schema-manifest.json.'
+          : 'Generate and commit the standalone Draft 2020-12 validator; do not equate envelope checks with schema validation.',
         exitCode: stage === 'K0' ? 0 : 10,
       }),
     );

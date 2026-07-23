@@ -1,0 +1,8 @@
+{
+  "markdown": "markdown/valid-span.md",
+  "crlf_markdown": "derive-at-runtime-from-markdown",
+  "point_id": "point:demo.principle",
+  "algorithm_span": "cc-master/skill-knowledge-markdown-span-hash/v1",
+  "algorithm_budget": "cc-master/skill-knowledge-budget-estimator/v1",
+  "newline_normalization": "crlf-to-lf"
+}
