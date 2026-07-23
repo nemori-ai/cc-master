@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/../plugin/src/hooks/**/CONTRACT.md",
+        "$TURBO_ROOT$/../design_docs/harnesses/capabilities/**/*.md"
+      ]
+    }
+  }
+}
