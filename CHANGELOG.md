@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-rc.4] — 2026-07-23
+
+> **Tracked worker dispatch + adapter-owned harness capability/routing core (release candidate)** — pairs with **ccm-v0.22.0-rc.4**.
+
 ### Added
 
 - **Tracked cross-harness worker dispatch (GitHub #175)** — adds `ccm worker dispatch` as an explicit, synchronous tracked transport while preserving `ccm worker run` as raw transport with zero board side effects. The new command requires a caller idempotency key, registers only `agents[]`, and atomically binds a real spawned PID plus agent-side task link. Codex and Kimi accept only their declared structured session events; Claude Code accepts an explicit `--session-id` or, only with declared `--output-format json|stream-json`, a strict `type=result / session_id` envelope, then locates the transcript and derives a `claude --resume <sid>` resume attach. It never guesses identity from model text. Without proven session evidence the agent remains PID-only, with identity/attach typed unavailable; an explicit readable `--transcript` independently makes transcript typed supported even without session identity. With no readable `--transcript`, transcript is typed unavailable. Cursor keeps native session identity, SQLite transcript, and exact attach typed unsupported, while an explicit external transcript can provide the existing raw stream. Dispatch closes sanitized lifecycle facts and fails closed to reconciliation across claim/PID, bind, identity, terminal-write, and lost-supervisor ambiguity. It never changes task status/handle/routing/acceptance and never persists prompts, stdin, secrets, environment, provider argv, or provider output.
+- **Cross-harness routing hub (GitHub #187)** — centralizes candidate qualification, fallback, terminal/reconciliation, and per-host background execution guidance into one host-aware reference instead of duplicating subtly different rules across the orchestrator skill.
+- **Adapter-owned harness capability model (GitHub #188)** — replaces parallel hard-coded harness lists with composed capability providers, discovery strategies, lifecycle services, and a shared catalog while keeping host-specific evidence and unsupported states explicit.
+
+### Fixed
+
+- **Codex nested `apply_patch` normalization (GitHub #156)** — recognizes Codex tool envelopes without treating an ordinary non-board patch as a board mutation; rootedness and symlink mutation guards remain fail-closed.
+- **Provider model facts refresh** — updates current provider/model evidence and regenerates the attested cross-harness guidance projections.
+
+### Release integrity
+
+- Release metadata now derives title, prerelease status, one-line notes, and a tag-pinned changelog link from a single validated planner for both plugin and ccm workflows.
+- Turbo cache inputs now include harness contracts and shared source dependencies, with a mutation-kill regression test preventing stale-green CI results.
 
 ## [0.21.0-rc.3] — 2026-07-21
 
