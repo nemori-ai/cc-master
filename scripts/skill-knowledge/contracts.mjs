@@ -4,7 +4,13 @@ export const SOURCE_SCHEMA_VERSION = 'cc-master/skill-knowledge-source/v1alpha1'
 export const CHANGE_SCHEMA_VERSION = 'cc-master/skill-knowledge-change/v1alpha1';
 export const DEFAULT_SOURCE_ROOT = 'plugin/src/knowledge';
 
-export const IMPLEMENTED_COMMANDS = Object.freeze(['check', 'contract']);
+export const IMPLEMENTED_COMMANDS = Object.freeze([
+  'check',
+  'contract',
+  'explain',
+  'path',
+  'report',
+]);
 export const DECLARED_COMMANDS = Object.freeze([
   'change',
   'check',
@@ -147,20 +153,20 @@ export const CAPABILITIES = Object.freeze({
   source_json_parse: true,
   source_envelope_validation: true,
   global_id_uniqueness: true,
-  // K1-03 walking skeleton: standalone Draft 2020-12 validators + IR/hash/marker/inventory.
+  // K1 pilot: standalone validators + IR/hash/marker/inventory + authored-graph query.
   full_json_schema_validation: true,
   markdown_binding: true,
-  graph_invariants: false,
+  graph_invariants: true,
   runtime_projection: false,
-  hop_analysis: false,
+  hop_analysis: true,
   typed_change_transactions: false,
-  entry_surface_binding: false,
+  entry_surface_binding: true,
   canonical_source_inventory: true,
-  derived_freshness: false,
+  derived_freshness: true,
   canonical_graph_hash: true,
   deterministic_budget_estimator: true,
   host_portability_probe: false,
-  semantic_coverage: false,
+  semantic_coverage: true,
   behavioral_evidence_tracking: false,
 });
 

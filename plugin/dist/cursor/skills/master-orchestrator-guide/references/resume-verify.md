@@ -25,6 +25,7 @@
 
 ## 3. 端点验收 —— 唯一可靠的正确性点
 
+<!-- ccm:k:start point:verification.endpoint-procedure -->
 **end-to-end argument**（Saltzer-Reed-Clark, 1984）：一个放在低层的功能，相对于在端点实现它，往往是冗余的；正确性的最终保证必须活在端点。
 
 - **你独立验收** —— 你**亲自跑闸**、**亲自读 diff**。低层 agent 那句"所有质量闸都绿"只是一个不可信的性能优化（agent 自报已经一再出错）。
@@ -34,6 +35,7 @@
 
 验收是续跑缓存（§1）的校验步骤：唯有一个既存在**又**通过这道端点检查的产物，才算 done。
 
+<!-- ccm:k:end point:verification.endpoint-procedure -->
 ### resume 第 0 步：先 `cd` 进 `board.git.worktree`，确认 cwd == 它，再接手
 
 `--resume` 唤起的新 session，其 shell cwd **未必** == board 声明的 `git.worktree`——它可能落在 home、上一次操作残留的某目录、或另一个 checkout 里。**接手的第一件事**（先于 reconcile、先于任何孤儿验收、先于跑任何闸）：读 board 窄腰里的 `git.worktree`，`cd` 进去，**核对 cwd 确实 == 它**（`pwd` 比对，或 `git -C` 显式锚定每条命令）。确认一致前不要执行任何后续动作。

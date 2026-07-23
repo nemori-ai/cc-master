@@ -2,7 +2,7 @@
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json
  * Source-schema-sha256: 6920e0532d209ff63d96e0ca824f06c5a5e8a343714a824c3b62d5810a557f3d
- * Schema-fingerprint: 20f5e6ea7de070c8e19f2c1c6ccc16feefab2dbc3c960e5da333433769af6236
+ * Schema-fingerprint: 676df7d2e4be240e53f772fab8253e166efd810f081c81af8bd96c29f4904856
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";

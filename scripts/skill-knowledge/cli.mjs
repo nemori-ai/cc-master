@@ -4,17 +4,22 @@ import {
   CONTRACT_VERSION,
   DECLARED_COMMANDS,
   EXIT_CODES,
+  IMPLEMENTED_COMMANDS,
   contractEnvelope,
 } from './contracts.mjs';
-import { diagnostic, failureEnvelope, outputDiagnostic } from './diagnostics.mjs';
+import { diagnostic, failureEnvelope } from './diagnostics.mjs';
 import { runCheck } from './check.mjs';
+import { assertReportFormat, runExplain, runPath, runReport } from './query.mjs';
 
 const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
 
 Commands:
   contract [--json]
   check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
-  compile|report|path|explain|change [--json]   Declared; unavailable in K0
+  report [--source <dir>] [--format json|markdown] [--host <host>] [--json]
+  path --from <id> --to <id> --host <host> [--source <dir>] [--json]
+  explain <id-or-code> [--source <dir>] [--json]
+  compile|change [--json]   Declared; unavailable in K1 pilot
 
 Global:
   --help
@@ -49,6 +54,45 @@ function parseCheckOptions(args) {
   return options;
 }
 
+function parseSourceJsonOptions(args, { allowFormat = false, allowHost = false } = {}) {
+  const options = {
+    source: undefined,
+    host: undefined,
+    format: 'json',
+    json: false,
+    positionals: [],
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === '--json') options.json = true;
+    else if (token === '--source') {
+      index += 1;
+      if (!args[index]) throw new Error('--source requires a directory');
+      options.source = args[index];
+    } else if (token === '--host') {
+      if (!allowHost) throw new Error('unknown argument: --host');
+      index += 1;
+      if (!args[index]) throw new Error('--host requires a host');
+      options.host = args[index];
+    } else if (token === '--format') {
+      if (!allowFormat) throw new Error('unknown argument: --format');
+      index += 1;
+      if (!args[index]) throw new Error('--format requires json|markdown');
+      options.format = args[index];
+      if (options.format === 'json') options.json = true;
+    } else if (token === '--from' || token === '--to') {
+      index += 1;
+      if (!args[index]) throw new Error(`${token} requires an id`);
+      options[token.slice(2)] = args[index];
+    } else if (token.startsWith('-')) {
+      throw new Error(`unknown argument: ${token}`);
+    } else {
+      options.positionals.push(token);
+    }
+  }
+  return options;
+}
+
 function renderHuman(body) {
   if (body.result_kind === 'contract') {
     return [
@@ -67,6 +111,32 @@ function renderHuman(body) {
       lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
     }
     return lines.join('\n');
+  }
+  if (body.result_kind === 'report') {
+    const lines = [
+      `skill-knowledge report: ${body.ok ? 'OK' : 'FAILED'}`,
+      `structural: ${body.structural_status.state}; behavioral: ${body.behavioral_evidence_status.state}`,
+    ];
+    if (body.graph_hash) lines.push(`graph_hash: ${body.graph_hash}`);
+    for (const item of body.diagnostics) {
+      lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
+    }
+    return lines.join('\n');
+  }
+  if (body.result_kind === 'path') {
+    const pathResult = body.path_result;
+    return [
+      `skill-knowledge path: ${pathResult.reachable ? 'REACHABLE' : 'UNREACHABLE'}`,
+      `from ${body.path_query.from} -> ${body.path_query.to} (host=${body.path_query.host})`,
+      `hops: ${pathResult.hops}`,
+      `nodes: ${(pathResult.nodes ?? []).join(' -> ')}`,
+    ].join('\n');
+  }
+  if (body.result_kind === 'explain') {
+    return [
+      `skill-knowledge explain ${body.explain_target}`,
+      `kind: ${body.entity.kind}; id: ${body.entity.id}`,
+    ].join('\n');
   }
   return body.diagnostics
     .map((item) => `${item.severity.toUpperCase()} ${item.code}: ${item.message}`)
@@ -94,9 +164,9 @@ function unavailable(command) {
   const item = diagnostic({
     severity: 'error',
     code: 'SKG-CAPABILITY-NOT-IMPLEMENTED',
-    message: `${command} is declared but not implemented in K0`,
+    message: `${command} is declared but not implemented in K1 pilot`,
     location: 'scripts/skill-knowledge.mjs',
-    witness: { command, stage: 'K0' },
+    witness: { command, stage: 'K1' },
     remediation: 'Implement the next admitted slice; do not treat this command as successful.',
     exitCode: EXIT_CODES.capability_not_implemented,
   });
@@ -107,10 +177,11 @@ function unavailableCheckOption(option, value) {
   const item = diagnostic({
     severity: 'error',
     code: 'SKG-CAPABILITY-NOT-IMPLEMENTED',
-    message: `check ${option} is declared but not implemented in K0`,
+    message: `check ${option} is declared but not implemented in K1 pilot`,
     location: 'scripts/skill-knowledge.mjs',
-    witness: { command: 'check', option, value, stage: 'K0' },
-    remediation: 'Omit --host/--base in K0, or implement the next admitted slice; do not treat this option as successful.',
+    witness: { command: 'check', option, value, stage: 'K1' },
+    remediation:
+      'Omit --host/--base until changed-scope / host portability slices land; do not treat this option as successful.',
     exitCode: EXIT_CODES.capability_not_implemented,
   });
   return failureEnvelope('check', [item]);
@@ -164,7 +235,86 @@ export function main(argv = process.argv.slice(2)) {
     return result.exitCode;
   }
 
-  if (DECLARED_COMMANDS.includes(command)) {
+  if (command === 'report') {
+    let options;
+    try {
+      options = parseSourceJsonOptions(argv.slice(argv.indexOf(command) + 1), {
+        allowFormat: true,
+        allowHost: true,
+      });
+    } catch (error) {
+      emit(usageFailure(command, error.message), json || false);
+      return EXIT_CODES.usage;
+    }
+    if (options.host !== undefined) {
+      emit(
+        unavailable('report --host'),
+        options.json || json || options.format === 'json',
+      );
+      return EXIT_CODES.capability_not_implemented;
+    }
+    const formatError = assertReportFormat(options.format);
+    if (formatError) {
+      emit(failureEnvelope('report', [formatError]), true);
+      return EXIT_CODES.usage;
+    }
+    if (options.format === 'markdown') {
+      const item = diagnostic({
+        severity: 'error',
+        code: 'SKG-CAPABILITY-NOT-IMPLEMENTED',
+        message: 'report --format markdown is declared but not implemented in K1 pilot',
+        location: 'scripts/skill-knowledge.mjs',
+        witness: { command: 'report', format: 'markdown', stage: 'K1' },
+        remediation: 'Use --format json / --json for the pilot query surface.',
+        exitCode: EXIT_CODES.capability_not_implemented,
+      });
+      emit(failureEnvelope('report', [item]), true);
+      return EXIT_CODES.capability_not_implemented;
+    }
+    const result = runReport({ repoRoot, source: options.source });
+    emit(result.body, true);
+    return result.exitCode;
+  }
+
+  if (command === 'path') {
+    let options;
+    try {
+      options = parseSourceJsonOptions(argv.slice(argv.indexOf(command) + 1), {
+        allowHost: true,
+      });
+    } catch (error) {
+      emit(usageFailure(command, error.message), json);
+      return EXIT_CODES.usage;
+    }
+    const result = runPath({
+      repoRoot,
+      source: options.source,
+      from: options.from,
+      to: options.to,
+      host: options.host,
+    });
+    emit(result.body, options.json || json);
+    return result.exitCode;
+  }
+
+  if (command === 'explain') {
+    let options;
+    try {
+      options = parseSourceJsonOptions(argv.slice(argv.indexOf(command) + 1));
+    } catch (error) {
+      emit(usageFailure(command, error.message), json);
+      return EXIT_CODES.usage;
+    }
+    const result = runExplain({
+      repoRoot,
+      source: options.source,
+      target: options.positionals[0],
+    });
+    emit(result.body, options.json || json);
+    return result.exitCode;
+  }
+
+  if (DECLARED_COMMANDS.includes(command) && !IMPLEMENTED_COMMANDS.includes(command)) {
     emit(unavailable(command), json);
     return EXIT_CODES.capability_not_implemented;
   }

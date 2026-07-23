@@ -59,7 +59,13 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.command, 'contract');
   assert.equal(body.result_kind, 'contract');
   assert.equal(body.contract_version, 'v1alpha1');
-  assert.deepEqual(body.implemented_commands, ['check', 'contract']);
+  assert.deepEqual(body.implemented_commands, [
+    'check',
+    'contract',
+    'explain',
+    'path',
+    'report',
+  ]);
   assert.deepEqual(body.declared_commands, [
     'change',
     'check',
@@ -90,15 +96,18 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.global_id_uniqueness, true);
   assert.equal(body.capabilities.full_json_schema_validation, true);
   assert.equal(body.capabilities.markdown_binding, true);
-  assert.equal(body.capabilities.graph_invariants, false);
-  assert.equal(body.capabilities.entry_surface_binding, false);
+  assert.equal(body.capabilities.graph_invariants, true);
+  assert.equal(body.capabilities.entry_surface_binding, true);
   assert.equal(body.capabilities.canonical_source_inventory, true);
-  assert.equal(body.capabilities.derived_freshness, false);
+  assert.equal(body.capabilities.derived_freshness, true);
   assert.equal(body.capabilities.canonical_graph_hash, true);
   assert.equal(body.capabilities.deterministic_budget_estimator, true);
   assert.equal(body.capabilities.host_portability_probe, false);
-  assert.equal(body.capabilities.semantic_coverage, false);
+  assert.equal(body.capabilities.semantic_coverage, true);
   assert.equal(body.capabilities.behavioral_evidence_tracking, false);
+  assert.equal(body.capabilities.hop_analysis, true);
+  assert.equal(body.capabilities.runtime_projection, false);
+  assert.equal(body.capabilities.typed_change_transactions, false);
   assert.deepEqual(Object.keys(body.hardening_contract),
     Array.from({ length: 14 }, (_, index) => `C${index + 1}`));
   assert.deepEqual(body.hardening_contract.C5.change_workflow, ['begin', 'validate', 'apply']);
@@ -124,7 +133,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.hardening_contract.C14.governance_meta_skill_is_runtime, false);
 });
 
-test('SKG-CLI-02: K0 check reports empty inventory debt once validators are available', () => {
+test('SKG-CLI-02: K0 check reads the admitted pilot inventory without coverage-empty debt', () => {
   const result = runCli(['check', '--stage', 'K0', '--json']);
   assert.equal(result.status, 0, result.stderr);
   const body = parseJson(result);
@@ -135,13 +144,16 @@ test('SKG-CLI-02: K0 check reports empty inventory debt once validators are avai
   assert.equal(body.result_kind, 'check');
   assert.equal(body.stage, 'K0');
   assert.equal(body.source_root, 'plugin/src/knowledge');
-  assert.equal(body.summary.documents, 0);
+  assert.equal(body.summary.documents, 5);
+  assert.equal(body.summary.portfolio, 1);
+  assert.equal(body.summary.skill, 1);
+  assert.equal(body.summary.module, 3);
   assert.equal(body.summary.errors, 0);
-  assert.equal(body.summary.debts, 1);
+  assert.equal(body.summary.debts, 0);
   assert.equal(body.capabilities.full_json_schema_validation, true);
-  assert.deepEqual(
-    body.diagnostics.map((diagnostic) => diagnostic.code).sort(),
-    ['SKG-COVERAGE-EMPTY'],
+  assert.equal(
+    body.diagnostics.some((diagnostic) => diagnostic.code === 'SKG-COVERAGE-EMPTY'),
+    false,
   );
 });
 
@@ -210,8 +222,8 @@ test('SKG-CLI-06: K1 with envelope-only source fails full schema validation loud
     );
   }));
 
-test('SKG-CLI-07: declared but unavailable commands fail closed with exit 10', () => {
-  for (const command of ['compile', 'report', 'path', 'explain', 'change']) {
+test('SKG-CLI-07: compile/change and unavailable check options still fail closed with exit 10', () => {
+  for (const command of ['compile', 'change']) {
     const result = runCli([command, '--json']);
     assert.equal(result.status, 10, `${command}: ${result.stderr}`);
     const body = parseJson(result);
@@ -532,7 +544,7 @@ test('SKG-EXAMPLES-02: change workspace, validation, and ledger identity remain 
   );
 });
 
-test('SKG-EXAMPLES-03: K1 pilot has one admitted inventoried skill and four unique hosts', () => {
+test('SKG-EXAMPLES-03: K1 pilot has one admitted skill, three modules, and four unique hosts', () => {
   const portfolio = JSON.parse(
     fs.readFileSync(path.join(examplesRoot, 'portfolio.json'), 'utf8'),
   );
@@ -547,6 +559,7 @@ test('SKG-EXAMPLES-03: K1 pilot has one admitted inventoried skill and four uniq
 
   assert.equal(portfolio.rollout, 'K1');
   assert.equal(portfolio.skills.length, 1);
+  assert.equal(skill.modules.length, 3);
   assert.equal(new Set(portfolio.runtime_hosts).size, 4);
   assert.deepEqual(portfolio.runtime_hosts, ['claude-code', 'codex', 'cursor', 'kimi-code']);
   assert.deepEqual(hosts, portfolio.runtime_hosts);
@@ -554,7 +567,7 @@ test('SKG-EXAMPLES-03: K1 pilot has one admitted inventoried skill and four uniq
   assert.equal(skill.lifecycle.state, 'accepted');
   assert.ok(skill.admission.evidence.length > 0);
   assert.ok(skill.admission.verifiers.length > 0);
-  assert.ok(skill.canonical_source_inventory.length > 0);
+  assert.ok(skill.canonical_source_inventory.length >= 14);
 });
 
 test('SKG-EXAMPLES-04: report golden keeps structural and behavioral evidence separate', () => {
@@ -575,7 +588,7 @@ test('SKG-DOC-01: K0 check success sample uses the executable capability map', (
     path.join(repoRoot, 'design_docs', 'skill-knowledge-graph', 'cli-contract.md'),
     'utf8',
   );
-  const sample = cliContract.match(/成功报告：\s*```json\n([\s\S]*?)\n```/);
+  const sample = cliContract.match(/成功报告[^\n]*：\s*```json\n([\s\S]*?)\n```/);
   assert.ok(sample, 'K0 success sample must remain machine-readable JSON');
   const documented = JSON.parse(sample[1]);
   assert.deepEqual(documented.capabilities, contract.capabilities);

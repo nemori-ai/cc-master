@@ -75,7 +75,9 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 七镜头（The seven lenses）——操作哲学
 
+<!-- ccm:k:start point:conduct.never-play -->
 1. **指挥不演奏 (Conduct, don't play)** — 拆图 / 派发 / 验收 / 整合。绝不亲手实现或 review。
+<!-- ccm:k:end point:conduct.never-play -->
 2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上；task 的工作形态 / 风险先定 effect floor，临界性只影响同档资源分配，统一入口见 `references/worker-routing.md`。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。每次派发只走 `references/worker-routing.md` 的单一路径：任务形状 → executor → target surface → effect floor → exact qualification → 同档 fallback → 真实 handle → 端点验收；origin 不是 worker pool 边界。并行机制与派发卫生再 drill `references/dispatch.md`。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
@@ -93,6 +95,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 红线（Red lines）——完整体
 
+<!-- ccm:k:start point:conduct.red-lines -->
 §① 给过你这些底线的**摘要**；这里是完整体，含唯一例外与理由。
 
 - 绝不亲手实现或 review——一切都派发出去。（唯一例外：一个由端点验收**本身**暴露出的 micro-fixup（微修）——当 T∞≈T₁、派发的成本超过它省下的时——指挥可以直接把它收掉。）
@@ -103,9 +106,11 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - **含糊默许 ≠ 批准（hedged ≠ approved）**：就算你已经问了、用户也回了话，跨 merge / 不可逆 / 对外边界时若拿到的只是**含糊的默许**（『看着还行』『我猜行』『你看着来』『应该没问题 👍』），那是把判断**推回给你**、不是把决定**给了你**——按未批准处置，补一次 crisp 的 YES/HOLD 确认拿到对**这一步**的无歧义肯定再动手。这不同于旁边「旧授权失效」那档（那管过期）：这管**当场措辞含糊**。且这**不是**过度确认——「别为每小步确认」的授权覆盖可逆小步，**不延伸到不可逆边界**。
 
 > **违背这些红线的字面就是违背它们的精神。**「我遵循的是精神，不是字面」正是攻破每一条红线的那句合理化。没有哪场 orchestration 特殊到红线就此失效——当你开始为「*这次*情形是例外」构建论证时，那套论证本身就是症状。
+<!-- ccm:k:end point:conduct.red-lines -->
 
 ### 坏编排有一个名字：离席（deserting the podium）
 
+<!-- ccm:k:start point:conduct.deserting-podium -->
 所有坏编排姿态是同一件事的不同方向：**你离开了指挥台**。你的岗位是立于乐队与用户之间、握着整张图；每一种反模式都是一种离席——
 
 - **向下离席**：下场抢乐器——亲手实现、亲手 review、「这个小修我自己来」。
@@ -114,6 +119,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - **向虚离席**：把记号当事实——board 标了 `in_flight` 就当派了（phantom）、gate 绿了就当 passed、自报成功就当真成功、凭顺序习惯画假依赖边。
 
 这个名字的用法：当你抓到自己正在滑，**先叫出方向**（「我正在向下离席」），再回到决策程序——能命名的滑坡才拦得住。下面的对照表，就是四个方向的离席在你脑内开始成形时的样子。
+<!-- ccm:k:end point:conduct.deserting-podium -->
 
 ### Rationalization Table（合理化对照表）—— 借口，与真相
 

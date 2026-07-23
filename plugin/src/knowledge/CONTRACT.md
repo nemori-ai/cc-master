@@ -1,39 +1,45 @@
 # Skill knowledge source root
 
-> Status: **K1 walking skeleton — validators/IR available; inventory still empty**
+> Status: **K1 pilot — three modules / authored query surface**
 >
 > This directory is an authored maintainer source root, not runtime prose and not a distributed
-> knowledge claim.
+> knowledge claim beyond the admitted pilot inventory.
 
-未来 source layout：
+Source layout:
 
 ```text
 plugin/src/knowledge/
+├── CONTRACT.md
 ├── portfolio.json
-├── changes/
-└── skills/<skill>/{skill.json,modules/*.json}
+└── skills/master-orchestrator-guide/
+    ├── skill.json
+    └── modules/
+        ├── verification.endpoint.json
+        ├── conduct.never-play.json
+        └── routing.worker-chain.json
 ```
 
-K0 有意不提交空的 `portfolio.json`：机器 schema 要求真实 skill/module inventory，创建一份零内容或
-不完整的 portfolio 会把 coverage debt 伪装成 source truth。当前唯一合法入口是：
+K1 pilot admits **one** runtime skill (`master-orchestrator-guide`) with **three** modules and
+**8–12** points bound to real canonical Markdown markers. JSON holds identity / authority /
+routing / inventory metadata only — exact HOW remains in Markdown spans (no second SSOT).
+
+Executable entry points:
 
 ```bash
-node scripts/skill-knowledge.mjs check --stage K0
+node scripts/skill-knowledge.mjs check --stage K1 --json
+node scripts/skill-knowledge.mjs report --json
+node scripts/skill-knowledge.mjs path --from <id> --to <id> --host claude-code --json
+node scripts/skill-knowledge.mjs explain <id-or-code> --json
 ```
 
-它必须报告 `SKG-COVERAGE-EMPTY` debt，但返回成功。K1 开始，同一缺口升级为 hard failure。
+Implemented capabilities (see `contract --json`): schema validation, markdown binding, canonical
+source inventory attestation, derived authority freshness, graph invariants, entry-surface
+binding, authored-plane hop analysis, canonical graph hash, budget estimator.
 
-K1-03 已交付 standalone Draft 2020-12 validators、source loader、canonical/span hash、budget
-estimator、marker/source-map 与 inventory attestation 模块；`contract --json` 中对应 capability
-为 `true`。生成物携带 source schema SHA-256 fingerprint 与三份 emitted CJS bundle 的
-SHA-256（`validators/schema-manifest.json`）；`validatorsAvailable()` / `check` 在 schema
-bytes 或 bundle bytes 漂移时 fail closed（不加载被篡改的 validator），并提供
-`generate-validators.mjs --check` 做无副作用 CI 门。typed change transactions 与 host
-portability probe 仍未实现，相关命令/`--host`/`--base` 继续 exit 10。
+Still declared-unavailable (exit 10): `compile`, `change`, `check --host|--base`, `report --host`.
+Do not treat authored-plane `path` results as final-host H1–H4 proof.
 
-不要把 design examples 复制到这里冒充已盘点完成的 runtime knowledge。
-
-规范与机器合同：
+Normative contracts:
 
 - `design_docs/skill-knowledge-graph/specification.md`
 - `design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json`

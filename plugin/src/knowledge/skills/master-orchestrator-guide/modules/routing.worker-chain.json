@@ -1,0 +1,292 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:routing.worker-chain",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "Worker 路由链",
+  "intent": "按不可换序的八段链完成派发记录：任务形状 → executor → target → floor → qualification → fallback → handle → 端点验收。",
+  "recognition_cues": [
+    "准备派一个 worker",
+    "要写 routing record",
+    "没有 handle 却想标 in_flight"
+  ],
+  "boundary": {
+    "includes": [
+      "八段路由顺序",
+      "executor 与 target 正交",
+      "真实 handle gate"
+    ],
+    "excludes": [
+      "并行机制细节",
+      "ccm 命令语法表"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:routing.ordered-chain"
+    ],
+    "rationale": "派发卫生的承重入口；顺序错了会制造幽灵任务或绕过验收。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.routing.worker-chain"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:routing.ordered-chain",
+      "title": "不可换序的八段路由链",
+      "point_kind": "procedure",
+      "summary": "task shape → executor → target → floor → qualification → fallback → handle → endpoint verification。",
+      "recognition_cues": [
+        "要写出 routing record 的字段次序"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "marker": "point:routing.ordered-chain",
+        "heading_hint": "一条不可换序的路由链"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.ordered-chain"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md ordered chain"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.routing.ordered-chain"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:routing.executor-vs-target",
+      "title": "executor 不等于 target surface",
+      "point_kind": "principle",
+      "summary": "executor 回答责任形状，target surface 回答可调用面；二者正交。",
+      "recognition_cues": [
+        "把 subagent 当成当前 origin 的同名工具"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "marker": "point:routing.executor-vs-target",
+        "heading_hint": "executor 不等于 target surface"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.executor-vs-target"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md executor vs target"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.routing.executor-vs-target"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:routing.handle-gate",
+      "title": "拿到真实 handle 才算派发",
+      "point_kind": "check",
+      "summary": "没有可 recon handle 的 in_flight 是幽灵任务。",
+      "recognition_cues": [
+        "spawn 失败",
+        "想先写 in_flight 再找 handle"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "marker": "point:routing.handle-gate",
+        "heading_hint": "拿到真实 handle 才算派发"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.handle-gate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md handle gate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.routing.handle-gate"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:routing.chain-to-executor",
+      "type": "deepens_to",
+      "from": "point:routing.ordered-chain",
+      "to": "point:routing.executor-vs-target",
+      "when": [
+        "需要解释 executor 与 target surface 为何正交"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md section order"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.routing.chain-to-executor"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:routing.chain-to-handle",
+      "type": "next",
+      "from": "point:routing.ordered-chain",
+      "to": "point:routing.handle-gate",
+      "when": [
+        "进入真实派发 / bind handle 步骤"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md handle section"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.routing.chain-to-handle"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:routing.handle-to-terminal",
+      "type": "next",
+      "from": "point:routing.handle-gate",
+      "to": "point:verification.terminal-is-not-done",
+      "when": [
+        "runtime 已停止，需要区分 terminal 与 task done"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md terminal after handle"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.routing.handle-to-terminal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:routing.chain-to-terminal",
+      "type": "requires",
+      "from": "point:routing.ordered-chain",
+      "to": "point:verification.terminal-is-not-done",
+      "when": [
+        "路由链最后一环是端点验收原则"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md chain ends at verification"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.routing.chain-to-terminal"
+          }
+        ]
+      }
+    }
+  ]
+}

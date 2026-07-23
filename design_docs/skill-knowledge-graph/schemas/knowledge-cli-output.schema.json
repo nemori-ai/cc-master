@@ -28,8 +28,27 @@
         "contract",
         "check",
         "report",
+        "path",
+        "explain",
         "diagnostic"
       ]
+    },
+    "graph_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path_query": {
+      "$ref": "#/$defs/pathQuery"
+    },
+    "path_result": {
+      "$ref": "#/$defs/pathResult"
+    },
+    "explain_target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entity": {
+      "$ref": "#/$defs/explainedEntity"
     },
     "contract_version": {
       "const": "v1alpha1"
@@ -191,6 +210,52 @@
         "required": [
           "structural_status",
           "behavioral_evidence_status",
+          "diagnostics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "path"
+          },
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "result_kind",
+          "ok"
+        ]
+      },
+      "then": {
+        "required": [
+          "path_query",
+          "path_result",
+          "diagnostics"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "explain"
+          },
+          "ok": {
+            "const": true
+          }
+        },
+        "required": [
+          "result_kind",
+          "ok"
+        ]
+      },
+      "then": {
+        "required": [
+          "explain_target",
+          "entity",
           "diagnostics"
         ]
       }
@@ -660,6 +725,17 @@
             "debt",
             "not_run"
           ]
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "graph_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
@@ -714,6 +790,202 @@
           }
         }
       ]
+    },
+    "pathQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "host",
+        "plane"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plane": {
+          "const": "navigation"
+        }
+      }
+    },
+    "pathHop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "edge_id",
+        "type"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "pathResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reachable",
+        "hops",
+        "witness"
+      ],
+      "properties": {
+        "reachable": {
+          "type": "boolean"
+        },
+        "hops": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pathHop"
+          }
+        },
+        "witness": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reachable": {
+                "const": true
+              }
+            },
+            "required": [
+              "reachable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hops": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reachable": {
+                "const": false
+              }
+            },
+            "required": [
+              "reachable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "hops": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "explainedEntity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "portfolio",
+            "skill",
+            "module",
+            "point",
+            "edge",
+            "entry",
+            "diagnostic"
+          ]
+        },
+        "owner_skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "type": "object"
+        },
+        "binding": {
+          "type": "object"
+        },
+        "recognition_cues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inbound": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outbound": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "access": {
+          "type": "object"
+        },
+        "witness": {
+          "type": "object"
+        }
+      }
     },
     "summary": {
       "type": "object",

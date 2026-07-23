@@ -1,15 +1,73 @@
 {
   "schema": "cc-master/skill-knowledge-cli/v1alpha1",
-  "ok": true,
   "command": "report",
   "result_kind": "report",
   "contract_version": "v1alpha1",
+  "ok": true,
+  "source_root": "plugin/src/knowledge",
+  "graph_hash": "d45f89e768ce7c459ac5e063b27f1f18fe88f77bd082578fc1a6a6a72b5acc7b",
   "structural_status": {
-    "state": "not_run"
+    "state": "debt",
+    "counts": {
+      "portfolio": 1,
+      "skill": 1,
+      "module": 3,
+      "point": 9,
+      "edge": 9,
+      "entry": 1,
+      "change": 0
+    },
+    "graph_hash": "d45f89e768ce7c459ac5e063b27f1f18fe88f77bd082578fc1a6a6a72b5acc7b"
   },
   "behavioral_evidence_status": {
     "state": "not_run",
     "evidence": []
   },
-  "diagnostics": []
+  "capabilities": {
+    "source_json_parse": true,
+    "source_envelope_validation": true,
+    "global_id_uniqueness": true,
+    "full_json_schema_validation": true,
+    "markdown_binding": true,
+    "graph_invariants": true,
+    "runtime_projection": false,
+    "hop_analysis": true,
+    "typed_change_transactions": false,
+    "entry_surface_binding": true,
+    "canonical_source_inventory": true,
+    "derived_freshness": true,
+    "canonical_graph_hash": true,
+    "deterministic_budget_estimator": true,
+    "host_portability_probe": false,
+    "semantic_coverage": true,
+    "behavioral_evidence_tracking": false
+  },
+  "diagnostics": [
+    {
+      "severity": "debt",
+      "code": "SKG-COVERAGE-PARTIAL",
+      "message": "Partial coverage debt remains for plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+      "location": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+      "witness": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "unresolved_coverage_debt": [
+          "SKILL.md 中非 conduct pilot 段落尚未切点。"
+        ]
+      },
+      "remediation": "Bind remaining prose into points, or keep the debt explicit until K2."
+    },
+    {
+      "severity": "debt",
+      "code": "SKG-COVERAGE-PARTIAL",
+      "message": "Partial coverage debt remains for plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
+      "location": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
+      "witness": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
+        "unresolved_coverage_debt": [
+          "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+        ]
+      },
+      "remediation": "Bind remaining prose into points, or keep the debt explicit until K2."
+    }
+  ]
 }
