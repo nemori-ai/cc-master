@@ -451,7 +451,12 @@ function locateKimiTranscript(
 //   外部提供的纯文本 transcript 路径（CURSOR_TRANSCRIPT_PATH），让 cursor hook / wrapper 无需显式
 //   `ccm agent bind --transcript` 也能挂上可 tail 的日志（走 raw parser·见 parserFor）。显式登记的
 //   transcript_ref 优先级更高（在本函数更早处命中）。
-const CURSOR_HARNESSES = new Set(['cursor-agent', 'cursor', 'cursor-agent-cli', 'cursor-ide']);
+export const CURSOR_HARNESSES = new Set([
+  'cursor-agent',
+  'cursor',
+  'cursor-agent-cli',
+  'cursor-ide',
+]);
 
 function locateCursorEnvTranscript(
   harness: string | undefined,

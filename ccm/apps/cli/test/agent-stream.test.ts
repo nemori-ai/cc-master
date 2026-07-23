@@ -420,6 +420,39 @@ test('unresolvable handle degrades to source.kind none (200 payload, not an erro
   assert.ok(p.source.reason && p.source.reason.length > 0);
 });
 
+test('no-source reason names the binding gap (not the agent type) for a streamable harness', () => {
+  // 真实事故形状：codex agent 以 task-id 登记（未走 ccm worker dispatch）、无 transcript_ref ——
+  //   旧文案「no readable stream source for this agent type yet」被误读成 codex 不支持流式。
+  const p = buildAgentStream({
+    agentId: 'agt-007',
+    harness: 'codex',
+    handleKind: 'task-id',
+    handleValue: 'b71um3zlv',
+    transcriptRef: null,
+    env: {},
+  });
+  assert.equal(p.source.kind, 'none');
+  assert.match(p.source.reason ?? '', /no stream binding/);
+  assert.match(p.source.reason ?? '', /task-id/);
+  assert.match(p.source.reason ?? '', /ccm worker dispatch/);
+  assert.match(p.source.reason ?? '', /ccm agent amend agt-007/);
+});
+
+test('no-source reason for cursor names the SQLite store and both bind-a-transcript exits', () => {
+  const p = buildAgentStream({
+    agentId: 'agt-008',
+    harness: 'cursor-agent',
+    handleKind: 'session-id',
+    handleValue: 'conv-123',
+    transcriptRef: null,
+    env: {},
+  });
+  assert.equal(p.source.kind, 'none');
+  assert.match(p.source.reason ?? '', /state\.vscdb/);
+  assert.match(p.source.reason ?? '', /CURSOR_TRANSCRIPT_PATH/);
+  assert.match(p.source.reason ?? '', /ccm agent amend agt-008/);
+});
+
 test('truncation marks long values and unknown harness falls back to raw lines', () => {
   const big = 'z'.repeat(9000);
   const ref = tmpFile(

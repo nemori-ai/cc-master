@@ -18,7 +18,7 @@
 //   源信息全收在 source 对象里，cursor 语义留给将来换源（run-store journal）不绑死「文件」。
 
 import * as fs from 'node:fs';
-import { locateTranscriptFile } from '../agent-probe.js';
+import { CURSOR_HARNESSES, locateTranscriptFile } from '../agent-probe.js';
 
 export const AGENT_STREAM_SCHEMA = 'ccm/web-viewer-agent-stream/v1';
 
@@ -653,6 +653,33 @@ function noSourcePayload(
   };
 }
 
+// 结构化转录可定位的 harness（parserFor 有专属 parser 且 agent-probe 有源定位策略的那批）。
+//   cursor 系列刻意不在此列：原生 store 是 SQLite state.vscdb（不可 tail），另走专属归因。
+const STREAM_LOCATABLE_HARNESSES = new Set(['claude-code', 'origin', 'codex', 'kimi-code']);
+
+// noSourceReason — 定位不到源时的诚实归因。命门：绝不把「这条 agent 记录没绑上源」说成「这个
+//   agent 类型不支持」——前者是操作者可修的绑定缺口（用户实测踩过：codex agent 以 task-id 登记、
+//   无 transcript_ref，viewer 显示旧文案后被误读成 codex 流式不支持），归因必须区分且给出操作出口。
+function noSourceReason(req: AgentStreamRequest): string {
+  if (req.transcriptRef) return 'transcript reference does not resolve to a readable file';
+  if (req.harness && CURSOR_HARNESSES.has(req.harness)) {
+    return (
+      'cursor native session store (SQLite state.vscdb) is not tailable yet — ' +
+      `expose a plaintext log via CURSOR_TRANSCRIPT_PATH, or bind one with 'ccm agent amend ${req.agentId} --transcript <absolute path>'`
+    );
+  }
+  if (req.handleKind === 'session-id') return 'transcript file not found yet for this session';
+  if (req.harness && STREAM_LOCATABLE_HARNESSES.has(req.harness)) {
+    const kind = req.handleKind ? `handle kind '${req.handleKind}'` : 'no handle';
+    return (
+      `agent record has no stream binding (${kind}, no transcript_ref) — ` +
+      `dispatch via 'ccm worker dispatch' to bind the session automatically, or run ` +
+      `'ccm agent amend ${req.agentId} --handle session-id:<sid>' / '--transcript <absolute path>'`
+    );
+  }
+  return 'no readable stream source for this agent type yet';
+}
+
 // buildAgentStream — /agent-stream.json 主入口：定位源 + 按模式增量读取 + 规范化。只读，绝不写。
 export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
   const nowMs = req.nowMs ?? Date.now();
@@ -670,13 +697,7 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
   );
 
   if (!location) {
-    const reason =
-      req.handleKind === 'session-id'
-        ? 'transcript file not found yet for this session'
-        : req.transcriptRef
-          ? 'transcript reference does not resolve to a readable file'
-          : 'no readable stream source for this agent type yet';
-    return noSourcePayload(req, reason, nowIso);
+    return noSourcePayload(req, noSourceReason(req), nowIso);
   }
 
   let size: number;
