@@ -1,0 +1,921 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.commands.extended",
+  "owner_skill": "skill:using-ccm",
+  "title": "命令面：cross-harness / advisory / ops",
+  "intent": "覆盖其余易腐 CLI namespace：cross-harness、usage/estimate、ops surfaces。",
+  "recognition_cues": [
+    "ccm usage/estimate",
+    "worker/quota",
+    "web-viewer/monitor"
+  ],
+  "boundary": {
+    "includes": [
+      "扩展 namespace 机械命令事实"
+    ],
+    "excludes": [
+      "配速决策（归 pacing-and-estimation / master）"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.cmd.usage"
+    ],
+    "rationale": "按需查阅；默认不挤占入口 pin。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.commands.extended"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.cmd.cross-harness-facts",
+      "title": "跨 harness 目标事实查询",
+      "point_kind": "reference",
+      "summary": "跨 harness 目标事实查询（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "跨 harness",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.cross-harness-facts",
+        "heading_hint": "跨 harness"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.cross-harness-facts"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.cross-harness-facts"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.worker-quota",
+      "title": "worker/provider/model-policy/orchestrator/route/quota",
+      "point_kind": "reference",
+      "summary": "worker/provider/model-policy/orchestrator/route/quota（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace worker",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.worker-quota",
+        "heading_hint": "namespace worker"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.worker-quota"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.worker-quota"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.capability-deps",
+      "title": "capability/target/delivery/dependency",
+      "point_kind": "reference",
+      "summary": "capability/target/delivery/dependency（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace capability",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.capability-deps",
+        "heading_hint": "namespace capability"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.capability-deps"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.capability-deps"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.peers-coord",
+      "title": "peers/coordination",
+      "point_kind": "reference",
+      "summary": "peers/coordination（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace peers",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.peers-coord",
+        "heading_hint": "namespace peers"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.peers-coord"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.peers-coord"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.usage",
+      "title": "namespace usage",
+      "point_kind": "reference",
+      "summary": "namespace usage（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace usage",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.usage",
+        "heading_hint": "namespace usage"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.usage"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.usage"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.ops-surfaces",
+      "title": "status-report/web-viewer/monitor/services/runtime",
+      "point_kind": "reference",
+      "summary": "status-report/web-viewer/monitor/services/runtime（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace status-report",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.ops-surfaces",
+        "heading_hint": "namespace status-report"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.ops-surfaces"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.ops-surfaces"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.estimate",
+      "title": "namespace estimate",
+      "point_kind": "reference",
+      "summary": "namespace estimate（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace estimate",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.estimate",
+        "heading_hint": "namespace estimate"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.estimate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.estimate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.calibration",
+      "title": "namespace calibration",
+      "point_kind": "reference",
+      "summary": "namespace calibration（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace calibration",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.calibration",
+        "heading_hint": "namespace calibration"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.calibration"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.calibration"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.misc-ns",
+      "title": "statusline/attempt/harness/upgrade",
+      "point_kind": "reference",
+      "summary": "statusline/attempt/harness/upgrade（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace statusline",
+        "advisory/ops namespace"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.misc-ns",
+        "heading_hint": "namespace statusline"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.misc-ns"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.misc-ns"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.cmd-ext.0",
+      "type": "next",
+      "from": "point:ccm.cmd.cross-harness-facts",
+      "to": "point:ccm.cmd.worker-quota",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.0"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.1",
+      "type": "next",
+      "from": "point:ccm.cmd.worker-quota",
+      "to": "point:ccm.cmd.capability-deps",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.1"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.2",
+      "type": "next",
+      "from": "point:ccm.cmd.capability-deps",
+      "to": "point:ccm.cmd.peers-coord",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.2"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.3",
+      "type": "next",
+      "from": "point:ccm.cmd.peers-coord",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 4,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.3"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.4",
+      "type": "next",
+      "from": "point:ccm.cmd.usage",
+      "to": "point:ccm.cmd.ops-surfaces",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 5,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.4"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.5",
+      "type": "next",
+      "from": "point:ccm.cmd.ops-surfaces",
+      "to": "point:ccm.cmd.estimate",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 6,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.5"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.6",
+      "type": "next",
+      "from": "point:ccm.cmd.estimate",
+      "to": "point:ccm.cmd.calibration",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 7,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.6"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext.7",
+      "type": "next",
+      "from": "point:ccm.cmd.calibration",
+      "to": "point:ccm.cmd.misc-ns",
+      "when": [
+        "继续扩展命令面"
+      ],
+      "path_role": "next",
+      "order": 8,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext.7"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext-to-core",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.usage",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "从 advisory 回到核心 task 命令面"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext-to-core"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-ext-to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.usage",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "任意扩展面回到 critical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-ext-to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.cross-harness-facts.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.cross-harness-facts",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.cross-harness-facts.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.worker-quota.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.worker-quota",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.worker-quota.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.ops-surfaces.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.ops-surfaces",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.ops-surfaces.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.estimate.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.estimate",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.estimate.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.calibration.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.calibration",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.calibration.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.misc-ns.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.misc-ns",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.misc-ns.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.hop.ccm.cmd.capability-deps.to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.capability-deps",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "满足 critical any-point→primary authored hop ≤2"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "hop budget bridge edge:ccm.hop.ccm.cmd.capability-deps.to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.hop-budget"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,659 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.commands.core",
+  "owner_skill": "skill:using-ccm",
+  "title": "命令面：board/goal/task 核心",
+  "intent": "提供易腐 CLI 事实的 canonical 段：board/goal/task/log 与 --json 形状。",
+  "recognition_cues": [
+    "ccm board/goal/task 怎么敲",
+    "flag/exit/schema",
+    "--json 形状"
+  ],
+  "boundary": {
+    "includes": [
+      "核心 namespace 机械命令事实"
+    ],
+    "excludes": [
+      "字段取值判断",
+      "换号决策"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.cmd.task"
+    ],
+    "rationale": "绝大多数写板热路径落到 task/board/goal 命令面。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.commands.core"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.cmd.overview",
+      "title": "ccm 顶层结构与 namespaces",
+      "point_kind": "reference",
+      "summary": "ccm 顶层结构与 namespaces（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "顶层结构",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.overview",
+        "heading_hint": "顶层结构"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.overview"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.overview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.board",
+      "title": "namespace board 命令面",
+      "point_kind": "reference",
+      "summary": "namespace board 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "namespace board",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.board",
+        "heading_hint": "namespace board"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.board"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.board"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.goal",
+      "title": "namespace goal 命令面",
+      "point_kind": "reference",
+      "summary": "namespace goal 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "namespace goal",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.goal",
+        "heading_hint": "namespace goal"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.goal"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.goal"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.task",
+      "title": "namespace task 命令面",
+      "point_kind": "reference",
+      "summary": "namespace task 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "namespace task",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.task",
+        "heading_hint": "namespace task"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.task"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.task"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.log",
+      "title": "namespace log 命令面",
+      "point_kind": "reference",
+      "summary": "namespace log 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "namespace log",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.log",
+        "heading_hint": "namespace log"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.log"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.log"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.json-shape",
+      "title": "--json 输出形状",
+      "point_kind": "reference",
+      "summary": "--json 输出形状（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
+      "recognition_cues": [
+        "--json 输出形状",
+        "怎么敲这条命令",
+        "有哪些 flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.json-shape",
+        "heading_hint": "--json 输出形状"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.json-shape"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.json-shape"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.cmd-core.0",
+      "type": "next",
+      "from": "point:ccm.cmd.overview",
+      "to": "point:ccm.cmd.board",
+      "when": [
+        "查阅核心 board/goal/task 命令面"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-core.0"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-core.1",
+      "type": "next",
+      "from": "point:ccm.cmd.board",
+      "to": "point:ccm.cmd.goal",
+      "when": [
+        "查阅核心 board/goal/task 命令面"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-core.1"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-core.2",
+      "type": "next",
+      "from": "point:ccm.cmd.goal",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "查阅核心 board/goal/task 命令面"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-core.2"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-core.3",
+      "type": "next",
+      "from": "point:ccm.cmd.task",
+      "to": "point:ccm.cmd.log",
+      "when": [
+        "查阅核心 board/goal/task 命令面"
+      ],
+      "path_role": "next",
+      "order": 4,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-core.3"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-core.4",
+      "type": "next",
+      "from": "point:ccm.cmd.log",
+      "to": "point:ccm.cmd.json-shape",
+      "when": [
+        "查阅核心 board/goal/task 命令面"
+      ],
+      "path_role": "next",
+      "order": 5,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-core.4"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.hotpath-ops-task-cmd",
+      "type": "operationalizes",
+      "from": "point:ccm.hotpath-flows",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "热路径需要精确 task flags/verb"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.hotpath-ops-task-cmd"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.status-ops-task-cmd",
+      "type": "operationalizes",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "状态机规则落到具体 task verb/flag"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.status-ops-task-cmd"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-task-to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.task",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "查完命令面回到状态机硬规则"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-task-to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-board-to-fields",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.board",
+      "to": "point:ccm.board.task-fields",
+      "when": [
+        "命令怎么敲之后要判断字段取值"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-board-to-fields"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.overview.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.overview",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.overview.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.log.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.log",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.log.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.json-shape.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.json-shape",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.json-shape.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ]
+}

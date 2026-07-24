@@ -1,0 +1,527 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.account-pool",
+  "owner_skill": "skill:using-ccm",
+  "title": "号池概念 + account 命令面",
+  "intent": "分离号池 why/选号判据/vault 安全与 account 命令机械事实；换号决策不在本模块。",
+  "recognition_cues": [
+    "ccm account",
+    "号池",
+    "换号机制",
+    "token-blind"
+  ],
+  "boundary": {
+    "includes": [
+      "号池概念叙事",
+      "account 命令面"
+    ],
+    "excludes": [
+      "换号决策/授权（归 master-orchestrator-guide）",
+      "选号算法实现（归 ccm 引擎）"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.account-pool-model"
+    ],
+    "rationale": "换号是重 lever；机制误解会导致泄漏或空切。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.account-pool"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.account-pool-model",
+      "title": "号池模型（指针 vs token）",
+      "point_kind": "principle",
+      "summary": "registry 零凭证；vault 存指针；home 不跟随 CLAUDE_CONFIG_DIR。",
+      "recognition_cues": [
+        "accounts.json",
+        "vault 指针",
+        "号池模型"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "marker": "point:ccm.account-pool-model",
+        "heading_hint": "号池模型"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.account-pool-model"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/account-pool.md#point:ccm.account-pool-model"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.account-enroll-why",
+      "title": "录号机制 why + refreshToken 硬要求",
+      "point_kind": "principle",
+      "summary": "keychain 直读完整 blob；无 refreshToken 不能无重启换号。",
+      "recognition_cues": [
+        "account add",
+        "refreshToken",
+        "setup-token"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "marker": "point:ccm.account-enroll-why",
+        "heading_hint": "录号机制 why"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.account-enroll-why"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/account-pool.md#point:ccm.account-enroll-why"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.account-select-method",
+      "title": "选号方法论判据",
+      "point_kind": "decision_rule",
+      "summary": "双窗口硬闸 + 恢复度二值推算 + 信任分级；全池耗尽 surface 用户。",
+      "recognition_cues": [
+        "选哪个号",
+        "NONE_ALL_EXHAUSTED",
+        "5h/7d 硬闸"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "marker": "point:ccm.account-select-method",
+        "heading_hint": "选号方法论"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.account-select-method"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/account-pool.md#point:ccm.account-select-method"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.account-policy-vault",
+      "title": "policy 硬闸 + vault/token-blind",
+      "point_kind": "check",
+      "summary": "switch 前读 policy；vault 两形态局限；token 永不进 agent context。",
+      "recognition_cues": [
+        "exit 7 policy-deny",
+        "token-blind",
+        "file vault 明文"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "marker": "point:ccm.account-policy-vault",
+        "heading_hint": "policy 机制硬闸"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.account-policy-vault"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/account-pool.md#point:ccm.account-policy-vault"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.account",
+      "title": "namespace account 命令面",
+      "point_kind": "reference",
+      "summary": "account add/refresh/delete/list/switch 机械命令事实（易腐）。",
+      "recognition_cues": [
+        "ccm account switch",
+        "account list"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.account",
+        "heading_hint": "namespace account"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.account"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.account"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.account-model-enroll",
+      "type": "next",
+      "from": "point:ccm.account-pool-model",
+      "to": "point:ccm.account-enroll-why",
+      "when": [
+        "懂模型后看录号 why"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.account-model-enroll"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.account-enroll-select",
+      "type": "next",
+      "from": "point:ccm.account-enroll-why",
+      "to": "point:ccm.account-select-method",
+      "when": [
+        "录号后看选号判据"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.account-enroll-select"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.account-select-policy",
+      "type": "next",
+      "from": "point:ccm.account-select-method",
+      "to": "point:ccm.account-policy-vault",
+      "when": [
+        "选号后看 policy/vault/token-blind"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.account-select-policy"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.account-policy-ops-cmd",
+      "type": "operationalizes",
+      "from": "point:ccm.account-policy-vault",
+      "to": "point:ccm.cmd.account",
+      "when": [
+        "机制理解后要敲 account 命令"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.account-policy-ops-cmd"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.account-to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.account-pool-model",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "从号池回到 critical 主点（跨模块直径）"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.account-to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.account-enroll-why.pri",
+      "type": "routes_to",
+      "from": "point:ccm.account-enroll-why",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.account-enroll-why.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.account-select-method.pri",
+      "type": "routes_to",
+      "from": "point:ccm.account-select-method",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.account-select-method.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.account-policy-vault.pri",
+      "type": "routes_to",
+      "from": "point:ccm.account-policy-vault",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.account-policy-vault.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.account.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.account",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.account.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ]
+}

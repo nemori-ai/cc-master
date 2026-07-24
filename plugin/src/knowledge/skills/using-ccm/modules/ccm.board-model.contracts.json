@@ -1,0 +1,1088 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.board-model.contracts",
+  "owner_skill": "skill:using-ccm",
+  "title": "board 模型：合同、节奏与校验判断",
+  "intent": "判断 planning/routing、agents、jc/cadence/watchdog、true-done、反模式、校验规则与 DDL。",
+  "recognition_cues": [
+    "routing 合同",
+    "arm watchdog",
+    "true-done",
+    "撞校验规则",
+    "goal deadline"
+  ],
+  "boundary": {
+    "includes": [
+      "C.5–O 判断性知识",
+      "操作侧校验规则速查"
+    ],
+    "excludes": [
+      "引擎规则实现",
+      "命令 flag 全集"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.board.artifact-verified"
+    ],
+    "rationale": "真完成与合同误判会放行未验收产物或假派发。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.board-model.contracts"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.board.planning-routing",
+      "title": "planning/routing 合同判断",
+      "point_kind": "decision_rule",
+      "summary": "planning/routing 合同判断",
+      "recognition_cues": [
+        "set-planning",
+        "set-routing",
+        "route-bind"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.planning-routing",
+        "heading_hint": "C.5"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.planning-routing"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.planning-routing"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.agents-registry",
+      "title": "agents[] 登记簿语义",
+      "point_kind": "procedure",
+      "summary": "agents[] 登记簿语义",
+      "recognition_cues": [
+        "agent create/bind/terminal",
+        "凡派发皆登记"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.agents-registry",
+        "heading_hint": "C.6"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.agents-registry"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.agents-registry"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.jc-judgment",
+      "title": "jc 何时建与 severity",
+      "point_kind": "decision_rule",
+      "summary": "jc 何时建与 severity",
+      "recognition_cues": [
+        "judgment_call",
+        "自驱决策记录"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.jc-judgment",
+        "heading_hint": "H. jc"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.jc-judgment"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.jc-judgment"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.cadence",
+      "title": "cadence/iteration 节奏",
+      "point_kind": "decision_rule",
+      "summary": "cadence/iteration 节奏",
+      "recognition_cues": [
+        "开 iteration",
+        "overbooked warn"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.cadence",
+        "heading_hint": "I. cadence"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.cadence"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.cadence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.parent-owner",
+      "title": "parent/owner 嵌套语义",
+      "point_kind": "decision_rule",
+      "summary": "parent/owner 嵌套语义",
+      "recognition_cues": [
+        "owner 容器",
+        "依赖连叶节点"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.parent-owner",
+        "heading_hint": "J. parent"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.parent-owner"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.parent-owner"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.watchdog",
+      "title": "watchdog 何时 arm",
+      "point_kind": "procedure",
+      "summary": "watchdog 何时 arm",
+      "recognition_cues": [
+        "arm watchdog",
+        "disarm 两件套"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.watchdog",
+        "heading_hint": "K. watchdog"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.watchdog"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.watchdog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.artifact-verified",
+      "title": "artifact/verified 真完成",
+      "point_kind": "check",
+      "summary": "artifact/verified 真完成",
+      "recognition_cues": [
+        "BIZ-DONE-VERIFIED",
+        "true-done"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.artifact-verified",
+        "heading_hint": "L. artifact"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.artifact-verified"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.artifact-verified"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.antipatterns",
+      "title": "决策树与反模式深化",
+      "point_kind": "check",
+      "summary": "决策树与反模式深化",
+      "recognition_cues": [
+        "反模式",
+        "裸 path 错落"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.antipatterns",
+        "heading_hint": "M. 反模式"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.antipatterns"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.antipatterns"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.validation-rules",
+      "title": "FMT/GRAPH/BIZ 规则速查（操作视图）",
+      "point_kind": "reference",
+      "summary": "FMT/GRAPH/BIZ 规则速查（操作视图）",
+      "recognition_cues": [
+        "撞了哪条规则",
+        "FMT-TIME"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.validation-rules",
+        "heading_hint": "N. 校验规则"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.validation-rules"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.validation-rules"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.board.deadline-ddl",
+      "title": "交付 DDL 四态判断",
+      "point_kind": "decision_rule",
+      "summary": "交付 DDL 四态判断",
+      "recognition_cues": [
+        "deadline_pending",
+        "confirm-none"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "marker": "point:ccm.board.deadline-ddl",
+        "heading_hint": "O. DDL"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.board.deadline-ddl"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md#point:ccm.board.deadline-ddl"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.board-ops.0",
+      "type": "next",
+      "from": "point:ccm.board.planning-routing",
+      "to": "point:ccm.board.agents-registry",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.0"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.1",
+      "type": "deepens_to",
+      "from": "point:ccm.board.agents-registry",
+      "to": "point:ccm.board.jc-judgment",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.1"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.2",
+      "type": "next",
+      "from": "point:ccm.board.jc-judgment",
+      "to": "point:ccm.board.cadence",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.2"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.3",
+      "type": "deepens_to",
+      "from": "point:ccm.board.cadence",
+      "to": "point:ccm.board.parent-owner",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 4,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.3"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.4",
+      "type": "next",
+      "from": "point:ccm.board.parent-owner",
+      "to": "point:ccm.board.watchdog",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 5,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.4"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.5",
+      "type": "deepens_to",
+      "from": "point:ccm.board.watchdog",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 6,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.5"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.6",
+      "type": "next",
+      "from": "point:ccm.board.artifact-verified",
+      "to": "point:ccm.board.antipatterns",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 7,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.6"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.7",
+      "type": "deepens_to",
+      "from": "point:ccm.board.antipatterns",
+      "to": "point:ccm.board.validation-rules",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 8,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.7"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops.8",
+      "type": "next",
+      "from": "point:ccm.board.validation-rules",
+      "to": "point:ccm.board.deadline-ddl",
+      "when": [
+        "继续 board 合同/节奏/校验操作判断"
+      ],
+      "path_role": "next",
+      "order": 9,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops.8"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.planning-requires-optin",
+      "type": "requires",
+      "from": "point:ccm.board.planning-routing",
+      "to": "point:ccm.planning-opt-in",
+      "when": [
+        "写 planning/routing 前先懂 opt-in 非派发器"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.planning-requires-optin"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.artifact-requires-status",
+      "type": "requires",
+      "from": "point:ccm.board.artifact-verified",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "true-done 证据绑定 status 状态机"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.artifact-requires-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops-to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.board.planning-routing",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "从合同段回到 critical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops-to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-ops-to-lifecycle",
+      "type": "routes_to",
+      "from": "point:ccm.board.antipatterns",
+      "to": "point:ccm.board.status-semantics",
+      "when": [
+        "反模式常回到 status 语义"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-ops-to-lifecycle"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.planning-routing.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.planning-routing",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.planning-routing.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.agents-registry.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.agents-registry",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.agents-registry.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.jc-judgment.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.jc-judgment",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.jc-judgment.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.cadence.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.cadence",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.cadence.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.antipatterns.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.antipatterns",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.antipatterns.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.validation-rules.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.validation-rules",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.validation-rules.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.board.deadline-ddl.pri",
+      "type": "routes_to",
+      "from": "point:ccm.board.deadline-ddl",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.board.deadline-ddl.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.hop.ccm.board.parent-owner.to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.board.parent-owner",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "满足 critical any-point→primary authored hop ≤2"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "hop budget bridge edge:ccm.hop.ccm.board.parent-owner.to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.hop-budget"
+          }
+        ]
+      }
+    }
+  ]
+}

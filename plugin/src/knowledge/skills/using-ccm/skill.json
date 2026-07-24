@@ -1,0 +1,200 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:using-ccm",
+  "name": "using-ccm",
+  "package_root": "plugin/src/skills/using-ccm",
+  "intent": "用 ccm CLI 正确读写 board：稳定心智 + 命令面机械事实 + board 模型判断 + 号池机制。",
+  "modules": [
+    {
+      "id": "module:ccm.mind-model",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.mind-model.json"
+    },
+    {
+      "id": "module:ccm.hotpath-footgun",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.hotpath-footgun.json"
+    },
+    {
+      "id": "module:ccm.board-model.lifecycle",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.board-model.lifecycle.json"
+    },
+    {
+      "id": "module:ccm.board-model.contracts",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.board-model.contracts.json"
+    },
+    {
+      "id": "module:ccm.commands.core",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.commands.core.json"
+    },
+    {
+      "id": "module:ccm.commands.scheduling",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.commands.scheduling.json"
+    },
+    {
+      "id": "module:ccm.commands.extended",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.commands.extended.json"
+    },
+    {
+      "id": "module:ccm.account-pool",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/modules/ccm.account-pool.json"
+    }
+  ],
+  "entry_modules": [
+    "module:ccm.mind-model",
+    "module:ccm.hotpath-footgun",
+    "module:ccm.board-model.lifecycle",
+    "module:ccm.board-model.contracts",
+    "module:ccm.commands.core",
+    "module:ccm.commands.scheduling",
+    "module:ccm.commands.extended",
+    "module:ccm.account-pool"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:ccm.account-enroll-why",
+        "point:ccm.account-policy-vault",
+        "point:ccm.account-pool-model",
+        "point:ccm.account-select-method"
+      ],
+      "reviewed_unbound_sha256": "448721c7cb9c24e70d129bd4a800ad23cd3e20ee62bd12f9ea06b5f882ba9598"
+    },
+    {
+      "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:ccm.board.acceptance",
+        "point:ccm.board.agents-registry",
+        "point:ccm.board.antipatterns",
+        "point:ccm.board.artifact-verified",
+        "point:ccm.board.blocked-on",
+        "point:ccm.board.cadence",
+        "point:ccm.board.deadline-ddl",
+        "point:ccm.board.deps-linking",
+        "point:ccm.board.estimate-judgment",
+        "point:ccm.board.executor-choice",
+        "point:ccm.board.jc-judgment",
+        "point:ccm.board.parent-owner",
+        "point:ccm.board.planning-routing",
+        "point:ccm.board.status-semantics",
+        "point:ccm.board.task-fields",
+        "point:ccm.board.validation-rules",
+        "point:ccm.board.watchdog"
+      ],
+      "reviewed_unbound_sha256": "b5833a36421416dd51bf92d283c5718da08926cf7bfddfa1f92b7d7e32d929b7"
+    },
+    {
+      "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:ccm.cmd.account",
+        "point:ccm.cmd.agent",
+        "point:ccm.cmd.baseline",
+        "point:ccm.cmd.board",
+        "point:ccm.cmd.cadence",
+        "point:ccm.cmd.calibration",
+        "point:ccm.cmd.capability-deps",
+        "point:ccm.cmd.cross-harness-facts",
+        "point:ccm.cmd.estimate",
+        "point:ccm.cmd.goal",
+        "point:ccm.cmd.jc",
+        "point:ccm.cmd.json-shape",
+        "point:ccm.cmd.log",
+        "point:ccm.cmd.misc-ns",
+        "point:ccm.cmd.ops-surfaces",
+        "point:ccm.cmd.overview",
+        "point:ccm.cmd.peers-coord",
+        "point:ccm.cmd.task",
+        "point:ccm.cmd.usage",
+        "point:ccm.cmd.watchdog",
+        "point:ccm.cmd.worker-quota"
+      ],
+      "reviewed_unbound_sha256": "ce8903c651ef1b739da24a11c216cabc099b115e87aa6b4399de1c2f2c380a10"
+    },
+    {
+      "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:ccm.exit-codes",
+        "point:ccm.field-tiers",
+        "point:ccm.footgun-table",
+        "point:ccm.hotpath-flows",
+        "point:ccm.planning-opt-in",
+        "point:ccm.pointers-routing",
+        "point:ccm.single-write-path",
+        "point:ccm.status-state-machine",
+        "point:ccm.when-to-open",
+        "point:ccm.write-gate"
+      ],
+      "reviewed_unbound_sha256": "4910ace21c1702000128a8b5f62573e0d2e74eb9ff490473cec9b16d9790a863"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "partial",
+      "covered_modules": [
+        "module:ccm.mind-model",
+        "module:ccm.hotpath-footgun",
+        "module:ccm.board-model.lifecycle",
+        "module:ccm.board-model.contracts",
+        "module:ccm.commands.core",
+        "module:ccm.commands.scheduling",
+        "module:ccm.commands.extended"
+      ],
+      "reason": "Codex adapter excludes canonical/references/account-pool.md and marks account_switch unsupported (ccm account targets Claude Code OAuth stores); module:ccm.account-pool and its accepted points are out of this host surface."
+    },
+    {
+      "host": "cursor",
+      "state": "partial",
+      "covered_modules": [
+        "module:ccm.mind-model",
+        "module:ccm.hotpath-footgun",
+        "module:ccm.board-model.lifecycle",
+        "module:ccm.board-model.contracts",
+        "module:ccm.commands.core",
+        "module:ccm.commands.scheduling",
+        "module:ccm.commands.extended"
+      ],
+      "reason": "Cursor adapter excludes canonical/references/account-pool.md and marks account_switch unsupported (ccm account targets Claude Code OAuth stores); module:ccm.account-pool and its accepted points are out of this host surface."
+    },
+    {
+      "host": "kimi-code",
+      "state": "partial",
+      "covered_modules": [
+        "module:ccm.mind-model",
+        "module:ccm.hotpath-footgun",
+        "module:ccm.board-model.lifecycle",
+        "module:ccm.board-model.contracts",
+        "module:ccm.commands.core",
+        "module:ccm.commands.scheduling",
+        "module:ccm.commands.extended"
+      ],
+      "reason": "Kimi Code adapter excludes canonical/references/account-pool.md and marks account_switch unsupported (NotImplemented; ccm account targets Claude Code OAuth stores); module:ccm.account-pool and its accepted points are out of this host surface."
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "accepted-skill-admission-k2-using-ccm"
+      }
+    ]
+  }
+}

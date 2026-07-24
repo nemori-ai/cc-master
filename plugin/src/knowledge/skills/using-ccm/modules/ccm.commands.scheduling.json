@@ -1,0 +1,516 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.commands.scheduling",
+  "owner_skill": "skill:using-ccm",
+  "title": "命令面：jc/cadence/watchdog/agent",
+  "intent": "调度与运行时登记相关 namespace 的机械命令事实。",
+  "recognition_cues": [
+    "ccm jc/cadence/watchdog/agent",
+    "baseline 怎么写"
+  ],
+  "boundary": {
+    "includes": [
+      "jc/cadence/watchdog/agent/baseline 命令面"
+    ],
+    "excludes": [
+      "何时该 arm/建 jc 的判断（归 board-model）"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.cmd.watchdog"
+    ],
+    "rationale": "低频于核心写板，但需要时可到达。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.commands.scheduling"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.cmd.jc",
+      "title": "namespace jc",
+      "point_kind": "reference",
+      "summary": "namespace jc 命令面（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace jc",
+        "namespace jc flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.jc",
+        "heading_hint": "namespace jc"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.jc"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.jc"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.cadence",
+      "title": "namespace cadence",
+      "point_kind": "reference",
+      "summary": "namespace cadence 命令面（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace cadence",
+        "namespace cadence flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.cadence",
+        "heading_hint": "namespace cadence"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.cadence"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.cadence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.watchdog",
+      "title": "namespace watchdog",
+      "point_kind": "reference",
+      "summary": "namespace watchdog 命令面（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace watchdog",
+        "namespace watchdog flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.watchdog",
+        "heading_hint": "namespace watchdog"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.watchdog"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.watchdog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.agent",
+      "title": "namespace agent",
+      "point_kind": "reference",
+      "summary": "namespace agent 命令面（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace agent",
+        "namespace agent flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.agent",
+        "heading_hint": "namespace agent"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.agent"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.agent"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.cmd.baseline",
+      "title": "namespace baseline",
+      "point_kind": "reference",
+      "summary": "namespace baseline 命令面（易腐 CLI 事实）。",
+      "recognition_cues": [
+        "namespace baseline",
+        "namespace baseline flag"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "marker": "point:ccm.cmd.baseline",
+        "heading_hint": "namespace baseline"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.cmd.baseline"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md#point:ccm.cmd.baseline"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.cmd-jc-cadence",
+      "type": "next",
+      "from": "point:ccm.cmd.jc",
+      "to": "point:ccm.cmd.cadence",
+      "when": [
+        "从决策记录转到节奏命令"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-jc-cadence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-cadence-watchdog",
+      "type": "next",
+      "from": "point:ccm.cmd.cadence",
+      "to": "point:ccm.cmd.watchdog",
+      "when": [
+        "节奏命令后查 watchdog 面"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-cadence-watchdog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-watchdog-agent",
+      "type": "next",
+      "from": "point:ccm.cmd.watchdog",
+      "to": "point:ccm.cmd.agent",
+      "when": [
+        "查 agent registry 命令"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-watchdog-agent"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-agent-baseline",
+      "type": "next",
+      "from": "point:ccm.cmd.agent",
+      "to": "point:ccm.cmd.baseline",
+      "when": [
+        "查 baseline 写 noun"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-agent-baseline"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.board-watchdog-ops-cmd",
+      "type": "operationalizes",
+      "from": "point:ccm.board.watchdog",
+      "to": "point:ccm.cmd.watchdog",
+      "when": [
+        "判断何时 arm 后要精确命令"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.board-watchdog-ops-cmd"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.cmd-sched-to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.watchdog",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "从调度命令面回到 critical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.cmd-sched-to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.agent.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.agent",
+      "to": "point:ccm.cmd.watchdog",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.agent.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.cmd.baseline.pri",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.baseline",
+      "to": "point:ccm.cmd.watchdog",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.cmd.baseline.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.hop.ccm.cmd.jc.to-critical",
+      "type": "routes_to",
+      "from": "point:ccm.cmd.jc",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "满足 critical any-point→primary authored hop ≤2"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "hop budget bridge edge:ccm.hop.ccm.cmd.jc.to-critical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.hop-budget"
+          }
+        ]
+      }
+    }
+  ]
+}
