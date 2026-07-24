@@ -6,6 +6,7 @@ import {
   HARDENING_CONTRACT,
   OUTPUT_SCHEMA,
 } from './contracts.mjs';
+import { loadPublishedBehaviorEvidence } from './behavior-eval.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
 import { buildAndValidateGraph, resolveEntityId, shortestPath } from './graph.mjs';
 import { compareCodePoint } from './hash.mjs';
@@ -64,6 +65,19 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
         ? 'debt'
         : 'pass'
       : 'fail';
+  const loadedBehavioralEvidence = built.graph?.graph_hash
+    ? loadPublishedBehaviorEvidence({
+        repoRoot,
+        graphHash: built.graph.graph_hash,
+      })
+    : { state: 'not_run', evidence: [] };
+  const behavioralEvidence = {
+    state: loadedBehavioralEvidence.state,
+    evidence: loadedBehavioralEvidence.evidence ?? [],
+    ...(loadedBehavioralEvidence.verdict
+      ? { verdict: loadedBehavioralEvidence.verdict }
+      : {}),
+  };
 
   const body = envelopeBase('report', 'report', {
     ok: exitCode === 0,
@@ -75,10 +89,7 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
       ...(built.graph ? { counts: built.graph.counts } : {}),
       ...(built.graph?.graph_hash ? { graph_hash: built.graph.graph_hash } : {}),
     },
-    behavioral_evidence_status: {
-      state: 'not_run',
-      evidence: [],
-    },
+    behavioral_evidence_status: behavioralEvidence,
     capabilities: { ...CAPABILITIES },
     diagnostics: publicDiagnostics(diagnostics),
   });

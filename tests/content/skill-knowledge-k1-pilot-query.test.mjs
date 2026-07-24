@@ -107,7 +107,27 @@ test('SKG-PILOT-01: check loads full portfolio inventory with stable graph hash'
   assertValidCliOutput(report, 'report success');
   assert.equal(report.result_kind, 'report');
   assert.equal(report.structural_status.state, 'pass');
-  assert.equal(report.behavioral_evidence_status.state, 'not_run');
+  const publishedEvidence = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        'design_docs/eval/skill-knowledge-router/evidence.json',
+      ),
+      'utf8',
+    ),
+  );
+  const evidenceIsCurrent = publishedEvidence.graph_hash === report.graph_hash;
+  assert.equal(
+    report.behavioral_evidence_status.state,
+    evidenceIsCurrent ? 'baseline' : 'not_run',
+  );
+  assert.deepEqual(
+    report.behavioral_evidence_status.evidence,
+    evidenceIsCurrent
+      ? ['design_docs/eval/skill-knowledge-router/evidence.json']
+      : [],
+  );
+  assert.equal(Object.hasOwn(report.behavioral_evidence_status, 'verdict'), false);
   assert.equal(Object.hasOwn(report, 'improvement_claim'), false);
   assert.equal(report.structural_status.counts.skill, 8);
   assert.equal(report.structural_status.counts.entry, 8);

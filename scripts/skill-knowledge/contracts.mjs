@@ -175,7 +175,7 @@ export const CAPABILITIES = Object.freeze({
   host_portability_probe: true,
   // K1 pilot semantic coverage over admitted three-module inventory.
   semantic_coverage: true,
-  behavioral_evidence_tracking: false,
+  behavioral_evidence_tracking: true,
 });
 
 export function contractEnvelope() {

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "point_id",
+    "module_id",
+    "owner_skill",
+    "evidence_path",
+    "evidence_quote",
+    "answer",
+    "visited_files",
+    "route",
+    "abstained"
+  ],
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "point_id": {"type": ["string", "null"]},
+    "module_id": {"type": ["string", "null"]},
+    "owner_skill": {"type": ["string", "null"]},
+    "evidence_path": {"type": ["string", "null"]},
+    "evidence_quote": {"type": ["string", "null"]},
+    "answer": {"type": "string"},
+    "visited_files": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "route": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "abstained": {"type": "boolean"}
+  }
+}

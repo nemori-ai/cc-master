@@ -106,7 +106,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.capabilities.deterministic_budget_estimator, true);
   assert.equal(body.capabilities.host_portability_probe, true);
   assert.equal(body.capabilities.semantic_coverage, true);
-  assert.equal(body.capabilities.behavioral_evidence_tracking, false);
+  assert.equal(body.capabilities.behavioral_evidence_tracking, true);
   assert.equal(body.capabilities.hop_analysis, true);
   assert.equal(body.capabilities.runtime_projection, true);
   assert.equal(body.capabilities.typed_change_transactions, true);

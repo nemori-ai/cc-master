@@ -40,7 +40,7 @@
     "deterministic_budget_estimator": true,
     "host_portability_probe": true,
     "semantic_coverage": true,
-    "behavioral_evidence_tracking": false
+    "behavioral_evidence_tracking": true
   },
   "diagnostics": [
     {

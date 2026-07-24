@@ -38,6 +38,10 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 - 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI `check --host` integration；
 - `runtime_projection=true`：`compile` 写入 `plugin/dist/<host>/knowledge/` 与 skill nav/anchors，final verifier 只计真实可点击边；host honesty 保留 stub/partial coverage（workflow stubs；using-ccm / master-orchestrator partial hosts）；
 - typed change transactions 已交付：`change begin → validate → apply` 冻结 scope/base/hash，验证闭合集合并以 rollback-safe publication 写入 immutable ledger（`typed_change_transactions=true`）；
+- 带外行为评测脚手架已交付（`behavioral_evidence_tracking=true`）：冻结 train/holdout、
+  no-router baseline / router candidate、Codex/Cursor runner、grounding/navigation grader 与
+  graph-hash evidence freshness；随机 LLM 结果不接 CI 硬门；
 - `check --host` 或 `check --base`、`report --host` 仍 exit 10。
 
-未来项只留真实缺口：`behavioral_evidence_tracking`，以及 `check --host` CLI 接线。`examples/` 仍保留历史 K1 pilot fixture，不得冒充 live portfolio inventory。
+未来项只留真实缺口：完整 8 skills × 2 harnesses × 3 runs 的 baseline/candidate/holdout
+证据矩阵，以及 `check --host` CLI 接线。`examples/` 仍保留历史 K1 pilot fixture，不得冒充 live portfolio inventory。
