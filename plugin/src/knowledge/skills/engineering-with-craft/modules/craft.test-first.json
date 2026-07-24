@@ -1,0 +1,809 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:craft.test-first",
+  "owner_skill": "skill:engineering-with-craft",
+  "title": "TDD Test-first",
+  "intent": "执行可验证的 RED→GREEN→REFACTOR，并用真实约束和末端证据守住完成声明。",
+  "recognition_cues": [
+    "准备写产品代码却没有失败测试",
+    "测试全绿但真实约束未验证"
+  ],
+  "boundary": {
+    "includes": [
+      "TDD 铁律",
+      "红绿重构",
+      "constraint parity",
+      "completion gate"
+    ],
+    "excludes": [
+      "执行任务的优化循环形状",
+      "spec 的准入判断"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:engineering-craft"
+    ],
+    "primary_points": [
+      "point:tdd.iron-law"
+    ],
+    "rationale": "TDD Test-first是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.craft.test-first"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:tdd.completion-gate",
+      "title": "完成证据闸",
+      "point_kind": "check",
+      "summary": "最后一次编辑后重跑回归、质量闸并只报告观察到的事实。",
+      "recognition_cues": [
+        "需要完成证据闸"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.completion-gate",
+        "heading_hint": "完成证据闸"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.completion-gate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.completion-gate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.constraint-parity",
+      "title": "Constraint parity",
+      "point_kind": "principle",
+      "summary": "test double 必须与真实后端执行相同约束，关键约束须在真后端验证。",
+      "recognition_cues": [
+        "需要Constraint parity"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.constraint-parity",
+        "heading_hint": "Constraint parity"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.constraint-parity"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.constraint-parity"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.design-feedback",
+      "title": "测试困难是设计反馈",
+      "point_kind": "decision_rule",
+      "summary": "把庞大 setup、全面 mock 与难测接口当成耦合或边界错误的证据。",
+      "recognition_cues": [
+        "需要测试困难是设计反馈"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.design-feedback",
+        "heading_hint": "测试困难是设计反馈"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.design-feedback"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.design-feedback"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.iron-law",
+      "title": "TDD 铁律",
+      "point_kind": "principle",
+      "summary": "没有亲眼验证会因预期原因失败的测试，就不写产品代码。",
+      "recognition_cues": [
+        "需要TDD 铁律"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.iron-law",
+        "heading_hint": "TDD 铁律"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.iron-law"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.iron-law"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.loop-boundary",
+      "title": "TDD 与执行循环边界",
+      "point_kind": "boundary",
+      "summary": "TDD 拥有 test-first 手艺，dev loop 只拥有迭代优化形状。",
+      "recognition_cues": [
+        "需要TDD 与执行循环边界"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.loop-boundary",
+        "heading_hint": "TDD 与执行循环边界"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.loop-boundary"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.loop-boundary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.rationalizations",
+      "title": "TDD 合理化与红旗",
+      "point_kind": "check",
+      "summary": "识别事后补测、沉没成本、手测替代和未重验全绿等谈判信号。",
+      "recognition_cues": [
+        "需要TDD 合理化与红旗"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.rationalizations",
+        "heading_hint": "TDD 合理化与红旗"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.rationalizations"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.rationalizations"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.red-evidence",
+      "title": "验证 RED 原因",
+      "point_kind": "check",
+      "summary": "区分预期失败、测试自身错误与危险的首次通过。",
+      "recognition_cues": [
+        "需要验证 RED 原因"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.red-evidence",
+        "heading_hint": "验证 RED 原因"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.red-evidence"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.red-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:tdd.red-green-loop",
+      "title": "红绿重构循环",
+      "point_kind": "procedure",
+      "summary": "依次完成最小 RED、验证失败、最小 GREEN、验证回归与绿上重构。",
+      "recognition_cues": [
+        "需要红绿重构循环"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "marker": "point:tdd.red-green-loop",
+        "heading_hint": "红绿重构循环"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:tdd.red-green-loop"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.tdd.red-green-loop"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:craft.test-first.iron-law-to-completion-gate",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.completion-gate",
+      "when": [
+        "从模块主点进入完成证据闸"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.completion-gate-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.completion-gate",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从完成证据闸返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-constraint-parity",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.constraint-parity",
+      "when": [
+        "从模块主点进入Constraint parity"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.constraint-parity-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.constraint-parity",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从Constraint parity返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-design-feedback",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.design-feedback",
+      "when": [
+        "从模块主点进入测试困难是设计反馈"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.design-feedback-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.design-feedback",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从测试困难是设计反馈返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-loop-boundary",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.loop-boundary",
+      "when": [
+        "从模块主点进入TDD 与执行循环边界"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.loop-boundary-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.loop-boundary",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从TDD 与执行循环边界返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-rationalizations",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.rationalizations",
+      "when": [
+        "从模块主点进入TDD 合理化与红旗"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.rationalizations-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.rationalizations",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从TDD 合理化与红旗返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-red-evidence",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.red-evidence",
+      "when": [
+        "从模块主点进入验证 RED 原因"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.red-evidence-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.red-evidence",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从验证 RED 原因返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.iron-law-to-red-green-loop",
+      "type": "deepens_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:tdd.red-green-loop",
+      "when": [
+        "从模块主点进入红绿重构循环"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.red-green-loop-to-iron-law",
+      "type": "routes_to",
+      "from": "point:tdd.red-green-loop",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "从红绿重构循环返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.test-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.test-first.to-shared-spine",
+      "type": "routes_to",
+      "from": "point:tdd.iron-law",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从 TDD 决策返回四理论共享 canonical 脊椎"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "TDD 与共享工程根的显式接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.test-first.to-shared-spine"
+          }
+        ]
+      }
+    }
+  ]
+}

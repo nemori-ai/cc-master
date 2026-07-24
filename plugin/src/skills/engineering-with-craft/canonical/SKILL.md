@@ -15,12 +15,15 @@ description: 'Use when you (a coding/execution agent) are designing, building, o
 
 ---
 
+<!-- ccm:k:start point:craft.shared-spine -->
 ## 核心论题：四个理论，一条脊椎
 
 DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一种工程良知在 design / build / test 三阶段的不同切面，从**同一组根**长出来。这五根同时管着四理论的**手艺**、也管着**交付尺度**——顶层怎么敏捷切（slicing-goals-into-dags）、任务内怎么迭代（dev-as-ml-loop）与本 skill 的手艺内容共享同一组根，三层范式见下文接力段。先握住下面五条根，再到各 reference 取深度：**根对了，四个理论彼此印证；根没握住，它们就退化成四张互不相干的清单。**
 
 ---
 
+<!-- ccm:k:end point:craft.shared-spine -->
+<!-- ccm:k:start point:craft.invariant-anchor -->
 ## 根 1：不变式即锚
 
 先找到那条**任何时刻都必须为真**的约束——它同时决定了三件事：边界划在哪、守卫放进哪个对象、拿什么测试去戳它。
@@ -31,6 +34,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.invariant-anchor -->
+<!-- ccm:k:start point:craft.contract-ssot -->
 ## 根 2：契约即 SSOT
 
 每个边界都有一份**先达成、被双方共同遵守**的合约。它在哪定、谁拥有、**改它的顺序**，比任何实现细节都先。
@@ -42,6 +47,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.contract-ssot -->
+<!-- ccm:k:start point:craft.composition-over-wrapper -->
 ## 根 3：组合优于包装
 
 每多一层都要**挣到**它的开销——它得改变合约、翻译语言、或挂上行为。只「转发一下」的层是负债。
@@ -52,6 +59,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.composition-over-wrapper -->
+<!-- ccm:k:start point:craft.layered-thinking -->
 ## 根 4：分层思维
 
 把「**算什么**」和「**从哪取 / 往哪写**」分开，依赖**只许从外朝里指**。
@@ -62,6 +71,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.layered-thinking -->
+<!-- ccm:k:start point:craft.evidence-over-claim -->
 ## 根 5：证据优于声称
 
 「做完了」是一个**关于世界的声称**，要**事后证据**——不是感觉、不是绿闸本身。
@@ -71,6 +82,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.evidence-over-claim -->
+<!-- ccm:k:start point:craft.stage-handoff -->
 ## 设计 → 开发 → 测试：何时取哪把刀
 
 | 阶段 | 主用理论 | 这一刀回答什么 | 深度 reference |
@@ -87,6 +100,8 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 ---
 
+<!-- ccm:k:end point:craft.stage-handoff -->
+<!-- ccm:k:start point:craft.red-lines -->
 ## 红线（工程硬规则，违背字面就是违背精神）
 
 这几条是四个理论共同的底线，**跨语言跨项目成立**。它们不在「品味可权衡」那一层——是不跨的线。深度展开见各 reference。
@@ -98,6 +113,7 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 | **test-first 不是可选** | 没有失败测试就没有产码；没看它失败，你不知道它在测什么。 | tdd.md |
 | **constraint parity** | test double 必须强制与真实后端同样的约束，否则你测的是 mock 不是世界。 | tdd.md |
 | **无 idle wrapper / 无虚造名** | 不挣开销的层删掉；事件 / 命令 / 枚举名来自合约源、不临时起。 | oop.md · ddd.md |
+<!-- ccm:k:end point:craft.red-lines -->
 
 ---
 

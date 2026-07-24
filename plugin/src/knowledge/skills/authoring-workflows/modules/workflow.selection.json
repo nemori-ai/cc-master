@@ -1,0 +1,349 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:workflow.selection",
+  "owner_skill": "skill:authoring-workflows",
+  "title": "Workflow 准入与形状选择",
+  "intent": "先判断是否值得 Workflow，再按 work 形状选择控制流并定位 known-good 资源。",
+  "recognition_cues": [
+    "准备调用 Workflow 工具",
+    "需要在 fan-out、pipeline、loop 与 scout 间选择"
+  ],
+  "boundary": {
+    "includes": [
+      "Workflow 准入",
+      "形状决策树",
+      "资源索引"
+    ],
+    "excludes": [
+      "primitive 精确 API",
+      "组合 pattern 的完整目录"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:workflow-authoring"
+    ],
+    "primary_points": [
+      "point:workflow.shape-tree"
+    ],
+    "rationale": "Workflow 准入与形状选择是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.workflow.selection"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:workflow.admission",
+      "title": "Workflow 准入",
+      "point_kind": "decision_rule",
+      "summary": "只有几十到几百 agent 且中间结果必须留在 context 外时才升级到 Workflow。",
+      "recognition_cues": [
+        "需要Workflow 准入"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "marker": "point:workflow.admission",
+        "heading_hint": "Workflow 准入"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.admission"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.admission"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.shape-tree",
+      "title": "Workflow 形状决策树",
+      "point_kind": "decision_rule",
+      "summary": "按 barrier、streaming、未知数量或未知 work-list 选择 primitive 与入口形状。",
+      "recognition_cues": [
+        "需要Workflow 形状决策树"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "marker": "point:workflow.shape-tree",
+        "heading_hint": "Workflow 形状决策树"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.shape-tree"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.shape-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.resource-index",
+      "title": "Workflow 资源路由",
+      "point_kind": "reference",
+      "summary": "把具体机制、API、pattern、template 与完整 example 路由到唯一深度材料。",
+      "recognition_cues": [
+        "需要Workflow 资源路由"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "marker": "point:workflow.resource-index",
+        "heading_hint": "Workflow 资源路由"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.resource-index"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.resource-index"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:workflow.selection.shape-tree-to-admission",
+      "type": "deepens_to",
+      "from": "point:workflow.shape-tree",
+      "to": "point:workflow.admission",
+      "when": [
+        "从模块主点进入Workflow 准入"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.selection"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.selection.admission-to-shape-tree",
+      "type": "routes_to",
+      "from": "point:workflow.admission",
+      "to": "point:workflow.shape-tree",
+      "when": [
+        "从Workflow 准入返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.selection"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.selection.shape-tree-to-resource-index",
+      "type": "deepens_to",
+      "from": "point:workflow.shape-tree",
+      "to": "point:workflow.resource-index",
+      "when": [
+        "从模块主点进入Workflow 资源路由"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.selection"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.selection.resource-index-to-shape-tree",
+      "type": "routes_to",
+      "from": "point:workflow.resource-index",
+      "to": "point:workflow.shape-tree",
+      "when": [
+        "从Workflow 资源路由返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.selection"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.selection.to-runtime-contract",
+      "type": "routes_to",
+      "from": "point:workflow.shape-tree",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "选定形状后进入 runtime/API canonical 契约"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "Workflow 选择到 runtime 契约的接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection.to-runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.selection.to-pattern-catalog",
+      "type": "deepens_to",
+      "from": "point:workflow.shape-tree",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "裸形状不足时进入 pattern catalog canonical 主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "Workflow 选择到 pattern 目录的接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.selection.to-pattern-catalog"
+          }
+        ]
+      }
+    }
+  ]
+}

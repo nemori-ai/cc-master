@@ -1,0 +1,901 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:craft.foundation",
+  "owner_skill": "skill:engineering-with-craft",
+  "title": "工程手艺共享脊椎",
+  "intent": "用五条共享根和阶段接力统一 DDD、OOP、SDD、TDD，并守住跨理论红线。",
+  "recognition_cues": [
+    "需要在设计、实现、测试间选择主导手艺",
+    "要判断四理论共同依赖的工程根"
+  ],
+  "boundary": {
+    "includes": [
+      "五条共享根",
+      "四理论阶段接力",
+      "跨理论工程红线"
+    ],
+    "excludes": [
+      "DDD 战略/战术细节",
+      "Workflow runtime API"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:engineering-craft"
+    ],
+    "primary_points": [
+      "point:craft.shared-spine"
+    ],
+    "rationale": "工程手艺共享脊椎是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.craft.foundation"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:craft.composition-over-wrapper",
+      "title": "组合优于包装",
+      "point_kind": "decision_rule",
+      "summary": "只有改变合约、翻译语言或挂载行为的层才配得上存在。",
+      "recognition_cues": [
+        "需要组合优于包装"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.composition-over-wrapper",
+        "heading_hint": "组合优于包装"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.composition-over-wrapper"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.composition-over-wrapper"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.contract-ssot",
+      "title": "契约即 SSOT",
+      "point_kind": "principle",
+      "summary": "让 spec、领域词汇、接口与 test double 共同服从唯一契约源。",
+      "recognition_cues": [
+        "需要契约即 SSOT"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.contract-ssot",
+        "heading_hint": "契约即 SSOT"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.contract-ssot"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.contract-ssot"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.evidence-over-claim",
+      "title": "证据优于声称",
+      "point_kind": "principle",
+      "summary": "完成声明必须由最后一次改动后的端点证据支撑。",
+      "recognition_cues": [
+        "需要证据优于声称"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.evidence-over-claim",
+        "heading_hint": "证据优于声称"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.evidence-over-claim"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.evidence-over-claim"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.invariant-anchor",
+      "title": "不变式即锚",
+      "point_kind": "principle",
+      "summary": "以必须始终成立的不变式决定边界、所有者与测试探针。",
+      "recognition_cues": [
+        "需要不变式即锚"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.invariant-anchor",
+        "heading_hint": "不变式即锚"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.invariant-anchor"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.invariant-anchor"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.layered-thinking",
+      "title": "分层思维",
+      "point_kind": "principle",
+      "summary": "分开规则与 I/O，并让依赖只从外层指向内层。",
+      "recognition_cues": [
+        "需要分层思维"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.layered-thinking",
+        "heading_hint": "分层思维"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.layered-thinking"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.layered-thinking"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.red-lines",
+      "title": "工程共享红线",
+      "point_kind": "check",
+      "summary": "集中检查 silent failure、spec 漂移、test-first、constraint parity 与 idle wrapper。",
+      "recognition_cues": [
+        "需要工程共享红线"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.red-lines",
+        "heading_hint": "工程共享红线"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.red-lines"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.red-lines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.shared-spine",
+      "title": "四理论共享脊椎",
+      "point_kind": "principle",
+      "summary": "用五条共享根把 DDD、OOP、SDD、TDD 统一为同一套工程判断。",
+      "recognition_cues": [
+        "需要四理论共享脊椎"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.shared-spine",
+        "heading_hint": "四理论共享脊椎"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.shared-spine"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.shared-spine"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:craft.stage-handoff",
+      "title": "四理论阶段接力",
+      "point_kind": "procedure",
+      "summary": "在薄切片内按 SDD、DDD、OOP、TDD 的领棒关系工作，同时允许迭代回返。",
+      "recognition_cues": [
+        "需要四理论阶段接力"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "marker": "point:craft.stage-handoff",
+        "heading_hint": "四理论阶段接力"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:craft.stage-handoff"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.craft.stage-handoff"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:craft.foundation.shared-spine-to-composition-over-wrapper",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.composition-over-wrapper",
+      "when": [
+        "从模块主点进入组合优于包装"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.composition-over-wrapper-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.composition-over-wrapper",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从组合优于包装返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-contract-ssot",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.contract-ssot",
+      "when": [
+        "从模块主点进入契约即 SSOT"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.contract-ssot-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.contract-ssot",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从契约即 SSOT返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-evidence-over-claim",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.evidence-over-claim",
+      "when": [
+        "从模块主点进入证据优于声称"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.evidence-over-claim-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.evidence-over-claim",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从证据优于声称返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-invariant-anchor",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.invariant-anchor",
+      "when": [
+        "从模块主点进入不变式即锚"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.invariant-anchor-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.invariant-anchor",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从不变式即锚返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-layered-thinking",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.layered-thinking",
+      "when": [
+        "从模块主点进入分层思维"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.layered-thinking-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.layered-thinking",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从分层思维返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-red-lines",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.red-lines",
+      "when": [
+        "从模块主点进入工程共享红线"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.red-lines-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.red-lines",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从工程共享红线返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.shared-spine-to-stage-handoff",
+      "type": "deepens_to",
+      "from": "point:craft.shared-spine",
+      "to": "point:craft.stage-handoff",
+      "when": [
+        "从模块主点进入四理论阶段接力"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.stage-handoff-to-shared-spine",
+      "type": "routes_to",
+      "from": "point:craft.stage-handoff",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从四理论阶段接力返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.foundation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.stage-to-ddd",
+      "type": "routes_to",
+      "from": "point:craft.stage-handoff",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "进入领域建模阶段时路由到 DDD canonical 主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "四理论阶段接力到 DDD"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation.stage-to-ddd"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.stage-to-oop",
+      "type": "routes_to",
+      "from": "point:craft.stage-handoff",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "进入对象实现阶段时路由到 OOP canonical 主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "四理论阶段接力到 OOP"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation.stage-to-oop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.stage-to-sdd",
+      "type": "routes_to",
+      "from": "point:craft.stage-handoff",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "需要冻结合约时路由到 SDD canonical 主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "四理论阶段接力到 SDD"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation.stage-to-sdd"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.foundation.stage-to-tdd",
+      "type": "routes_to",
+      "from": "point:craft.stage-handoff",
+      "to": "point:tdd.iron-law",
+      "when": [
+        "进入测试实现阶段时路由到 TDD canonical 主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "四理论阶段接力到 TDD"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.foundation.stage-to-tdd"
+          }
+        ]
+      }
+    }
+  ]
+}

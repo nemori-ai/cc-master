@@ -1,0 +1,711 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:craft.domain-modeling",
+  "owner_skill": "skill:engineering-with-craft",
+  "title": "DDD 领域建模",
+  "intent": "判断何时值得 DDD，并从语言边界、不变式与业务流程推导领域和应用层。",
+  "recognition_cues": [
+    "划 bounded context 或 aggregate",
+    "定位不变式所有者"
+  ],
+  "boundary": {
+    "includes": [
+      "DDD 准入",
+      "战略与战术设计",
+      "应用层推导",
+      "DDD 红线"
+    ],
+    "excludes": [
+      "类实现品味",
+      "测试循环纪律"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:engineering-craft"
+    ],
+    "primary_points": [
+      "point:ddd.admission-question"
+    ],
+    "rationale": "DDD 领域建模是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.craft.domain-modeling"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ddd.admission-question",
+      "title": "DDD 准入问题",
+      "point_kind": "decision_rule",
+      "summary": "先问是否真有值得保护的不变式或语言，避免把 CRUD 仪式化。",
+      "recognition_cues": [
+        "需要DDD 准入问题"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.admission-question",
+        "heading_hint": "DDD 准入问题"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.admission-question"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.admission-question"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.aggregate-ownership",
+      "title": "Aggregate 与不变式所有权",
+      "point_kind": "principle",
+      "summary": "按生命周期、原子性和最小可持有者划一致性边界。",
+      "recognition_cues": [
+        "需要Aggregate 与不变式所有权"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.aggregate-ownership",
+        "heading_hint": "Aggregate 与不变式所有权"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.aggregate-ownership"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.aggregate-ownership"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.application-derivation",
+      "title": "应用层推导",
+      "point_kind": "procedure",
+      "summary": "从 event storming 与生产者/消费者矩阵推导应用服务、policy 与 saga。",
+      "recognition_cues": [
+        "需要应用层推导"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.application-derivation",
+        "heading_hint": "应用层推导"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.application-derivation"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.application-derivation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.design-focus",
+      "title": "设计阶段焦点",
+      "point_kind": "boundary",
+      "summary": "区分设计阶段必须固定的承重决定与应推迟的实现细节。",
+      "recognition_cues": [
+        "需要设计阶段焦点"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.design-focus",
+        "heading_hint": "设计阶段焦点"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.design-focus"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.design-focus"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.failure-radar",
+      "title": "DDD 反模式雷达",
+      "point_kind": "check",
+      "summary": "识别贫血模型、aggregate 膨胀、语言漂移、空洞包装等结构性失败。",
+      "recognition_cues": [
+        "需要DDD 反模式雷达"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.failure-radar",
+        "heading_hint": "DDD 反模式雷达"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.failure-radar"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.failure-radar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.red-lines",
+      "title": "DDD 红线",
+      "point_kind": "check",
+      "summary": "守住依赖方向、跨 BC 边界、提交后发事件、forward-only 与幂等。",
+      "recognition_cues": [
+        "需要DDD 红线"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.red-lines",
+        "heading_hint": "DDD 红线"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.red-lines"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.red-lines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ddd.strategic-boundaries",
+      "title": "战略边界与语言",
+      "point_kind": "procedure",
+      "summary": "用语言变化、能力、本体轴、context mapping 与 ubiquitous language 发现 BC。",
+      "recognition_cues": [
+        "需要战略边界与语言"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "marker": "point:ddd.strategic-boundaries",
+        "heading_hint": "战略边界与语言"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ddd.strategic-boundaries"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.ddd.strategic-boundaries"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-aggregate-ownership",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.aggregate-ownership",
+      "when": [
+        "从模块主点进入Aggregate 与不变式所有权"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.aggregate-ownership-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.aggregate-ownership",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从Aggregate 与不变式所有权返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-application-derivation",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.application-derivation",
+      "when": [
+        "从模块主点进入应用层推导"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.application-derivation-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.application-derivation",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从应用层推导返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-design-focus",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.design-focus",
+      "when": [
+        "从模块主点进入设计阶段焦点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.design-focus-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.design-focus",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从设计阶段焦点返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-failure-radar",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.failure-radar",
+      "when": [
+        "从模块主点进入DDD 反模式雷达"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.failure-radar-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.failure-radar",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从DDD 反模式雷达返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-red-lines",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.red-lines",
+      "when": [
+        "从模块主点进入DDD 红线"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.red-lines-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.red-lines",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从DDD 红线返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.admission-question-to-strategic-boundaries",
+      "type": "deepens_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:ddd.strategic-boundaries",
+      "when": [
+        "从模块主点进入战略边界与语言"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.strategic-boundaries-to-admission-question",
+      "type": "routes_to",
+      "from": "point:ddd.strategic-boundaries",
+      "to": "point:ddd.admission-question",
+      "when": [
+        "从战略边界与语言返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.domain-modeling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.domain-modeling.to-shared-spine",
+      "type": "routes_to",
+      "from": "point:ddd.admission-question",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从 DDD 决策返回四理论共享 canonical 脊椎"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "DDD 与共享工程根的显式接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.domain-modeling.to-shared-spine"
+          }
+        ]
+      }
+    }
+  ]
+}

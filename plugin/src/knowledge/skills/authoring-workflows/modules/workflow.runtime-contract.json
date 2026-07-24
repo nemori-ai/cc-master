@@ -1,0 +1,1985 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:workflow.runtime-contract",
+  "owner_skill": "skill:authoring-workflows",
+  "title": "Workflow Runtime/API 契约",
+  "intent": "以 harness 契约为权威起草、launch、resume 并处理 primitive、budget、failure 与 caps。",
+  "recognition_cues": [
+    "要写或调试 dynamic-workflow 脚本",
+    "要确认 primitive、resume、cache 或 failure 语义"
+  ],
+  "boundary": {
+    "includes": [
+      "起草与 launch",
+      "契约/内部边界",
+      "runtime 机制",
+      "全部 primitive API"
+    ],
+    "excludes": [
+      "是否升级为 Workflow 的产品判断",
+      "组合 pattern 目录"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:workflow-authoring"
+    ],
+    "primary_points": [
+      "point:workflow.contract-vs-internals"
+    ],
+    "rationale": "Workflow Runtime/API 契约是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.workflow.runtime-contract"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:workflow.authoring-contract",
+      "title": "起草与 launch 契约",
+      "point_kind": "procedure",
+      "summary": "从 known-good 资产起草，遵守 meta、determinism、sandbox、thunk 与 cap，再以 harness 报错修复。",
+      "recognition_cues": [
+        "需要起草与 launch 契约"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "marker": "point:workflow.authoring-contract",
+        "heading_hint": "起草与 launch 契约"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.authoring-contract"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.authoring-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.background-contract",
+      "title": "后台执行契约",
+      "point_kind": "boundary",
+      "summary": "Workflow 以 task ID 后台运行、完成自动唤醒，且启动后没有 mid-run 输入。",
+      "recognition_cues": [
+        "需要后台执行契约"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.background-contract",
+        "heading_hint": "后台执行契约"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.background-contract"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.background-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.barrier-vs-streaming",
+      "title": "Barrier 与 streaming 判断",
+      "point_kind": "decision_rule",
+      "summary": "多阶段默认 pipeline，只有下游需要整批集合时才引入 parallel barrier。",
+      "recognition_cues": [
+        "需要Barrier 与 streaming 判断"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.barrier-vs-streaming",
+        "heading_hint": "Barrier 与 streaming 判断"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.barrier-vs-streaming"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.barrier-vs-streaming"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.contract-vs-internals",
+      "title": "契约与内部机制分界",
+      "point_kind": "boundary",
+      "summary": "只依赖 first-party 行为契约，不把 sandbox、journal 与 cache 内部猜测当地基。",
+      "recognition_cues": [
+        "需要契约与内部机制分界"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.contract-vs-internals",
+        "heading_hint": "契约与内部机制分界"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.contract-vs-internals"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.contract-vs-internals"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.determinism",
+      "title": "Determinism 三禁",
+      "point_kind": "check",
+      "summary": "禁止墙钟与随机控制流，用 args 或稳定 index 保住 resume。",
+      "recognition_cues": [
+        "需要Determinism 三禁"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.determinism",
+        "heading_hint": "Determinism 三禁"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.determinism"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.determinism"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.execution-model",
+      "title": "确定性协调器本质",
+      "point_kind": "principle",
+      "summary": "让确定性脚本协调 leaf agent，并把中间结果留在脚本变量而非主 context。",
+      "recognition_cues": [
+        "需要确定性协调器本质"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.execution-model",
+        "heading_hint": "确定性协调器本质"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.execution-model"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.execution-model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.primitive-model",
+      "title": "Primitive 与注入对象模型",
+      "point_kind": "reference",
+      "summary": "说明 agent、parallel、pipeline、phase、log、workflow、args 与 budget 的真实语义。",
+      "recognition_cues": [
+        "需要Primitive 与注入对象模型"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.primitive-model",
+        "heading_hint": "Primitive 与注入对象模型"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.primitive-model"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.primitive-model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.resource-caps",
+      "title": "Workflow 资源上限",
+      "point_kind": "check",
+      "summary": "按并发、总 agent、单调用 item 与脚本大小硬上限设计吞吐。",
+      "recognition_cues": [
+        "需要Workflow 资源上限"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.resource-caps",
+        "heading_hint": "Workflow 资源上限"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.resource-caps"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.resource-caps"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.resume-prefix",
+      "title": "最长未变前缀 Resume",
+      "point_kind": "principle",
+      "summary": "按 agent 调用序列复用未变前缀，第一个变化点之后全部 live 重跑。",
+      "recognition_cues": [
+        "需要最长未变前缀 Resume"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "marker": "point:workflow.resume-prefix",
+        "heading_hint": "最长未变前缀 Resume"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.resume-prefix"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.resume-prefix"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-agent",
+      "title": "agent API",
+      "point_kind": "reference",
+      "summary": "定义 fresh-context agent 的返回、结构化 schema、跳过语义与 opts。",
+      "recognition_cues": [
+        "需要agent API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-agent",
+        "heading_hint": "agent API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-agent"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-agent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-args",
+      "title": "args 注入",
+      "point_kind": "reference",
+      "summary": "要求传真实 JSON 值而非 stringify 后的字符串。",
+      "recognition_cues": [
+        "需要args 注入"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-args",
+        "heading_hint": "args 注入"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-args"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-args"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-budget",
+      "title": "共享 budget API",
+      "point_kind": "reference",
+      "summary": "定义 total、spent、remaining、硬上限与有 total 守卫的预算循环。",
+      "recognition_cues": [
+        "需要共享 budget API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-budget",
+        "heading_hint": "共享 budget API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-budget"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-budget"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-cache-key",
+      "title": "Resume cache key",
+      "point_kind": "reference",
+      "summary": "以 prompt、schema、model、isolation 与 agentType 决定调用身份，排除装饰字段。",
+      "recognition_cues": [
+        "需要Resume cache key"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-cache-key",
+        "heading_hint": "Resume cache key"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-cache-key"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-cache-key"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-caps",
+      "title": "API 硬 caps",
+      "point_kind": "reference",
+      "summary": "速查并发、run 总量、单次 item 与脚本尺寸上限。",
+      "recognition_cues": [
+        "需要API 硬 caps"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-caps",
+        "heading_hint": "API 硬 caps"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-caps"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-caps"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-composition",
+      "title": "workflow 组合 API",
+      "point_kind": "reference",
+      "summary": "定义一层 child workflow、共享资源与 catch-and-degrade。",
+      "recognition_cues": [
+        "需要workflow 组合 API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-composition",
+        "heading_hint": "workflow 组合 API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-composition"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-composition"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-failure",
+      "title": "Workflow failure 语义",
+      "point_kind": "reference",
+      "summary": "汇总 skip、thunk、stage、child、budget 与 determinism 的失败形态。",
+      "recognition_cues": [
+        "需要Workflow failure 语义"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-failure",
+        "heading_hint": "Workflow failure 语义"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-failure"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-failure"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-meta",
+      "title": "meta 脚本头",
+      "point_kind": "check",
+      "summary": "第一条语句必须是纯字面量 meta，并由 harness 做权威校验。",
+      "recognition_cues": [
+        "需要meta 脚本头"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-meta",
+        "heading_hint": "meta 脚本头"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-meta"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-meta"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-parallel",
+      "title": "parallel API",
+      "point_kind": "reference",
+      "summary": "定义 thunk barrier、null 槽位、输入顺序与单次上限。",
+      "recognition_cues": [
+        "需要parallel API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-parallel",
+        "heading_hint": "parallel API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-parallel"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-parallel"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-pipeline",
+      "title": "pipeline API",
+      "point_kind": "reference",
+      "summary": "定义 item 流式 stages、回调参数、失败降级与单次上限。",
+      "recognition_cues": [
+        "需要pipeline API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-pipeline",
+        "heading_hint": "pipeline API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-pipeline"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-pipeline"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.api-progress",
+      "title": "phase 与 log API",
+      "point_kind": "reference",
+      "summary": "定义 progress group、并发 phase 归属和显式记录收窄。",
+      "recognition_cues": [
+        "需要phase 与 log API"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "marker": "point:workflow.api-progress",
+        "heading_hint": "phase 与 log API"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.api-progress"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.api-progress"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-authoring-contract",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.authoring-contract",
+      "when": [
+        "从模块主点进入起草与 launch 契约"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.authoring-contract-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.authoring-contract",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从起草与 launch 契约返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-background-contract",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.background-contract",
+      "when": [
+        "从模块主点进入后台执行契约"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.background-contract-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.background-contract",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从后台执行契约返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-barrier-vs-streaming",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.barrier-vs-streaming",
+      "when": [
+        "从模块主点进入Barrier 与 streaming 判断"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.barrier-vs-streaming-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.barrier-vs-streaming",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Barrier 与 streaming 判断返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-determinism",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.determinism",
+      "when": [
+        "从模块主点进入Determinism 三禁"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.determinism-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.determinism",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Determinism 三禁返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-execution-model",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.execution-model",
+      "when": [
+        "从模块主点进入确定性协调器本质"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.execution-model-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.execution-model",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从确定性协调器本质返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-primitive-model",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.primitive-model",
+      "when": [
+        "从模块主点进入Primitive 与注入对象模型"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.primitive-model-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.primitive-model",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Primitive 与注入对象模型返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-resource-caps",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.resource-caps",
+      "when": [
+        "从模块主点进入Workflow 资源上限"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.resource-caps-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.resource-caps",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Workflow 资源上限返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-resume-prefix",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.resume-prefix",
+      "when": [
+        "从模块主点进入最长未变前缀 Resume"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.resume-prefix-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.resume-prefix",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从最长未变前缀 Resume返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-agent",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-agent",
+      "when": [
+        "从模块主点进入agent API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-agent-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-agent",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从agent API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-args",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-args",
+      "when": [
+        "从模块主点进入args 注入"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-args-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-args",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从args 注入返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-budget",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-budget",
+      "when": [
+        "从模块主点进入共享 budget API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-budget-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-budget",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从共享 budget API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-cache-key",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-cache-key",
+      "when": [
+        "从模块主点进入Resume cache key"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-cache-key-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-cache-key",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Resume cache key返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-caps",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-caps",
+      "when": [
+        "从模块主点进入API 硬 caps"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-caps-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-caps",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从API 硬 caps返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-composition",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-composition",
+      "when": [
+        "从模块主点进入workflow 组合 API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-composition-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-composition",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从workflow 组合 API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-failure",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-failure",
+      "when": [
+        "从模块主点进入Workflow failure 语义"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-failure-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-failure",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从Workflow failure 语义返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-meta",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-meta",
+      "when": [
+        "从模块主点进入meta 脚本头"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-meta-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-meta",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从meta 脚本头返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-parallel",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-parallel",
+      "when": [
+        "从模块主点进入parallel API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-parallel-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-parallel",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从parallel API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-pipeline",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-pipeline",
+      "when": [
+        "从模块主点进入pipeline API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-pipeline-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-pipeline",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从pipeline API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.contract-vs-internals-to-api-progress",
+      "type": "deepens_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.api-progress",
+      "when": [
+        "从模块主点进入phase 与 log API"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.api-progress-to-contract-vs-internals",
+      "type": "routes_to",
+      "from": "point:workflow.api-progress",
+      "to": "point:workflow.contract-vs-internals",
+      "when": [
+        "从phase 与 log API返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.runtime-contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.runtime-contract.to-selection",
+      "type": "routes_to",
+      "from": "point:workflow.contract-vs-internals",
+      "to": "point:workflow.shape-tree",
+      "when": [
+        "从 runtime 细节返回准入与形状 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "Workflow runtime 契约回到选择入口"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.runtime-contract.to-selection"
+          }
+        ]
+      }
+    }
+  ]
+}

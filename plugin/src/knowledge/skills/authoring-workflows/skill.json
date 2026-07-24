@@ -1,0 +1,149 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:authoring-workflows",
+  "name": "authoring-workflows",
+  "package_root": "plugin/src/skills/authoring-workflows",
+  "intent": "让 workflow 作者做准入、形状选择并按 Claude Code Workflow runtime 契约起草和修复脚本。",
+  "modules": [
+    {
+      "id": "module:workflow.selection",
+      "manifest": "plugin/src/knowledge/skills/authoring-workflows/modules/workflow.selection.json"
+    },
+    {
+      "id": "module:workflow.runtime-contract",
+      "manifest": "plugin/src/knowledge/skills/authoring-workflows/modules/workflow.runtime-contract.json"
+    },
+    {
+      "id": "module:workflow.pattern-catalog",
+      "manifest": "plugin/src/knowledge/skills/authoring-workflows/modules/workflow.pattern-catalog.json"
+    }
+  ],
+  "entry_modules": [
+    "module:workflow.selection",
+    "module:workflow.runtime-contract",
+    "module:workflow.pattern-catalog"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/authoring-workflows/canonical/.design/OBJECTIVE.md",
+      "coverage": "non_knowledge",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "aba4723edcea95aabc4cac4b94bbd12e2914903638755ff0f960dc943f1d6eb7",
+      "review": {
+        "reviewer": "K2-02 inventory review",
+        "rationale": "这是 dev-only objective/J 记录，不是投影给 runtime agent 的 canonical HOW。"
+      }
+    },
+    {
+      "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:workflow.admission",
+        "point:workflow.authoring-contract",
+        "point:workflow.resource-index",
+        "point:workflow.shape-tree"
+      ],
+      "reviewed_unbound_sha256": "ed5d55163efd3f750c5b951b994d056e765bc0eae95fce57b3d06893c6bf691e"
+    },
+    {
+      "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:workflow.api-agent",
+        "point:workflow.api-args",
+        "point:workflow.api-budget",
+        "point:workflow.api-cache-key",
+        "point:workflow.api-caps",
+        "point:workflow.api-composition",
+        "point:workflow.api-failure",
+        "point:workflow.api-meta",
+        "point:workflow.api-parallel",
+        "point:workflow.api-pipeline",
+        "point:workflow.api-progress"
+      ],
+      "reviewed_unbound_sha256": "03daa420cb2390d50a9e9be0e3e8f5c448d0b7a5f9f6d10caa0fc61f625b807f"
+    },
+    {
+      "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:workflow.background-contract",
+        "point:workflow.barrier-vs-streaming",
+        "point:workflow.contract-vs-internals",
+        "point:workflow.determinism",
+        "point:workflow.execution-model",
+        "point:workflow.primitive-model",
+        "point:workflow.resource-caps",
+        "point:workflow.resume-prefix"
+      ],
+      "reviewed_unbound_sha256": "9405318d00add78de8e14bfa02233d8a2bce8d6fc4e4f10f8fee050e222d0fc2"
+    },
+    {
+      "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:workflow.pattern-adversarial-verify",
+        "point:workflow.pattern-bug-hunt",
+        "point:workflow.pattern-completeness-critic",
+        "point:workflow.pattern-dep-upgrade",
+        "point:workflow.pattern-fan-out",
+        "point:workflow.pattern-judge-panel",
+        "point:workflow.pattern-loop-budget",
+        "point:workflow.pattern-loop-count",
+        "point:workflow.pattern-loop-dry",
+        "point:workflow.pattern-migration",
+        "point:workflow.pattern-multimodal-sweep",
+        "point:workflow.pattern-nested-composition",
+        "point:workflow.pattern-perspective-verify",
+        "point:workflow.pattern-pipeline",
+        "point:workflow.pattern-pr-triage",
+        "point:workflow.pattern-scout-fanout",
+        "point:workflow.pattern-self-repair",
+        "point:workflow.pattern-staged-escalation",
+        "point:workflow.pattern-test-repair",
+        "point:workflow.pattern-tournament"
+      ],
+      "reviewed_unbound_sha256": "eaa80821a9c505a3adca2183811c6ce124ded451609d8f7a5319a247cb27fba9"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "stub",
+      "reason": "该 host 无经验证的 Claude Code Workflow 等价能力。"
+    },
+    {
+      "host": "cursor",
+      "state": "stub",
+      "reason": "该 host 无经验证的 Claude Code Workflow 等价能力。"
+    },
+    {
+      "host": "kimi-code",
+      "state": "stub",
+      "reason": "该 host 无经验证的 Claude Code Workflow 等价能力。"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.skill.authoring-workflows"
+      }
+    ]
+  }
+}
