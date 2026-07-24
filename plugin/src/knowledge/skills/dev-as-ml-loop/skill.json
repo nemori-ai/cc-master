@@ -1,0 +1,96 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:dev-as-ml-loop",
+  "name": "dev-as-ml-loop",
+  "package_root": "plugin/src/skills/dev-as-ml-loop",
+  "intent": "把开发工作建成可测优化循环：验收=目标函数、迭代测量、plateau→restart、收敛即停；外层编排与 ledger 一并覆盖。",
+  "modules": [
+    {
+      "id": "module:devloop.core",
+      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.core.json"
+    },
+    {
+      "id": "module:devloop.outer",
+      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.outer.json"
+    },
+    {
+      "id": "module:devloop.ledger",
+      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.ledger.json"
+    }
+  ],
+  "entry_modules": [
+    "module:devloop.core",
+    "module:devloop.outer",
+    "module:devloop.ledger"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:devloop.core-thesis",
+        "point:devloop.objective",
+        "point:devloop.iterate",
+        "point:devloop.instrument",
+        "point:devloop.explore-exploit",
+        "point:devloop.plateau-restart",
+        "point:devloop.converge",
+        "point:devloop.fit-intent",
+        "point:devloop.regularize",
+        "point:devloop.taste-and-cycle",
+        "point:devloop.two-scale",
+        "point:devloop.ml-components"
+      ],
+      "reviewed_unbound_sha256": "56fc6d32588c364a9c4791ef6caa4879e23a5cc02baa7532c87d20341c26d9a4"
+    },
+    {
+      "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:devloop.ledger-when",
+        "point:devloop.ledger-what",
+        "point:devloop.ledger-ccm",
+        "point:devloop.ledger-handoff",
+        "point:devloop.ledger-antipatterns"
+      ],
+      "reviewed_unbound_sha256": "6ee8eaf451996e851cff24374ee5e6974c1347adc4a94002963a8016dfd69d8b"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "skill:dev-as-ml-loop"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.skill.dev-as-ml-loop"
+      }
+    ]
+  }
+}

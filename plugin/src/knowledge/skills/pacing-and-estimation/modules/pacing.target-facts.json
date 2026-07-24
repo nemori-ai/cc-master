@@ -1,0 +1,182 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.target-facts",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "跨 harness 目标事实",
+  "intent": "按 selected target 绑定 surface/model/quota/binding，输出 eligible/insufficient。",
+  "recognition_cues": [
+    "跨 harness 目标事实",
+    "selected target"
+  ],
+  "boundary": {
+    "includes": [
+      "四步绑定解释"
+    ],
+    "excludes": [
+      "派发决策",
+      "provider CLI 复制"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.selected-target-facts"
+    ],
+    "rationale": "发车前事实绑定入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.target-facts"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.target-facts"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.selected-target-facts",
+      "title": "selected target 事实绑定",
+      "point_kind": "procedure",
+      "summary": "Surface/Model/Quota/Binding 必须同一候选同一 freshness；unknown/stale→insufficient。",
+      "recognition_cues": [
+        "跨 harness 解释 envelope"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md",
+        "marker": "point:pacing.selected-target-facts",
+        "heading_hint": "selected target"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.selected-target-facts"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.selected-target-facts"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.selected-target-facts"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.target-to-model",
+      "type": "deepens_to",
+      "from": "point:pacing.selected-target-facts",
+      "to": "point:pacing.model-tier-facts",
+      "when": [
+        "需要模型档位三层事实"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.target-to-model"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.target-to-model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.target-to-signals",
+      "type": "requires",
+      "from": "point:pacing.selected-target-facts",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "quota 层要回到 machine-wide 读法"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.target-to-signals"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.target-to-signals"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.target-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.selected-target-facts",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "绑定后回到全局读法"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.target-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.target-to-global"
+          }
+        ]
+      }
+    }
+  ]
+}

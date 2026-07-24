@@ -1,0 +1,1110 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:devloop.core",
+  "owner_skill": "skill:dev-as-ml-loop",
+  "title": "优化循环心智锚",
+  "intent": "把单任务/内层下降建成带目标函数、测量、迭代、收敛的优化循环。",
+  "recognition_cues": [
+    "怎么判断做完了",
+    "卡住越改越深",
+    "要不要先写测试"
+  ],
+  "boundary": {
+    "includes": [
+      "八个心智锚",
+      "核心论题",
+      "taste 与一图流"
+    ],
+    "excludes": [
+      "外层 subagent 组件表",
+      "board ledger 写法"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:dev-as-ml-loop"
+    ],
+    "primary_points": [
+      "point:devloop.objective"
+    ],
+    "rationale": "目标函数不清则整个下降无效；是执行侧入口主点。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:devloop.core"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.devloop.core"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:devloop.core-thesis",
+      "title": "dev work 是优化过程",
+      "point_kind": "principle",
+      "summary": "开发是带测量的迭代优化，不是一次成型写对。",
+      "recognition_cues": [
+        "想一次性写一大坨",
+        "把开发当线性完工"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.core-thesis",
+        "heading_hint": "核心论题"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.core-thesis"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.core-thesis"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.core-thesis"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.objective",
+      "title": "验收标准 = 目标函数",
+      "point_kind": "principle",
+      "summary": "先把 DoD/acceptance 看清楚再下降；模糊先锐化。",
+      "recognition_cues": [
+        "验收模糊",
+        "acceptance 空"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.objective",
+        "heading_hint": "心智锚 1"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.objective"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.objective"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.iterate",
+      "title": "小步迭代优化",
+      "point_kind": "procedure",
+      "summary": "propose→测量→读梯度→调整；每轮要有可证伪 hypothesis。",
+      "recognition_cues": [
+        "写一大坨再跑",
+        "说不出 hypothesis"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.iterate",
+        "heading_hint": "心智锚 2"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.iterate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.iterate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.iterate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.instrument",
+      "title": "测试是测量仪器",
+      "point_kind": "principle",
+      "summary": "先架仪器再下降；失败是梯度，假梯度先校准。",
+      "recognition_cues": [
+        "没有测试就改",
+        "flaky 当梯度"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.instrument",
+        "heading_hint": "心智锚 3"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.instrument"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.instrument"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.instrument"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.explore-exploit",
+      "title": "explore vs exploit",
+      "point_kind": "decision_rule",
+      "summary": "早期探索买信息，接近验收再精修；过早 exploit 是反模式。",
+      "recognition_cues": [
+        "一上来就精修未验证方案"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.explore-exploit",
+        "heading_hint": "心智锚 4"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.explore-exploit"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.explore-exploit"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.explore-exploit"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.plateau-restart",
+      "title": "plateau 则 restart",
+      "point_kind": "decision_rule",
+      "summary": "局部最小值时换方向，不沿同一沟再打补丁。",
+      "recognition_cues": [
+        "钻牛角尖",
+        "补丁打补丁"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.plateau-restart",
+        "heading_hint": "心智锚 5"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.plateau-restart"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.plateau-restart"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.plateau-restart"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.converge",
+      "title": "收敛即停",
+      "point_kind": "check",
+      "summary": "验收达标就停；别 gold-plating / 过拟合噪声。",
+      "recognition_cues": [
+        "还能更完美",
+        "验收已绿还继续镀金"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.converge",
+        "heading_hint": "心智锚 6"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.converge"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.converge"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.converge"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.fit-intent",
+      "title": "拟合意图非用例",
+      "point_kind": "principle",
+      "summary": "hard-code 过检查是过拟合；要满足真实意图。",
+      "recognition_cues": [
+        "特判让测试变绿"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.fit-intent",
+        "heading_hint": "心智锚 7"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.fit-intent"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.fit-intent"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.fit-intent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.regularize",
+      "title": "简单性正则",
+      "point_kind": "principle",
+      "summary": "同样达标选最简单方案；复杂度是未奖励的长期成本。",
+      "recognition_cues": [
+        "为复杂而复杂"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.regularize",
+        "heading_hint": "心智锚 8"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.regularize"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.regularize"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.regularize"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.taste-and-cycle",
+      "title": "好 loop 手感与一图流",
+      "point_kind": "procedure",
+      "summary": "稳定训练的手感 + 一轮优化循环图。",
+      "recognition_cues": [
+        "判断 loop 好不好",
+        "需要一张循环图"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.taste-and-cycle",
+        "heading_hint": "Taste / 一图流"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.taste-and-cycle"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.taste-and-cycle"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.taste-and-cycle"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:devloop.thesis-to-objective",
+      "type": "deepens_to",
+      "from": "point:devloop.core-thesis",
+      "to": "point:devloop.objective",
+      "when": [
+        "进入第一心智锚：把验收当 loss"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.thesis-to-objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.thesis-to-objective"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:devloop.objective-to-instrument",
+      "type": "requires",
+      "from": "point:devloop.objective",
+      "to": "point:devloop.instrument",
+      "when": [
+        "目标清楚后要先有测量仪器"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.objective-to-instrument"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.objective-to-instrument"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:devloop.objective-to-iterate",
+      "type": "next",
+      "from": "point:devloop.objective",
+      "to": "point:devloop.iterate",
+      "when": [
+        "开始小步 propose→测量"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.objective-to-iterate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.objective-to-iterate"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:devloop.iterate-to-explore",
+      "type": "deepens_to",
+      "from": "point:devloop.iterate",
+      "to": "point:devloop.explore-exploit",
+      "when": [
+        "需要调步长 / explore vs exploit"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.iterate-to-explore"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.iterate-to-explore"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.iterate-to-plateau",
+      "type": "next",
+      "from": "point:devloop.iterate",
+      "to": "point:devloop.plateau-restart",
+      "when": [
+        "loss 不再下降要判断是否 plateau"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.iterate-to-plateau"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.iterate-to-plateau"
+          }
+        ]
+      },
+      "order": 3
+    },
+    {
+      "id": "edge:devloop.plateau-to-converge",
+      "type": "contrasts_with",
+      "from": "point:devloop.plateau-restart",
+      "to": "point:devloop.converge",
+      "when": [
+        "区分该 restart 还是已收敛该停"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.plateau-to-converge"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.plateau-to-converge"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.converge-to-fit",
+      "type": "requires",
+      "from": "point:devloop.converge",
+      "to": "point:devloop.fit-intent",
+      "when": [
+        "停机前确认拟合的是意图"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.converge-to-fit"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.converge-to-fit"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.fit-to-regularize",
+      "type": "next",
+      "from": "point:devloop.fit-intent",
+      "to": "point:devloop.regularize",
+      "when": [
+        "在达标方案里选最简单"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.fit-to-regularize"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.fit-to-regularize"
+          }
+        ]
+      },
+      "order": 4
+    },
+    {
+      "id": "edge:devloop.regularize-to-cycle",
+      "type": "operationalizes",
+      "from": "point:devloop.regularize",
+      "to": "point:devloop.taste-and-cycle",
+      "when": [
+        "需要整张循环图复核一轮形状"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.regularize-to-cycle"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.regularize-to-cycle"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.cycle-to-objective",
+      "type": "routes_to",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:devloop.objective",
+      "when": [
+        "从图回到目标函数入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.cycle-to-objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.cycle-to-objective"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.instrument-to-iterate",
+      "type": "next",
+      "from": "point:devloop.instrument",
+      "to": "point:devloop.iterate",
+      "when": [
+        "仪器就绪后进入迭代下降"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.instrument-to-iterate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.instrument-to-iterate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.explore-to-plateau",
+      "type": "next",
+      "from": "point:devloop.explore-exploit",
+      "to": "point:devloop.plateau-restart",
+      "when": [
+        "探索后仍卡在局部最小值"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.explore-to-plateau"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.explore-to-plateau"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.explore-to-objective",
+      "type": "routes_to",
+      "from": "point:devloop.explore-exploit",
+      "to": "point:devloop.objective",
+      "when": [
+        "explore 后回到目标函数复核"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.explore-to-objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.explore-to-objective"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.cycle-to-two-scale",
+      "type": "routes_to",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:devloop.two-scale",
+      "when": [
+        "从图进入外层编排视角"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.cycle-to-two-scale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.cycle-to-two-scale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.objective-to-ledger-when",
+      "type": "requires",
+      "from": "point:devloop.objective",
+      "to": "point:devloop.ledger-when",
+      "when": [
+        "长程任务要把 objective 落 ledger"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.objective-to-ledger-when"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.objective-to-ledger-when"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.core-thesis",
+      "type": "routes_to",
+      "from": "point:devloop.core-thesis",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.core-thesis"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.core-thesis"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.iterate",
+      "type": "routes_to",
+      "from": "point:devloop.iterate",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.iterate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.iterate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.instrument",
+      "type": "routes_to",
+      "from": "point:devloop.instrument",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.instrument"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.instrument"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.plateau-restart",
+      "type": "routes_to",
+      "from": "point:devloop.plateau-restart",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.plateau-restart"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.plateau-restart"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.converge",
+      "type": "routes_to",
+      "from": "point:devloop.converge",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.converge"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.converge"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.fit-intent",
+      "type": "routes_to",
+      "from": "point:devloop.fit-intent",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.fit-intent"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.fit-intent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.regularize",
+      "type": "routes_to",
+      "from": "point:devloop.regularize",
+      "to": "point:devloop.objective",
+      "when": [
+        "回技能主点：验收=目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.regularize"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.regularize"
+          }
+        ]
+      }
+    }
+  ]
+}

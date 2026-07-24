@@ -1,0 +1,678 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:distill.routing",
+  "owner_skill": "skill:distilling-lessons-into-assets",
+  "title": "归宿路由",
+  "intent": "判断一条候选经验该落哪类资产，并处理双落点与不确定兜底。",
+  "recognition_cues": [
+    "归宿判断",
+    "该进纪律文档还是 skill"
+  ],
+  "boundary": {
+    "includes": [
+      "三问概览",
+      "决策树完整体",
+      "双落点",
+      "兜底",
+      "职责边界"
+    ],
+    "excludes": [
+      "落地文风细节",
+      "证据泛化细则"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:distilling-lessons-into-assets"
+    ],
+    "primary_points": [
+      "point:distill.routing-tree"
+    ],
+    "rationale": "蒸馏第一步是路由。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:distill.routing"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.distill.routing"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:distill.routing-overview",
+      "title": "归宿判断三问概览",
+      "point_kind": "decision_rule",
+      "summary": "事实→纪律文档；判断力再分机制/角色/skill；不确定不丢弃。",
+      "recognition_cues": [
+        "归宿判断",
+        "三问"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "marker": "point:distill.routing-overview",
+        "heading_hint": "归宿判断决策树"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:distill.routing-tree",
+        "canonical": "point:distill.routing-tree",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "d0ab35a69b39765ef40562795a0cf3d94cc72aa586804d1a2aabedb7f1b8000f"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.routing-overview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.routing-overview"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.boundary",
+      "title": "与其他判断力边界",
+      "point_kind": "boundary",
+      "summary": "不管工程手艺/切 DAG/执行循环/命令手册/是否新建 skill 的治理判断。",
+      "recognition_cues": [
+        "是不是该用本 skill"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "marker": "point:distill.boundary",
+        "heading_hint": "边界"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.boundary"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.boundary"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.boundary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.routing-tree",
+      "title": "归宿判断决策树完整体",
+      "point_kind": "decision_rule",
+      "summary": "三问展开、陷阱与默认落点（skill 默认、subagent 需论证）。",
+      "recognition_cues": [
+        "完整决策树"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "marker": "point:distill.routing-tree",
+        "heading_hint": "顶层三问"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.routing-tree"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.routing-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.routing-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.dual-dest",
+      "title": "允许双落点",
+      "point_kind": "decision_rule",
+      "summary": "纪律文档指针 + skill 细节可并存，显式标注双落点。",
+      "recognition_cues": [
+        "既是事实又是判断力"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "marker": "point:distill.dual-dest",
+        "heading_hint": "二义性"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.dual-dest"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.dual-dest"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.dual-dest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.fallback-no-drop",
+      "title": "不确定绝不丢弃",
+      "point_kind": "check",
+      "summary": "判不清或基建缺失→纪律文档托底并标注，经验不得蒸发。",
+      "recognition_cues": [
+        "归宿不确定",
+        "没地方放"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "marker": "point:distill.fallback-no-drop",
+        "heading_hint": "兜底"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.fallback-no-drop"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.fallback-no-drop"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.fallback-no-drop"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:distill.overview-to-tree",
+      "type": "deepens_to",
+      "from": "point:distill.routing-overview",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "需要完整三问与陷阱"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.overview-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.overview-to-tree"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:distill.tree-to-dual",
+      "type": "next",
+      "from": "point:distill.routing-tree",
+      "to": "point:distill.dual-dest",
+      "when": [
+        "同一经验像两类资产"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tree-to-dual"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.tree-to-dual"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:distill.tree-to-fallback",
+      "type": "fallback_to",
+      "from": "point:distill.routing-tree",
+      "to": "point:distill.fallback-no-drop",
+      "when": [
+        "三问判不清或基建缺失"
+      ],
+      "path_role": "fallback",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tree-to-fallback"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.tree-to-fallback"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.tree-to-taxonomy",
+      "type": "requires",
+      "from": "point:distill.routing-tree",
+      "to": "point:distill.taxonomy",
+      "when": [
+        "需要四类资产完整定义"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tree-to-taxonomy"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.tree-to-taxonomy"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.boundary-to-overview",
+      "type": "routes_to",
+      "from": "point:distill.boundary",
+      "to": "point:distill.routing-overview",
+      "when": [
+        "确认在本 skill 边界内后开始路由"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.boundary-to-overview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.boundary-to-overview"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.boundary-to-evidence",
+      "type": "requires",
+      "from": "point:distill.boundary",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "在边界内动手前先守证据忠实"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.boundary-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.boundary-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.overview-to-evidence",
+      "type": "requires",
+      "from": "point:distill.routing-overview",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "路由全程受证据硬约束"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.overview-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.overview-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.tree-to-evidence",
+      "type": "requires",
+      "from": "point:distill.routing-tree",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "判归宿时不脱离证据"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tree-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.tree-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.dual-to-evidence",
+      "type": "requires",
+      "from": "point:distill.dual-dest",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "双落点仍守证据范围"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.dual-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.dual-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.fallback-to-evidence",
+      "type": "requires",
+      "from": "point:distill.fallback-no-drop",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "托底落地也要收窄措辞"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.fallback-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.fallback-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.dual-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.dual-dest",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "双落点后回到决策树"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.dual-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.dual-to-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.fallback-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.fallback-no-drop",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "兜底后仍可回树重判"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.fallback-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.fallback-to-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hub-from.overview",
+      "type": "routes_to",
+      "from": "point:distill.routing-overview",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "概览回决策树主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hub-from.overview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hub-from.overview"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hub-from.boundary",
+      "type": "routes_to",
+      "from": "point:distill.boundary",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "边界回决策树主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hub-from.boundary"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hub-from.boundary"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -5,6 +5,7 @@
 
 ---
 
+<!-- ccm:k:start point:slicing.example-contrast -->
 ## ❌ 横切(agent 的默认第一反应)
 
 按技术层一层层切:
@@ -60,3 +61,4 @@
 | 安全并行度 | schema 定完前=1 | 脊椎后≈3 |
 
 **一句话**:横切把"地基"做成 serial 瓶颈、把价值推到最后;纵切用一根薄脊椎换来"早可用 + 高并行 + 早去风险"——直接改善开发节奏与派发效率。
+<!-- ccm:k:end point:slicing.example-contrast -->

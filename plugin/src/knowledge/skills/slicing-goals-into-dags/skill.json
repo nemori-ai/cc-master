@@ -1,0 +1,86 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:slicing-goals-into-dags",
+  "name": "slicing-goals-into-dags",
+  "package_root": "plugin/src/skills/slicing-goals-into-dags",
+  "intent": "把目标切成纵切薄增量 DAG：walking skeleton、粒度、价值风险排序与 board 落地。",
+  "modules": [
+    {
+      "id": "module:slicing.vertical",
+      "manifest": "plugin/src/knowledge/skills/slicing-goals-into-dags/modules/slicing.vertical.json"
+    },
+    {
+      "id": "module:slicing.craft",
+      "manifest": "plugin/src/knowledge/skills/slicing-goals-into-dags/modules/slicing.craft.json"
+    },
+    {
+      "id": "module:slicing.example",
+      "manifest": "plugin/src/knowledge/skills/slicing-goals-into-dags/modules/slicing.example.json"
+    }
+  ],
+  "entry_modules": [
+    "module:slicing.vertical",
+    "module:slicing.craft"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:slicing.why-cut",
+        "point:slicing.vertical-rule",
+        "point:slicing.walking-skeleton",
+        "point:slicing.grain",
+        "point:slicing.value-risk",
+        "point:slicing.board-landing",
+        "point:slicing.antipatterns"
+      ],
+      "reviewed_unbound_sha256": "aa31155d72a27093d0bbc30bf5e8f7fe455ac25ff27cb732afc7ee12135be0c8"
+    },
+    {
+      "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:slicing.example-contrast"
+      ],
+      "reviewed_unbound_sha256": "0a5c9a79f0a954f17683ca9923011bc4df43769c84a89c4379a8cb65687db056"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "skill:slicing-goals-into-dags"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.skill.slicing-goals-into-dags"
+      }
+    ]
+  }
+}

@@ -1,0 +1,519 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:slicing.craft",
+  "owner_skill": "skill:slicing-goals-into-dags",
+  "title": "切分手艺与落地",
+  "intent": "用 walking skeleton、粒度、价值风险排序与 board 落地把纵切做成可排派的图。",
+  "recognition_cues": [
+    "walking skeleton",
+    "任务粒度",
+    "落到 board"
+  ],
+  "boundary": {
+    "includes": [
+      "锚 2-4",
+      "board 落地",
+      "反模式"
+    ],
+    "excludes": [
+      "纵切硬规则正文",
+      "排期 CPM"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:slicing-goals-into-dags"
+    ],
+    "primary_points": [
+      "point:slicing.walking-skeleton"
+    ],
+    "rationale": "纵切之后第一动作是立薄脊椎。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:slicing.craft"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.slicing.craft"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:slicing.walking-skeleton",
+      "title": "walking skeleton",
+      "point_kind": "procedure",
+      "summary": "第一片是最薄端到端线；共享核心最小化，schema 增量生长。",
+      "recognition_cues": [
+        "一次定全地基"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.walking-skeleton",
+        "heading_hint": "心智锚 2"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.walking-skeleton"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.walking-skeleton"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.walking-skeleton"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:slicing.grain",
+      "title": "粒度为并行与验收",
+      "point_kind": "decision_rule",
+      "summary": "能并行 + 有清爽 DoD；太粗太细都病。",
+      "recognition_cues": [
+        "任务粒度",
+        "大爆炸节点"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.grain",
+        "heading_hint": "心智锚 3"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.grain"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.grain"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.grain"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:slicing.value-risk",
+      "title": "价值×风险排序",
+      "point_kind": "decision_rule",
+      "summary": "先做最早可用与最险集成；常合于 walking skeleton。",
+      "recognition_cues": [
+        "先做哪片"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.value-risk",
+        "heading_hint": "心智锚 4"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.value-risk"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.value-risk"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.value-risk"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:slicing.board-landing",
+      "title": "落到 board",
+      "point_kind": "procedure",
+      "summary": "一片一 task、脊椎最少前置、远期粗粒度、近期可路由画像、cadence 收口。",
+      "recognition_cues": [
+        "怎么写进 board"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.board-landing",
+        "heading_hint": "落到 board"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.board-landing"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.board-landing"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.board-landing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:slicing.antipatterns",
+      "title": "切分反模式速查",
+      "point_kind": "check",
+      "summary": "横切、大爆炸、吞 cadence、瀑布、镀金地基、过度切碎、假串行边。",
+      "recognition_cues": [
+        "对照切坏了没有"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.antipatterns",
+        "heading_hint": "anti-pattern"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.antipatterns"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.antipatterns"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.antipatterns"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:slicing.skeleton-to-grain",
+      "type": "next",
+      "from": "point:slicing.walking-skeleton",
+      "to": "point:slicing.grain",
+      "when": [
+        "脊椎后校准片粒度"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.skeleton-to-grain"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.skeleton-to-grain"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:slicing.grain-to-value",
+      "type": "next",
+      "from": "point:slicing.grain",
+      "to": "point:slicing.value-risk",
+      "when": [
+        "切完后决定先做哪片"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.grain-to-value"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.grain-to-value"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:slicing.value-to-board",
+      "type": "operationalizes",
+      "from": "point:slicing.value-risk",
+      "to": "point:slicing.board-landing",
+      "when": [
+        "把切法落到 board 字段形态"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.value-to-board"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.value-to-board"
+          }
+        ]
+      },
+      "order": 3
+    },
+    {
+      "id": "edge:slicing.board-to-anti",
+      "type": "contrasts_with",
+      "from": "point:slicing.board-landing",
+      "to": "point:slicing.antipatterns",
+      "when": [
+        "对照切坏信号"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.board-to-anti"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.board-to-anti"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.anti-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.antipatterns",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "反模式指向回纵切硬规则"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.anti-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.anti-to-vertical"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.skeleton-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.walking-skeleton",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "脊椎动作回指纵切硬规则"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.skeleton-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.skeleton-to-vertical"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.grain-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.grain",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "粒度判断回指纵切"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.grain-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.grain-to-vertical"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.value-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.value-risk",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "排序判断回指纵切"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.value-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.value-to-vertical"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.board-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.board-landing",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "落地前复核纵切"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.board-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.board-to-vertical"
+          }
+        ]
+      }
+    }
+  ]
+}

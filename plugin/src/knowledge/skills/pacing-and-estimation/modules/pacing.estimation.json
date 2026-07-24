@@ -1,0 +1,615 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.estimation",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "估算消费",
+  "intent": "召回并正确消费 ccm estimate 只读 advisory 与诚实字段。",
+  "recognition_cues": [
+    "forecast",
+    "deadline-risk",
+    "EVM",
+    "cost-to-complete"
+  ],
+  "boundary": {
+    "includes": [
+      "六 verb",
+      "DDL 风险",
+      "baseline 前置",
+      "诚实字段",
+      "usage⊗estimate"
+    ],
+    "excludes": [
+      "重算估算数学",
+      "baseline 写入命令"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.estimate-verbs"
+    ],
+    "rationale": "估算召回入口是 verb 映射表。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.estimation"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.estimation"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.estimate-verbs",
+      "title": "六 estimate verb 消费映射",
+      "point_kind": "procedure",
+      "summary": "forecast/evm/velocity/risk/cost-to-complete/deadline-risk：何时查→读字段→决策输入。",
+      "recognition_cues": [
+        "要估 ETA",
+        "查 EVM"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "marker": "point:pacing.estimate-verbs",
+        "heading_hint": "6 个 verb"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.estimate-verbs"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.estimate-verbs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.estimate-verbs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.deadline-risk",
+      "title": "交付 DDL 风险消费",
+      "point_kind": "procedure",
+      "summary": "读 risk_band/on_time_probability/margin/诚实字段；unknown 不当绿。",
+      "recognition_cues": [
+        "板上有 deadline"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "marker": "point:pacing.deadline-risk",
+        "heading_hint": "deadline-risk"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.deadline-risk"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.deadline-risk"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.deadline-risk"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.baseline-precondition",
+      "title": "baseline 是 EVM 前置",
+      "point_kind": "boundary",
+      "summary": "has_baseline:false 时 CPI/SPI 无从算；写入归 using-ccm。",
+      "recognition_cues": [
+        "evm 不可用"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "marker": "point:pacing.baseline-precondition",
+        "heading_hint": "baseline"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.baseline-precondition"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.baseline-precondition"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.baseline-precondition"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.honest-fields",
+      "title": "估算诚实字段",
+      "point_kind": "check",
+      "summary": "coverage/confidence/source/interval/5% 硬墙命中即降权；用区间不用点估。",
+      "recognition_cues": [
+        "冷启动预测",
+        "信不信 ETA"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "marker": "point:pacing.honest-fields",
+        "heading_hint": "诚实字段"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.honest-fields"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.honest-fields"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.honest-fields"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.usage-estimate-tension",
+      "title": "usage⊗estimate 张力",
+      "point_kind": "decision_rule",
+      "summary": "throttle/硬停 vs 长 ETA/装不下 cost-to-complete → 列张力交编排决策。",
+      "recognition_cues": [
+        "配额不够装完活"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "marker": "point:pacing.usage-estimate-tension",
+        "heading_hint": "usage ⊗ estimate"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.usage-estimate-tension"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.usage-estimate-tension"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.usage-estimate-tension"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.verbs-to-ddl",
+      "type": "deepens_to",
+      "from": "point:pacing.estimate-verbs",
+      "to": "point:pacing.deadline-risk",
+      "when": [
+        "板背 DDL 要读准时性"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.verbs-to-ddl"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.verbs-to-ddl"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:pacing.verbs-to-baseline",
+      "type": "requires",
+      "from": "point:pacing.estimate-verbs",
+      "to": "point:pacing.baseline-precondition",
+      "when": [
+        "要读 EVM 先确认 baseline"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.verbs-to-baseline"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.verbs-to-baseline"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.verbs-to-honest",
+      "type": "requires",
+      "from": "point:pacing.estimate-verbs",
+      "to": "point:pacing.honest-fields",
+      "when": [
+        "判预测信不信"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.verbs-to-honest"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.verbs-to-honest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.honest-to-tension",
+      "type": "applies_to",
+      "from": "point:pacing.honest-fields",
+      "to": "point:pacing.usage-estimate-tension",
+      "when": [
+        "可信预测仍装不下配额"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.honest-to-tension"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.honest-to-tension"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:pacing.tension-to-verbs",
+      "type": "routes_to",
+      "from": "point:pacing.usage-estimate-tension",
+      "to": "point:pacing.estimate-verbs",
+      "when": [
+        "回到该查哪个 verb"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.tension-to-verbs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.tension-to-verbs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.ddl-to-verbs",
+      "type": "routes_to",
+      "from": "point:pacing.deadline-risk",
+      "to": "point:pacing.estimate-verbs",
+      "when": [
+        "从 DDL 风险回到 verb 表"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.ddl-to-verbs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.ddl-to-verbs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.baseline-to-verbs",
+      "type": "routes_to",
+      "from": "point:pacing.baseline-precondition",
+      "to": "point:pacing.estimate-verbs",
+      "when": [
+        "baseline 判定后回 verb 表"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.baseline-to-verbs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.baseline-to-verbs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.verbs-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.estimate-verbs",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "估算与配额交叉"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.verbs-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.verbs-to-global"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.honest",
+      "type": "routes_to",
+      "from": "point:pacing.honest-fields",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "诚实字段回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.honest"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.honest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.tension",
+      "type": "routes_to",
+      "from": "point:pacing.usage-estimate-tension",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "张力回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.tension"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.tension"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.ddl",
+      "type": "routes_to",
+      "from": "point:pacing.deadline-risk",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "DDL 风险回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.ddl"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.ddl"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.baseline",
+      "type": "routes_to",
+      "from": "point:pacing.baseline-precondition",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "baseline 回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.baseline"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.baseline"
+          }
+        ]
+      }
+    }
+  ]
+}

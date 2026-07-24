@@ -1,0 +1,287 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:distill.evidence",
+  "owner_skill": "skill:distilling-lessons-into-assets",
+  "title": "证据忠实性",
+  "intent": "守住本 skill 唯一硬约束：不脱离证据泛化，弱证据收窄托底。",
+  "recognition_cues": [
+    "脱离证据",
+    "收窄",
+    "弱证据丢弃"
+  ],
+  "boundary": {
+    "includes": [
+      "硬约束声明",
+      "泛化 vs 收窄细则"
+    ],
+    "excludes": [
+      "资产分类定义"
+    ]
+  },
+  "access": {
+    "class": "critical",
+    "relevant_entries": [
+      "entry:distilling-lessons-into-assets"
+    ],
+    "primary_points": [
+      "point:distill.evidence-fidelity"
+    ],
+    "rationale": "唯一硬约束；失守则蒸馏产物撒谎。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:distill.evidence"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.distill.evidence"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:distill.evidence-hard-line",
+      "title": "证据忠实性硬约束声明",
+      "point_kind": "principle",
+      "summary": "候选到资产间不允许脱离证据泛化；不够就收窄。",
+      "recognition_cues": [
+        "写通用一点",
+        "证据忠实"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "marker": "point:distill.evidence-hard-line",
+        "heading_hint": "唯一硬约束"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:distill.evidence-fidelity",
+        "canonical": "point:distill.evidence-fidelity",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "23fa4f982e338b906ac557aa20bf5405f57067887f464463086a18a4dd869963"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.evidence-hard-line"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.evidence-hard-line"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.evidence-fidelity",
+      "title": "泛化 vs 收窄细则",
+      "point_kind": "principle",
+      "summary": "脱离证据的泛化长什么样、怎么收窄、弱证据如何托底不丢弃。",
+      "recognition_cues": [
+        "措辞写通用",
+        "弱证据"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/evidence-fidelity.md",
+        "marker": "point:distill.evidence-fidelity",
+        "heading_hint": "泛化 vs 收窄"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.evidence-fidelity"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.evidence-fidelity"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.evidence-fidelity"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:distill.hardline-to-fidelity",
+      "type": "deepens_to",
+      "from": "point:distill.evidence-hard-line",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "需要泛化/收窄细则与例子"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hardline-to-fidelity"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.hardline-to-fidelity"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:distill.fidelity-to-hardline",
+      "type": "routes_to",
+      "from": "point:distill.evidence-fidelity",
+      "to": "point:distill.evidence-hard-line",
+      "when": [
+        "回到硬约束声明"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.fidelity-to-hardline"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.fidelity-to-hardline"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.fidelity-to-fallback",
+      "type": "applies_to",
+      "from": "point:distill.evidence-fidelity",
+      "to": "point:distill.fallback-no-drop",
+      "when": [
+        "弱证据场景接到不丢弃兜底"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.fidelity-to-fallback"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.fidelity-to-fallback"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.fidelity-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.evidence-fidelity",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "证据规则明确后继续路由"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.fidelity-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.fidelity-to-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hardline-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.evidence-hard-line",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "硬约束声明后进入路由"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hardline-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hardline-to-tree"
+          }
+        ]
+      }
+    }
+  ]
+}

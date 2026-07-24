@@ -1,0 +1,122 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:slicing.example",
+  "owner_skill": "skill:slicing-goals-into-dags",
+  "title": "横切纵切对照样例",
+  "intent": "用同一目标对照横切病灶与纵切收益，校准切法直觉。",
+  "recognition_cues": [
+    "需要具体样例",
+    "默认先 schema/API/UI"
+  ],
+  "boundary": {
+    "includes": [
+      "worked-example 全文对照"
+    ],
+    "excludes": [
+      "硬规则正文"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:slicing-goals-into-dags"
+    ],
+    "primary_points": [
+      "point:slicing.example-contrast"
+    ],
+    "rationale": "样例按需加深，不占入口 pin。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:slicing.example"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.slicing.example"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:slicing.example-contrast",
+      "title": "横切 vs 纵切对照样例",
+      "point_kind": "example",
+      "summary": "记账 app 横切病灶与 walking skeleton 纵切收益对照。",
+      "recognition_cues": [
+        "脑中只有先 schema/API/UI"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
+        "marker": "point:slicing.example-contrast",
+        "heading_hint": "横切 vs 纵切"
+      },
+      "authority": {
+        "role": "example",
+        "subject": "subject:slicing.vertical-rule",
+        "canonical": "point:slicing.vertical-rule",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "8c3e2f28d6d691615861fdee2b7ff52001877302111cb02cf9194d803e7f2ded"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.example-contrast"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.example-contrast"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:slicing.example-to-vertical",
+      "type": "routes_to",
+      "from": "point:slicing.example-contrast",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "从样例回到纵切硬规则 canonical"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.example-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.example-to-vertical"
+          }
+        ]
+      }
+    }
+  ]
+}

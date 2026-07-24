@@ -9,6 +9,7 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 该配一个专职 subagent——选错归宿,这条经验要么被淹没、要么被滥用、要么干脆无人再看。本 skill 承载的是
 **这一步路由判断的品味**,不是任何具体项目的执行流程(执行流程归调用你的那个命令/工作流本身)。
 
+<!-- ccm:k:start point:distill.taxonomy-quick -->
 ## 四类资产判据速查
 
 | 资产类型 | 适合承载 | 不适合承载 |
@@ -18,6 +19,8 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 | **workflow**(确定性编排脚本) | 确定性的编排/并行形状本身(先做什么、并行还是串行、怎么 fan-out) | 需要临场判断力的决策点——判断力应留给触发它的 agent,不要把决策塞进脚本里 |
 | **subagent**(角色化的专职人格定义) | 需要独立 persona + 独立工具/上下文边界、会被反复以同一角色调用的专职分工 | 一次性任务委托——用普通派发即可,不必新建一个命名 subagent 定义 |
 
+<!-- ccm:k:end point:distill.taxonomy-quick -->
+<!-- ccm:k:start point:distill.routing-overview -->
 ## 归宿判断决策树(顶层三问,细节见 [references/routing-decision-tree.md](references/routing-decision-tree.md))
 
 1. **这条经验的本质是事实还是判断力?** 事实(这次因为具体原因踩了坑,下次注意这件具体的事)→ 纪律文档;
@@ -31,6 +34,8 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 设施缺失时,绝不静默丢弃这条经验**;找不到理想归宿就落成本最低的纪律文档指针,并显式标注"归宿不确定"或
 "该项目无对应基础设施,已降级",留给人工审阅时改判。宁可归宿判浅了被人工纠正,也不能让一条经验凭空消失。
 
+<!-- ccm:k:end point:distill.routing-overview -->
+<!-- ccm:k:start point:distill.evidence-hard-line -->
 ## 唯一硬约束:证据忠实性(存在性声明,细则见 references/evidence-fidelity.md)
 
 **从候选内容草稿写进目标资产的这一步,不允许发生任何脱离原始证据的改写或泛化。** 措辞收不住时,你要做的是
@@ -39,6 +44,8 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 收窄为…"。这条红线的判断细则、"泛化 vs 收窄"的对照例子,都在
 [references/evidence-fidelity.md](references/evidence-fidelity.md)。
 
+<!-- ccm:k:end point:distill.evidence-hard-line -->
+<!-- ccm:k:start point:distill.landing-preview -->
 ## 落地手艺与反模式
 
 每类资产的具体落地手艺(文风套用、frontmatter/触发描述写法、workflow 脚本纪律、subagent persona 边界)与
@@ -47,6 +54,8 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 一条元反模式先摆在这里:**"这条经验挺重要的,得进 skill 才够重"是本 skill 要堵的头号自我说服**——重要
 不等于可复用判断力,重要的一次性事实老实进纪律文档更合适。
 
+<!-- ccm:k:end point:distill.landing-preview -->
+<!-- ccm:k:start point:distill.boundary -->
 ## 边界:与其他判断力不重叠
 
 - **不是代码工程手艺判断**——本 skill 管"一条经验该归属哪类资产、以及落地到该资产时的品味",不涉及"领域
@@ -61,6 +70,7 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
   读者。若一条候选经验判定该落成 skill、且遇到"该新建 skill 还是塞进既有 skill 的一节"这类治理分歧,把
   这个二级问题转交给项目自己的 skill 治理规范(若存在),本 skill 到此为止。
 
+<!-- ccm:k:end point:distill.boundary -->
 ## Pointers
 
 - [references/asset-taxonomy.md](references/asset-taxonomy.md) —— 四类资产各自"适合承载什么性质的经验"

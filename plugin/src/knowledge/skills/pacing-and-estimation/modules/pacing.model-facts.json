@@ -1,0 +1,151 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.model-facts",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "模型档位事实",
+  "intent": "解释四 provider 模型事实三层与不确定性，不做分配决策。",
+  "recognition_cues": [
+    "model-policy show",
+    "相对成本"
+  ],
+  "boundary": {
+    "includes": [
+      "三层事实读法"
+    ],
+    "excludes": [
+      "模型分配决策"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.model-tier-facts"
+    ],
+    "rationale": "按需查表。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.model-facts"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.model-facts"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.model-tier-facts",
+      "title": "模型档位事实三层",
+      "point_kind": "reference",
+      "summary": "hard_facts / project_role_evidence / community_advisory 分开；缺 payer 标 unknown。",
+      "recognition_cues": [
+        "有哪些模型候选",
+        "相对成本"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md",
+        "marker": "point:pacing.model-tier-facts",
+        "heading_hint": "模型档位"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.model-tier-facts"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.model-tier-facts"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.model-tier-facts"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.model-to-target",
+      "type": "routes_to",
+      "from": "point:pacing.model-tier-facts",
+      "to": "point:pacing.selected-target-facts",
+      "when": [
+        "模型事实要绑回 selected target"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.model-to-target"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.model-to-target"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.model-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.model-tier-facts",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "模型事实与配额一并消费"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.model-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.model-to-global"
+          }
+        ]
+      }
+    }
+  ]
+}
