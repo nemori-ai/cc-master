@@ -330,6 +330,480 @@
         }
       }
     },
+    "hopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "witness": {
+          "type": "object"
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "abstainedHopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "witness": {
+          "type": "object",
+          "required": [
+            "abstained"
+          ],
+          "properties": {
+            "abstained": {
+              "const": true
+            }
+          }
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "executedSuccessHopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "witness": {
+          "type": "object",
+          "properties": {
+            "abstained": {
+              "not": {
+                "const": true
+              }
+            },
+            "skipped": {
+              "not": {
+                "const": true
+              }
+            }
+          }
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hostProjectionWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "ok",
+        "mode",
+        "artifacts",
+        "enabled_edges",
+        "point_anchors",
+        "hop_report",
+        "budgets",
+        "executed_checks",
+        "conditional_route_policy",
+        "result_graph_sha256"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex",
+            "cursor",
+            "kimi-code"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "full",
+            "partial",
+            "stub",
+            "unsupported"
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "enabled_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "point_anchors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hop_report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H1",
+            "H2",
+            "H3",
+            "H4"
+          ],
+          "properties": {
+            "H1": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H2": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H3": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H4": {
+              "$ref": "#/$defs/hopGate"
+            }
+          }
+        },
+        "budgets": {
+          "type": "object"
+        },
+        "executed_checks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "conditional_route_policy": {
+          "type": "string",
+          "enum": [
+            "enabled_by_default-only",
+            "abstained"
+          ]
+        },
+        "result_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "final_surface_snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host",
+            "mode",
+            "final_root",
+            "fileset_manifest",
+            "fileset",
+            "skills",
+            "modules",
+            "points",
+            "edges",
+            "entries",
+            "enabled_edge_ids",
+            "enabled_adjacency"
+          ],
+          "properties": {
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "partial"
+              ]
+            },
+            "final_root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fileset_manifest": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "fileset": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "kind"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "file",
+                      "dir",
+                      "symlink"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "file"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "bytes",
+                        "sha256"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "skills": {
+              "type": "array"
+            },
+            "modules": {
+              "type": "array"
+            },
+            "points": {
+              "type": "array"
+            },
+            "edges": {
+              "type": "array"
+            },
+            "entries": {
+              "type": "array"
+            },
+            "enabled_edge_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "enabled_adjacency": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "stub",
+                  "unsupported"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifacts": {
+                "maxItems": 0
+              },
+              "enabled_edges": {
+                "const": 0
+              },
+              "point_anchors": {
+                "const": 0
+              },
+              "conditional_route_policy": {
+                "const": "abstained"
+              },
+              "final_surface_snapshot": false,
+              "hop_report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "H1",
+                  "H2",
+                  "H3",
+                  "H4"
+                ],
+                "properties": {
+                  "H1": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H2": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H3": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H4": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              },
+              "ok": {
+                "const": true
+              }
+            },
+            "required": [
+              "mode",
+              "ok"
+            ]
+          },
+          "then": {
+            "required": [
+              "final_surface_snapshot"
+            ],
+            "properties": {
+              "conditional_route_policy": {
+                "const": "enabled_by_default-only"
+              },
+              "budgets": {
+                "type": "object",
+                "minProperties": 1
+              },
+              "executed_checks": {
+                "type": "array",
+                "allOf": [
+                  {
+                    "contains": {
+                      "const": "candidate_runtime_sync"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "candidate_runtime_verify"
+                    }
+                  }
+                ]
+              },
+              "hop_report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "H1",
+                  "H2",
+                  "H3",
+                  "H4"
+                ],
+                "properties": {
+                  "H1": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H2": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H3": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H4": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              },
+              "ok": {
+                "const": false
+              }
+            },
+            "required": [
+              "mode",
+              "ok"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conditional_route_policy": {
+                "const": "enabled_by_default-only"
+              },
+              "final_surface_snapshot": false
+            }
+          }
+        }
+      ]
+    },
     "changeValidation": {
       "type": "object",
       "additionalProperties": false,
@@ -342,9 +816,11 @@
         "scope",
         "result_graph_sha256",
         "candidate_valid",
+        "candidate_runtime_valid",
         "optimistic_lock_valid",
         "git_apply_check",
         "patch_sha256",
+        "host_projection_witnesses",
         "diagnostics"
       ],
       "properties": {
@@ -376,6 +852,9 @@
         "candidate_valid": {
           "type": "boolean"
         },
+        "candidate_runtime_valid": {
+          "type": "boolean"
+        },
         "optimistic_lock_valid": {
           "type": "boolean"
         },
@@ -384,6 +863,82 @@
         },
         "patch_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "host_projection_witnesses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "claude-code"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "codex"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "cursor"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "kimi-code"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            }
+          ],
+          "items": false
         },
         "diagnostics": {
           "type": "array",
@@ -535,7 +1090,10 @@
               "authority.subject",
               "edge.when",
               "edge.avoid_when",
-              "edge.path_role"
+              "edge.path_role",
+              "edge.runtime.enabled_by_default",
+              "hop_policy.critical_any_point_to_primary_max",
+              "hop_policy.primary_entry_to_primary_max"
             ]
           },
           "uniqueItems": true

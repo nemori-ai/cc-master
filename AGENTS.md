@@ -1,7 +1,7 @@
 ---
 path: AGENTS.md
 version: v1.0
-last-edited: 2026-07-23
+last-edited: 2026-07-24
 agent-edit-policy: |
   仓库根 AGENTS.md——agent / 贡献者进入 cc-master 的着陆页与导航地图。三类编辑分级：
   - 自主刷新（无需 PR 人审）：§12 目录/文件约定在子目录增减时刷新行级；§N 触发式深入阅读表新增行；§9 findings 台账新增条目的指针；frontmatter 的 last-edited / version 字段；命令或脚本落地后在对应表追加行。
@@ -24,7 +24,7 @@ content-summary: |
 
 `cc-master` 是一个 **ship-anywhere 的 agent harness 插件项目**：产品目标是让 Claude Code 或 Codex 等 agent harness 的主会话 agent 都能被初始化成 long-horizon **master orchestrator（总指挥）**。源码结构已按 paragoge 范式重构为 **CLI + source-to-adapter plugin projection**：共享产品语义在 `plugin/src`，Claude Code / Codex 等 host 只通过 adapter 投影成各自可安装产物。
 
-它**不是**：agent framework / library，不是某个 LLM API 的包装，不依赖 agent-teams 或 scheduled routines（见 §3 红线 5）。它的 runtime 是 **commands + 7 skills + hooks + 一个 board 文件**的薄编排层；它的 repo 形态是 **paragoge-style 多 harness adapter 工程**。
+它**不是**：agent framework / library，不是某个 LLM API 的包装，不依赖 agent-teams 或 scheduled routines（见 §3 红线 5）。它的 runtime 是 **commands + 8 skills + hooks + 一个 board 文件**的薄编排层；它的 repo 形态是 **paragoge-style 多 harness adapter 工程**。
 
 **产品愿景 / 北极星（charter）**——cc-master **致力于让** agent 化身 master orchestrator 并具备六项能力：① 异步并行多线程推进、把目标完整落地；② 控制 token 消耗速度；③ 把握自主决策 vs 寻求人类接入的边界；④ 目标的分解 / 管理 / 更新 / 规划；⑤ 资源消耗速度合理前提下最大化实施效率的调度编排；⑥ 按复杂性 / 难度 / 时长选合适的模型。这是**方向目标（aspirational）而非「已全部兑现」**——哪些已落地、哪些 design-only 由 gap 审计度量。**完整六条 charter 的 SSOT 在 [`design_docs/spec.md` §1.0](design_docs/spec.md)**，本段只是摘要回指，不复述。
 
@@ -126,7 +126,7 @@ cc-master/
 
 ## 6. Skill 创作 / 维护纪律（含 TDD-for-skills）
 
-本仓**分发**八个 skill（源码在 `plugin/src/skills/`，各 host 产物在 `plugin/dist/<host>/skills/`）：A（编排决策 + DAG 排期 + 换号决策锚）、B（workflow 写法）、D（`using-ccm`·ccm CLI 操作手册 / board 操作机制层 + 号池 account 操作面）、E（`slicing-goals-into-dags`·敏捷切 DAG 方法论）、F（`dev-as-ml-loop`·执行侧 dev loop 心智）、G（`engineering-with-craft`·设计/开发/测试的工程手艺）、H（`pacing-and-estimation`·消费 ccm 只读 advisory 配速 + 估算）、I（`distilling-lessons-into-assets`·经验→资产的路由与落地品味）——**互不重叠**（红线 3）：A = orchestrator 做什么（含换号**决策** + 已切好的 DAG 怎么排期），B = workflow 脚本怎么写，D = 怎么用 ccm 读写 board + 操作 account 号池（操作**机制**；号池 / 选号 / vault **实现** SSOT 在 ccm `account` 引擎，概念叙事在 D 的 account-pool.md），E = 怎么把目标**切**成 board DAG（「切」先于 A 的「排」），F = 把一个已切好的任务**优化到验收**（agentic-loop 开发=ML 优化的执行侧**循环形状**，与 A「指挥不演奏」不同 plane），G = 设计/开发/测试时**领域 / 类 / 合约 / 测试本身怎么建得好**（DDD/SDD/TDD/OOP 整合成五根 + 红线，与 F 不同 plane:F 给循环形状、G 给循环里的手艺内容），H = 消费 ccm `usage`/`estimate`/`baseline` 只读 advisory 配速 + 估算（读 verdict / 四档模型档 / 配额信号源 / 估算诚实字段·**ccm 出 verdict、A 决策**，只教消费层），I = `/cc-master:distill` 引导加载的**经验→资产路由判断力**（一条候选经验该落成纪律文档 / skill / workflow / subagent 中的哪一种、每类资产怎么落地不走样、证据忠实性硬约束——不涉及代码工程手艺内容本身〔归 G〕、不涉及目标切分〔归 E〕、不涉及任务执行循环〔归 F〕）。另有**七个项目自用、不随插件分发**的 dev/meta skill（住 `.claude/skills/`，不在 `plugin/src/skills/`，并投影到 `.agents/skills/` 给 Codex 项目级发现），终端用户装插件时看不到它们：
+本仓**分发**八个 skill（源码在 `plugin/src/skills/`，各 host 产物在 `plugin/dist/<host>/skills/`）：A（编排决策 + DAG 排期 + 换号决策锚）、B（workflow 写法）、D（`using-ccm`·ccm CLI 操作手册 / board 操作机制层 + 号池 account 操作面）、E（`slicing-goals-into-dags`·敏捷切 DAG 方法论）、F（`dev-as-ml-loop`·执行侧 dev loop 心智）、G（`engineering-with-craft`·设计/开发/测试的工程手艺）、H（`pacing-and-estimation`·消费 ccm 只读 advisory 配速 + 估算）、I（`distilling-lessons-into-assets`·经验→资产的路由与落地品味）——**互不重叠**（红线 3）：A = orchestrator 做什么（含换号**决策** + 已切好的 DAG 怎么排期），B = workflow 脚本怎么写，D = 怎么用 ccm 读写 board + 操作 account 号池（操作**机制**；号池 / 选号 / vault **实现** SSOT 在 ccm `account` 引擎，概念叙事在 D 的 account-pool.md），E = 怎么把目标**切**成 board DAG（「切」先于 A 的「排」），F = 把一个已切好的任务**优化到验收**（agentic-loop 开发=ML 优化的执行侧**循环形状**，与 A「指挥不演奏」不同 plane），G = 设计/开发/测试时**领域 / 类 / 合约 / 测试本身怎么建得好**（DDD/SDD/TDD/OOP 整合成五根 + 红线，与 F 不同 plane:F 给循环形状、G 给循环里的手艺内容），H = 消费 ccm `usage`/`estimate`/`baseline` 只读 advisory 配速 + 估算（读 verdict / 四档模型档 / 配额信号源 / 估算诚实字段·**ccm 出 verdict、A 决策**，只教消费层），I = `/cc-master:distill` 引导加载的**经验→资产路由判断力**（一条候选经验该落成纪律文档 / skill / workflow / subagent 中的哪一种、每类资产怎么落地不走样、证据忠实性硬约束——不涉及代码工程手艺内容本身〔归 G〕、不涉及目标切分〔归 E〕、不涉及任务执行循环〔归 F〕）。另有**九个项目自用、不随插件分发**的 dev/meta skill（住 `.claude/skills/`，不在 `plugin/src/skills/`，并投影到 `.agents/skills/` 给 Codex 项目级发现），终端用户装插件时看不到它们：
 
 - **`requirement-elicitation`** — 在动手任何 feature / skill / 行为改动**之前**，通过协作对话挖出用户真实痛点、过设计闸（批准前不实现）。本仓 dev 流的需求发现闸，**取代 `superpowers:brainstorming`**（self-contain + 重接地到 board `goal` 模型）。**它不是「为对仗凑的第四件造/评/治」**——是不同家族的**发现层**（喂给 curating），靠 self-containment 缺口 + 强 B1 覆写挣得席位，见其 [`DESIGN.md`](.claude/skills/requirement-elicitation/DESIGN.md)。
 - **`cc-master-skillsmith`** — 写或改**一个** skill 的 body（craft 两轴诊断 + 4 类 body 内容 + pressure-test 纪律）。
@@ -135,8 +135,10 @@ cc-master/
 - **`harness-plugin-architecture`** — 设计 / 重构本仓的多 agent harness 兼容架构：paragoge 式 `plugin/src` → `plugin/dist/<host>`、SAP skills、PHIP hooks、host adapter 边界、Codex 项目 skills 同步。
 - **`adapter-projection-engineering`** — 实现 / 修改 / 调试 source-to-adapter 投影脚本：strategy/meta 检查、slot/placeholder rewrite、dist 生成、sync check、path token 验证。
 - **`plugin-release-engineering`** — 打包 / 分发 / 发布 CLI+plugin：source/dist/package 边界、host-native artifact、版本线、release checks、marketplace metadata。
+- **`readme-steward`** — 创建 / 更新 / 审查 / 同步 `README.md` 与 `README_zh.md`（产品叙事、双语一致性、feature claim 诚实性）。
+- **`worktree-discipline`** — 本仓 Solo / Fan-out worktree 隔离纪律（防污染 main checkout；single-committer 下 spoke 不 commit）。
 
-**路由**：**还没搞清用户真需求 / 动手实现之前 → `requirement-elicitation`；要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`；改 origin 多 harness plugin adapter / N-host parity → `harness-plugin-architecture`；改 sync/projection → `adapter-projection-engineering`；改打包/发布 → `plugin-release-engineering`**。它们触发时机正交，靠 description 识别，不设路由器 skill。
+**路由**：**还没搞清用户真需求 / 动手实现之前 → `requirement-elicitation`；要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`；改 origin 多 harness plugin adapter / N-host parity → `harness-plugin-architecture`；改 sync/projection → `adapter-projection-engineering`；改打包/发布 → `plugin-release-engineering`；改 README 双语入口 → `readme-steward`；立 worktree 隔离 / fan-out → `worktree-discipline`**。它们触发时机正交，靠 description 识别，不设路由器 skill。Skill knowledge graph 的健康诊断 / typed change / witness 走正式规范 + CLI（见 §N 与 `design_docs/skill-knowledge-graph/`），不设独立 meta-skill。
 
 **Codex 项目级 meta-skill 同步**：Codex 不读取 `.claude/skills`，项目级 skills 的官方目录是 `.agents/skills`。本仓以 `.claude/skills` 为 dev/meta-skill 源，`.agents/skills` 由 [`scripts/sync-codex-skills.sh`](scripts/sync-codex-skills.sh) 生成（默认 symlink，Codex 支持 symlinked skill folders；不能用 symlink 的环境跑 `--copy`）。新增 / 删除 / 重命名 `.claude/skills/*` 后必须运行：
 
@@ -314,9 +316,12 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 判断要不要建 skill / 该 skill 还是 reference / 一组 skill 边界与重叠 | [`.claude/skills/curating-skill-portfolios/SKILL.md`](.claude/skills/curating-skill-portfolios/SKILL.md)（Counterfactual Probe A/B + 裁剪七维 + DESIGN 宪法，项目自用 dev skill）|
 | 设计 / 维护 skill knowledge graph：module/point/edge schema、canonical SSOT、access class、三跳、typed change、projection / CI 合同 | [`design_docs/skill-knowledge-graph/README.md`](design_docs/skill-knowledge-graph/README.md)（正式规范 + schema + examples）+ [`adrs/ADR-038-git-native-skill-knowledge-graph.md`](adrs/ADR-038-git-native-skill-knowledge-graph.md)（技术路线决策）|
+| 对本仓 skill knowledge graph 做健康诊断 / 选 typed op / 走 `change begin→validate→apply` / 读 witness | [`design_docs/skill-knowledge-graph/specification.md`](design_docs/skill-knowledge-graph/specification.md) + [`cli-contract.md`](design_docs/skill-knowledge-graph/cli-contract.md) + `node scripts/skill-knowledge.mjs change …`（无独立 meta-skill；正式规范即维护者旅程）|
 | 查询 skill knowledge toolkit 当前能力 / 运行 K0 source 合同检查 / 读取稳定 diagnostics 与 exit code | `node scripts/skill-knowledge.mjs contract --json` + `node scripts/skill-knowledge.mjs check --stage K0 --json` + [`design_docs/skill-knowledge-graph/cli-contract.md`](design_docs/skill-knowledge-graph/cli-contract.md) |
 | 调研 skill 内 knowledge point 身份、Markdown span source map、跨 skill navigation、lineage / admission / health diagnosis | [`design_docs/research/skill_knowledge_graph/README.md`](design_docs/research/skill_knowledge_graph/README.md)（近一年官方规范 + 学术证据 + 工程分类 + cc-master 映射 + 研究议程）|
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
+| 创建 / 更新 / 审查 / 同步 README.md 与 README_zh.md | [`.claude/skills/readme-steward/SKILL.md`](.claude/skills/readme-steward/SKILL.md)（项目自用 dev skill）|
+| 立 Solo / Fan-out worktree 隔离、防污染 main checkout、写 spoke 派发纪律 | [`.claude/skills/worktree-discipline/SKILL.md`](.claude/skills/worktree-discipline/SKILL.md)（项目自用 dev skill）|
 | 梳理 / 规划 / 审查 ccm-owned cross-harness headless worker control plane（planning/routing/attempt/run 合同、machine facts/quota admission、provider driver、supervisor/journal/attach、active-run upgrade lifecycle） | [`design_docs/cross-harness-orchestration-capability-model.md`](design_docs/cross-harness-orchestration-capability-model.md)（current / partial / target、owner、工业化 gate 的持续 SSOT；不是独立 dev skill） |
 | 实现 / 审查 cross-harness worker 的 immutable runtime stage→verify→activate→exact invoke→doctor/recover→rollback supply chain | [`design_docs/cross-harness-runtime-supply-chain-spec.md`](design_docs/cross-harness-runtime-supply-chain-spec.md)（C1 implementation contract）+ `ccm/apps/cli/src/runtime-supply-chain.ts` + `ccm/apps/cli/test/handler-runtime.test.ts`；公共合同不得钉死 POSIX symlink，Windows backend gate 未过须 fail closed |
 | 设计 / 重构多 agent harness 兼容架构（paragoge-style CLI + plugin source-to-adapter、SAP/PHIP、host adapter 边界） | [`.claude/skills/harness-plugin-architecture/SKILL.md`](.claude/skills/harness-plugin-architecture/SKILL.md) + [`plugin/src/AGENTS.md`](plugin/src/AGENTS.md) + [`design_docs/harnesses/`](design_docs/harnesses/) |

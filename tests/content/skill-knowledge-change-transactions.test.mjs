@@ -85,7 +85,11 @@ function skillDoc(id, moduleIds) {
         review: { reviewer: 'test', rationale: 'transaction fixture uses point bindings directly' },
       },
     ],
-    host_coverage: ['claude-code', 'codex', 'cursor', 'kimi-code'].map((host) => ({ host, state: 'full' })),
+    host_coverage: ['claude-code', 'codex', 'cursor', 'kimi-code'].map((host) => ({
+      host,
+      state: 'stub',
+      reason: 'transaction unit fixture has no SAP/dist surface; candidate runtime abstains',
+    })),
     lifecycle: lifecycle(),
     admission: evidence(id),
   };
@@ -441,6 +445,65 @@ test('SKG-TX-06: rollback failure preserves an exact recovery bundle and names u
     assert.deepEqual(fs.readFileSync(path.join(recovery, 'before', files.moduleTwoPath)), moduleTwoBefore);
     assert.ok(fs.existsSync(path.join(recovery, 'manifest.json')));
   } finally { fs.rmSync(files.root, { recursive: true, force: true }); }
+});
+
+test('SKG-TX-08: mislabeling point module relocation as transfer_owner fails; move passes', async () => {
+  const tx = await import(transactionModule);
+  const files = fixture();
+  try {
+    const wrongBegin = tx.beginTransaction({
+      repoRoot: files.root,
+      operation: 'transfer_owner',
+      scope: [files.moduleOnePath, files.moduleTwoPath, files.skillPath, files.otherSkillPath, files.markdownPath],
+      base: 'HEAD',
+    });
+    assert.equal(wrongBegin.exitCode, 0, JSON.stringify(wrongBegin.diagnostics));
+    // Move point:demo.one into module:demo.two while drafting transfer_owner (wrong label).
+    editModule(wrongBegin.workspace, files.moduleOnePath, (document) => {
+      document.points = document.points.filter((item) => item.id !== 'point:demo.one');
+      document.edges = [];
+    });
+    editModule(wrongBegin.workspace, files.moduleTwoPath, (document) => {
+      document.points.push(point('point:demo.one', 'subject:demo.one'));
+    });
+    writeDraft(wrongBegin.workspace, {
+      op: 'transfer_owner',
+      subject: 'module:demo.two',
+      from_skill: 'skill:demo',
+      to_skill: 'skill:other',
+      edge_rewrites: [],
+      rationale: 'mislabel point move as owner transfer',
+    });
+    const wrong = tx.validateTransaction({ repoRoot: files.root, workspace: wrongBegin.workspace });
+    assert.notEqual(wrong.exitCode, 0);
+
+    const rightBegin = tx.beginTransaction({
+      repoRoot: files.root,
+      operation: 'move',
+      scope: [files.moduleOnePath, files.moduleTwoPath, files.skillPath, files.otherSkillPath, files.markdownPath],
+      base: 'HEAD',
+    });
+    editModule(rightBegin.workspace, files.moduleOnePath, (document) => {
+      document.points = document.points.filter((item) => item.id !== 'point:demo.one');
+      document.edges = [];
+    });
+    editModule(rightBegin.workspace, files.moduleTwoPath, (document) => {
+      document.points.push(point('point:demo.one', 'subject:demo.one'));
+    });
+    writeDraft(rightBegin.workspace, {
+      op: 'move',
+      subject: 'point:demo.one',
+      from: { module: 'module:demo.one' },
+      to: { module: 'module:demo.two' },
+      edge_rewrites: [{ action: 'remove', edge: 'edge:demo.one-to-two' }],
+      rationale: 'same-skill point module relocation',
+    });
+    const right = tx.validateTransaction({ repoRoot: files.root, workspace: rightBegin.workspace });
+    assert.equal(right.exitCode, 0, JSON.stringify(right.diagnostics));
+    assert.equal(right.validation.candidate_valid, true);
+  } finally {
+    fs.rmSync(files.root, { recursive: true, force: true });
+  }
 });
 
 test('SKG-TX-07: every typed operation has a concrete, non-noop graph precondition', async () => {

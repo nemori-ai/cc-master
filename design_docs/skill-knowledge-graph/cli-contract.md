@@ -295,11 +295,44 @@ loud、exit 10，不把 envelope check 冒充 full validation。
 base ref、base graph hash 与 scope file hashes。agent 只编辑 `candidate/`。
 
 `change validate <workspace>` 必须对完整 candidate graph 的 schema、marker/binding、membership、authority、admission、edge endpoint、inventory freshness 与 typed-operation precondition 验证，计算 result graph
-hash 与 patch；只有 optimistic lock、scope hash 和 `git apply --check`
-全部通过才产生 `candidate_valid: true`。
+hash 与 patch，并在 ignored `runtime-candidate/` 根内对四 host（`claude-code` /
+`codex` / `cursor` / `kimi-code`）完成 candidate final-host projection：重解析 relative
+link 与 explicit anchor，校验 H1–H4 与逐 router budget。`validation.json` 必须含：
 
-`change apply <workspace>` 必须重验 accepted scope 后全有或全无写入；成功写入后才 finalized immutable
-change record。任一 scope stale/dirty/写失败都拒绝部分写入和 ledger finalize。closed operation set 保持：
+- `candidate_runtime_valid`（boolean）；
+- `host_projection_witnesses`（恰好 4 项，按 host 稳定排序；每项含 `host` / `ok` / `mode` /
+  `hop_report` / `budgets` / `executed_checks` / `conditional_route_policy` /
+  `result_graph_sha256`，且四 host 的 `result_graph_sha256` 与顶层 `result_graph_sha256` 相同）。
+
+`full` / `partial` / `stub` / `unsupported` 必须遵守 skill `host_coverage`：overall `full` 仅当该
+host 上全部 skill coverage 都是 `full`；mixed full+partial / full+stub / partial+stub 只能报
+`partial`（或全 abstain 时的 stub/unsupported）。stub/unsupported abstain，不得声称 point
+coverage。`partial` 只把 full skill 模块与 partial `covered_modules` 计入分母，并把子图真正
+投影到独立 final host tree 后再重解析 H1–H4 / budget；excluded module/point/entry target 不得
+出现在该 tree 或 witness 分母。
+路径权威：workspace / candidate / runtime / scope 的 locate 链拒绝 symlink；目录必须逐段安全
+创建（遇 symlink 在任何写前拒绝），不得 `mkdir -p` 穿过仓外 symlink；预存 `runtime-candidate`
+一律拒绝或仅允许带本次 ownership marker 的目录，绝删除未知内容；`apply` 在最终
+open/rename 前重新鉴权 candidate、accepted targets、ledger target。
+条件边只按 `conditional_route_policy: "enabled_by_default-only"`（K1 无 cue context）计入默认 route
+class。candidate runtime 使用 **provider-guidance registry v2**（每 host/skill 独立
+`accepted_sap` + `accepted_final` manifest）：candidate 图只授权改变 compiler-owned overlay，
+raw SAP 必须 exact 等于 committed `accepted_sap`；expected final 由 trusted compiler 从
+accepted_sap 复制后应用完整 per-skill overlays + skills-scoped entry pins 重建，actual final
+必须 exact 等于该 rebuild。candidate attestation sidecar 只是 evidence（verifier 重算全部
+commitment），不是信任根。禁止 marker-only / overlay-normalized digest 旁路。非法 hop 必须以
+结构化 `SKG-HOP-*` fail closed。sync 非零时绝不能消费残留/
+partial dist（artifacts/budgets 空，H1–H4 全 `ok:false`+`skipped`），诊断走稳定 structured
+envelope，不用 greedy stdout regex。
+任一 host projection / link / hop / budget 失败都 fail closed，且不得写 accepted tree、
+不得 finalize ledger。只有 optimistic lock、scope hash、`git apply --check` **与**
+`candidate_runtime_valid` 全部通过才产生 `candidate_valid: true`；该布尔必须与
+source/runtime/lock/git_apply/host witness 双向等价。`validation.json` 写入前必须通过
+committed change schema 与 semantic envelope gate；gate 后若改写 envelope，最终 bytes 必须
+再次 schema+semantic validate。
+
+`change apply <workspace>` 必须重跑完整 validate（含四 host candidate runtime gate）后全有或全无写入；成功写入后才 finalized immutable
+change record。任一 scope stale/dirty/写失败或 runtime gate 失败都拒绝部分写入和 ledger finalize。closed operation set 保持：
 `add / wording / refine / move / split / merge / transfer_owner / deprecate / retire`。
 
 `report` envelope 的 `result_kind` 为 `report`，并同时含：

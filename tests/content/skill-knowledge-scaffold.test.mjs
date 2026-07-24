@@ -456,11 +456,32 @@ test('SKG-CONTRACT-04: change schema freezes C5/C10 workspace and immutable chai
     'scope',
     'result_graph_sha256',
     'candidate_valid',
+    'candidate_runtime_valid',
     'optimistic_lock_valid',
     'git_apply_check',
     'patch_sha256',
+    'host_projection_witnesses',
     'diagnostics',
   ]);
+  const witnessArray = schema.$defs.changeValidation.properties.host_projection_witnesses;
+  assert.equal(witnessArray.prefixItems.length, 4);
+  assert.equal(witnessArray.items, false);
+  assert.equal(witnessArray.prefixItems[0].allOf[1].properties.host.const, 'claude-code');
+  assert.equal(witnessArray.prefixItems[3].allOf[1].properties.host.const, 'kimi-code');
+  const witnessModeBranches = schema.$defs.hostProjectionWitness.allOf;
+  assert.equal(
+    witnessModeBranches.length,
+    3,
+    'stub/unsupported + ok full/partial + failed full/partial mode branches',
+  );
+  assert.deepEqual(witnessModeBranches[0].if.properties.mode.enum, ['stub', 'unsupported']);
+  assert.equal(witnessModeBranches[0].then.properties.final_surface_snapshot, false);
+  assert.deepEqual(witnessModeBranches[1].if.properties.mode.enum, ['full', 'partial']);
+  assert.equal(witnessModeBranches[1].if.properties.ok.const, true);
+  assert.ok(witnessModeBranches[1].then.required.includes('final_surface_snapshot'));
+  assert.deepEqual(witnessModeBranches[2].if.properties.mode.enum, ['full', 'partial']);
+  assert.equal(witnessModeBranches[2].if.properties.ok.const, false);
+  assert.equal(witnessModeBranches[2].then.properties.final_surface_snapshot, false);
   assert.equal(schema.$defs.operation.oneOf.length, 9);
   const outputSchema = JSON.parse(
     fs.readFileSync(

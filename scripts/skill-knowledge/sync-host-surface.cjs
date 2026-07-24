@@ -11,6 +11,11 @@
  * `stamp` is an explicit internal parameter (tests inject deterministic values).
  * Optional `injectLateFault` is a dev-test-only seam after staging is fully built
  * (including compile) and before publish — production sync never passes it.
+ * Optional `injectPostPublishFault` runs after a successful publishHostTree and
+ * must throw so callers can observe residual live dist with a non-zero sync.
+ * `attestationMode: 'candidate-v2'` enables dual-manifest candidate attestation
+ * (exact accepted_sap + trusted expected-final rebuild). Marker/overlay-normalized
+ * bypasses are intentionally absent.
  */
 'use strict';
 
@@ -22,6 +27,7 @@ const {
   assertPacingRuntimeTree,
 } = require('../pacing-read-only-attestation.cjs');
 const {
+  assertProviderGuidanceAcceptedSap,
   assertProviderGuidanceRuntimeTree,
   loadProviderGuidanceRegistry,
 } = require('../provider-guidance-attestation.cjs');
@@ -188,9 +194,14 @@ function applySkillsScopedEntryPinsBridge({ repoRoot, host, stagingRoot, skillsT
   }
   let parsed;
   try {
-    parsed = JSON.parse(String(result.stdout || '').trim().split('\n').filter(Boolean).at(-1));
-  } catch {
-    throw new Error(`skills-scoped entry pins returned non-JSON for ${host}: ${result.stdout}`);
+    const { parseStructuredJsonStdout } = require('./json-framing.cjs');
+    parsed = parseStructuredJsonStdout(result.stdout, {
+      label: `skills-scoped entry pins (${host})`,
+    });
+  } catch (error) {
+    throw new Error(
+      `skills-scoped entry pins returned non-JSON for ${host}: ${error.message}; stdout=${result.stdout}`,
+    );
   }
   if (!parsed || parsed.ok !== true) {
     throw new Error(`skills-scoped entry pins refused for ${host}: ${JSON.stringify(parsed)}`);
@@ -214,14 +225,152 @@ function compileIntoCandidate({ repoRoot, host, candidateRoot }) {
     { encoding: 'utf8' },
   );
   if (result.status !== 0) {
-    throw new Error(
-      `candidate-root compile failed for ${host}: ${result.stderr || result.stdout || `exit ${result.status}`}`,
+    let compileBody = null;
+    try {
+      const { parseStructuredJsonStdout } = require('./json-framing.cjs');
+      compileBody = parseStructuredJsonStdout(result.stdout || result.stderr || '', {
+        label: `candidate-root compile (${host})`,
+      });
+    } catch {
+      compileBody = null;
+    }
+    const nestedDiagnostics = [];
+    if (compileBody && typeof compileBody === 'object') {
+      for (const item of compileBody.diagnostics ?? []) {
+        if (item && item.severity === 'error') nestedDiagnostics.push(item);
+      }
+      for (const hostResult of compileBody.host_results ?? []) {
+        for (const item of hostResult.diagnostics ?? []) {
+          if (item && item.severity === 'error') nestedDiagnostics.push(item);
+        }
+      }
+    }
+    const error = new Error(
+      nestedDiagnostics.length > 0
+        ? `candidate-root compile failed for ${host}`
+        : `candidate-root compile failed for ${host}: ${result.stderr || result.stdout || `exit ${result.status}`}`,
     );
+    error.code = 'SKG-CHANGE-CANDIDATE-RUNTIME';
+    error.sync_envelope = {
+      schema: 'cc-master/skill-knowledge-sync/v1alpha1',
+      ok: false,
+      host,
+      phase: 'candidate_compile',
+      exit_status: result.status,
+      compile_ok: compileBody?.ok ?? false,
+      graph_hash: compileBody?.graph_hash ?? null,
+    };
+    error.compile_diagnostics = nestedDiagnostics;
+    error.compile_body = compileBody;
+    throw error;
   }
   return result;
 }
 
-function projectSkillsIntoStaging({ repoRoot, host, stagingAbsolute }) {
+function resolveAttestationMode(attestationMode) {
+  if (attestationMode === 'candidate-v2' || attestationMode === 'accepted') {
+    return attestationMode;
+  }
+  if (process.env.SKG_CANDIDATE_RUNTIME_ATTESTATION === 'candidate-v2') {
+    return 'candidate-v2';
+  }
+  return 'accepted';
+}
+
+function attestProjectedSkillTree({
+  plan,
+  projectionTarget,
+  repoRoot,
+  attestationMode,
+}) {
+  if (plan.providerGuidanceContract) {
+    const registry = loadProviderGuidanceRegistry(plan.providerGuidanceRegistryPath, repoRoot);
+    if (attestationMode === 'candidate-v2') {
+      // Final trusted compare happens after overlays via candidate-attestation bridge.
+      // Here only accepted_sap is checked when called on raw SAP (see projectSkillsIntoStaging).
+      assertProviderGuidanceAcceptedSap(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    } else {
+      assertProviderGuidanceRuntimeTree(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
+  }
+  if (plan.readOnlyContract) {
+    assertPacingRenderedArtifact(
+      plan.pacingRegistry,
+      plan.readOnlyContract.host,
+      plan.pacingRenderedBody,
+    );
+    assertPacingRuntimeTree(plan.pacingRegistry, plan.readOnlyContract.host, projectionTarget);
+  }
+}
+
+function runCandidateGuidanceAttestationBridge({
+  repoRoot,
+  host,
+  skillsStaging,
+  stagingRoot,
+  registryPath,
+  graphSha256,
+}) {
+  const script = path.join(repoRoot, 'scripts/skill-knowledge/candidate-attestation.mjs');
+  const result = spawnSync(
+    process.execPath,
+    [
+      script,
+      '--repo-root',
+      repoRoot,
+      '--host',
+      host,
+      '--skills-staging',
+      skillsStaging,
+      '--staging-root',
+      stagingRoot,
+      '--registry',
+      registryPath,
+      '--graph-sha256',
+      graphSha256,
+    ],
+    { encoding: 'utf8' },
+  );
+  let parsed;
+  try {
+    const { parseStructuredJsonStdout } = require('./json-framing.cjs');
+    parsed = parseStructuredJsonStdout(result.stdout, {
+      label: `candidate attestation (${host})`,
+    });
+  } catch (error) {
+    throw Object.assign(
+      new Error(
+        `candidate attestation bridge non-JSON for ${host}: ${error.message}; ${result.stderr || result.stdout}`,
+      ),
+      { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+    );
+  }
+  if (result.status !== 0 || !parsed?.ok) {
+    throw Object.assign(
+      new Error(parsed?.message || `candidate attestation failed for ${host}`),
+      { code: parsed?.code || 'SKG-CHANGE-CANDIDATE-ATTESTATION', sync_envelope: parsed },
+    );
+  }
+  return parsed;
+}
+
+function projectSkillsIntoStaging({
+  repoRoot,
+  host,
+  stagingAbsolute,
+  attestationMode = 'accepted',
+}) {
+  const mode = resolveAttestationMode(attestationMode);
   const skillsSrc = path.join(repoRoot, 'plugin/src/skills');
   const skillsStaging = path.join(stagingAbsolute, 'skills');
   requireDir(skillsSrc);
@@ -234,6 +383,15 @@ function projectSkillsIntoStaging({ repoRoot, host, stagingAbsolute }) {
     if (plan.mode === 'planned') continue;
     const projectionTarget = path.join(skillsStaging, skill);
     applySkillProjection(plan, projectionTarget);
+    if (mode === 'candidate-v2' && plan.providerGuidanceContract) {
+      const registry = loadProviderGuidanceRegistry(plan.providerGuidanceRegistryPath, repoRoot);
+      assertProviderGuidanceAcceptedSap(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
     applyFinalSkillOverlay({
       repoRoot,
       host,
@@ -241,19 +399,14 @@ function projectSkillsIntoStaging({ repoRoot, host, stagingAbsolute }) {
       skillTree: projectionTarget,
       stagingRoot: stagingAbsolute,
     });
-    if (plan.providerGuidanceContract) {
-      const registry = loadProviderGuidanceRegistry(
-        plan.providerGuidanceRegistryPath,
-        repoRoot,
-      );
-      assertProviderGuidanceRuntimeTree(
-        registry,
-        plan.providerGuidanceContract.host,
-        plan.providerGuidanceContract.skill,
+    if (mode === 'accepted') {
+      attestProjectedSkillTree({
+        plan,
         projectionTarget,
-      );
-    }
-    if (plan.readOnlyContract) {
+        repoRoot,
+        attestationMode: mode,
+      });
+    } else if (plan.readOnlyContract) {
       assertPacingRenderedArtifact(
         plan.pacingRegistry,
         plan.readOnlyContract.host,
@@ -472,10 +625,14 @@ function projectAndPublishHostSurface({
   host,
   stamp: stampInput,
   injectLateFault,
+  injectPostPublishFault,
+  attestationMode = 'accepted',
+  candidateGraphSha256 = null,
   warn = (message) => console.warn(`sync-plugin-dist: ${message}`),
 }) {
   const root = path.resolve(repoRoot);
   const stamp = assertSafeStamp(stampInput);
+  const mode = resolveAttestationMode(attestationMode);
   const integrity = assertHostDistPathIntegrity(root, host);
   const distParent = integrity.distParentAbsolute;
   const liveAbsolute = integrity.liveAbsolute;
@@ -494,7 +651,12 @@ function projectAndPublishHostSurface({
 
   try {
     projectNonSkillSurfaces({ repoRoot: root, host, stagingAbsolute });
-    projectSkillsIntoStaging({ repoRoot: root, host, stagingAbsolute });
+    projectSkillsIntoStaging({
+      repoRoot: root,
+      host,
+      stagingAbsolute,
+      attestationMode: mode,
+    });
     compileIntoCandidate({
       repoRoot: root,
       host,
@@ -504,12 +666,34 @@ function projectAndPublishHostSurface({
     // Post-compile attestation re-check on final skill trees inside candidate.
     const skillsStaging = path.join(stagingAbsolute, 'skills');
     if (fs.existsSync(skillsStaging)) {
+      if (mode === 'candidate-v2') {
+        const registryPath = path.join(root, 'plugin/src/skills/provider-guidance-runtime.json');
+        if (
+          typeof candidateGraphSha256 !== 'string' ||
+          !/^[0-9a-f]{64}$/u.test(candidateGraphSha256)
+        ) {
+          throw Object.assign(
+            new Error(
+              `candidate-v2 requires explicit candidateGraphSha256 (real graph hash); refused staging-path fallback for ${host}`,
+            ),
+            { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+          );
+        }
+        runCandidateGuidanceAttestationBridge({
+          repoRoot: root,
+          host,
+          skillsStaging,
+          stagingRoot: stagingAbsolute,
+          registryPath,
+          graphSha256: candidateGraphSha256,
+        });
+      }
       for (const skill of fs.readdirSync(skillsStaging).sort()) {
         const projectionTarget = path.join(skillsStaging, skill);
         if (!fs.statSync(projectionTarget).isDirectory()) continue;
         const plan = planSkillProjection({ repoRoot: root, host, skill });
         if (plan.mode === 'planned') continue;
-        if (plan.providerGuidanceContract) {
+        if (mode === 'accepted' && plan.providerGuidanceContract) {
           const registry = loadProviderGuidanceRegistry(
             plan.providerGuidanceRegistryPath,
             root,
@@ -541,7 +725,7 @@ function projectAndPublishHostSurface({
       });
     }
 
-    return publishHostTree({
+    const published = publishHostTree({
       distParentAbsolute: path.resolve(distParent),
       liveAbsolute: path.resolve(liveAbsolute),
       stagingAbsolute: path.resolve(stagingAbsolute),
@@ -549,6 +733,31 @@ function projectAndPublishHostSurface({
       stamp,
       warn,
     });
+
+    if (typeof injectPostPublishFault === 'function') {
+      injectPostPublishFault({
+        distParentAbsolute: path.resolve(distParent),
+        liveAbsolute: path.resolve(liveAbsolute),
+        stagingAbsolute: path.resolve(stagingAbsolute),
+        backupAbsolute: path.resolve(backupAbsolute),
+        stamp,
+        published,
+      });
+      const fault = new Error(
+        `injected post-publish fault for ${host} after successful publish (residual live dist present)`,
+      );
+      fault.code = 'SKG-SYNC-POST-PUBLISH-FAULT';
+      fault.sync_envelope = {
+        schema: 'cc-master/skill-knowledge-sync/v1alpha1',
+        ok: false,
+        host,
+        phase: 'post_publish',
+        residual_live_dist: true,
+      };
+      throw fault;
+    }
+
+    return published;
   } catch (error) {
     if (lstatOrNull(stagingAbsolute)) {
       try {

@@ -453,10 +453,14 @@
           "const": 1
         },
         "critical_any_point_to_primary_max": {
-          "const": 2
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
         },
         "primary_entry_to_primary_max": {
-          "const": 2
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
         }
       }
     },

@@ -1,6 +1,6 @@
 # Portfolio scoresheet — 3 必维 + 重叠检测
 
-> 这是 SKILL.md「cc-master 只用 3 条承重维」与「重叠检测」的展开。本仓 portfolio 小（2 个分发 + 4 个 dev-only），只用三条承重维（audience-plane / bounded-context / Probe）+ 重叠检测——任一承重维不过即拒，**无 trade-off 路径**。
+> 这是 SKILL.md「cc-master 只用 3 条承重维」与「重叠检测」的展开。本仓 portfolio 刻意保持小（分发 + 若干 dev-only；个数以磁盘为准），只用三条承重维（audience-plane / bounded-context / Probe）+ 重叠检测——任一承重维不过即拒，**无 trade-off 路径**。
 
 ## Contents
 

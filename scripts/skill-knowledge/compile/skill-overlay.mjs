@@ -851,6 +851,87 @@ export function writeFileAtomicNoFollowContained(absolutePath, contents, contain
 }
 
 /**
+ * Walk a skill (or skills) tree and inspect every Markdown file for compiler-owned
+ * overlays. Pure read; does not mutate. Fail-closed callers treat has_overlay or
+ * malformed markers as hard errors on raw SAP paths.
+ */
+export function inspectSkillTreeCompilerOwnedOverlay(treeAbsolute) {
+  const root = path.resolve(treeAbsolute);
+  const rootStat = lstatOrNull(root);
+  if (!rootStat || rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    throw new SkillOverlayError(
+      'SKG-OVERLAY-TREE-INVALID',
+      `overlay inspect root must be a real directory (no symlink): ${root}`,
+      { root },
+    );
+  }
+  const files = [];
+  const visit = (directory, relativeDirectory = '') => {
+    for (const dirent of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      const absolute = path.join(directory, dirent.name);
+      const relative = relativeDirectory ? `${relativeDirectory}/${dirent.name}` : dirent.name;
+      if (dirent.isSymbolicLink()) {
+        throw new SkillOverlayError(
+          'SKG-OVERLAY-SYMLINK',
+          `refusing symlink during overlay inspect: ${absolute}`,
+          { absolute },
+        );
+      }
+      if (dirent.isDirectory()) {
+        visit(absolute, relative);
+        continue;
+      }
+      if (!dirent.isFile()) {
+        throw new SkillOverlayError(
+          'SKG-OVERLAY-NODE-TYPE',
+          `unsupported filesystem node during overlay inspect: ${absolute}`,
+          { absolute },
+        );
+      }
+      if (!relative.endsWith('.md') && !relative.endsWith('.markdown')) continue;
+      const text = fs.readFileSync(absolute, 'utf8');
+      const inspection = inspectCompilerOwnedOverlay(text);
+      files.push({
+        path: relative,
+        ok: inspection.ok,
+        has_overlay: inspection.has_overlay,
+        issues: inspection.issues,
+        nav_blocks: inspection.nav_blocks,
+        entry_pin_blocks: inspection.entry_pin_blocks,
+        skill_anchors: inspection.skill_anchors,
+        point_anchors: inspection.point_anchors,
+      });
+    }
+  };
+  visit(root);
+  const withOverlay = files.filter((item) => item.has_overlay);
+  const malformed = files.filter((item) => !item.ok);
+  return {
+    ok: withOverlay.length === 0 && malformed.length === 0,
+    files,
+    files_with_overlay: withOverlay.map((item) => item.path),
+    malformed_files: malformed.map((item) => item.path),
+  };
+}
+
+/**
+ * Assert a raw SAP skill tree contains zero compiler-owned overlay markers.
+ */
+export function assertSkillTreeHasNoCompilerOwnedOverlay(treeAbsolute) {
+  const inspection = inspectSkillTreeCompilerOwnedOverlay(treeAbsolute);
+  if (!inspection.ok) {
+    throw new SkillOverlayError(
+      'SKG-OVERLAY-RAW-SAP-POLLUTED',
+      `raw SAP tree must have no compiler-owned overlays; polluted=${JSON.stringify(inspection.files_with_overlay)} malformed=${JSON.stringify(inspection.malformed_files)}`,
+      inspection,
+    );
+  }
+  return inspection;
+}
+
+/**
  * Walk skill tree with lstat only; reject any symlink / non-dir / non-regular leaf.
  */
 export function assertSkillTreeNoSymlinks(skillTreeAbsolute, stagingRootAbsolute) {

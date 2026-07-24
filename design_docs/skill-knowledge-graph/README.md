@@ -9,6 +9,7 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 | 目的 | 入口 |
 |---|---|
 | 理解完整拓扑、SSOT、三跳、事务、工具链与 CI 合同 | [specification.md](specification.md) |
+| 维护者执行 health / typed change / witness（无独立 meta-skill） | [specification.md](specification.md) §12–13 + [cli-contract.md](cli-contract.md) + `node scripts/skill-knowledge.mjs` |
 | 查询当前可执行能力、稳定 JSON envelope、diagnostic 与 exit code | [cli-contract.md](cli-contract.md) |
 | 编写或验证 authored graph source | [schemas/knowledge-source.schema.json](schemas/knowledge-source.schema.json) |
 | 编写或验证语义变更事务 | [schemas/knowledge-change.schema.json](schemas/knowledge-change.schema.json) |

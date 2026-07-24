@@ -19,7 +19,7 @@
 
 没有声明的 J，这三件事都**失锚**：评测逐 case 漂移、迭代 reward-hack 碰巧在视野里的指标、写作丢失纪律。
 
-**为什么本仓的 J 是轻量的：** 重型方法论的 J 有一整套形状——重型 J 不变量集、多档 measurement class、多阶段 lifecycle、多字段机器可读裁决 schema、独立 skill 元数据 YAML 承载。**本仓 2+1 的小 portfolio 体量用不上那套**——本仓的 J 就是一份 OBJECTIVE.md 里的：一句话 `J_top` + 一段 `baseline_reference` + 1-2 个 `strict_dims`。**不引入 cc-master 没有的独立 skill 元数据 YAML**（决策 §4.3）。任何把 J 膨胀回重型 schema 的冲动都是照搬过度工程。
+**为什么本仓的 J 是轻量的：** 重型方法论的 J 有一整套形状——重型 J 不变量集、多档 measurement class、多阶段 lifecycle、多字段机器可读裁决 schema、独立 skill 元数据 YAML 承载。**本仓小 portfolio 体量用不上那套**——本仓的 J 就是一份 OBJECTIVE.md 里的：一句话 `J_top` + 一段 `baseline_reference` + 1-2 个 `strict_dims`。**不引入 cc-master 没有的独立 skill 元数据 YAML**（决策 §4.3）。任何把 J 膨胀回重型 schema 的冲动都是照搬过度工程。
 
 ## 2. OBJECTIVE.md 的 schema（§5.4）
 

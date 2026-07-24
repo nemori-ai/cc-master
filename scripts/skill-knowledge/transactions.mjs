@@ -12,10 +12,26 @@ import { canonicalGraphHash, hashMarkdownSpan, sha256Hex } from './hash.mjs';
 import { attestInventoryEntry } from './inventory.mjs';
 import { extractMarkers } from './markers.mjs';
 import { validateAuthoredDocument, validatorsAvailable } from './schema.mjs';
+import { validateCandidateRuntimeProjection } from './candidate-runtime.mjs';
+import { resolveHostCoveragePlan } from './host-coverage.mjs';
+import {
+  assertLocateChainNoSymlinks,
+  assertPublicationAuthority,
+  ensureTrustedWorkspacesRoot,
+  lstatOrNull,
+  mkdirTrustedSegmented,
+  prepareTrustedRecoveryBundle,
+  resolveTrustedRepoRoot,
+  resolveTrustedScopeFile,
+  resolveTrustedWorkspace,
+  safeCleanupRecoveryBundle,
+} from './path-authority.mjs';
+import { validateChangeValidationSemantics } from './validation-envelope.mjs';
 
 const WORKSPACE_ROOT = '.skill-knowledge/workspaces';
 const ZERO_HASH = '0'.repeat(64);
 const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module']);
+const PRODUCT_HOSTS = Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']);
 
 function txDiagnostic(code, message, location, witness, remediation, exitCode = EXIT_CODES.semantic_invariant) {
   return diagnostic({ severity: 'error', code, message, location, witness, remediation, exitCode });
@@ -52,9 +68,15 @@ function relativePath(repoRoot, target) {
 
 function safeScopePath(repoRoot, value) {
   if (typeof value !== 'string' || value.length === 0 || path.isAbsolute(value)) return null;
-  const absolute = path.resolve(repoRoot, value);
-  if (!inside(repoRoot, absolute)) return null;
-  return { absolute, relative: relativePath(repoRoot, absolute) };
+  try {
+    const repoAuthority = resolveTrustedRepoRoot(repoRoot);
+    const trusted = resolveTrustedScopeFile(repoAuthority, value);
+    return { absolute: trusted.absolute, relative: trusted.relative };
+  } catch {
+    const absolute = path.resolve(repoRoot, value);
+    if (!inside(repoRoot, absolute)) return null;
+    return null;
+  }
 }
 
 function readJson(file, diagnostics) {
@@ -67,7 +89,12 @@ function readJson(file, diagnostics) {
 }
 
 function writeJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const dir = path.dirname(file);
+  if (!fs.existsSync(dir)) {
+    // Caller must have already created ancestors via trusted segmented mkdir when
+    // under workspace/repo authority. Fall back only for already-trusted dirs.
+    fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
@@ -513,6 +540,22 @@ export function beginTransaction({ repoRoot, operation, scope, base, sourceRoot 
   if (normalizedScope.length === 0 || normalizedScope.some((item) => !item)) diagnostics.push(txDiagnostic('SKG-USAGE', 'Change begin requires one or more safe repository-relative scope paths.', 'argv', { scope }, 'Pass existing repository-relative authored manifest or Markdown paths.', EXIT_CODES.usage));
   for (const item of normalizedScope.filter(Boolean)) if (!fs.existsSync(item.absolute) || !fs.statSync(item.absolute).isFile()) diagnostics.push(txDiagnostic('SKG-CHANGE-SCOPE-MISSING', 'Scope path must exist as an accepted file at begin.', item.relative, { path: item.relative }, 'Add the file outside this transaction first, then begin from its exact bytes.', EXIT_CODES.source_contract));
   if (diagnostics.length) return { exitCode: selectExitCode(diagnostics), diagnostics };
+  let repoAuthority;
+  try {
+    repoAuthority = resolveTrustedRepoRoot(repoRoot);
+  } catch (error) {
+    diagnostics.push(
+      txDiagnostic(
+        error?.code && String(error.code).startsWith('SKG-') ? error.code : 'SKG-PATH-AUTHORITY-REPO',
+        error instanceof Error ? error.message : String(error),
+        'argv',
+        { ...(error?.witness ?? {}) },
+        'Run change begin from a real repository root without symlink leaf.',
+        EXIT_CODES.usage,
+      ),
+    );
+    return { exitCode: selectExitCode(diagnostics), diagnostics };
+  }
   const graph = loadGraph({ repoRoot, sourceRoot });
   const invariant = validateGraph(graph, repoRoot, null, []);
   diagnostics.push(...invariant.diagnostics);
@@ -521,10 +564,32 @@ export function beginTransaction({ repoRoot, operation, scope, base, sourceRoot 
   if (diagnostics.some((item) => item.severity === 'error')) return { exitCode: selectExitCode(diagnostics), diagnostics };
   const changeId = workspaceId(operation);
   const workspace = path.join(repoRoot, WORKSPACE_ROOT, changeId.slice('change:'.length));
+  try {
+    // Segment-safe create: refuse symlink .skill-knowledge before any mkdir that
+    // could create directories outside the repository.
+    ensureTrustedWorkspacesRoot(repoRoot, WORKSPACE_ROOT);
+    mkdirTrustedSegmented(path.join(repoAuthority.absolute, WORKSPACE_ROOT), workspace, {
+      leafMustBeDirectory: true,
+    });
+    resolveTrustedWorkspace(repoRoot, workspace, WORKSPACE_ROOT);
+  } catch (error) {
+    diagnostics.push(
+      txDiagnostic(
+        error?.code && String(error.code).startsWith('SKG-') ? error.code : 'SKG-PATH-AUTHORITY-WORKSPACE',
+        error instanceof Error ? error.message : String(error),
+        WORKSPACE_ROOT,
+        { ...(error?.witness ?? {}) },
+        'Keep .skill-knowledge/workspaces as a real directory tree inside the repository; never mkdir through a symlink.',
+        EXIT_CODES.usage,
+      ),
+    );
+    return { exitCode: selectExitCode(diagnostics), diagnostics };
+  }
   const frozenScope = normalizedScope.map((item) => ({ path: item.relative, sha256: sha256Hex(fs.readFileSync(item.absolute)) }));
   for (const item of normalizedScope) {
     const target = path.join(workspace, 'candidate', item.relative);
-    fs.mkdirSync(path.dirname(target), { recursive: true }); fs.copyFileSync(item.absolute, target);
+    mkdirTrustedSegmented(workspace, path.dirname(target), { leafMustBeDirectory: true });
+    fs.copyFileSync(item.absolute, target);
   }
   const workspaceDocument = { schema_version: 'cc-master/skill-knowledge-workspace/v1alpha1', kind: 'change_workspace', change_id: changeId, operation, base_ref: baseRef, base_graph_sha256: baseGraphHash, scope: frozenScope, candidate_root: normalized(path.relative(repoRoot, path.join(workspace, 'candidate'))), status: 'begun' };
   writeJson(path.join(workspace, 'workspace.json'), workspaceDocument);
@@ -535,8 +600,33 @@ export function beginTransaction({ repoRoot, operation, scope, base, sourceRoot 
 function readWorkspace(workspace, diagnostics) {
   const document = readJson(path.join(workspace, 'workspace.json'), diagnostics);
   if (!document) return null;
-  if (document.kind !== 'change_workspace' || !Array.isArray(document.scope)) {
-    diagnostics.push(txDiagnostic('SKG-CHANGE-WORKSPACE-INVALID', 'workspace.json does not match the change workspace contract.', path.join(workspace, 'workspace.json'), { kind: document.kind ?? null }, 'Recreate the workspace with change begin.', EXIT_CODES.source_contract)); return null;
+  if (validatorsAvailable()) {
+    const schema = validateAuthoredDocument(document, 'change');
+    if (!schema.ok) {
+      diagnostics.push(
+        txDiagnostic(
+          'SKG-CHANGE-WORKSPACE-INVALID',
+          'workspace.json fails the committed change workspace schema.',
+          path.join(workspace, 'workspace.json'),
+          { errors: schema.errors?.slice(0, 8) ?? [] },
+          'Recreate the workspace with change begin so every required contract field is present.',
+          EXIT_CODES.source_contract,
+        ),
+      );
+      return null;
+    }
+  } else if (document.kind !== 'change_workspace' || !Array.isArray(document.scope)) {
+    diagnostics.push(
+      txDiagnostic(
+        'SKG-CHANGE-WORKSPACE-INVALID',
+        'workspace.json does not match the change workspace contract.',
+        path.join(workspace, 'workspace.json'),
+        { kind: document.kind ?? null },
+        'Recreate the workspace with change begin.',
+        EXIT_CODES.source_contract,
+      ),
+    );
+    return null;
   }
   return document;
 }
@@ -545,15 +635,65 @@ function candidateTransitions(repoRoot, workspace, scope) {
   return scope.map((item) => ({ path: item.path, before_sha256: item.sha256, after_sha256: sha256Hex(fs.readFileSync(path.join(workspace, 'candidate', item.path))) }));
 }
 
-export function validateTransaction({ repoRoot, workspace, sourceRoot = DEFAULT_SOURCE_ROOT }) {
+export function validateTransaction({
+  repoRoot,
+  workspace,
+  sourceRoot = DEFAULT_SOURCE_ROOT,
+  testSeams = null,
+}) {
   const diagnostics = [];
-  const allowedWorkspaceRoot = path.resolve(repoRoot, WORKSPACE_ROOT);
-  if (!inside(allowedWorkspaceRoot, path.resolve(workspace))) {
-    const item = txDiagnostic('SKG-CHANGE-WORKSPACE-INVALID', 'Transaction workspace must be under the ignored workspace root.', normalized(workspace), { workspace: normalized(workspace), workspace_root: relativePath(repoRoot, allowedWorkspaceRoot) }, 'Create the workspace with change begin and validate that exact path.', EXIT_CODES.usage);
+  try {
+    resolveTrustedWorkspace(repoRoot, workspace, WORKSPACE_ROOT);
+  } catch (error) {
+    const item = txDiagnostic(
+      error?.code && String(error.code).startsWith('SKG-') ? error.code : 'SKG-CHANGE-WORKSPACE-INVALID',
+      error instanceof Error ? error.message : String(error),
+      normalized(workspace),
+      { workspace: normalized(workspace), ...(error?.witness ?? {}) },
+      'Create the workspace with change begin and validate that exact real path under the ignored workspace root.',
+      EXIT_CODES.usage,
+    );
     return { exitCode: EXIT_CODES.usage, diagnostics: [item] };
   }
   const metadata = readWorkspace(workspace, diagnostics);
   if (!metadata) return { exitCode: selectExitCode(diagnostics), diagnostics };
+
+  // Zero-write-before-authority: authenticate workspace, candidate scope, accepted
+  // scope, and validation outputs once before any graph read / patch / validation write.
+  try {
+    assertPublicationAuthority({
+      repoRoot,
+      workspace,
+      workspaceRootRelative: WORKSPACE_ROOT,
+      candidateRelativePaths: metadata.scope.map((item) => item.path),
+      acceptedTargets: metadata.scope.map((item) => item.path),
+    });
+    const workspaceAbsolute = path.resolve(workspace);
+    for (const outputName of ['apply.patch', 'validation.json']) {
+      const outputAbsolute = path.join(workspaceAbsolute, outputName);
+      assertLocateChainNoSymlinks(workspaceAbsolute, path.dirname(outputAbsolute), {
+        leafMustBeDirectory: true,
+      });
+      const leaf = lstatOrNull(outputAbsolute);
+      if (leaf?.isSymbolicLink()) {
+        const error = new Error(`Refusing symlink validation output: ${outputAbsolute}`);
+        error.code = 'SKG-PATH-AUTHORITY-SYMLINK';
+        error.witness = { target: outputAbsolute };
+        throw error;
+      }
+    }
+  } catch (error) {
+    const item = txDiagnostic(
+      error?.code && String(error.code).startsWith('SKG-') ? error.code : 'SKG-PATH-AUTHORITY-ESCAPE',
+      error instanceof Error ? error.message : String(error),
+      normalized(workspace),
+      { ...(error?.witness ?? {}) },
+      'Refuse validate before any graph/patch/validation write when path authority fails.',
+      EXIT_CODES.usage,
+    );
+    return { exitCode: EXIT_CODES.usage, diagnostics: [item] };
+  }
+
   diagnostics.push(...checkScopeFresh(repoRoot, metadata.scope));
   const draft = readJson(path.join(workspace, 'change.draft.json'), diagnostics);
   if (!draft) return { exitCode: selectExitCode(diagnostics), diagnostics };
@@ -587,9 +727,205 @@ export function validateTransaction({ repoRoot, workspace, sourceRoot = DEFAULT_
   const patch = patchParts.join(''); fs.writeFileSync(patchPath, patch);
   const applyCheck = spawnSync('git', ['apply', '--check', '--unsafe-paths', patchPath], { cwd: repoRoot, encoding: 'utf8' });
   if (applyCheck.status !== 0) diagnostics.push(txDiagnostic('SKG-CHANGE-GIT-APPLY-CHECK', 'Generated candidate patch cannot be applied to accepted scope.', patchPath, { stderr: applyCheck.stderr }, 'Rebase by beginning a new transaction from current bytes.', EXIT_CODES.drift));
-  const validation = { schema_version: 'cc-master/skill-knowledge-validation/v1alpha1', kind: 'change_validation', change_id: metadata.change_id, base_ref: metadata.base_ref, base_graph_sha256: metadata.base_graph_sha256, scope: metadata.scope, result_graph_sha256: resultHash, candidate_valid: diagnostics.length === 0, optimistic_lock_valid: !diagnostics.some((item) => item.code.includes('STALE') || item.code.includes('GIT-APPLY')), git_apply_check: applyCheck.status === 0, patch_sha256: sha256Hex(patch), diagnostics: diagnostics.map(({ exit_code, ...item }) => item) };
+
+  // Four-host candidate runtime gate (spec §8.3): compile/reparse/H1–H4/budgets in an
+  // ignored runtime-candidate root. Never mutates live accepted source or live plugin/dist.
+  let hostProjectionWitnesses = [];
+  let candidateRuntimeValid = false;
+  const sourceErrorsBeforeRuntime = diagnostics.some((item) => item.severity === 'error');
+  if (!sourceErrorsBeforeRuntime) {
+    const runtime = validateCandidateRuntimeProjection({
+      repoRoot,
+      workspace,
+      scope: metadata.scope,
+      candidateGraph: candidate,
+      resultGraphSha256: resultHash,
+      testSeams,
+    });
+    diagnostics.push(...runtime.diagnostics);
+    hostProjectionWitnesses = runtime.witnesses;
+    candidateRuntimeValid = runtime.candidate_runtime_valid;
+  } else {
+    candidateRuntimeValid = false;
+    const { plan } = resolveHostCoveragePlan(candidate);
+    hostProjectionWitnesses = PRODUCT_HOSTS.map((host) => {
+      const mode = plan[host]?.mode ?? 'unsupported';
+      if (mode === 'stub' || mode === 'unsupported') {
+        const gate = {
+          ok: true,
+          witness: { host, abstained: true, mode, skipped_runtime: true },
+          remediation: 'Repair source/schema diagnostics before candidate runtime projection.',
+        };
+        return {
+          host,
+          ok: false,
+          mode,
+          artifacts: [],
+          enabled_edges: 0,
+          point_anchors: 0,
+          hop_report: { H1: { ...gate }, H2: { ...gate }, H3: { ...gate }, H4: { ...gate } },
+          budgets: {},
+          executed_checks: ['skipped_due_to_prior_source_errors'],
+          conditional_route_policy: 'abstained',
+          result_graph_sha256: resultHash,
+        };
+      }
+      const gate = {
+        ok: false,
+        witness: { host, skipped: true, mode },
+        remediation: 'Repair source/schema diagnostics before candidate runtime projection.',
+      };
+      return {
+        host,
+        ok: false,
+        mode,
+        artifacts: [],
+        enabled_edges: 0,
+        point_anchors: 0,
+        hop_report: { H1: { ...gate }, H2: { ...gate }, H3: { ...gate }, H4: { ...gate } },
+        budgets: {},
+        executed_checks: ['skipped_due_to_prior_source_errors'],
+        conditional_route_policy: 'enabled_by_default-only',
+        result_graph_sha256: resultHash,
+      };
+    });
+  }
+
+  const validation = {
+    schema_version: 'cc-master/skill-knowledge-validation/v1alpha1',
+    kind: 'change_validation',
+    change_id: metadata.change_id,
+    base_ref: metadata.base_ref,
+    base_graph_sha256: metadata.base_graph_sha256,
+    scope: metadata.scope,
+    result_graph_sha256: resultHash,
+    candidate_valid: false,
+    candidate_runtime_valid: candidateRuntimeValid,
+    optimistic_lock_valid: !diagnostics.some((item) => item.code.includes('STALE') || item.code.includes('GIT-APPLY')),
+    git_apply_check: applyCheck.status === 0,
+    patch_sha256: sha256Hex(patch),
+    host_projection_witnesses: hostProjectionWitnesses,
+    diagnostics: diagnostics.map(({ exit_code, ...item }) => item),
+  };
+  validation.candidate_valid =
+    diagnostics.every((item) => item.severity !== 'error') && candidateRuntimeValid;
+
+  const runEnvelopeGate = (document) => {
+    const envelopeDiagnostics = [];
+    if (validatorsAvailable()) {
+      const schema = validateAuthoredDocument(document, 'change');
+      if (!schema.ok) {
+        envelopeDiagnostics.push(
+          txDiagnostic(
+            'SKG-CHANGE-VALIDATION-SCHEMA-INVALID',
+            'validation.json fails the committed change validation schema.',
+            path.join(workspace, 'validation.json'),
+            { errors: schema.errors?.slice(0, 12) ?? [] },
+            'Repair host witness shape/order/mode constraints before treating validation as authoritative.',
+            EXIT_CODES.source_contract,
+          ),
+        );
+      }
+    } else {
+      envelopeDiagnostics.push(
+        txDiagnostic(
+          'SKG-CHANGE-VALIDATION-SCHEMA-INVALID',
+          'Committed change validators unavailable; refusing to accept validation.json.',
+          path.join(workspace, 'validation.json'),
+          {},
+          'Regenerate standalone validators with generate-validators.mjs --check green.',
+          EXIT_CODES.source_contract,
+        ),
+      );
+    }
+    envelopeDiagnostics.push(
+      ...validateChangeValidationSemantics(document, {
+        runtimeValid: document.candidate_runtime_valid,
+      }),
+    );
+    return envelopeDiagnostics;
+  };
+
+  if (typeof testSeams?.forceFirstEnvelopeFailure === 'function') {
+    testSeams.forceFirstEnvelopeFailure(validation);
+  }
+
+  let envelopeDiagnostics = runEnvelopeGate(validation);
+  if (envelopeDiagnostics.length) {
+    diagnostics.push(...envelopeDiagnostics);
+    validation.diagnostics = diagnostics.map(({ exit_code, ...item }) => item);
+    validation.candidate_valid = false;
+    validation.candidate_runtime_valid = false;
+    // Rebuild witnesses into a failure-shaped envelope (no pseudo-success snapshot).
+    validation.host_projection_witnesses = (validation.host_projection_witnesses ?? []).map(
+      (witness) => {
+        const mode = witness.mode ?? 'unsupported';
+        if (mode === 'stub' || mode === 'unsupported') {
+          const gate = {
+            ok: true,
+            witness: { host: witness.host, abstained: true, mode, envelope_revalidation: true },
+            remediation: 'Repair validation envelope before treating witnesses as authoritative.',
+          };
+          return {
+            host: witness.host,
+            ok: false,
+            mode,
+            artifacts: [],
+            enabled_edges: 0,
+            point_anchors: 0,
+            hop_report: { H1: { ...gate }, H2: { ...gate }, H3: { ...gate }, H4: { ...gate } },
+            budgets: {},
+            executed_checks: ['envelope_revalidation_failure'],
+            conditional_route_policy: 'abstained',
+            result_graph_sha256: validation.result_graph_sha256,
+          };
+        }
+        const gate = {
+          ok: false,
+          witness: { host: witness.host, skipped: true, mode, envelope_revalidation: true },
+          remediation: 'Repair validation envelope before treating witnesses as authoritative.',
+        };
+        return {
+          host: witness.host,
+          ok: false,
+          mode,
+          artifacts: [],
+          enabled_edges: 0,
+          point_anchors: 0,
+          hop_report: { H1: { ...gate }, H2: { ...gate }, H3: { ...gate }, H4: { ...gate } },
+          budgets: {},
+          executed_checks: ['envelope_revalidation_failure'],
+          conditional_route_policy: 'enabled_by_default-only',
+          result_graph_sha256: validation.result_graph_sha256,
+        };
+      },
+    );
+    if (typeof testSeams?.corruptAfterEnvelopeRewrite === 'function') {
+      testSeams.corruptAfterEnvelopeRewrite(validation);
+    }
+    // Revalidate from the modified document (recomputed candidateRuntimeValid etc.).
+    envelopeDiagnostics = runEnvelopeGate(validation);
+    if (envelopeDiagnostics.length) {
+      diagnostics.push(...envelopeDiagnostics);
+      validation.diagnostics = diagnostics.map(({ exit_code, ...item }) => item);
+      validation.candidate_valid = false;
+      validation.candidate_runtime_valid = false;
+      // Final gate still failing: refuse to write unverified bytes.
+      return {
+        exitCode: selectExitCode(diagnostics),
+        diagnostics,
+        validation,
+        change: finalChange,
+        patchPath,
+      };
+    }
+  }
+
   writeJson(path.join(workspace, 'validation.json'), validation);
-  if (validation.candidate_valid) { metadata.status = 'validated'; writeJson(path.join(workspace, 'workspace.json'), metadata); }
+  if (validation.candidate_valid) {
+    metadata.status = 'validated';
+    writeJson(path.join(workspace, 'workspace.json'), metadata);
+  }
   return { exitCode: selectExitCode(diagnostics), diagnostics, validation, change: finalChange, patchPath };
 }
 
@@ -597,26 +933,51 @@ function ledgerPath(repoRoot, changeId) {
   return path.join(repoRoot, DEFAULT_SOURCE_ROOT, 'changes', `${changeId.slice('change:'.length)}.change.json`);
 }
 
-function recoveryBundle(files, recoveryRoot) {
-  const recoveryDirectory = path.join(recoveryRoot, 'recovery', `publish-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
-  const originals = files.map((item) => ({ ...item, exists: fs.existsSync(item.target), originalBytes: fs.existsSync(item.target) && fs.statSync(item.target).isFile() ? fs.readFileSync(item.target) : null }));
-  const manifest = { schema_version: 'cc-master/skill-knowledge-recovery/v1alpha1', kind: 'change_publish_recovery', status: 'prepared', targets: [] };
+function recoveryBundle(files, workspaceAuthority) {
+  const leaf = `publish-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const recoveryAuthority = prepareTrustedRecoveryBundle(workspaceAuthority, leaf);
+  const recoveryDirectory = recoveryAuthority.absolute;
+  const originals = files.map((item) => ({
+    ...item,
+    exists: fs.existsSync(item.target),
+    originalBytes:
+      fs.existsSync(item.target) && fs.statSync(item.target).isFile()
+        ? fs.readFileSync(item.target)
+        : null,
+  }));
+  const manifest = {
+    schema_version: 'cc-master/skill-knowledge-recovery/v1alpha1',
+    kind: 'change_publish_recovery',
+    status: 'prepared',
+    targets: [],
+  };
   for (const item of originals) {
     const before = path.join(recoveryDirectory, 'before', item.relative);
     const after = path.join(recoveryDirectory, 'after', item.relative);
-    fs.mkdirSync(path.dirname(after), { recursive: true });
+    mkdirTrustedSegmented(recoveryDirectory, path.dirname(after), { leafMustBeDirectory: true });
     fs.writeFileSync(after, item.bytes);
-    if (item.exists && item.originalBytes !== null) { fs.mkdirSync(path.dirname(before), { recursive: true }); fs.writeFileSync(before, item.originalBytes); }
-    manifest.targets.push({ path: item.relative, existed_before: item.exists, before_sha256: item.originalBytes === null ? null : sha256Hex(item.originalBytes), after_sha256: sha256Hex(item.bytes), before_artifact: item.originalBytes === null ? null : normalized(path.relative(recoveryDirectory, before)), after_artifact: normalized(path.relative(recoveryDirectory, after)) });
+    if (item.exists && item.originalBytes !== null) {
+      mkdirTrustedSegmented(recoveryDirectory, path.dirname(before), { leafMustBeDirectory: true });
+      fs.writeFileSync(before, item.originalBytes);
+    }
+    manifest.targets.push({
+      path: item.relative,
+      existed_before: item.exists,
+      before_sha256: item.originalBytes === null ? null : sha256Hex(item.originalBytes),
+      after_sha256: sha256Hex(item.bytes),
+      before_artifact:
+        item.originalBytes === null
+          ? null
+          : normalized(path.relative(recoveryDirectory, before)),
+      after_artifact: normalized(path.relative(recoveryDirectory, after)),
+    });
   }
   writeJson(path.join(recoveryDirectory, 'manifest.json'), manifest);
-  return { recoveryDirectory, originals, manifest };
+  return { recoveryDirectory, recoveryAuthority, originals, manifest };
 }
 
-function removeRecoveryBundle(recoveryDirectory) {
-  fs.rmSync(recoveryDirectory, { recursive: true, force: true });
-  const parent = path.dirname(recoveryDirectory);
-  if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) fs.rmdirSync(parent);
+function removeRecoveryBundle(recoveryAuthority, workspaceAuthority) {
+  safeCleanupRecoveryBundle(recoveryAuthority, workspaceAuthority);
 }
 
 function rollbackOriginals(originals) {
@@ -627,7 +988,9 @@ function rollbackOriginals(originals) {
       if (item.exists) fs.writeFileSync(item.target, item.originalBytes);
       else if (fs.existsSync(item.target)) fs.unlinkSync(item.target);
       const restored = item.exists
-        ? fs.existsSync(item.target) && fs.statSync(item.target).isFile() && fs.readFileSync(item.target).equals(item.originalBytes)
+        ? fs.existsSync(item.target) &&
+          fs.statSync(item.target).isFile() &&
+          fs.readFileSync(item.target).equals(item.originalBytes)
         : !fs.existsSync(item.target);
       if (!restored) throw new Error('target does not match its exact pre-publication state');
       recoveredPaths.push(item.relative);
@@ -638,34 +1001,64 @@ function rollbackOriginals(originals) {
   return { recoveredPaths, unrecoveredPaths };
 }
 
-function atomicPublish(files, recoveryRoot, failureInjector) {
+function atomicPublish(files, workspaceAuthority, failureInjector) {
   let bundle;
   try {
-    bundle = recoveryBundle(files, recoveryRoot);
+    bundle = recoveryBundle(files, workspaceAuthority);
   } catch (error) {
-    return { error, recoveryDirectory: null, recoveredPaths: [], unrecoveredPaths: files.map((item) => ({ path: item.relative, error: `unable to persist recovery bundle: ${error.message}` })) };
+    return {
+      error,
+      recoveryDirectory: null,
+      recoveredPaths: [],
+      unrecoveredPaths: files.map((item) => ({
+        path: item.relative,
+        error: `unable to persist recovery bundle: ${error.message}`,
+      })),
+    };
   }
   const temps = [];
   try {
     for (const item of bundle.originals) {
       fs.mkdirSync(path.dirname(item.target), { recursive: true });
-      const temporary = path.join(path.dirname(item.target), `.${path.basename(item.target)}.skg-${process.pid}-${Math.random().toString(36).slice(2)}`);
-      fs.writeFileSync(temporary, item.bytes); temps.push({ temporary, target: item.target });
+      const temporary = path.join(
+        path.dirname(item.target),
+        `.${path.basename(item.target)}.skg-${process.pid}-${Math.random().toString(36).slice(2)}`,
+      );
+      fs.writeFileSync(temporary, item.bytes);
+      temps.push({ temporary, target: item.target });
     }
     for (let index = 0; index < temps.length; index += 1) {
       failureInjector?.(index, temps[index].target);
       fs.renameSync(temps[index].temporary, temps[index].target);
     }
-    removeRecoveryBundle(bundle.recoveryDirectory);
+    removeRecoveryBundle(bundle.recoveryAuthority, workspaceAuthority);
     return null;
   } catch (error) {
     const rollback = rollbackOriginals(bundle.originals);
-    const manifest = { ...bundle.manifest, status: rollback.unrecoveredPaths.length === 0 ? 'rolled_back' : 'rollback_incomplete', recovered_paths: rollback.recoveredPaths, unrecovered_paths: rollback.unrecoveredPaths };
+    const manifest = {
+      ...bundle.manifest,
+      status: rollback.unrecoveredPaths.length === 0 ? 'rolled_back' : 'rollback_incomplete',
+      recovered_paths: rollback.recoveredPaths,
+      unrecovered_paths: rollback.unrecoveredPaths,
+    };
     writeJson(path.join(bundle.recoveryDirectory, 'manifest.json'), manifest);
-    if (rollback.unrecoveredPaths.length === 0) removeRecoveryBundle(bundle.recoveryDirectory);
-    return { error, recoveryDirectory: rollback.unrecoveredPaths.length === 0 ? null : bundle.recoveryDirectory, ...rollback };
+    if (rollback.unrecoveredPaths.length === 0) {
+      removeRecoveryBundle(bundle.recoveryAuthority, workspaceAuthority);
+    }
+    return {
+      error,
+      recoveryDirectory:
+        rollback.unrecoveredPaths.length === 0 ? null : bundle.recoveryDirectory,
+      ...rollback,
+    };
   } finally {
-    for (const item of temps) if (fs.existsSync(item.temporary)) { try { fs.unlinkSync(item.temporary); } catch {} }
+    for (const item of temps) {
+      if (fs.existsSync(item.temporary)) {
+        try {
+          fs.unlinkSync(item.temporary);
+        } catch {}
+      }
+    }
   }
 }
 
@@ -678,13 +1071,39 @@ export function applyTransaction({ repoRoot, workspace, sourceRoot = DEFAULT_SOU
     const item = txDiagnostic('SKG-LEDGER-IMMUTABLE', 'Finalized change ledger record already exists and cannot be overwritten.', relativePath(repoRoot, targetLedger), { change_id: metadata.change_id }, 'Begin a new change with a fresh identity.', EXIT_CODES.drift);
     return { ...validation, exitCode: EXIT_CODES.drift, diagnostics: [...validation.diagnostics, item] };
   }
+
+  // Re-authenticate candidate / accepted targets / ledger / recovery immediately before open/rename (TOCTOU).
+  let workspaceAuthority;
+  try {
+    const authority = assertPublicationAuthority({
+      repoRoot,
+      workspace,
+      workspaceRootRelative: WORKSPACE_ROOT,
+      candidateRelativePaths: metadata.scope.map((item) => item.path),
+      acceptedTargets: metadata.scope.map((item) => item.path),
+      ledgerTarget: relativePath(repoRoot, targetLedger),
+      requireRecoveryAbsent: true,
+    });
+    workspaceAuthority = authority.workspaceAuthority;
+  } catch (error) {
+    const item = txDiagnostic(
+      error?.code && String(error.code).startsWith('SKG-') ? error.code : 'SKG-PATH-AUTHORITY-ESCAPE',
+      error instanceof Error ? error.message : String(error),
+      relativePath(repoRoot, targetLedger),
+      { ...(error?.witness ?? {}) },
+      'Refuse publication when candidate/accepted/ledger/recovery paths fail final lstat/realpath authority.',
+      EXIT_CODES.drift,
+    );
+    return { ...validation, exitCode: EXIT_CODES.drift, diagnostics: [...validation.diagnostics, item] };
+  }
+
   const files = metadata.scope.map((item) => ({ target: path.join(repoRoot, item.path), relative: item.path, bytes: fs.readFileSync(path.join(workspace, 'candidate', item.path)) }));
   const ledgerDirectory = path.dirname(targetLedger);
   const ledgerDirectoryExisted = fs.existsSync(ledgerDirectory);
   files.push({ target: targetLedger, relative: relativePath(repoRoot, targetLedger), bytes: Buffer.from(`${JSON.stringify(validation.change, null, 2)}\n`) });
   const environmentFailure = process.env.SKG_SIMULATE_WRITE_FAILURE_AT;
   const injected = failureInjector ?? (environmentFailure === undefined ? undefined : (index) => { if (index === Number(environmentFailure)) throw new Error('simulated transaction write failure'); });
-  const publication = atomicPublish(files, workspace, injected);
+  const publication = atomicPublish(files, workspaceAuthority, injected);
   if (publication) {
     if (!ledgerDirectoryExisted && fs.existsSync(ledgerDirectory) && fs.readdirSync(ledgerDirectory).length === 0) {
       fs.rmdirSync(ledgerDirectory);

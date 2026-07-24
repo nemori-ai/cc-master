@@ -94,9 +94,14 @@ function applySkillsScopedEntryPinsBridge({ repoRoot, host, stagingRoot, skillsT
   }
   let parsed;
   try {
-    parsed = JSON.parse(String(result.stdout || '').trim().split('\n').filter(Boolean).at(-1));
-  } catch {
-    throw new Error(`skills-scoped entry pins returned non-JSON for ${host}: ${result.stdout}`);
+    const { parseStructuredJsonStdout } = require('./json-framing.cjs');
+    parsed = parseStructuredJsonStdout(result.stdout, {
+      label: `skills-scoped entry pins (${host})`,
+    });
+  } catch (error) {
+    throw new Error(
+      `skills-scoped entry pins returned non-JSON for ${host}: ${error.message}; stdout=${result.stdout}`,
+    );
   }
   if (!parsed || parsed.ok !== true) {
     throw new Error(`skills-scoped entry pins refused for ${host}: ${JSON.stringify(parsed)}`);

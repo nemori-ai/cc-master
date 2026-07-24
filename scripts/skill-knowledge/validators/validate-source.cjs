@@ -1,8 +1,8 @@
 /**
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json
- * Source-schema-sha256: 6920e0532d209ff63d96e0ca824f06c5a5e8a343714a824c3b62d5810a557f3d
- * Schema-fingerprint: 5fc42caddc957b67257066327c0e3d7a40f397d713eb07e70e26316c7a49b681
+ * Source-schema-sha256: bfa2d184cbe63503c776cf5e92de1b8ec3337822a9f83ecef58d406cdda9515f
+ * Schema-fingerprint: 02ba5253bb96d71ccde23b106284b21942b7790a387e99cbbf2dc942e2e66580
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";
@@ -2305,8 +2305,9 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
           }
         }
         if (data13.critical_any_point_to_primary_max !== void 0) {
-          if (2 !== data13.critical_any_point_to_primary_max) {
-            const err41 = { instancePath: instancePath + "/hop_policy/critical_any_point_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/critical_any_point_to_primary_max/const", keyword: "const", params: { allowedValue: 2 }, message: "must be equal to constant" };
+          let data17 = data13.critical_any_point_to_primary_max;
+          if (!(typeof data17 == "number" && (!(data17 % 1) && !isNaN(data17)))) {
+            const err41 = { instancePath: instancePath + "/hop_policy/critical_any_point_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/critical_any_point_to_primary_max/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err41];
             } else {
@@ -2314,24 +2315,65 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
             errors++;
           }
+          if (typeof data17 == "number") {
+            if (data17 > 2 || isNaN(data17)) {
+              const err42 = { instancePath: instancePath + "/hop_policy/critical_any_point_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/critical_any_point_to_primary_max/maximum", keyword: "maximum", params: { comparison: "<=", limit: 2 }, message: "must be <= 2" };
+              if (vErrors === null) {
+                vErrors = [err42];
+              } else {
+                vErrors.push(err42);
+              }
+              errors++;
+            }
+            if (data17 < 1 || isNaN(data17)) {
+              const err43 = { instancePath: instancePath + "/hop_policy/critical_any_point_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/critical_any_point_to_primary_max/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+              if (vErrors === null) {
+                vErrors = [err43];
+              } else {
+                vErrors.push(err43);
+              }
+              errors++;
+            }
+          }
         }
         if (data13.primary_entry_to_primary_max !== void 0) {
-          if (2 !== data13.primary_entry_to_primary_max) {
-            const err42 = { instancePath: instancePath + "/hop_policy/primary_entry_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/primary_entry_to_primary_max/const", keyword: "const", params: { allowedValue: 2 }, message: "must be equal to constant" };
+          let data18 = data13.primary_entry_to_primary_max;
+          if (!(typeof data18 == "number" && (!(data18 % 1) && !isNaN(data18)))) {
+            const err44 = { instancePath: instancePath + "/hop_policy/primary_entry_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/primary_entry_to_primary_max/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
-              vErrors = [err42];
+              vErrors = [err44];
             } else {
-              vErrors.push(err42);
+              vErrors.push(err44);
             }
             errors++;
           }
+          if (typeof data18 == "number") {
+            if (data18 > 2 || isNaN(data18)) {
+              const err45 = { instancePath: instancePath + "/hop_policy/primary_entry_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/primary_entry_to_primary_max/maximum", keyword: "maximum", params: { comparison: "<=", limit: 2 }, message: "must be <= 2" };
+              if (vErrors === null) {
+                vErrors = [err45];
+              } else {
+                vErrors.push(err45);
+              }
+              errors++;
+            }
+            if (data18 < 1 || isNaN(data18)) {
+              const err46 = { instancePath: instancePath + "/hop_policy/primary_entry_to_primary_max", schemaPath: "#/$defs/hopPolicy/properties/primary_entry_to_primary_max/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+              if (vErrors === null) {
+                vErrors = [err46];
+              } else {
+                vErrors.push(err46);
+              }
+              errors++;
+            }
+          }
         }
       } else {
-        const err43 = { instancePath: instancePath + "/hop_policy", schemaPath: "#/$defs/hopPolicy/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err47 = { instancePath: instancePath + "/hop_policy", schemaPath: "#/$defs/hopPolicy/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err43];
+          vErrors = [err47];
         } else {
-          vErrors.push(err43);
+          vErrors.push(err47);
         }
         errors++;
       }
@@ -2340,30 +2382,30 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
       let data19 = data.critical_pin_budget;
       if (data19 && typeof data19 == "object" && !Array.isArray(data19)) {
         if (data19.max_modules === void 0) {
-          const err44 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/required", keyword: "required", params: { missingProperty: "max_modules" }, message: "must have required property 'max_modules'" };
+          const err48 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/required", keyword: "required", params: { missingProperty: "max_modules" }, message: "must have required property 'max_modules'" };
           if (vErrors === null) {
-            vErrors = [err44];
+            vErrors = [err48];
           } else {
-            vErrors.push(err44);
+            vErrors.push(err48);
           }
           errors++;
         }
         if (data19.max_fraction === void 0) {
-          const err45 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/required", keyword: "required", params: { missingProperty: "max_fraction" }, message: "must have required property 'max_fraction'" };
+          const err49 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/required", keyword: "required", params: { missingProperty: "max_fraction" }, message: "must have required property 'max_fraction'" };
           if (vErrors === null) {
-            vErrors = [err45];
+            vErrors = [err49];
           } else {
-            vErrors.push(err45);
+            vErrors.push(err49);
           }
           errors++;
         }
         for (const key2 in data19) {
           if (!(key2 === "max_modules" || key2 === "max_fraction")) {
-            const err46 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key2 }, message: "must NOT have additional properties" };
+            const err50 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key2 }, message: "must NOT have additional properties" };
             if (vErrors === null) {
-              vErrors = [err46];
+              vErrors = [err50];
             } else {
-              vErrors.push(err46);
+              vErrors.push(err50);
             }
             errors++;
           }
@@ -2371,21 +2413,21 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
         if (data19.max_modules !== void 0) {
           let data20 = data19.max_modules;
           if (!(typeof data20 == "number" && (!(data20 % 1) && !isNaN(data20)))) {
-            const err47 = { instancePath: instancePath + "/critical_pin_budget/max_modules", schemaPath: "#/$defs/pinBudget/properties/max_modules/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            const err51 = { instancePath: instancePath + "/critical_pin_budget/max_modules", schemaPath: "#/$defs/pinBudget/properties/max_modules/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
-              vErrors = [err47];
+              vErrors = [err51];
             } else {
-              vErrors.push(err47);
+              vErrors.push(err51);
             }
             errors++;
           }
           if (typeof data20 == "number") {
             if (data20 < 1 || isNaN(data20)) {
-              const err48 = { instancePath: instancePath + "/critical_pin_budget/max_modules", schemaPath: "#/$defs/pinBudget/properties/max_modules/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+              const err52 = { instancePath: instancePath + "/critical_pin_budget/max_modules", schemaPath: "#/$defs/pinBudget/properties/max_modules/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
               if (vErrors === null) {
-                vErrors = [err48];
+                vErrors = [err52];
               } else {
-                vErrors.push(err48);
+                vErrors.push(err52);
               }
               errors++;
             }
@@ -2395,39 +2437,39 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
           let data21 = data19.max_fraction;
           if (typeof data21 == "number") {
             if (data21 > 1 || isNaN(data21)) {
-              const err49 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/maximum", keyword: "maximum", params: { comparison: "<=", limit: 1 }, message: "must be <= 1" };
+              const err53 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/maximum", keyword: "maximum", params: { comparison: "<=", limit: 1 }, message: "must be <= 1" };
               if (vErrors === null) {
-                vErrors = [err49];
+                vErrors = [err53];
               } else {
-                vErrors.push(err49);
+                vErrors.push(err53);
               }
               errors++;
             }
             if (data21 <= 0 || isNaN(data21)) {
-              const err50 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/exclusiveMinimum", keyword: "exclusiveMinimum", params: { comparison: ">", limit: 0 }, message: "must be > 0" };
+              const err54 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/exclusiveMinimum", keyword: "exclusiveMinimum", params: { comparison: ">", limit: 0 }, message: "must be > 0" };
               if (vErrors === null) {
-                vErrors = [err50];
+                vErrors = [err54];
               } else {
-                vErrors.push(err50);
+                vErrors.push(err54);
               }
               errors++;
             }
           } else {
-            const err51 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/type", keyword: "type", params: { type: "number" }, message: "must be number" };
+            const err55 = { instancePath: instancePath + "/critical_pin_budget/max_fraction", schemaPath: "#/$defs/pinBudget/properties/max_fraction/type", keyword: "type", params: { type: "number" }, message: "must be number" };
             if (vErrors === null) {
-              vErrors = [err51];
+              vErrors = [err55];
             } else {
-              vErrors.push(err51);
+              vErrors.push(err55);
             }
             errors++;
           }
         }
       } else {
-        const err52 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err56 = { instancePath: instancePath + "/critical_pin_budget", schemaPath: "#/$defs/pinBudget/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err52];
+          vErrors = [err56];
         } else {
-          vErrors.push(err52);
+          vErrors.push(err56);
         }
         errors++;
       }
@@ -2436,43 +2478,7 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
       let data22 = data.router_budget;
       if (data22 && typeof data22 == "object" && !Array.isArray(data22)) {
         if (data22.atlas_max_lines === void 0) {
-          const err53 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "atlas_max_lines" }, message: "must have required property 'atlas_max_lines'" };
-          if (vErrors === null) {
-            vErrors = [err53];
-          } else {
-            vErrors.push(err53);
-          }
-          errors++;
-        }
-        if (data22.atlas_max_tokens === void 0) {
-          const err54 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "atlas_max_tokens" }, message: "must have required property 'atlas_max_tokens'" };
-          if (vErrors === null) {
-            vErrors = [err54];
-          } else {
-            vErrors.push(err54);
-          }
-          errors++;
-        }
-        if (data22.module_max_lines === void 0) {
-          const err55 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "module_max_lines" }, message: "must have required property 'module_max_lines'" };
-          if (vErrors === null) {
-            vErrors = [err55];
-          } else {
-            vErrors.push(err55);
-          }
-          errors++;
-        }
-        if (data22.module_max_tokens === void 0) {
-          const err56 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "module_max_tokens" }, message: "must have required property 'module_max_tokens'" };
-          if (vErrors === null) {
-            vErrors = [err56];
-          } else {
-            vErrors.push(err56);
-          }
-          errors++;
-        }
-        if (data22.point_nav_max_lines === void 0) {
-          const err57 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "point_nav_max_lines" }, message: "must have required property 'point_nav_max_lines'" };
+          const err57 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "atlas_max_lines" }, message: "must have required property 'atlas_max_lines'" };
           if (vErrors === null) {
             vErrors = [err57];
           } else {
@@ -2480,13 +2486,49 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
+        if (data22.atlas_max_tokens === void 0) {
+          const err58 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "atlas_max_tokens" }, message: "must have required property 'atlas_max_tokens'" };
+          if (vErrors === null) {
+            vErrors = [err58];
+          } else {
+            vErrors.push(err58);
+          }
+          errors++;
+        }
+        if (data22.module_max_lines === void 0) {
+          const err59 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "module_max_lines" }, message: "must have required property 'module_max_lines'" };
+          if (vErrors === null) {
+            vErrors = [err59];
+          } else {
+            vErrors.push(err59);
+          }
+          errors++;
+        }
+        if (data22.module_max_tokens === void 0) {
+          const err60 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "module_max_tokens" }, message: "must have required property 'module_max_tokens'" };
+          if (vErrors === null) {
+            vErrors = [err60];
+          } else {
+            vErrors.push(err60);
+          }
+          errors++;
+        }
+        if (data22.point_nav_max_lines === void 0) {
+          const err61 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/required", keyword: "required", params: { missingProperty: "point_nav_max_lines" }, message: "must have required property 'point_nav_max_lines'" };
+          if (vErrors === null) {
+            vErrors = [err61];
+          } else {
+            vErrors.push(err61);
+          }
+          errors++;
+        }
         for (const key3 in data22) {
           if (!(key3 === "atlas_max_lines" || key3 === "atlas_max_tokens" || key3 === "module_max_lines" || key3 === "module_max_tokens" || key3 === "point_nav_max_lines")) {
-            const err58 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key3 }, message: "must NOT have additional properties" };
+            const err62 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key3 }, message: "must NOT have additional properties" };
             if (vErrors === null) {
-              vErrors = [err58];
+              vErrors = [err62];
             } else {
-              vErrors.push(err58);
+              vErrors.push(err62);
             }
             errors++;
           }
@@ -2494,53 +2536,7 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
         if (data22.atlas_max_lines !== void 0) {
           let data23 = data22.atlas_max_lines;
           if (!(typeof data23 == "number" && (!(data23 % 1) && !isNaN(data23)))) {
-            const err59 = { instancePath: instancePath + "/router_budget/atlas_max_lines", schemaPath: "#/$defs/routerBudget/properties/atlas_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
-            if (vErrors === null) {
-              vErrors = [err59];
-            } else {
-              vErrors.push(err59);
-            }
-            errors++;
-          }
-          if (typeof data23 == "number") {
-            if (data23 < 1 || isNaN(data23)) {
-              const err60 = { instancePath: instancePath + "/router_budget/atlas_max_lines", schemaPath: "#/$defs/routerBudget/properties/atlas_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
-              if (vErrors === null) {
-                vErrors = [err60];
-              } else {
-                vErrors.push(err60);
-              }
-              errors++;
-            }
-          }
-        }
-        if (data22.atlas_max_tokens !== void 0) {
-          let data24 = data22.atlas_max_tokens;
-          if (!(typeof data24 == "number" && (!(data24 % 1) && !isNaN(data24)))) {
-            const err61 = { instancePath: instancePath + "/router_budget/atlas_max_tokens", schemaPath: "#/$defs/routerBudget/properties/atlas_max_tokens/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
-            if (vErrors === null) {
-              vErrors = [err61];
-            } else {
-              vErrors.push(err61);
-            }
-            errors++;
-          }
-          if (typeof data24 == "number") {
-            if (data24 < 1 || isNaN(data24)) {
-              const err62 = { instancePath: instancePath + "/router_budget/atlas_max_tokens", schemaPath: "#/$defs/routerBudget/properties/atlas_max_tokens/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
-              if (vErrors === null) {
-                vErrors = [err62];
-              } else {
-                vErrors.push(err62);
-              }
-              errors++;
-            }
-          }
-        }
-        if (data22.module_max_lines !== void 0) {
-          let data25 = data22.module_max_lines;
-          if (!(typeof data25 == "number" && (!(data25 % 1) && !isNaN(data25)))) {
-            const err63 = { instancePath: instancePath + "/router_budget/module_max_lines", schemaPath: "#/$defs/routerBudget/properties/module_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            const err63 = { instancePath: instancePath + "/router_budget/atlas_max_lines", schemaPath: "#/$defs/routerBudget/properties/atlas_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err63];
             } else {
@@ -2548,9 +2544,9 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
             errors++;
           }
-          if (typeof data25 == "number") {
-            if (data25 < 1 || isNaN(data25)) {
-              const err64 = { instancePath: instancePath + "/router_budget/module_max_lines", schemaPath: "#/$defs/routerBudget/properties/module_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+          if (typeof data23 == "number") {
+            if (data23 < 1 || isNaN(data23)) {
+              const err64 = { instancePath: instancePath + "/router_budget/atlas_max_lines", schemaPath: "#/$defs/routerBudget/properties/atlas_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
               if (vErrors === null) {
                 vErrors = [err64];
               } else {
@@ -2560,10 +2556,10 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
-        if (data22.module_max_tokens !== void 0) {
-          let data26 = data22.module_max_tokens;
-          if (!(typeof data26 == "number" && (!(data26 % 1) && !isNaN(data26)))) {
-            const err65 = { instancePath: instancePath + "/router_budget/module_max_tokens", schemaPath: "#/$defs/routerBudget/properties/module_max_tokens/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+        if (data22.atlas_max_tokens !== void 0) {
+          let data24 = data22.atlas_max_tokens;
+          if (!(typeof data24 == "number" && (!(data24 % 1) && !isNaN(data24)))) {
+            const err65 = { instancePath: instancePath + "/router_budget/atlas_max_tokens", schemaPath: "#/$defs/routerBudget/properties/atlas_max_tokens/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err65];
             } else {
@@ -2571,9 +2567,9 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
             errors++;
           }
-          if (typeof data26 == "number") {
-            if (data26 < 1 || isNaN(data26)) {
-              const err66 = { instancePath: instancePath + "/router_budget/module_max_tokens", schemaPath: "#/$defs/routerBudget/properties/module_max_tokens/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+          if (typeof data24 == "number") {
+            if (data24 < 1 || isNaN(data24)) {
+              const err66 = { instancePath: instancePath + "/router_budget/atlas_max_tokens", schemaPath: "#/$defs/routerBudget/properties/atlas_max_tokens/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
               if (vErrors === null) {
                 vErrors = [err66];
               } else {
@@ -2583,10 +2579,10 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
-        if (data22.point_nav_max_lines !== void 0) {
-          let data27 = data22.point_nav_max_lines;
-          if (!(typeof data27 == "number" && (!(data27 % 1) && !isNaN(data27)))) {
-            const err67 = { instancePath: instancePath + "/router_budget/point_nav_max_lines", schemaPath: "#/$defs/routerBudget/properties/point_nav_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+        if (data22.module_max_lines !== void 0) {
+          let data25 = data22.module_max_lines;
+          if (!(typeof data25 == "number" && (!(data25 % 1) && !isNaN(data25)))) {
+            const err67 = { instancePath: instancePath + "/router_budget/module_max_lines", schemaPath: "#/$defs/routerBudget/properties/module_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err67];
             } else {
@@ -2594,9 +2590,9 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
             errors++;
           }
-          if (typeof data27 == "number") {
-            if (data27 < 1 || isNaN(data27)) {
-              const err68 = { instancePath: instancePath + "/router_budget/point_nav_max_lines", schemaPath: "#/$defs/routerBudget/properties/point_nav_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+          if (typeof data25 == "number") {
+            if (data25 < 1 || isNaN(data25)) {
+              const err68 = { instancePath: instancePath + "/router_budget/module_max_lines", schemaPath: "#/$defs/routerBudget/properties/module_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
               if (vErrors === null) {
                 vErrors = [err68];
               } else {
@@ -2606,12 +2602,58 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
+        if (data22.module_max_tokens !== void 0) {
+          let data26 = data22.module_max_tokens;
+          if (!(typeof data26 == "number" && (!(data26 % 1) && !isNaN(data26)))) {
+            const err69 = { instancePath: instancePath + "/router_budget/module_max_tokens", schemaPath: "#/$defs/routerBudget/properties/module_max_tokens/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err69];
+            } else {
+              vErrors.push(err69);
+            }
+            errors++;
+          }
+          if (typeof data26 == "number") {
+            if (data26 < 1 || isNaN(data26)) {
+              const err70 = { instancePath: instancePath + "/router_budget/module_max_tokens", schemaPath: "#/$defs/routerBudget/properties/module_max_tokens/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+              if (vErrors === null) {
+                vErrors = [err70];
+              } else {
+                vErrors.push(err70);
+              }
+              errors++;
+            }
+          }
+        }
+        if (data22.point_nav_max_lines !== void 0) {
+          let data27 = data22.point_nav_max_lines;
+          if (!(typeof data27 == "number" && (!(data27 % 1) && !isNaN(data27)))) {
+            const err71 = { instancePath: instancePath + "/router_budget/point_nav_max_lines", schemaPath: "#/$defs/routerBudget/properties/point_nav_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err71];
+            } else {
+              vErrors.push(err71);
+            }
+            errors++;
+          }
+          if (typeof data27 == "number") {
+            if (data27 < 1 || isNaN(data27)) {
+              const err72 = { instancePath: instancePath + "/router_budget/point_nav_max_lines", schemaPath: "#/$defs/routerBudget/properties/point_nav_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+              if (vErrors === null) {
+                vErrors = [err72];
+              } else {
+                vErrors.push(err72);
+              }
+              errors++;
+            }
+          }
+        }
       } else {
-        const err69 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err73 = { instancePath: instancePath + "/router_budget", schemaPath: "#/$defs/routerBudget/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err69];
+          vErrors = [err73];
         } else {
-          vErrors.push(err69);
+          vErrors.push(err73);
         }
         errors++;
       }
@@ -2619,21 +2661,21 @@ function validate21(data, { instancePath = "", parentData, parentDataProperty, r
     if (data.rollout !== void 0) {
       let data28 = data.rollout;
       if (!(data28 === "K0" || data28 === "K1" || data28 === "K2" || data28 === "K3")) {
-        const err70 = { instancePath: instancePath + "/rollout", schemaPath: "#/properties/rollout/enum", keyword: "enum", params: { allowedValues: schema32.properties.rollout.enum }, message: "must be equal to one of the allowed values" };
+        const err74 = { instancePath: instancePath + "/rollout", schemaPath: "#/properties/rollout/enum", keyword: "enum", params: { allowedValues: schema32.properties.rollout.enum }, message: "must be equal to one of the allowed values" };
         if (vErrors === null) {
-          vErrors = [err70];
+          vErrors = [err74];
         } else {
-          vErrors.push(err70);
+          vErrors.push(err74);
         }
         errors++;
       }
     }
   } else {
-    const err71 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+    const err75 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
     if (vErrors === null) {
-      vErrors = [err71];
+      vErrors = [err75];
     } else {
-      vErrors.push(err71);
+      vErrors.push(err75);
     }
     errors++;
   }
