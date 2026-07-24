@@ -4,6 +4,7 @@
 
 ## Fresh：先定目标，再切 DAG
 
+<!-- ccm:k:start point:goal.fresh-contract -->
 1. 汇总原始请求、背景、约束、issue 等证据，不先写 task。
 2. 跑 **Goal Framing Test**。以下六项都能明确回答，目标才可进入 `asserted`：
    - **Outcome**：最终改变了什么，而非“做一些工作”。
@@ -28,8 +29,11 @@ ccm goal confirm --board <board> --user-authorized
 
 `pending` = 尚不可拆 DAG；`asserted` = agent 已基于证据完成无歧义改写，可逆地推进；`confirmed` = 用户明确确认当前 revision。不要为了追求 `confirmed` 对每个清晰请求机械追问。
 
+<!-- ccm:k:end point:goal.fresh-contract -->
+
 ## 交付 DDL：识别、确认、过期
 
+<!-- ccm:k:start point:goal.deadline-and-brief -->
 **交付 DDL（delivery deadline）**是用户对「整块 board / 当前 Goal Contract revision 最终交付」承诺的挂钟时刻，是 Goal Framing Test 里 **Constraints（时间硬约束）** 这一维被提升为一等约束——落在 `goal_contract.deadline`（单一 SSOT，随目标 revision 走）。它与单个 iteration 的局部 timebox（`cadence.iterations[].deadline`）、ETA 预测（`ccm estimate forecast`）、task timeout / watchdog **严格区分**：DDL 只表达整块交付承诺。它有**自己的四态 settledness 状态机**，与 goal `assurance` 正交：
 
 | `state` | 含义 | 能否拆 DAG |
@@ -80,8 +84,11 @@ ccm goal check --board <board> --json
 
 Goal Brief 至少包含：Outcome；背景与需求证据指针；in-scope / non-goals；验收标准；约束；用户权限边界；未决问题；评审与交付形态。不要写 token、凭证、个人信息等秘密。board 只保存相对 `ref` 与 `sha256`；Brief 文件在 `$CC_MASTER_HOME/goals/`，由 `ccm goal show` 给出真实路径。旧 revision 只读，绝不覆盖。
 
+<!-- ccm:k:end point:goal.deadline-and-brief -->
+
 ## 工作中：Goal Trace Test
 
+<!-- ccm:k:start point:goal.trace-and-delta -->
 每次 dispatch、接纳 fill-work、扩大 review、增加 task 或准备完成前，跑 **Goal Trace Test**：
 
 1. 这项工作直接兑现当前 revision 的哪一条 goal / acceptance / constraint？
@@ -112,8 +119,11 @@ ccm goal check --board <board> --json
 
 不得用 `ccm board update --goal` 绕过 revision。amend 后旧 task 不能自动继承正当性：逐个重跑 Trace Test，保留、改写、移出或取消，并让新的 revision 进入 completion fingerprint。
 
+<!-- ccm:k:end point:goal.trace-and-delta -->
+
 ## 六个对齐检查点
 
+<!-- ccm:k:start point:goal.alignment-checkpoints -->
 - **fresh**：Framing Test → `goal set` → 识别 / 确认交付 DDL（或确认无 DDL）→ `goal check` 返回 `ok`（非 `deadline_pending`）→ 才调用 `slicing-goals-into-dags`。
 - **resume / compaction**：先 `goal check`，有 Brief 就读当前 revision；恢复执行前补一次 DDL / no-DDL 确认 + deadline-risk 刷新（不沿用陈旧绿 verdict），再 reconcile；hash 异常立即硬停。
 - **recon / replan**：确认新发现已经过 Delta Classifier；不让 task 反向偷偷改写 goal。
@@ -122,3 +132,4 @@ ccm goal check --board <board> --json
 - **stop / complete**：确认没有 board 外漏项、没有未分类 delta、Goal Brief hash 有效，并以当前 revision 生成验收证据。
 
 Legacy board 没有 `goal_contract` 时保持可续跑；不要在恢复现场擅自迁移或改义。若确需纳入 lifecycle，把它当一次显式、可审计的目标确认/修订，而不是静默补字段。
+<!-- ccm:k:end point:goal.alignment-checkpoints -->

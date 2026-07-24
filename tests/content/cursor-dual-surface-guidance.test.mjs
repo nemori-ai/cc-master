@@ -1,10 +1,11 @@
 import {
   cpSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +14,10 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import pacingAttestation from '../../scripts/pacing-read-only-attestation.cjs';
+import { stripEntryPinOverlay } from '../../scripts/skill-knowledge/compile/skill-overlay.mjs';
+import { hashUnboundRegions } from '../../scripts/skill-knowledge/inventory.mjs';
+import { extractMarkers } from '../../scripts/skill-knowledge/markers.mjs';
+import { copyMinimalSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
@@ -25,26 +30,56 @@ const HOLDOUTS = [
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
+/**
+ * Pacing registry fingerprints overlay-only trees (pre entry-pin). Committed
+ * dist is post-pin; materialize a temp tree via the production strip helper.
+ */
+const materializeOverlayOnlyPacingTree = (postPinRoot) => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-pacing-overlay-only-'));
+  cpSync(postPinRoot, root, { recursive: true });
+  const visit = (directory) => {
+    for (const name of readdirSync(directory)) {
+      const absolute = join(directory, name);
+      if (statSync(absolute).isDirectory()) {
+        visit(absolute);
+        continue;
+      }
+      if (!name.endsWith('.md')) continue;
+      writeFileSync(absolute, stripEntryPinOverlay(readFileSync(absolute, 'utf8')));
+    }
+  };
+  visit(root);
+  return root;
+};
+
+/** Hostile-mutant temp repo: stable allowlist closure for real production sync/attestor. */
 const makeProjectionFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-guidance-mutant-'));
-  mkdirSync(join(root, 'plugin/src'), { recursive: true });
-  mkdirSync(join(root, 'scripts'), { recursive: true });
-  mkdirSync(join(root, 'ccm/apps/cli/src'), { recursive: true });
-  cpSync(join(ROOT, 'plugin/src/skills'), join(root, 'plugin/src/skills'), { recursive: true });
-  cpSync(
-    join(ROOT, 'ccm/apps/cli/src/provider-model-facts.json'),
-    join(root, 'ccm/apps/cli/src/provider-model-facts.json'),
-  );
-  for (const script of [
-    'sync-plugin-dist.sh',
-    'project-skill.cjs',
-    'pacing-read-only-capability.cjs',
-    'pacing-read-only-attestation.cjs',
-    'provider-guidance-attestation.cjs',
-  ]) {
-    cpSync(join(ROOT, 'scripts', script), join(root, 'scripts', script));
-  }
+  copyMinimalSkillKnowledgeRepo(root);
   return root;
+};
+
+/**
+ * Mutating inventory-covered canonical prose stales reviewed_unbound_sha256.
+ * Refresh the temp fixture hash so graph validation stays authentic and
+ * projection reaches the independent pacing/provider attestation gate.
+ */
+const refreshPacingInventoryUnboundHash = (repoRoot, repoRelativePath) => {
+  const skillJsonPath = join(
+    repoRoot,
+    'plugin/src/knowledge/skills/pacing-and-estimation/skill.json',
+  );
+  const skill = JSON.parse(readFileSync(skillJsonPath, 'utf8'));
+  const entry = skill.canonical_source_inventory?.find((item) => item.path === repoRelativePath);
+  if (!entry) return;
+  const text = readFileSync(join(repoRoot, repoRelativePath), 'utf8');
+  const markers = extractMarkers(text, repoRelativePath);
+  assert.equal(markers.ok, true, `markers must parse for ${repoRelativePath}`);
+  entry.reviewed_unbound_sha256 = hashUnboundRegions(
+    text,
+    markers.spans.filter((span) => (entry.point_ids ?? []).includes(span.point_id)),
+  );
+  writeFileSync(skillJsonPath, `${JSON.stringify(skill, null, 2)}\n`);
 };
 
 const project = (root, host) =>
@@ -117,11 +152,11 @@ test('four-host pacing projection rejects canonical references, overlays, descri
   for (const [index, holdout] of HOLDOUTS.entries()) {
     const root = makeProjectionFixture();
     try {
-      const reference = join(
-        root,
-        'plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md',
-      );
+      const repoRelative =
+        'plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md';
+      const reference = join(root, repoRelative);
       writeFileSync(reference, `${readFileSync(reference, 'utf8')}\n${holdout}\n`);
+      refreshPacingInventoryUnboundHash(root, repoRelative);
       for (const host of HOSTS) assertRejected(root, host, `canonical reference mutant ${index + 1}`);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -134,11 +169,11 @@ test('four-host pacing projection rejects canonical references, overlays, descri
   ]) {
     const root = makeProjectionFixture();
     try {
-      const path = join(
-        root,
-        `plugin/src/skills/pacing-and-estimation/canonical/references/${referenceName}`,
-      );
+      const repoRelative =
+        `plugin/src/skills/pacing-and-estimation/canonical/references/${referenceName}`;
+      const path = join(root, repoRelative);
       writeFileSync(path, `${readFileSync(path, 'utf8')}\n${holdout}\n`);
+      refreshPacingInventoryUnboundHash(root, repoRelative);
       for (const host of HOSTS) assertRejected(root, host, `${referenceName} canonical mutant`);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -174,10 +209,13 @@ test('four-host pacing projection rejects canonical references, overlays, descri
 test('clean generated pacing trees match the independent four-host manifest', () => {
   const registry = JSON.parse(read('plugin/src/skills/pacing-and-estimation/read-only-capability.json'));
   for (const host of HOSTS) {
-    pacingAttestation.assertPacingRuntimeTree(
-      registry,
-      host,
+    const overlayOnly = materializeOverlayOnlyPacingTree(
       join(ROOT, `plugin/dist/${host}/skills/pacing-and-estimation`),
     );
+    try {
+      pacingAttestation.assertPacingRuntimeTree(registry, host, overlayOnly);
+    } finally {
+      rmSync(overlayOnly, { recursive: true, force: true });
+    }
   }
 });

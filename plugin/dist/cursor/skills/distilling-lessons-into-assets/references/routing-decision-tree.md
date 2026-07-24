@@ -1,5 +1,7 @@
 # 归宿判断决策树
 
+<a id="ccm-k-point-distill-routing-tree"></a>
+<!-- ccm:k:start point:distill.routing-tree -->
 ## 顶层三问
 
 ```
@@ -40,6 +42,18 @@
 只需要在被触发时把这套方法论内化——**skill 是默认落点,subagent 是需要专门论证的加冒**,别为了"显得
 更正式"就升级成 subagent。
 
+<!-- ccm:k:end point:distill.routing-tree -->
+<!-- ccm:k:nav:start point:distill.routing-tree -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
+- [next: 允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [fallback_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop)
+- [requires: 四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-distill-dual-dest"></a>
+<!-- ccm:k:start point:distill.dual-dest -->
 ## 二义性:允许双落点
 
 一条候选经验可能**同时**该在纪律文档留一句指针、又该在 skill 里承载完整细节——比如"这个项目决定不用
@@ -47,6 +61,16 @@
 判断力。**这种情况允许双落点,不强求唯一归宿**:纪律文档留一句指针(是什么决定 + 指向哪份 skill 材料
 能看到判断力细节),skill 承载判断力本身。蒸馏计划里对这类候选经验应显式标注"双落点"。
 
+<!-- ccm:k:end point:distill.dual-dest -->
+<!-- ccm:k:nav:start point:distill.dual-dest -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-distill-fallback-no-drop"></a>
+<!-- ccm:k:start point:distill.fallback-no-drop -->
 ## 不确定时的兜底:绝不静默丢弃
 
 若三问都判不清(常见于来源文档里本就写着"待后续判断"这类占位),**不要逐条去问别人**——按下面的兜底
@@ -63,3 +87,11 @@
 经验是什么 + 若未来引入相应基础设施,应该落到哪一种资产),并显式标注"该项目无对应基础设施,已降级"。
 
 一句话:**归宿判断可以错、可以浅,但绝不能让一条经验因为判不清或没地方放就悄悄蒸发。**
+<!-- ccm:k:end point:distill.fallback-no-drop -->
+<!-- ccm:k:nav:start point:distill.fallback-no-drop -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+<!-- ccm:k:nav:end -->

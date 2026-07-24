@@ -1,0 +1,261 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:conduct.never-play",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "指挥不演奏",
+  "intent": "守住 orchestrator 的岗位：拆图 / 派发 / 验收 / 整合，绝不亲手实现或 review，并能命名离席方向。",
+  "recognition_cues": [
+    "想亲手改代码或亲自 review",
+    "抓到自己正在离席",
+    "准备越过红线合理化一次例外"
+  ],
+  "boundary": {
+    "includes": [
+      "指挥不演奏原则",
+      "红线完整体",
+      "离席四向命名"
+    ],
+    "excludes": [
+      "端点验收步骤本身",
+      "worker 路由八段链"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:conduct.never-play"
+    ],
+    "rationale": "指挥下场演奏会同时失守调度、验收、配速与 HITL。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.conduct.never-play"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:conduct.never-play",
+      "title": "指挥不演奏原则",
+      "point_kind": "principle",
+      "summary": "拆图 / 派发 / 验收 / 整合；绝不亲手实现或 review。",
+      "recognition_cues": [
+        "想亲自实现或 review",
+        "镜头 1 指挥不演奏"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:conduct.never-play",
+        "heading_hint": "七镜头"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:conduct.never-play"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md lens 1"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.conduct.never-play"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:conduct.red-lines",
+      "title": "红线完整体",
+      "point_kind": "check",
+      "summary": "红线含唯一例外（端点验收本身暴露的 micro-fixup）与 gate-green ≠ passed 等牙齿。",
+      "recognition_cues": [
+        "准备跨红线",
+        "想把含糊默许当批准"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:conduct.red-lines",
+        "heading_hint": "红线（Red lines）"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:conduct.red-lines"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md red lines"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.conduct.red-lines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:conduct.deserting-podium",
+      "title": "离席四向命名",
+      "point_kind": "principle",
+      "summary": "坏编排姿态都是离席：向下 / 向内 / 向前 / 向虚。",
+      "recognition_cues": [
+        "抓到自己正在滑",
+        "想给滑坡命名"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:conduct.deserting-podium",
+        "heading_hint": "坏编排有一个名字：离席"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:conduct.deserting-podium"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md deserting the podium"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.conduct.deserting-podium"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:conduct.principle-to-red-lines",
+      "type": "operationalizes",
+      "from": "point:conduct.never-play",
+      "to": "point:conduct.red-lines",
+      "when": [
+        "需要把原则落到可执行红线与唯一例外"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md red lines follow lens 1"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.conduct.principle-to-red-lines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:conduct.red-lines-to-deserting",
+      "type": "contrasts_with",
+      "from": "point:conduct.red-lines",
+      "to": "point:conduct.deserting-podium",
+      "when": [
+        "需要给即将跨线的姿态命名方向"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md deserting section"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.conduct.red-lines-to-deserting"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:conduct.to-verification-exception",
+      "type": "applies_to",
+      "from": "point:conduct.red-lines",
+      "to": "point:verification.endpoint-procedure",
+      "when": [
+        "唯一例外是端点验收本身暴露的 micro-fixup，需要回到验收 procedure"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md micro-fixup exception"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.conduct.to-verification"
+          }
+        ]
+      }
+    }
+  ]
+}

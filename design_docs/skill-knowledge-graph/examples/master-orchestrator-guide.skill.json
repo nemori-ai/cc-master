@@ -1,0 +1,203 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:master-orchestrator-guide",
+  "name": "master-orchestrator-guide",
+  "package_root": "plugin/src/skills/master-orchestrator-guide",
+  "intent": "让主会话 agent 对长程目标做调度、收割、端点验收、replan 与收口。",
+  "modules": [
+    {
+      "id": "module:verification.endpoint",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json"
+    },
+    {
+      "id": "module:conduct.never-play",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/conduct.never-play.json"
+    },
+    {
+      "id": "module:routing.worker-chain",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/routing.worker-chain.json"
+    }
+  ],
+  "entry_modules": [
+    "module:verification.endpoint",
+    "module:conduct.never-play",
+    "module:routing.worker-chain"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+      "coverage": "partial",
+      "point_ids": [
+        "point:conduct.never-play",
+        "point:conduct.red-lines",
+        "point:conduct.deserting-podium"
+      ],
+      "reviewed_unbound_sha256": "3612e1023b78d7338984989b0f28d3afd50915281eaa9cd9c52e377ec73807a0",
+      "unresolved_coverage_debt": [
+        "SKILL.md 中非 conduct pilot 段落尚未切点。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "f7042ad82e5e44b8d61eb9bc1708d8cdd6c2b1b1ffb4143a8a76ecd17221cdc0",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "21ce8769adc6fb265aa85b50e0ccb2ccb0483c848693c2ad21daa41bea81c7be",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "70db397cf783f400caaab6e82bbad83d01eb318369522e63f31a36d99b54f3b0",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "8daf8edeb8565d1d53517d871975f62ea9a80d3f29f0b8887d419a573e214dae",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "60dcf08550b13e078984d58caae0ff4025131098d0b88fff49fc2deb12a018f5",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "ea5ab50dce4d38a26752f7f169a171f361e8ea3fa29f4a0896907fcac6dada84",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "d726d7ecf8cce430efe83d4a19850b6440b927330dbd63d011ebc84c42a65602",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "f1b3795141605d61a2c2f38342a07884d9b23a05f866991cbb692df63696d733",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "2f6a83dae609d0360fee1c5e3c4e93e5927ef4b0e06047471892f2286b4f5733",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "68783b1bf89a21ca9bca280d43c266140c30ec62df8b10fc582ff8b734506b00",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md",
+      "coverage": "partial",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "b3bbf566faaf9bae748b42c12c39108a6390db92e5dd8cc1fb68508c36ef4323",
+      "unresolved_coverage_debt": [
+        "K1 pilot 尚未将该文件剩余 canonical prose 切成 admitted points。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "coverage": "partial",
+      "point_ids": [
+        "point:verification.endpoint-procedure"
+      ],
+      "reviewed_unbound_sha256": "4c562acb34a470ef7b0e5e75fe9d6593a4cc65143228ebd57e8173f572ddcc82",
+      "unresolved_coverage_debt": [
+        "resume-verify.md 中 content-hash / stale / resume cwd / 第二视角等段落尚未切点。"
+      ]
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+      "coverage": "partial",
+      "point_ids": [
+        "point:routing.ordered-chain",
+        "point:routing.executor-vs-target",
+        "point:routing.handle-gate",
+        "point:verification.terminal-is-not-done",
+        "point:verification.terminal-summary"
+      ],
+      "reviewed_unbound_sha256": "2a48b258ffb40612c64e471ab07e5b44cf7ce64e17ed65ca82230d6cefa82dc4",
+      "unresolved_coverage_debt": [
+        "worker-routing.md 中非 pilot 段落（任务形状表、effect floor、qualification、owner 地图等）尚未切点。"
+      ]
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "accepted-skill-admission-k1-pilot"
+      }
+    ]
+  }
+}

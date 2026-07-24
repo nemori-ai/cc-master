@@ -1,0 +1,150 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:engineering-with-craft",
+  "name": "engineering-with-craft",
+  "package_root": "plugin/src/skills/engineering-with-craft",
+  "intent": "让执行 agent 用 DDD、OOP、SDD、TDD 的共享根设计、实现并验证真实代码。",
+  "modules": [
+    {
+      "id": "module:craft.foundation",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/modules/craft.foundation.json"
+    },
+    {
+      "id": "module:craft.domain-modeling",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/modules/craft.domain-modeling.json"
+    },
+    {
+      "id": "module:craft.object-design",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/modules/craft.object-design.json"
+    },
+    {
+      "id": "module:craft.spec-first",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/modules/craft.spec-first.json"
+    },
+    {
+      "id": "module:craft.test-first",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/modules/craft.test-first.json"
+    }
+  ],
+  "entry_modules": [
+    "module:craft.foundation",
+    "module:craft.domain-modeling",
+    "module:craft.object-design",
+    "module:craft.spec-first",
+    "module:craft.test-first"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:craft.composition-over-wrapper",
+        "point:craft.contract-ssot",
+        "point:craft.evidence-over-claim",
+        "point:craft.invariant-anchor",
+        "point:craft.layered-thinking",
+        "point:craft.red-lines",
+        "point:craft.shared-spine",
+        "point:craft.stage-handoff"
+      ],
+      "reviewed_unbound_sha256": "97e652fc3c949fd67a77c848038fd3be5284bec7ba9828cb4b08229ac7d138a9"
+    },
+    {
+      "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:ddd.admission-question",
+        "point:ddd.aggregate-ownership",
+        "point:ddd.application-derivation",
+        "point:ddd.design-focus",
+        "point:ddd.failure-radar",
+        "point:ddd.red-lines",
+        "point:ddd.strategic-boundaries"
+      ],
+      "reviewed_unbound_sha256": "72a3b215bd10d243379dee845c820e850fe0d65b88824346908b94ce815fd9d0"
+    },
+    {
+      "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:oop.abstraction-cost",
+        "point:oop.composition-over-inheritance",
+        "point:oop.encapsulation-vocabulary",
+        "point:oop.failure-radar",
+        "point:oop.four-pillars",
+        "point:oop.red-lines",
+        "point:oop.shared-root-links",
+        "point:oop.solid-judgment"
+      ],
+      "reviewed_unbound_sha256": "1c41b5b01368359ab0b4ba04304357e1c29804630a5a3f65213d152d251c6082"
+    },
+    {
+      "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:sdd.admission",
+        "point:sdd.alignment",
+        "point:sdd.change-order",
+        "point:sdd.core-belief",
+        "point:sdd.drift-red-line",
+        "point:sdd.implementation-gate",
+        "point:sdd.practice-anchors",
+        "point:sdd.spec-boundary",
+        "point:sdd.theory-handoff"
+      ],
+      "reviewed_unbound_sha256": "6e01dbd972c58a041ebbdfa19fee78634419f7746434caa598861d2989cdfc2a"
+    },
+    {
+      "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:tdd.completion-gate",
+        "point:tdd.constraint-parity",
+        "point:tdd.design-feedback",
+        "point:tdd.iron-law",
+        "point:tdd.loop-boundary",
+        "point:tdd.rationalizations",
+        "point:tdd.red-evidence",
+        "point:tdd.red-green-loop"
+      ],
+      "reviewed_unbound_sha256": "8b9e989ddcc303e3d51726555b5e4781f8770277e95c90bf0136f642b6ed3b4a"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.skill.engineering-with-craft"
+      }
+    ]
+  }
+}

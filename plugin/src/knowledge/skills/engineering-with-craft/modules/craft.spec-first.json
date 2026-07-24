@@ -1,0 +1,907 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:craft.spec-first",
+  "owner_skill": "skill:engineering-with-craft",
+  "title": "SDD Spec-first",
+  "intent": "判断何时需要 spec-first，并让 spec 成为实现、测试和变更的唯一契约裁判。",
+  "recognition_cues": [
+    "跨边界接口需要先定契约",
+    "实现与 spec 可能漂移"
+  ],
+  "boundary": {
+    "includes": [
+      "spec 边界与准入",
+      "spec/impl/test 对齐",
+      "实现前硬闸",
+      "漂移红线"
+    ],
+    "excludes": [
+      "对象内部实现品味",
+      "测试红绿步骤"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:engineering-craft"
+    ],
+    "primary_points": [
+      "point:sdd.core-belief"
+    ],
+    "rationale": "SDD Spec-first是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.craft.spec-first"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:sdd.admission",
+      "title": "SDD 适用性判断",
+      "point_kind": "decision_rule",
+      "summary": "按跨边界、多消费者、稳定性、并行与不变式密度决定是否值得 spec-first。",
+      "recognition_cues": [
+        "需要SDD 适用性判断"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.admission",
+        "heading_hint": "SDD 适用性判断"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.admission"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.admission"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.alignment",
+      "title": "Spec、实现与测试对齐",
+      "point_kind": "principle",
+      "summary": "实现满足 spec，测试以 spec 为 oracle，禁止实现反向定义真相。",
+      "recognition_cues": [
+        "需要Spec、实现与测试对齐"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.alignment",
+        "heading_hint": "Spec、实现与测试对齐"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.alignment"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.alignment"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.change-order",
+      "title": "先改 spec 的变更顺序",
+      "point_kind": "procedure",
+      "summary": "新增、修改、删除行为都先更新合约，再写红测与实现。",
+      "recognition_cues": [
+        "需要先改 spec 的变更顺序"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.change-order",
+        "heading_hint": "先改 spec 的变更顺序"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.change-order"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.change-order"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.core-belief",
+      "title": "Spec 先于实现",
+      "point_kind": "principle",
+      "summary": "以先于实现达成的外部标准作为正确性裁判。",
+      "recognition_cues": [
+        "需要Spec 先于实现"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.core-belief",
+        "heading_hint": "Spec 先于实现"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.core-belief"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.core-belief"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.drift-red-line",
+      "title": "Spec 漂移红线",
+      "point_kind": "check",
+      "summary": "实现偏离 spec 而不更新合约就是对消费者的契约谎言。",
+      "recognition_cues": [
+        "需要Spec 漂移红线"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.drift-red-line",
+        "heading_hint": "Spec 漂移红线"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.drift-red-line"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.drift-red-line"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.implementation-gate",
+      "title": "实现前 Spec 硬闸",
+      "point_kind": "check",
+      "summary": "值得 SDD 且没有已认可 spec 时停止写产码，先固定关键决策。",
+      "recognition_cues": [
+        "需要实现前 Spec 硬闸"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.implementation-gate",
+        "heading_hint": "实现前 Spec 硬闸"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.implementation-gate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.implementation-gate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.practice-anchors",
+      "title": "SDD 当代实践锚",
+      "point_kind": "example",
+      "summary": "用 contract-first、schema-first、consumer contract、可执行 spec 与类型说明落地形态。",
+      "recognition_cues": [
+        "需要SDD 当代实践锚"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.practice-anchors",
+        "heading_hint": "SDD 当代实践锚"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.practice-anchors"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.practice-anchors"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.spec-boundary",
+      "title": "Spec 的职责边界",
+      "point_kind": "boundary",
+      "summary": "界定接口、schema、错误、不变式、示例与领域语言属于 spec，私有实现细节不属于。",
+      "recognition_cues": [
+        "需要Spec 的职责边界"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.spec-boundary",
+        "heading_hint": "Spec 的职责边界"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.spec-boundary"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.spec-boundary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:sdd.theory-handoff",
+      "title": "SDD 与 DDD/OOP/TDD 接力",
+      "point_kind": "procedure",
+      "summary": "把领域成果形式化成合约，再由对象实现并由测试验收。",
+      "recognition_cues": [
+        "需要SDD 与 DDD/OOP/TDD 接力"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "marker": "point:sdd.theory-handoff",
+        "heading_hint": "SDD 与 DDD/OOP/TDD 接力"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:sdd.theory-handoff"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.sdd.theory-handoff"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:craft.spec-first.core-belief-to-admission",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.admission",
+      "when": [
+        "从模块主点进入SDD 适用性判断"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.admission-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.admission",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从SDD 适用性判断返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-alignment",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.alignment",
+      "when": [
+        "从模块主点进入Spec、实现与测试对齐"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.alignment-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.alignment",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从Spec、实现与测试对齐返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-change-order",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.change-order",
+      "when": [
+        "从模块主点进入先改 spec 的变更顺序"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.change-order-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.change-order",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从先改 spec 的变更顺序返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-drift-red-line",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.drift-red-line",
+      "when": [
+        "从模块主点进入Spec 漂移红线"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.drift-red-line-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.drift-red-line",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从Spec 漂移红线返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-implementation-gate",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.implementation-gate",
+      "when": [
+        "从模块主点进入实现前 Spec 硬闸"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.implementation-gate-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.implementation-gate",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从实现前 Spec 硬闸返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-practice-anchors",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.practice-anchors",
+      "when": [
+        "从模块主点进入SDD 当代实践锚"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.practice-anchors-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.practice-anchors",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从SDD 当代实践锚返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-spec-boundary",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.spec-boundary",
+      "when": [
+        "从模块主点进入Spec 的职责边界"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.spec-boundary-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.spec-boundary",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从Spec 的职责边界返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.core-belief-to-theory-handoff",
+      "type": "deepens_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:sdd.theory-handoff",
+      "when": [
+        "从模块主点进入SDD 与 DDD/OOP/TDD 接力"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.theory-handoff-to-core-belief",
+      "type": "routes_to",
+      "from": "point:sdd.theory-handoff",
+      "to": "point:sdd.core-belief",
+      "when": [
+        "从SDD 与 DDD/OOP/TDD 接力返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.spec-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.spec-first.to-shared-spine",
+      "type": "routes_to",
+      "from": "point:sdd.core-belief",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从 SDD 决策返回四理论共享 canonical 脊椎"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "SDD 与共享工程根的显式接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.spec-first.to-shared-spine"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:slicing.vertical",
+  "owner_skill": "skill:slicing-goals-into-dags",
+  "title": "纵切硬规则",
+  "intent": "守住纵切不横切，并理解为何这一刀是高杠杆。",
+  "recognition_cues": [
+    "纵切 vs 横切",
+    "先打地基"
+  ],
+  "boundary": {
+    "includes": [
+      "为什么切值钱",
+      "纵切硬规则与合理化表"
+    ],
+    "excludes": [
+      "粒度与 walking skeleton 细节",
+      "worked example"
+    ]
+  },
+  "access": {
+    "class": "critical",
+    "relevant_entries": [
+      "entry:slicing-goals-into-dags"
+    ],
+    "primary_points": [
+      "point:slicing.vertical-rule"
+    ],
+    "rationale": "横切会同时毁掉并行、早交付与早去风险。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:slicing.vertical"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.slicing.vertical"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:slicing.why-cut",
+      "title": "切是高杠杆决策",
+      "point_kind": "principle",
+      "summary": "怎么切定死并行度与反馈天花板；先切对再排派。",
+      "recognition_cues": [
+        "急着排期",
+        "横切图算临界路径"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.why-cut",
+        "heading_hint": "为什么这一刀最值钱"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.why-cut"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.why-cut"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.why-cut"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:slicing.vertical-rule",
+      "title": "纵切不要横切硬规则",
+      "point_kind": "decision_rule",
+      "summary": "薄端到端纵向增量；不要按技术层横切。",
+      "recognition_cues": [
+        "先做 schema 层",
+        "纵切 vs 横切"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "marker": "point:slicing.vertical-rule",
+        "heading_hint": "心智锚 1"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:slicing.vertical-rule"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:slicing.vertical-rule"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.slicing.vertical-rule"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:slicing.why-to-vertical",
+      "type": "operationalizes",
+      "from": "point:slicing.why-cut",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "把高杠杆判断落到纵切硬规则"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.why-to-vertical"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.why-to-vertical"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:slicing.vertical-to-skeleton",
+      "type": "deepens_to",
+      "from": "point:slicing.vertical-rule",
+      "to": "point:slicing.walking-skeleton",
+      "when": [
+        "第一片怎么做最薄端到端线"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.vertical-to-skeleton"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.vertical-to-skeleton"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:slicing.vertical-to-example",
+      "type": "applies_to",
+      "from": "point:slicing.vertical-rule",
+      "to": "point:slicing.example-contrast",
+      "when": [
+        "需要具体横切/纵切对照"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.vertical-to-example"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.vertical-to-example"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.why-to-example",
+      "type": "applies_to",
+      "from": "point:slicing.why-cut",
+      "to": "point:slicing.example-contrast",
+      "when": [
+        "用样例证明切法杠杆"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.why-to-example"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.why-to-example"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.vertical-to-why",
+      "type": "routes_to",
+      "from": "point:slicing.vertical-rule",
+      "to": "point:slicing.why-cut",
+      "when": [
+        "从硬规则回到杠杆论证"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.vertical-to-why"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.vertical-to-why"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.hub-from.why-cut",
+      "type": "routes_to",
+      "from": "point:slicing.why-cut",
+      "to": "point:slicing.vertical-rule",
+      "when": [
+        "回纵切硬规则主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.hub-from.why-cut"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.hub-from.why-cut"
+          }
+        ]
+      }
+    }
+  ]
+}

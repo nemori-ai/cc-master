@@ -1,0 +1,486 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.signals",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "配额信号消费",
+  "intent": "从任意 origin 正确读取全机配额信号、恢复边界与诚实天花板。",
+  "recognition_cues": [
+    "读 usage",
+    "available false",
+    "窗口合同"
+  ],
+  "boundary": {
+    "includes": [
+      "machine-wide→下钻",
+      "refresh_hint",
+      "窗口合同",
+      "诚实天花板"
+    ],
+    "excludes": [
+      "lever 动作",
+      "estimate verb"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.machine-wide-first"
+    ],
+    "rationale": "配额消费入口先全局再下钻。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.signals"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.signals"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.machine-wide-first",
+      "title": "先全局再下钻",
+      "point_kind": "procedure",
+      "summary": "先 machine-wide quota status，再下钻 selected-target usage；unknown 不补成 healthy。",
+      "recognition_cues": [
+        "读配额从哪开始"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "marker": "point:pacing.machine-wide-first",
+        "heading_hint": "先全局，再下钻"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.machine-wide-first"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.machine-wide-first"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.machine-wide-first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.refresh-hint",
+      "title": "refresh_hint 恢复边界",
+      "point_kind": "decision_rule",
+      "summary": "available:false+recoverable 是 token 过期不是耗尽；照 hint 恢复，不当地 stop。",
+      "recognition_cues": [
+        "available false",
+        "refresh_hint"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "marker": "point:pacing.refresh-hint",
+        "heading_hint": "refresh_hint"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.refresh-hint"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.refresh-hint"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.refresh-hint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.window-contracts",
+      "title": "四类 harness 窗口合同",
+      "point_kind": "reference",
+      "summary": "各 target 承重窗口与独立池合同；不可跨 surface 拼接。",
+      "recognition_cues": [
+        "Codex 有没有 5h",
+        "Cursor 两池"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "marker": "point:pacing.window-contracts",
+        "heading_hint": "四类 harness"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.window-contracts"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.window-contracts"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.window-contracts"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.signal-ceiling",
+      "title": "信号诚实天花板",
+      "point_kind": "boundary",
+      "summary": "只有百分比与 reset，无绝对 token 分母；账户 pacing ⊥ 节点 telemetry。",
+      "recognition_cues": [
+        "想精确收敛 used%"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "marker": "point:pacing.signal-ceiling",
+        "heading_hint": "信号源与诚实天花板"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.signal-ceiling"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.signal-ceiling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.signal-ceiling"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.global-to-refresh",
+      "type": "next",
+      "from": "point:pacing.machine-wide-first",
+      "to": "point:pacing.refresh-hint",
+      "when": [
+        "遇到 available:false"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.global-to-refresh"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.global-to-refresh"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:pacing.global-to-windows",
+      "type": "deepens_to",
+      "from": "point:pacing.machine-wide-first",
+      "to": "point:pacing.window-contracts",
+      "when": [
+        "需要按 harness 解读承重窗口"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.global-to-windows"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.global-to-windows"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:pacing.windows-to-ceiling",
+      "type": "requires",
+      "from": "point:pacing.window-contracts",
+      "to": "point:pacing.signal-ceiling",
+      "when": [
+        "防止把百分比当绝对预算"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.windows-to-ceiling"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.windows-to-ceiling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.signals-to-target",
+      "type": "next",
+      "from": "point:pacing.machine-wide-first",
+      "to": "point:pacing.selected-target-facts",
+      "when": [
+        "解释候选 worker 的 target-bound 事实"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.signals-to-target"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.signals-to-target"
+          }
+        ]
+      },
+      "order": 3
+    },
+    {
+      "id": "edge:pacing.signals-to-levers",
+      "type": "next",
+      "from": "point:pacing.signal-ceiling",
+      "to": "point:pacing.upper-bound-only",
+      "when": [
+        "信号有压力要整理 lever 输入"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.signals-to-levers"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.signals-to-levers"
+          }
+        ]
+      },
+      "order": 4
+    },
+    {
+      "id": "edge:pacing.refresh-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.refresh-hint",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "恢复后重新全局读取"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.refresh-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.refresh-to-global"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.ceiling-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.signal-ceiling",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "从天花板回到读取入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.ceiling-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.ceiling-to-global"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.windows-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.window-contracts",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "窗口合同读完回入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.windows-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.windows-to-global"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.signals-to-estimate",
+      "type": "next",
+      "from": "point:pacing.machine-wide-first",
+      "to": "point:pacing.estimate-verbs",
+      "when": [
+        "配额读完要交叉估算"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.signals-to-estimate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.signals-to-estimate"
+          }
+        ]
+      }
+    }
+  ]
+}

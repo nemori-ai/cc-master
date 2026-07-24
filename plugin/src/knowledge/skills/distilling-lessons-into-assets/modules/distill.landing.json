@@ -1,0 +1,445 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:distill.landing",
+  "owner_skill": "skill:distilling-lessons-into-assets",
+  "title": "落地手艺",
+  "intent": "归宿判对后按资产类型写得不走样，并堵住落地合理化。",
+  "recognition_cues": [
+    "怎么落笔",
+    "落地反模式"
+  ],
+  "boundary": {
+    "includes": [
+      "预览入口",
+      "按类型手艺",
+      "合理化表"
+    ],
+    "excludes": [
+      "归宿三问"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:distilling-lessons-into-assets"
+    ],
+    "primary_points": [
+      "point:distill.landing-craft"
+    ],
+    "rationale": "路由之后的执行手艺入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:distill.landing"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.distill.landing"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:distill.landing-preview",
+      "title": "落地手艺入口",
+      "point_kind": "reference",
+      "summary": "重要≠进 skill；落地手艺与反模式见 landing-craft。",
+      "recognition_cues": [
+        "得进 skill 才够重"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "marker": "point:distill.landing-preview",
+        "heading_hint": "落地手艺与反模式"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:distill.landing-craft",
+        "canonical": "point:distill.landing-craft",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "a0ca9181bd466f457a3df927caad52c5b4a32200d79b82e45c22db9fcabbac8a"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.landing-preview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.landing-preview"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.landing-craft",
+      "title": "按资产类型的落地手艺",
+      "point_kind": "procedure",
+      "summary": "套文风、带 why、触发描述、只固化结构、角色边界。",
+      "recognition_cues": [
+        "怎么写进资产"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
+        "marker": "point:distill.landing-craft",
+        "heading_hint": "纪律文档/skill/workflow/subagent"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.landing-craft"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.landing-craft"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.landing-craft"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.landing-rationalization",
+      "title": "落地合理化表",
+      "point_kind": "check",
+      "summary": "堵住“得进 skill才够重”等跨类自我说服。",
+      "recognition_cues": [
+        "合理化落地选择"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
+        "marker": "point:distill.landing-rationalization",
+        "heading_hint": "Rationalization Table"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.landing-rationalization"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.landing-rationalization"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.landing-rationalization"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:distill.preview-to-craft",
+      "type": "deepens_to",
+      "from": "point:distill.landing-preview",
+      "to": "point:distill.landing-craft",
+      "when": [
+        "需要按类型落地细则"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.preview-to-craft"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.preview-to-craft"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:distill.craft-to-rat",
+      "type": "contrasts_with",
+      "from": "point:distill.landing-craft",
+      "to": "point:distill.landing-rationalization",
+      "when": [
+        "对照落地自我说服"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.craft-to-rat"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.craft-to-rat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.craft-to-evidence",
+      "type": "requires",
+      "from": "point:distill.landing-craft",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "落笔时守证据忠实"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.craft-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.craft-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.rat-to-craft",
+      "type": "routes_to",
+      "from": "point:distill.landing-rationalization",
+      "to": "point:distill.landing-craft",
+      "when": [
+        "从借口回到手艺"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.rat-to-craft"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.rat-to-craft"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.preview-to-evidence",
+      "type": "requires",
+      "from": "point:distill.landing-preview",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "落地预览接到硬约束"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.preview-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.preview-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.rat-to-evidence",
+      "type": "requires",
+      "from": "point:distill.landing-rationalization",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "合理化表指向证据红线"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.rat-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.rat-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.craft-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.landing-craft",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "落笔前复核归宿"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.craft-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.craft-to-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hub-from.preview",
+      "type": "routes_to",
+      "from": "point:distill.landing-preview",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "预览回决策树主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hub-from.preview"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hub-from.preview"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hub-from.rat",
+      "type": "routes_to",
+      "from": "point:distill.landing-rationalization",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "合理化回决策树主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hub-from.rat"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hub-from.rat"
+          }
+        ]
+      }
+    }
+  ]
+}

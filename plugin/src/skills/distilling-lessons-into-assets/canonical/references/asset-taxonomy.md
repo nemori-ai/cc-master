@@ -2,6 +2,7 @@
 
 四类资产不是同一种东西的四个模板,是四种**不同性质的知识**各自的天然容器。选对容器,经验才活得下去。
 
+<!-- ccm:k:start point:distill.taxonomy -->
 ## 纪律文档(discipline document)
 
 项目里那份大家默认会去读的主纪律载体——常见形态是一份贡献者入门文档、一份设计文档、一份变更记录。
@@ -63,3 +64,4 @@
 **事实 → 纪律文档;可复用判断力 → skill;确定性结构 → workflow;专职角色 → subagent。** 拿不准先回到
 [routing-decision-tree.md](routing-decision-tree.md) 的顶层三问重新过一遍,不要凭"这条经验感觉多重要"
 去猜归宿——重要程度和归宿类型是两个独立的维度。
+<!-- ccm:k:end point:distill.taxonomy -->

@@ -1,0 +1,203 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:master-orchestrator-guide",
+  "name": "master-orchestrator-guide",
+  "package_root": "plugin/src/skills/master-orchestrator-guide",
+  "intent": "让主会话 agent 对长程目标做调度、收割、端点验收、replan 与收口。",
+  "modules": [
+    {"id": "module:verification.endpoint", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json"},
+    {"id": "module:conduct.never-play", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/conduct.never-play.json"},
+    {"id": "module:routing.worker-chain", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/routing.worker-chain.json"},
+    {"id": "module:control.decision-loop", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/control.decision-loop.json"},
+    {"id": "module:goal.contract", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/goal.contract.json"},
+    {"id": "module:scheduling.dependency-dag", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/scheduling.dependency-dag.json"},
+    {"id": "module:dispatch.parallel-mechanisms", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/dispatch.parallel-mechanisms.json"},
+    {"id": "module:coordination.async-hitl", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/coordination.async-hitl.json"},
+    {"id": "module:state.board", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/state.board.json"},
+    {"id": "module:capacity.delivery", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/capacity.delivery.json"},
+    {"id": "module:capacity.account-switch", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/capacity.account-switch.json"},
+    {"id": "module:continuity.handoff", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/continuity.handoff.json"},
+    {"id": "module:planning.multi-layer", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/planning.multi-layer.json"},
+    {"id": "module:evidence.outside-in", "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/evidence.outside-in.json"}
+  ],
+  "entry_modules": [
+    "module:verification.endpoint",
+    "module:conduct.never-play",
+    "module:routing.worker-chain",
+    "module:control.decision-loop"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:conduct.deserting-podium",
+        "point:conduct.never-play",
+        "point:conduct.red-lines",
+        "point:control.decision-program",
+        "point:control.good-orchestration",
+        "point:control.identity-mandate",
+        "point:control.navigation-map",
+        "point:control.operating-lenses",
+        "point:control.rationalization-guards",
+        "point:control.role-consequences"
+      ],
+      "reviewed_unbound_sha256": "997077657b0425430bfd8c73aea07b3d43f6f6a33332e2416e42411be86aa57c"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
+      "coverage": "full",
+      "point_ids": ["point:hitl.decision-package", "point:hitl.inflight-and-user", "point:hitl.step6-ledger", "point:hitl.watchdog"],
+      "reviewed_unbound_sha256": "a751b4208b5b85430976ed4fa66016707ac9a4c613b8d72e48ef546b30289d39"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+      "coverage": "full",
+      "point_ids": ["point:board.audit-and-graph", "point:board.resume-and-interview", "point:board.waist-and-write", "point:board.worked-example"],
+      "reviewed_unbound_sha256": "8ffe7fc18aded3e1ba729b015b836870a5353482324f2041cfb4f3334c660af7"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
+      "coverage": "full",
+      "point_ids": ["point:capacity.account-switch-gate", "point:capacity.account-switch-sequence"],
+      "reviewed_unbound_sha256": "e3e9d36894d77e6be4e9b1dd06d455b97e1f64a4f721a7dcad4ff8298d08dc22"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md",
+      "coverage": "full",
+      "point_ids": ["point:deadline.constraint-axes", "point:deadline.guards-and-boundary", "point:deadline.nine-disciplines"],
+      "reviewed_unbound_sha256": "fdbfc84464c6c48e199761014353a7c0494c7bd147fdec3368a483f80a133d0b"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md",
+      "coverage": "full",
+      "point_ids": ["point:scheduling.dag-and-critical-path", "point:scheduling.node-contract", "point:scheduling.parallelism-and-granularity"],
+      "reviewed_unbound_sha256": "98f69319e66b10a780ef4c5cd20ce6a97ea11b456bcc2fc259c31c82674193b4"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
+      "coverage": "full",
+      "point_ids": ["point:dispatch.dataflow-and-mechanisms", "point:dispatch.hygiene-and-liveness", "point:dispatch.routing-and-isolation", "point:dispatch.workflow-and-escalation"],
+      "reviewed_unbound_sha256": "fb1cfa59ba8ef1a1960b704e5c8f17245a95c068213e51152803a71db88c1a3c"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md",
+      "coverage": "full",
+      "point_ids": ["point:goal.alignment-checkpoints", "point:goal.deadline-and-brief", "point:goal.fresh-contract", "point:goal.trace-and-delta"],
+      "reviewed_unbound_sha256": "536f84408b31b0173cf103a6fc3ad97ce6b8e53d2c19f648241070df81f233dc"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md",
+      "coverage": "full",
+      "point_ids": ["point:handoff.judgment-template", "point:handoff.procedure-and-drain", "point:handoff.rationale-and-guards"],
+      "reviewed_unbound_sha256": "bf9f827aaf3482217f9b48a953f907a34848bf35455534c38e9636cf7b250095"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md",
+      "coverage": "full",
+      "point_ids": ["point:capacity.ranking-and-contraction", "point:capacity.task-first-allocation"],
+      "reviewed_unbound_sha256": "b7e32b39f3f0f334b221a5cf751087d3dfd47548ea19843f29df5e224fa26c10"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md",
+      "coverage": "full",
+      "point_ids": ["point:multilayer.admission-and-escalation", "point:multilayer.handoff-contract", "point:multilayer.maintenance", "point:multilayer.orthogonality"],
+      "reviewed_unbound_sha256": "8f6136c7fa48904ec5b0c40c095db0e258178b17aecb451861f7883acb5580b5"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md",
+      "coverage": "full",
+      "point_ids": ["point:outside.evidence-levels", "point:outside.falsification-and-calibration", "point:outside.low-risk-exception", "point:outside.unknown-and-amendment"],
+      "reviewed_unbound_sha256": "c2adad55829560d8da3d66df0e2c1e411672dfee83e41ec61074abb82d638938"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "coverage": "full",
+      "point_ids": ["point:verification.endpoint-procedure", "point:verification.hash-and-stale", "point:verification.heterogeneous-review", "point:verification.loop-convergence", "point:verification.resume-takeover"],
+      "reviewed_unbound_sha256": "fac2c9db69bdb3f234c47345d958b08896016bcd34530b537ec11332d899e853"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:routing.executor-vs-target",
+        "point:routing.handle-gate",
+        "point:routing.ordered-chain",
+        "point:routing.owner-map",
+        "point:routing.qualification-and-fallback",
+        "point:routing.task-shape",
+        "point:routing.workflow-boundary",
+        "point:verification.terminal-is-not-done",
+        "point:verification.terminal-summary"
+      ],
+      "reviewed_unbound_sha256": "98503f154ad0ebab4bde68e8b1817fa0ae8598dc164cd25b83069508a1112eb9"
+    }
+  ],
+  "host_coverage": [
+    {"host": "claude-code", "state": "full"},
+    {
+      "host": "codex",
+      "state": "partial",
+      "covered_modules": [
+        "module:verification.endpoint",
+        "module:conduct.never-play",
+        "module:routing.worker-chain",
+        "module:control.decision-loop",
+        "module:goal.contract",
+        "module:scheduling.dependency-dag",
+        "module:dispatch.parallel-mechanisms",
+        "module:coordination.async-hitl",
+        "module:state.board",
+        "module:capacity.delivery",
+        "module:planning.multi-layer",
+        "module:evidence.outside-in"
+      ],
+      "reason": "Codex adapter 明确排除 Claude 订阅账号切换锚与 handoff reference；其余模块完整投影。"
+    },
+    {
+      "host": "cursor",
+      "state": "partial",
+      "covered_modules": [
+        "module:verification.endpoint",
+        "module:conduct.never-play",
+        "module:routing.worker-chain",
+        "module:control.decision-loop",
+        "module:goal.contract",
+        "module:scheduling.dependency-dag",
+        "module:dispatch.parallel-mechanisms",
+        "module:coordination.async-hitl",
+        "module:state.board",
+        "module:capacity.delivery",
+        "module:planning.multi-layer",
+        "module:evidence.outside-in"
+      ],
+      "reason": "Cursor adapter 明确排除 Claude 订阅账号切换锚与 handoff reference；其余模块完整投影。"
+    },
+    {
+      "host": "kimi-code",
+      "state": "partial",
+      "covered_modules": [
+        "module:verification.endpoint",
+        "module:conduct.never-play",
+        "module:routing.worker-chain",
+        "module:control.decision-loop",
+        "module:goal.contract",
+        "module:scheduling.dependency-dag",
+        "module:dispatch.parallel-mechanisms",
+        "module:coordination.async-hitl",
+        "module:state.board",
+        "module:capacity.delivery",
+        "module:continuity.handoff",
+        "module:planning.multi-layer",
+        "module:evidence.outside-in"
+      ],
+      "reason": "kimi-code adapter 明确排除 Claude 订阅账号切换锚；其余模块完整投影。"
+    }
+  ],
+  "lifecycle": {"state": "accepted", "since": "2026-07-23"},
+  "admission": {
+    "evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"}],
+    "verifiers": [{"kind": "review", "ref": "accepted-skill-admission-k2-full-inventory"}]
+  }
+}

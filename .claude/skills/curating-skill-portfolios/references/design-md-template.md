@@ -2,7 +2,7 @@
 
 > 这是 SKILL.md「`.design/DESIGN.md` 设计宪法」一节的展开。每个站得住的 skill（过了 scoresheet 3 必维）配一份设计宪法，回答「这 skill 是什么 / 为什么」。**设计先于实现**——任何对 SKILL.md 的实质改动，先在设计文档更新对应段，再动正文。
 >
-> 完整 10 段的 DESIGN（含 pipe protocol / context manifest / companion tooling / neighbour graph 等跨宿主治理段）对本仓 overkill；cc-master 是 2+4 的小 portfolio（2 个分发 + 4 个 dev-only），裁到 6 段——只保留对「判断这个 skill 站不站得住、边界清不清、会不会随模型演化退役」真正承重的部分。
+> 完整 10 段的 DESIGN（含 pipe protocol / context manifest / companion tooling / neighbour graph 等跨宿主治理段）对本仓 overkill；cc-master portfolio 刻意保持小，裁到 6 段——只保留对「判断这个 skill 站不站得住、边界清不清、会不会随模型演化退役」真正承重的部分。
 
 ## Contents
 

@@ -25,7 +25,10 @@
 # Exit:   0 = clean, 1 = at least one drift hit (or a setup error).
 set -euo pipefail
 
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+# Default = this repo. Tests may set CC_MASTER_GLOSSARY_LINT_ROOT to an isolated
+# fixture root (must contain design_docs/glossary.md + scan targets); never mutates
+# the caller's source tree beyond reading that root.
+REPO="${CC_MASTER_GLOSSARY_LINT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 command -v node >/dev/null 2>&1 || {
   echo "node not found on PATH — required (Claude Code hosts ship node; ADR-006)" >&2
@@ -144,13 +147,24 @@ for (const base of SCAN) {
 }
 
 const violations = [];
+/**
+ * Strip compiler-owned machine identity so kebab point/subject ids and portable
+ * ccm-k-* anchors are not treated as glossary prose. Must not swallow the rest
+ * of the line: only closed ccm:k comments, typed id tokens, and ccm-k-* anchors.
+ */
+function stripMachineIdentity(line) {
+  return String(line)
+    .replace(/<!--\s*ccm:k:[^>]*-->/g, '')
+    .replace(/\b(?:point|subject|module|skill|entry|edge):[a-z0-9][a-z0-9.-]*/g, '')
+    .replace(/\bccm-k-(?:point|module|skill)-[a-z0-9-]+/g, '');
+}
 for (const f of files) {
   let text;
   try { text = readFileSync(f, 'utf8'); }
   catch { continue; } // unreadable / binary — skip
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
+    const ln = stripMachineIdentity(lines[i]);
     for (const { variant, canonical } of banned) {
       if (ln.includes(variant)) {
         violations.push({

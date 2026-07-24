@@ -1,0 +1,345 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:devloop.outer",
+  "owner_skill": "skill:dev-as-ml-loop",
+  "title": "外层编排与组件分工",
+  "intent": "让 orchestrator 把外层 loop 建成可调度的优化系统，而不是 work order。",
+  "recognition_cues": [
+    "设计 subagent 分工",
+    "handoff 缺 objective/measurement"
+  ],
+  "boundary": {
+    "includes": [
+      "两尺度分工",
+      "ML 组件调度词汇"
+    ],
+    "excludes": [
+      "内层八锚细节",
+      "ccm 字段语法"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:dev-as-ml-loop"
+    ],
+    "primary_points": [
+      "point:devloop.two-scale"
+    ],
+    "rationale": "orchestrator 入口先分清外层/内层再派组件。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:devloop.outer"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.devloop.outer"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:devloop.two-scale",
+      "title": "外层编排与内层下降",
+      "point_kind": "boundary",
+      "summary": "orchestrator 拥有优化系统；执行 agent 做单任务下降。",
+      "recognition_cues": [
+        "handoff 写成 work order"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.two-scale",
+        "heading_hint": "两尺度"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.two-scale"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.two-scale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.two-scale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.ml-components",
+      "title": "subagents as ML components",
+      "point_kind": "decision_rule",
+      "summary": "按优化组件（objective/instrument/hypothesis/optimizer/evaluator/regularizer/restart）调度，不是只派写代码。",
+      "recognition_cues": [
+        "只问谁来写代码"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "marker": "point:devloop.ml-components",
+        "heading_hint": "subagents as ML components"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ml-components"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ml-components"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ml-components"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:devloop.two-scale-to-components",
+      "type": "operationalizes",
+      "from": "point:devloop.two-scale",
+      "to": "point:devloop.ml-components",
+      "when": [
+        "要把外层系统拆成可派发组件"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.two-scale-to-components"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.two-scale-to-components"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:devloop.components-to-objective",
+      "type": "requires",
+      "from": "point:devloop.ml-components",
+      "to": "point:devloop.objective",
+      "when": [
+        "组件表里的 objective owner 要接到目标函数锚"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.components-to-objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.components-to-objective"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.two-scale-to-ledger",
+      "type": "requires",
+      "from": "point:devloop.two-scale",
+      "to": "point:devloop.ledger-when",
+      "when": [
+        "外层 loop 需要 durable 优化状态"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.two-scale-to-ledger"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.two-scale-to-ledger"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:devloop.components-to-two-scale",
+      "type": "routes_to",
+      "from": "point:devloop.ml-components",
+      "to": "point:devloop.two-scale",
+      "when": [
+        "从组件表回到两尺度边界"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.components-to-two-scale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.components-to-two-scale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.ledger-when-to-two-scale",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-when",
+      "to": "point:devloop.two-scale",
+      "when": [
+        "ledger 判定后回到外层职责"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-when-to-two-scale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.ledger-when-to-two-scale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.two-scale",
+      "type": "routes_to",
+      "from": "point:devloop.two-scale",
+      "to": "point:devloop.objective",
+      "when": [
+        "外层视角回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.two-scale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.two-scale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.ml-components",
+      "type": "routes_to",
+      "from": "point:devloop.ml-components",
+      "to": "point:devloop.objective",
+      "when": [
+        "组件表回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.ml-components"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.ml-components"
+          }
+        ]
+      }
+    }
+  ]
+}

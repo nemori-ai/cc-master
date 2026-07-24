@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-slicing-goals-into-dags"></a>
 ---
 name: slicing-goals-into-dags
 description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —— 当你要把一个目标 / epic 切成 board 任务依赖图时:怎么拆、先做什么、任务多大粒度、纵切还是横切、怎么尽早 ship 可用增量 + 最大化并行。教敏捷切分的道与品味:纵切薄增量(非横切技术层)、walking skeleton、粒度为并行与验收而定、按价值/风险排序、切片映射到 cadence/iteration。Triggers: "这个目标怎么拆 / 先做什么后做什么"、把 epic 拆成 board、定任务粒度、纠结纵切 vs 横切、想尽早 ship 一个可用增量 / 想拉满并行度。Do NOT use when 一张已切好的 DAG 怎么排期 / 算临界路径(那是 master-orchestrator-guide 的 decomposition 一段)、切好后怎么派发(master-orchestrator-guide)、单个 task 怎么实现到验收(dev-as-ml-loop)、怎么用 ccm 把 task 写进 board(using-ccm)。'
@@ -13,12 +14,25 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<a id="ccm-k-point-slicing-why-cut"></a>
+<!-- ccm:k:start point:slicing.why-cut -->
 ## 为什么这一刀最值钱
 
 **你怎么切,定死了后面一切的天花板。** 并行度、多快能 ship、多快拿到反馈——全在切的那一刻就定了,**排期再优、派发再快也救不回一张切坏的图**。一张横切的图,哪怕关键路径算得再准,也照样把价值堆到最后、把本可并行的活人为串成一条线。所以:**切,是高杠杆决策;别急着排和派,先把它切对。**
 
 ---
 
+<!-- ccm:k:end point:slicing.why-cut -->
+<!-- ccm:k:nav:start point:slicing.why-cut -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.vertical](../../knowledge/modules/slicing.vertical.md#ccm-k-module-slicing-vertical)
+- [applies_to: 横切 vs 纵切对照样例](./references/worked-example.md#ccm-k-point-slicing-example-contrast)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [operationalizes: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-vertical-rule"></a>
+<!-- ccm:k:start point:slicing.vertical-rule -->
 ## 心智锚 1:纵切,不要横切 ★硬规则
 
 把目标切成**薄的、端到端的纵向增量**——每一片自己穿过所有需要的层、交付一个用户(或下一个消费者)**真能触碰**的能力;**不要**按技术层横切(全做数据模型 → 全做 API → 全做 UI)。
@@ -42,6 +56,17 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.vertical-rule -->
+<!-- ccm:k:nav:start point:slicing.vertical-rule -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.vertical](../../knowledge/modules/slicing.vertical.md#ccm-k-module-slicing-vertical)
+- [applies_to: 横切 vs 纵切对照样例](./references/worked-example.md#ccm-k-point-slicing-example-contrast)
+- [deepens_to: walking skeleton](./SKILL.md#ccm-k-point-slicing-walking-skeleton)
+- [routes_to: 切是高杠杆决策](./SKILL.md#ccm-k-point-slicing-why-cut)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-walking-skeleton"></a>
+<!-- ccm:k:start point:slicing.walking-skeleton -->
 ## 心智锚 2:walking skeleton —— 地基切到最小可用子集,而非一次定全
 
 第一片不是"地基层",是一根**最薄的端到端线**(walking skeleton):穿过所有层、但每层都只做让这一根线跑起来的最小量。它一举两得——**早早打通集成**(最贵的风险:各层接不上,提前暴露)+ **立起共享脊椎**(后续纵切都挂在它上面)。
@@ -51,6 +76,16 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.walking-skeleton -->
+<!-- ccm:k:nav:start point:slicing.walking-skeleton -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [next: 粒度为并行与验收](./SKILL.md#ccm-k-point-slicing-grain)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-grain"></a>
+<!-- ccm:k:start point:slicing.grain -->
 ## 心智锚 3:粒度,为并行与可验收而定
 
 每个节点的大小,由两个问题校准,不由"感觉差不多"定:
@@ -64,6 +99,16 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.grain -->
+<!-- ccm:k:nav:start point:slicing.grain -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [next: 价值×风险排序](./SKILL.md#ccm-k-point-slicing-value-risk)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-value-risk"></a>
+<!-- ccm:k:start point:slicing.value-risk -->
 ## 心智锚 4:按 价值 × 风险 排序
 
 切完是一组片,**先做哪片**有讲究:
@@ -76,6 +121,16 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.value-risk -->
+<!-- ccm:k:nav:start point:slicing.value-risk -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [operationalizes: 落到 board](./SKILL.md#ccm-k-point-slicing-board-landing)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-board-landing"></a>
+<!-- ccm:k:start point:slicing.board-landing -->
 ## 落到 board
 
 - **一片纵切 → 一个 task**;若这片自身还需内部并行,做成一个 owner 父节点 + 若干 leaf 子节点(嵌套 depth=1)。
@@ -88,6 +143,16 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.board-landing -->
+<!-- ccm:k:nav:start point:slicing.board-landing -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [contrasts_with: 切分反模式速查](./SKILL.md#ccm-k-point-slicing-antipatterns)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-slicing-antipatterns"></a>
+<!-- ccm:k:start point:slicing.antipatterns -->
 ## anti-pattern 速查
 
 | 反模式 | 为什么坏 / 怎么改 |
@@ -102,6 +167,13 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.antipatterns -->
+<!-- ccm:k:nav:start point:slicing.antipatterns -->
+Knowledge navigation:
+- [Knowledge atlas](../../knowledge/atlas.md)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+<!-- ccm:k:nav:end -->
 ## Pointers
 
 - **[references/worked-example.md](references/worked-example.md)** —— 同一个目标的横切 vs 纵切对照样例；当你脑中还只有"先 schema/API/UI"这种横切本能时，先看它校准切法。
@@ -110,3 +182,11 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **engineering-with-craft** —— 切出的单 task 执行时,除 dev-as-ml-loop 的循环**形状**,还要 engineering-with-craft 的手艺**内容**(片内 SDD→DDD→OOP→TDD 怎么建模 / 写类 / 测试)。本 skill 切片、engineering-with-craft 定义片内每一棒的手艺。
 - **using-ccm** —— 怎么把切出的 task / deps / estimate / cadence **写进** board(`ccm task add` / `cadence open` ...)，以及怎么为近期 agent task 写 opt-in planning/routing contract。
 - 切片 → board 字段的协议细节(task / parent 嵌套 / cadence / estimate schema)见 using-ccm 的 board-model-guide。
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:slicing-goals-into-dags:
+- [纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [Module module:slicing.craft](../../knowledge/modules/slicing.craft.md#ccm-k-module-slicing-craft)
+- [primary: walking skeleton](./SKILL.md#ccm-k-point-slicing-walking-skeleton)
+- [Module module:slicing.example](../../knowledge/modules/slicing.example.md#ccm-k-module-slicing-example)
+- [Module module:slicing.vertical](../../knowledge/modules/slicing.vertical.md#ccm-k-module-slicing-vertical)
+<!-- ccm:k:entry-pin:end -->

@@ -1,0 +1,1984 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:workflow.pattern-catalog",
+  "owner_skill": "skill:authoring-workflows",
+  "title": "Workflow Pattern 目录",
+  "intent": "按任务与质量目标选择有 bundled asset 证明的控制流、验证和组合形状。",
+  "recognition_cues": [
+    "裸 primitive 不能表达真实 work 形状",
+    "需要选择 review、迁移、修复或升级 pattern"
+  ],
+  "boundary": {
+    "includes": [
+      "控制流 patterns",
+      "质量 patterns",
+      "完整组合形态"
+    ],
+    "excludes": [
+      "primitive 底层语义",
+      "Workflow 准入阈值"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:workflow-authoring"
+    ],
+    "primary_points": [
+      "point:workflow.pattern-pipeline"
+    ],
+    "rationale": "Workflow Pattern 目录是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.workflow.pattern-catalog"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:workflow.pattern-adversarial-verify",
+      "title": "Adversarial verify",
+      "point_kind": "example",
+      "summary": "让 skeptic 尝试推翻 finding，证据不足默认淘汰。",
+      "recognition_cues": [
+        "需要Adversarial verify"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-adversarial-verify",
+        "heading_hint": "Adversarial verify"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-adversarial-verify"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-adversarial-verify"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-bug-hunt",
+      "title": "Bug hunt loop",
+      "point_kind": "example",
+      "summary": "组合 dry discovery 与 adversarial verification，同时追求完整性和低误报。",
+      "recognition_cues": [
+        "需要Bug hunt loop"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-bug-hunt",
+        "heading_hint": "Bug hunt loop"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-bug-hunt"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-bug-hunt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-completeness-critic",
+      "title": "Completeness critic",
+      "point_kind": "example",
+      "summary": "完成后专门寻找未扫角度、未核实主张与未读来源。",
+      "recognition_cues": [
+        "需要Completeness critic"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-completeness-critic",
+        "heading_hint": "Completeness critic"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-completeness-critic"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-completeness-critic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-dep-upgrade",
+      "title": "Dependency upgrade sweep",
+      "point_kind": "example",
+      "summary": "逐依赖隔离升级并只保留通过 gate 的 bump。",
+      "recognition_cues": [
+        "需要Dependency upgrade sweep"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-dep-upgrade",
+        "heading_hint": "Dependency upgrade sweep"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-dep-upgrade"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-dep-upgrade"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-fan-out",
+      "title": "Fan-out + synthesize",
+      "point_kind": "example",
+      "summary": "独立任务必须收齐整批结果后综合时使用 parallel barrier。",
+      "recognition_cues": [
+        "需要Fan-out + synthesize"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-fan-out",
+        "heading_hint": "Fan-out + synthesize"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-fan-out"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-fan-out"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-judge-panel",
+      "title": "Judge panel",
+      "point_kind": "example",
+      "summary": "并行生成多方案、独立评分并从胜者与亚军综合。",
+      "recognition_cues": [
+        "需要Judge panel"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-judge-panel",
+        "heading_hint": "Judge panel"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-judge-panel"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-judge-panel"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-loop-budget",
+      "title": "Loop until budget",
+      "point_kind": "example",
+      "summary": "深度随显式 token budget 伸缩并保留 reserve 与 total 守卫。",
+      "recognition_cues": [
+        "需要Loop until budget"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-loop-budget",
+        "heading_hint": "Loop until budget"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-loop-budget"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-loop-budget"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-loop-count",
+      "title": "Loop until count",
+      "point_kind": "example",
+      "summary": "目标数量明确时循环到 count 并保留硬停。",
+      "recognition_cues": [
+        "需要Loop until count"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-loop-count",
+        "heading_hint": "Loop until count"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-loop-count"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-loop-count"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-loop-dry",
+      "title": "Loop until dry",
+      "point_kind": "example",
+      "summary": "未知规模发现用 seen 去重，连续 dry rounds 后停止。",
+      "recognition_cues": [
+        "需要Loop until dry"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-loop-dry",
+        "heading_hint": "Loop until dry"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-loop-dry"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-loop-dry"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-migration",
+      "title": "Discover-transform-verify 迁移",
+      "point_kind": "example",
+      "summary": "先固定改动 spec，再在隔离 worktree 中逐 site transform 与 gate。",
+      "recognition_cues": [
+        "需要Discover-transform-verify 迁移"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-migration",
+        "heading_hint": "Discover-transform-verify 迁移"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-migration"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-migration"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-multimodal-sweep",
+      "title": "Multi-modal sweep",
+      "point_kind": "example",
+      "summary": "从多个独立角度扫全来源，整批去重后再 deep-read。",
+      "recognition_cues": [
+        "需要Multi-modal sweep"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-multimodal-sweep",
+        "heading_hint": "Multi-modal sweep"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-multimodal-sweep"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-multimodal-sweep"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-nested-composition",
+      "title": "Nested workflow composition",
+      "point_kind": "example",
+      "summary": "复用一层 child workflow，共享资源并对单项失败降级。",
+      "recognition_cues": [
+        "需要Nested workflow composition"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-nested-composition",
+        "heading_hint": "Nested workflow composition"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-nested-composition"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-nested-composition"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-perspective-verify",
+      "title": "Perspective-diverse verify",
+      "point_kind": "example",
+      "summary": "用不同 lens 验证同一 finding，覆盖单一评委看不到的失败模式。",
+      "recognition_cues": [
+        "需要Perspective-diverse verify"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-perspective-verify",
+        "heading_hint": "Perspective-diverse verify"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-perspective-verify"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-perspective-verify"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-pipeline",
+      "title": "Pipeline by default",
+      "point_kind": "principle",
+      "summary": "多阶段且无跨 item 同步依赖时默认流式 pipeline。",
+      "recognition_cues": [
+        "需要Pipeline by default"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-pipeline",
+        "heading_hint": "Pipeline by default"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-pipeline"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-pipeline"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-pr-triage",
+      "title": "PR/issue triage",
+      "point_kind": "example",
+      "summary": "scout backlog、逐项分类，再用 judge 排优先级。",
+      "recognition_cues": [
+        "需要PR/issue triage"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-pr-triage",
+        "heading_hint": "PR/issue triage"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-pr-triage"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-pr-triage"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-scout-fanout",
+      "title": "Scout then fan-out",
+      "point_kind": "example",
+      "summary": "work-list 未知时先让 scout 枚举，再按 item 流式或并发处理。",
+      "recognition_cues": [
+        "需要Scout then fan-out"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-scout-fanout",
+        "heading_hint": "Scout then fan-out"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-scout-fanout"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-scout-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-self-repair",
+      "title": "Self-repair loop",
+      "point_kind": "example",
+      "summary": "围绕结构化 gate 迭代单个 artifact，成功或到 attempt cap 停止。",
+      "recognition_cues": [
+        "需要Self-repair loop"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-self-repair",
+        "heading_hint": "Self-repair loop"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-self-repair"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-self-repair"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-staged-escalation",
+      "title": "Staged escalation",
+      "point_kind": "example",
+      "summary": "先用廉价 pass，只在低信心项上升级更强模型。",
+      "recognition_cues": [
+        "需要Staged escalation"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-staged-escalation",
+        "heading_hint": "Staged escalation"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-staged-escalation"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-staged-escalation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-test-repair",
+      "title": "Test generation and repair",
+      "point_kind": "example",
+      "summary": "批量生成测试，并把失败 suite 在有界 attempts 内修到绿。",
+      "recognition_cues": [
+        "需要Test generation and repair"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-test-repair",
+        "heading_hint": "Test generation and repair"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-test-repair"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-test-repair"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:workflow.pattern-tournament",
+      "title": "Tournament bracket",
+      "point_kind": "example",
+      "summary": "候选很多且相对比较更可靠时用两两淘汰选胜者。",
+      "recognition_cues": [
+        "需要Tournament bracket"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "marker": "point:workflow.pattern-tournament",
+        "heading_hint": "Tournament bracket"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:workflow.pattern-tournament"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.workflow.pattern-tournament"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-adversarial-verify",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-adversarial-verify",
+      "when": [
+        "从模块主点进入Adversarial verify"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-adversarial-verify-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-adversarial-verify",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Adversarial verify返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-bug-hunt",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-bug-hunt",
+      "when": [
+        "从模块主点进入Bug hunt loop"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-bug-hunt-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-bug-hunt",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Bug hunt loop返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-completeness-critic",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-completeness-critic",
+      "when": [
+        "从模块主点进入Completeness critic"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-completeness-critic-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-completeness-critic",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Completeness critic返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-dep-upgrade",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-dep-upgrade",
+      "when": [
+        "从模块主点进入Dependency upgrade sweep"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-dep-upgrade-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-dep-upgrade",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Dependency upgrade sweep返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-fan-out",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-fan-out",
+      "when": [
+        "从模块主点进入Fan-out + synthesize"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-fan-out-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-fan-out",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Fan-out + synthesize返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-judge-panel",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-judge-panel",
+      "when": [
+        "从模块主点进入Judge panel"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-judge-panel-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-judge-panel",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Judge panel返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-budget",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-loop-budget",
+      "when": [
+        "从模块主点进入Loop until budget"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-loop-budget-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-loop-budget",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Loop until budget返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-count",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-loop-count",
+      "when": [
+        "从模块主点进入Loop until count"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-loop-count-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-loop-count",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Loop until count返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-dry",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-loop-dry",
+      "when": [
+        "从模块主点进入Loop until dry"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-loop-dry-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-loop-dry",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Loop until dry返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-migration",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-migration",
+      "when": [
+        "从模块主点进入Discover-transform-verify 迁移"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-migration-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-migration",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Discover-transform-verify 迁移返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-multimodal-sweep",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-multimodal-sweep",
+      "when": [
+        "从模块主点进入Multi-modal sweep"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-multimodal-sweep-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-multimodal-sweep",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Multi-modal sweep返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-nested-composition",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-nested-composition",
+      "when": [
+        "从模块主点进入Nested workflow composition"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-nested-composition-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-nested-composition",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Nested workflow composition返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-perspective-verify",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-perspective-verify",
+      "when": [
+        "从模块主点进入Perspective-diverse verify"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-perspective-verify-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-perspective-verify",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Perspective-diverse verify返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-pr-triage",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-pr-triage",
+      "when": [
+        "从模块主点进入PR/issue triage"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pr-triage-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-pr-triage",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从PR/issue triage返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-scout-fanout",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-scout-fanout",
+      "when": [
+        "从模块主点进入Scout then fan-out"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-scout-fanout-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-scout-fanout",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Scout then fan-out返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-self-repair",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-self-repair",
+      "when": [
+        "从模块主点进入Self-repair loop"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-self-repair-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-self-repair",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Self-repair loop返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-staged-escalation",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-staged-escalation",
+      "when": [
+        "从模块主点进入Staged escalation"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-staged-escalation-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-staged-escalation",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Staged escalation返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-test-repair",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-test-repair",
+      "when": [
+        "从模块主点进入Test generation and repair"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-test-repair-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-test-repair",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Test generation and repair返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-tournament",
+      "type": "deepens_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.pattern-tournament",
+      "when": [
+        "从模块主点进入Tournament bracket"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.pattern-tournament-to-pattern-pipeline",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-tournament",
+      "to": "point:workflow.pattern-pipeline",
+      "when": [
+        "从Tournament bracket返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:workflow.pattern-catalog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:workflow.pattern-catalog.to-selection",
+      "type": "routes_to",
+      "from": "point:workflow.pattern-pipeline",
+      "to": "point:workflow.shape-tree",
+      "when": [
+        "从 pattern catalog 返回准入与形状 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "Workflow pattern 目录回到选择入口"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.workflow.pattern-catalog.to-selection"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,809 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:craft.object-design",
+  "owner_skill": "skill:engineering-with-craft",
+  "title": "OOP 对象设计",
+  "intent": "用四柱、SOLID 判断、封装和组合设计有清晰边界且能在生产存活的对象。",
+  "recognition_cues": [
+    "判断一个类的责任或抽象是否合理",
+    "纠结继承还是组合"
+  ],
+  "boundary": {
+    "includes": [
+      "SOLID judgment",
+      "封装与领域动词",
+      "组合/继承边界",
+      "OOP 反模式"
+    ],
+    "excludes": [
+      "领域边界发现",
+      "spec-first 变更顺序"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:engineering-craft"
+    ],
+    "primary_points": [
+      "point:oop.four-pillars"
+    ],
+    "rationale": "OOP 对象设计是该认知职责的主干入口。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-medium.module.craft.object-design"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:oop.abstraction-cost",
+      "title": "抽象成本审计",
+      "point_kind": "check",
+      "summary": "用 near-decomposability 与删除测试判断新抽象是否挣到开销。",
+      "recognition_cues": [
+        "需要抽象成本审计"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.abstraction-cost",
+        "heading_hint": "抽象成本审计"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.abstraction-cost"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.abstraction-cost"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.composition-over-inheritance",
+      "title": "组合优于继承",
+      "point_kind": "decision_rule",
+      "summary": "继承只留给三种稳定骨架，其余通过合约组合协作者。",
+      "recognition_cues": [
+        "需要组合优于继承"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.composition-over-inheritance",
+        "heading_hint": "组合优于继承"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.composition-over-inheritance"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.composition-over-inheritance"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.encapsulation-vocabulary",
+      "title": "封装即词汇",
+      "point_kind": "principle",
+      "summary": "让聚合根以领域动词持有守卫、状态翻转与副作用。",
+      "recognition_cues": [
+        "需要封装即词汇"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.encapsulation-vocabulary",
+        "heading_hint": "封装即词汇"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.encapsulation-vocabulary"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.encapsulation-vocabulary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.failure-radar",
+      "title": "OOP 反模式雷达",
+      "point_kind": "check",
+      "summary": "定位贫血模型、God class、继承滥用、共享可变状态等失败。",
+      "recognition_cues": [
+        "需要OOP 反模式雷达"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.failure-radar",
+        "heading_hint": "OOP 反模式雷达"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.failure-radar"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.failure-radar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.four-pillars",
+      "title": "OOP 四柱",
+      "point_kind": "principle",
+      "summary": "同时从可辩护设计、平台存活、生产安全与艺术优雅审视类。",
+      "recognition_cues": [
+        "需要OOP 四柱"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.four-pillars",
+        "heading_hint": "OOP 四柱"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.four-pillars"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.four-pillars"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.red-lines",
+      "title": "OOP 红线",
+      "point_kind": "check",
+      "summary": "禁止 silent failure、裸 catch-all、不可信执行、idle wrapper 与异步阻塞。",
+      "recognition_cues": [
+        "需要OOP 红线"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.red-lines",
+        "heading_hint": "OOP 红线"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.red-lines"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.red-lines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.shared-root-links",
+      "title": "OOP 与共享根接缝",
+      "point_kind": "reference",
+      "summary": "把对象设计判断回连到不变式、组合与分层三条 canonical 根。",
+      "recognition_cues": [
+        "需要OOP 与共享根接缝"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.shared-root-links",
+        "heading_hint": "OOP 与共享根接缝"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.shared-root-links"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.shared-root-links"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:oop.solid-judgment",
+      "title": "SOLID 判断法",
+      "point_kind": "decision_rule",
+      "summary": "把 SRP/OCP/LSP/ISP/DIP 用作具体接缝与约束判断，而非口号。",
+      "recognition_cues": [
+        "需要SOLID 判断法"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "marker": "point:oop.solid-judgment",
+        "heading_hint": "SOLID 判断法"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:oop.solid-judgment"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.point.oop.solid-judgment"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:craft.object-design.four-pillars-to-abstraction-cost",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.abstraction-cost",
+      "when": [
+        "从模块主点进入抽象成本审计"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.abstraction-cost-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.abstraction-cost",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从抽象成本审计返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-composition-over-inheritance",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.composition-over-inheritance",
+      "when": [
+        "从模块主点进入组合优于继承"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.composition-over-inheritance-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.composition-over-inheritance",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从组合优于继承返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-encapsulation-vocabulary",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.encapsulation-vocabulary",
+      "when": [
+        "从模块主点进入封装即词汇"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.encapsulation-vocabulary-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.encapsulation-vocabulary",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从封装即词汇返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-failure-radar",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.failure-radar",
+      "when": [
+        "从模块主点进入OOP 反模式雷达"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.failure-radar-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.failure-radar",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从OOP 反模式雷达返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-red-lines",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.red-lines",
+      "when": [
+        "从模块主点进入OOP 红线"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.red-lines-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.red-lines",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从OOP 红线返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-shared-root-links",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.shared-root-links",
+      "when": [
+        "从模块主点进入OOP 与共享根接缝"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.shared-root-links-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.shared-root-links",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从OOP 与共享根接缝返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.four-pillars-to-solid-judgment",
+      "type": "deepens_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:oop.solid-judgment",
+      "when": [
+        "从模块主点进入SOLID 判断法"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.solid-judgment-to-four-pillars",
+      "type": "routes_to",
+      "from": "point:oop.solid-judgment",
+      "to": "point:oop.four-pillars",
+      "when": [
+        "从SOLID 判断法返回模块 canonical 主点"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:craft.object-design"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft.object-design.to-shared-spine",
+      "type": "routes_to",
+      "from": "point:oop.four-pillars",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "从 OOP 决策返回四理论共享 canonical 脊椎"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "OOP 与共享工程根的显式接缝"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2-medium.edge.craft.object-design.to-shared-spine"
+          }
+        ]
+      }
+    }
+  ]
+}

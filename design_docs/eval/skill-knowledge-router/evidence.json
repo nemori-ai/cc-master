@@ -1,0 +1,420 @@
+{
+  "schema": "cc-master/skill-knowledge-behavior-evidence/v1",
+  "protocol_version": "cc-master/skill-knowledge-router-eval/v1",
+  "graph_hash": "076e5575240016fffeec663f29fd41628e6bd6f846916e359411dae95f0b4928",
+  "behavioral_evidence_status": {
+    "state": "baseline",
+    "evidence": [
+      "design_docs/eval/skill-knowledge-router/evidence.json"
+    ]
+  },
+  "coverage": {
+    "complete": false,
+    "minimum_runs_per_case": 3,
+    "required_harnesses": [
+      "codex",
+      "cursor"
+    ],
+    "required_runtime_skill_owners": [
+      "skill:authoring-workflows",
+      "skill:dev-as-ml-loop",
+      "skill:distilling-lessons-into-assets",
+      "skill:engineering-with-craft",
+      "skill:master-orchestrator-guide",
+      "skill:pacing-and-estimation",
+      "skill:slicing-goals-into-dags",
+      "skill:using-ccm"
+    ],
+    "conditions": {
+      "baseline": {
+        "complete": false,
+        "cells": [
+          {
+            "case_id": "train-authoring-loop-budget",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-authoring-loop-budget",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-devloop-plateau",
+            "harness": "codex",
+            "count": 1,
+            "required": 3
+          },
+          {
+            "case_id": "train-devloop-plateau",
+            "harness": "cursor",
+            "count": 1,
+            "required": 3
+          },
+          {
+            "case_id": "train-distill-evidence",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-distill-evidence",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-craft-constraint-parity",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-craft-constraint-parity",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-master-terminal",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-master-terminal",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-pacing-two-axes",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-pacing-two-axes",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-slicing-vertical",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-slicing-vertical",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-ccm-status",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-ccm-status",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          }
+        ]
+      },
+      "candidate": {
+        "complete": false,
+        "cells": [
+          {
+            "case_id": "train-authoring-loop-budget",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-authoring-loop-budget",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-devloop-plateau",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-devloop-plateau",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-distill-evidence",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-distill-evidence",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-craft-constraint-parity",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-craft-constraint-parity",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-master-terminal",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-master-terminal",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-pacing-two-axes",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-pacing-two-axes",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-slicing-vertical",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-slicing-vertical",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-ccm-status",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "train-ccm-status",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          }
+        ]
+      },
+      "holdout": {
+        "complete": false,
+        "cells": [
+          {
+            "case_id": "holdout-authoring-streaming",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-authoring-streaming",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-devloop-ledger",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-devloop-ledger",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-distill-dual-dest",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-distill-dual-dest",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-craft-aggregate",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-craft-aggregate",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-master-handle",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-master-handle",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-pacing-target",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-pacing-target",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-slicing-grain",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-slicing-grain",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-ccm-blocked",
+            "harness": "codex",
+            "count": 0,
+            "required": 3
+          },
+          {
+            "case_id": "holdout-ccm-blocked",
+            "harness": "cursor",
+            "count": 0,
+            "required": 3
+          }
+        ]
+      }
+    }
+  },
+  "conditions": {
+    "baseline": {
+      "runs": 2,
+      "metrics": {
+        "point_hit_accuracy": 1,
+        "owner_accuracy": 0,
+        "module_accuracy": 0,
+        "evidence_grounding_rate": 0,
+        "wrong_owner_rate": 0,
+        "abstention_rate": 0,
+        "navigation_grounding_rate": 0,
+        "mean_navigation_hops": null,
+        "navigation_hops_measured": 0,
+        "mean_validated_agent_trace_reads": 2,
+        "mean_estimated_tokens": 8419,
+        "mean_provider_reported_tokens": 40849,
+        "provider_token_runs": 2,
+        "mean_duration_ms": 41430.5
+      }
+    },
+    "candidate": {
+      "runs": 0,
+      "metrics": {
+        "point_hit_accuracy": null,
+        "owner_accuracy": null,
+        "module_accuracy": null,
+        "evidence_grounding_rate": null,
+        "wrong_owner_rate": null,
+        "abstention_rate": null,
+        "navigation_grounding_rate": null,
+        "mean_navigation_hops": null,
+        "navigation_hops_measured": 0,
+        "mean_validated_agent_trace_reads": null,
+        "mean_estimated_tokens": null,
+        "mean_provider_reported_tokens": null,
+        "provider_token_runs": 0,
+        "mean_duration_ms": null
+      }
+    },
+    "holdout": {
+      "runs": 0,
+      "metrics": {
+        "point_hit_accuracy": null,
+        "owner_accuracy": null,
+        "module_accuracy": null,
+        "evidence_grounding_rate": null,
+        "wrong_owner_rate": null,
+        "abstention_rate": null,
+        "navigation_grounding_rate": null,
+        "mean_navigation_hops": null,
+        "navigation_hops_measured": 0,
+        "mean_validated_agent_trace_reads": null,
+        "mean_estimated_tokens": null,
+        "mean_provider_reported_tokens": null,
+        "provider_token_runs": 0,
+        "mean_duration_ms": null
+      }
+    }
+  },
+  "harness_execution_posture": {
+    "codex": {
+      "mode": "exec",
+      "permission_mode": "non_interactive_default",
+      "sandbox": "read-only",
+      "kernel_sandbox_available": true,
+      "workspace": "temporary",
+      "session_persistence": "ephemeral",
+      "user_config": "ignored",
+      "user_rules": "ignored"
+    },
+    "cursor": {
+      "mode": "ask",
+      "permission_mode": "read_only_ask",
+      "sandbox": "disabled",
+      "kernel_sandbox_available": false,
+      "kernel_sandbox_unavailable_reason": "worker host does not meet Cursor kernel v6.2/AppArmor requirement",
+      "workspace": "temporary",
+      "workspace_trust": "explicit",
+      "isolation_equivalence": "weaker_than_codex_read_only_sandbox"
+    }
+  },
+  "measurement_notes": {
+    "reads": "validated_agent_trace; unobserved reads remain possible",
+    "estimated_tokens": "ceil(UTF-8 raw transcript bytes / 3); not provider tokenizer",
+    "stochastic_gate": false
+  }
+}

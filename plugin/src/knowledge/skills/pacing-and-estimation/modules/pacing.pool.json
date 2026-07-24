@@ -1,0 +1,351 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.pool",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "池感知建议",
+  "intent": "消费同池 own_row 相对分配，不与绝对 usage 轴混淆。",
+  "recognition_cues": [
+    "多 active board",
+    "pacing_yield",
+    "own_row"
+  ],
+  "boundary": {
+    "includes": [
+      "own_row kinds",
+      "相对 vs 绝对",
+      "合理化与消费顺序"
+    ],
+    "excludes": [
+      "写 sibling board"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.own-row"
+    ],
+    "rationale": "多板场景才需要。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.pool"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.pool"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.own-row",
+      "title": "读 pool own_row",
+      "point_kind": "procedure",
+      "summary": "按 kind 读相对分配：yield/claim/throttle/switch/stop/hold。",
+      "recognition_cues": [
+        "多板同池",
+        "own_row"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "marker": "point:pacing.own-row",
+        "heading_hint": "读 own_row"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.own-row"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.own-row"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.own-row"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.pool-vs-usage",
+      "title": "pool 相对轴 vs usage 绝对轴",
+      "point_kind": "boundary",
+      "summary": "usage 是绝对压力；own_row 是同池相对分配；单板时退化。",
+      "recognition_cues": [
+        "hold 是否忽略 sibling"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "marker": "point:pacing.pool-vs-usage",
+        "heading_hint": "与 usage advise"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.pool-vs-usage"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.pool-vs-usage"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.pool-vs-usage"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.pool-rationalization",
+      "title": "pool 合理化表与消费顺序",
+      "point_kind": "check",
+      "summary": "堵通吃/强制扩张借口；按通知→own_row→决策层顺序消费。",
+      "recognition_cues": [
+        "我是 urgent 可吃完池"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "marker": "point:pacing.pool-rationalization",
+        "heading_hint": "Rationalization"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.pool-rationalization"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.pool-rationalization"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.pool-rationalization"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.own-to-vs",
+      "type": "requires",
+      "from": "point:pacing.own-row",
+      "to": "point:pacing.pool-vs-usage",
+      "when": [
+        "需要对照绝对 usage 轴"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.own-to-vs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.own-to-vs"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:pacing.vs-to-rat",
+      "type": "contrasts_with",
+      "from": "point:pacing.pool-vs-usage",
+      "to": "point:pacing.pool-rationalization",
+      "when": [
+        "堵住相对轴合理化"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.vs-to-rat"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.vs-to-rat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.rat-to-own",
+      "type": "routes_to",
+      "from": "point:pacing.pool-rationalization",
+      "to": "point:pacing.own-row",
+      "when": [
+        "从借口回到读 own_row"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.rat-to-own"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.rat-to-own"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.own-to-upper",
+      "type": "routes_to",
+      "from": "point:pacing.own-row",
+      "to": "point:pacing.upper-bound-only",
+      "when": [
+        "相对分配接到上界收紧"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.own-to-upper"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.own-to-upper"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.vs",
+      "type": "routes_to",
+      "from": "point:pacing.pool-vs-usage",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "相对轴回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.vs"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.vs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.rat",
+      "type": "routes_to",
+      "from": "point:pacing.pool-rationalization",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "合理化回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.rat"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.rat"
+          }
+        ]
+      }
+    }
+  ]
+}

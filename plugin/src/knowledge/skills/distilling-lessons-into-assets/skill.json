@@ -1,0 +1,115 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:distilling-lessons-into-assets",
+  "name": "distilling-lessons-into-assets",
+  "package_root": "plugin/src/skills/distilling-lessons-into-assets",
+  "intent": "判断候选经验该落成纪律文档/skill/workflow/subagent，并以证据忠实性落地。",
+  "modules": [
+    {
+      "id": "module:distill.routing",
+      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/modules/distill.routing.json"
+    },
+    {
+      "id": "module:distill.taxonomy",
+      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/modules/distill.taxonomy.json"
+    },
+    {
+      "id": "module:distill.landing",
+      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/modules/distill.landing.json"
+    },
+    {
+      "id": "module:distill.evidence",
+      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/modules/distill.evidence.json"
+    }
+  ],
+  "entry_modules": [
+    "module:distill.routing",
+    "module:distill.evidence"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:distill.taxonomy-quick",
+        "point:distill.routing-overview",
+        "point:distill.evidence-hard-line",
+        "point:distill.landing-preview",
+        "point:distill.boundary"
+      ],
+      "reviewed_unbound_sha256": "84ed39afac9973d1dc13d3ccac2d2cd3fd009d85a961b0d11384a2e76f10d478"
+    },
+    {
+      "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:distill.routing-tree",
+        "point:distill.dual-dest",
+        "point:distill.fallback-no-drop"
+      ],
+      "reviewed_unbound_sha256": "34893a76dbc322bcc277c2ac2601d11e411c4b3fbb88546f91cd83a556d30229"
+    },
+    {
+      "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/asset-taxonomy.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:distill.taxonomy"
+      ],
+      "reviewed_unbound_sha256": "af22b1867a75cb2b1b3bbbb346ebe00d133cac381deba2f4265f4ac7e8003ab1"
+    },
+    {
+      "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:distill.landing-craft",
+        "point:distill.landing-rationalization"
+      ],
+      "reviewed_unbound_sha256": "d35c38c34202782ba3ab6db02eee0718fa457a2d64b522042118ac43afccf937"
+    },
+    {
+      "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/evidence-fidelity.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:distill.evidence-fidelity"
+      ],
+      "reviewed_unbound_sha256": "48a9ee095cdc71efb427ce44a10b4e84f1f391ce313d0d2bbcbba8c2c81c83dc"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "skill:distilling-lessons-into-assets"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.skill.distilling-lessons-into-assets"
+      }
+    ]
+  }
+}

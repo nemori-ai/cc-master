@@ -1,0 +1,425 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.hotpath-footgun",
+  "owner_skill": "skill:using-ccm",
+  "title": "热路径与 footgun",
+  "intent": "用最短热路径与踩坑表把心智锚落到可执行流程，并路由到深度 reference。",
+  "recognition_cues": [
+    "要一条可抄热路径",
+    "刚撞 exit 3",
+    "不知读哪本 reference"
+  ],
+  "boundary": {
+    "includes": [
+      "canonical flows",
+      "footgun 表",
+      "exit 速记",
+      "指针"
+    ],
+    "excludes": [
+      "全量 flag 表",
+      "FMT/GRAPH/BIZ 全集"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.footgun-table"
+    ],
+    "rationale": "高频失败模式集中在此；入口需快速到达。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.hotpath-footgun"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.hotpath-flows",
+      "title": "热路径 canonical flows",
+      "point_kind": "procedure",
+      "summary": "建板→Goal→派发→true-done→review/delivery/block/调度/jc·cadence·watchdog 热路径。",
+      "recognition_cues": [
+        "起步建板",
+        "派发到 done",
+        "block 等用户"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.hotpath-flows",
+        "heading_hint": "热路径速查"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.hotpath-flows"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.hotpath-flows"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.footgun-table",
+      "title": "footgun 速查表",
+      "point_kind": "check",
+      "summary": "常见拒写/假绿/遗留证据/native projection 等踩坑对照表。",
+      "recognition_cues": [
+        "exit 3 不懂原因",
+        "data:null 还 ok",
+        "retry 后旧 artifact"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.footgun-table",
+        "heading_hint": "footgun 速查"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.footgun-table"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.footgun-table"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.exit-codes",
+      "title": "Exit code 速记（指针）",
+      "point_kind": "reference",
+      "summary": "退出码速记；完整命令面与 schema 以 command-catalog / --help 为准。",
+      "recognition_cues": [
+        "exit 2/3/4/7",
+        "不知道失败码含义"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.exit-codes",
+        "heading_hint": "Exit code 速记"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.exit-codes"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.exit-codes"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.pointers-routing",
+      "title": "深度指针路由",
+      "point_kind": "reference",
+      "summary": "命令面→catalog；字段取值→board-model；决策→master-orchestrator-guide。",
+      "recognition_cues": [
+        "该读哪个 reference",
+        "与编排 skill 边界"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.pointers-routing",
+        "heading_hint": "Pointers"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.pointers-routing"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.pointers-routing"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.hotpath-to-footgun",
+      "type": "next",
+      "from": "point:ccm.hotpath-flows",
+      "to": "point:ccm.footgun-table",
+      "when": [
+        "跑热路径时撞错或要预防踩坑"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.hotpath-to-footgun"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.footgun-to-exit",
+      "type": "deepens_to",
+      "from": "point:ccm.footgun-table",
+      "to": "point:ccm.exit-codes",
+      "when": [
+        "需要把现象映射到 exit code"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.footgun-to-exit"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.footgun-to-pointers",
+      "type": "routes_to",
+      "from": "point:ccm.footgun-table",
+      "to": "point:ccm.pointers-routing",
+      "when": [
+        "表不够、要进深度 reference"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.footgun-to-pointers"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.hotpath-to-status",
+      "type": "requires",
+      "from": "point:ccm.hotpath-flows",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "执行 done/start/retry 前复核状态机"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.hotpath-to-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.footgun-to-status",
+      "type": "routes_to",
+      "from": "point:ccm.footgun-table",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "footgun 行指向 status/--set 误用"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.footgun-to-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.exit-codes.pri",
+      "type": "routes_to",
+      "from": "point:ccm.exit-codes",
+      "to": "point:ccm.footgun-table",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.exit-codes.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.pointers-routing.pri",
+      "type": "routes_to",
+      "from": "point:ccm.pointers-routing",
+      "to": "point:ccm.footgun-table",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.pointers-routing.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ]
+}

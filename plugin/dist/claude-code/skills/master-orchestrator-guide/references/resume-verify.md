@@ -8,6 +8,8 @@
 
 ## 1. content-hash 续跑 —— build-system 的 action key
 
+<a id="ccm-k-point-verification-hash-and-stale"></a>
+<!-- ccm:k:start point:verification.hash-and-stale -->
 把动态 workflow 当成一台**增量构建引擎（incremental build engine）**。每个节点拿到一个 **content-hash** = `hash(spec + upstream outputs + key context)`，这正是 Bazel 的 **action key**。
 
 - **跑之前先查 journal**：hash 命中 → 该节点已经做完 → **复用那个已落地的产物**（commit / PR / output）、**跳过**；miss → 执行，并写一条 journal 条目（带 output ref）。
@@ -23,8 +25,16 @@
 
 ---
 
+<!-- ccm:k:end point:verification.hash-and-stale -->
+<!-- ccm:k:nav:start point:verification.hash-and-stale -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+<!-- ccm:k:nav:end -->
 ## 3. 端点验收 —— 唯一可靠的正确性点
 
+<a id="ccm-k-point-verification-endpoint-procedure"></a>
+<!-- ccm:k:start point:verification.endpoint-procedure -->
 **end-to-end argument**（Saltzer-Reed-Clark, 1984）：一个放在低层的功能，相对于在端点实现它，往往是冗余的；正确性的最终保证必须活在端点。
 
 - **你独立验收** —— 你**亲自跑闸**、**亲自读 diff**。低层 agent 那句"所有质量闸都绿"只是一个不可信的性能优化（agent 自报已经一再出错）。
@@ -34,8 +44,17 @@
 
 验收是续跑缓存（§1）的校验步骤：唯有一个既存在**又**通过这道端点检查的产物，才算 done。
 
+<!-- ccm:k:end point:verification.endpoint-procedure -->
+<!-- ccm:k:nav:start point:verification.endpoint-procedure -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+- [routes_to: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+<!-- ccm:k:nav:end -->
 ### resume 第 0 步：先 `cd` 进 `board.git.worktree`，确认 cwd == 它，再接手
 
+<a id="ccm-k-point-verification-resume-takeover"></a>
+<!-- ccm:k:start point:verification.resume-takeover -->
 `--resume` 唤起的新 session，其 shell cwd **未必** == board 声明的 `git.worktree`——它可能落在 home、上一次操作残留的某目录、或另一个 checkout 里。**接手的第一件事**（先于 reconcile、先于任何孤儿验收、先于跑任何闸）：读 board 窄腰里的 `git.worktree`，`cd` 进去，**核对 cwd 确实 == 它**（`pwd` 比对，或 `git -C` 显式锚定每条命令）。确认一致前不要执行任何后续动作。
 
 为什么这是第 0 步而非「顺手」：resume 之后你做的每件事都隐式依赖 cwd——相对路径读写、`git status` / `git diff` / `git log`、端点验收命令、重派 sub-agent 给的工作目录。cwd ≠ worktree 时这些**全在错的地方跑**，而且是**静默错误**，两种后果都致命：
@@ -64,8 +83,16 @@
 
 这条恢复路径的核心不是「旧 handle 都死了」或「有 registry 就一定活着」，而是**先读登记、再 probe、能接则接，不能接则验或重派**；父 task 始终独立验收。
 
+<!-- ccm:k:end point:verification.resume-takeover -->
+<!-- ccm:k:nav:start point:verification.resume-takeover -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+<!-- ccm:k:nav:end -->
 ### 异构族系第二视角（高杠杆 / 临界强制）
 
+<a id="ccm-k-point-verification-heterogeneous-review"></a>
+<!-- ccm:k:start point:verification.heterogeneous-review -->
 单层端点验收（你亲跑闸 + 读 diff）仍会漏同族盲区与契约误读。**第二视角**补的是另一双眼睛——原则是 **产出模型族 ≠ 验收模型族**（异构），不是「再派一个同族 subagent」或「同族升一档再读一遍」。同族复读不算第二视角。
 
 **何时强制（方案 A）**：仅对 **高杠杆裁决**（独立 review / 二审 / 端点验收节点本身 / 架构仲裁）与 **临界路径上 correctness-critical 的 `done`**。常规 float / 机械叶不强制——成本可控；鼓励但不强制。
@@ -102,11 +129,25 @@
 
 ---
 
+<!-- ccm:k:end point:verification.heterogeneous-review -->
+<!-- ccm:k:nav:start point:verification.heterogeneous-review -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+<!-- ccm:k:nav:end -->
 ## 4. Loop 收敛 —— 结构化闸 + 保险丝 + dedup
 
+<a id="ccm-k-point-verification-loop-convergence"></a>
+<!-- ccm:k:start point:verification.loop-convergence -->
 当一个节点的执行图取决于事先未知的中间结果（分支）时，就 loop 到收敛为止——Joiner 模式：
 
 - **结构化闸**：一个结构化的二选一——`FinalResponse`（收敛 → 收工）vs `Replan(feedback)`（带上对先前尝试的诊断 + 要修什么 → 重编一张新 DAG → 重新调度）。这个决策按**类型**做，绝不凭一个模糊 / 空的判断——它和"一个 null review = 未通过"是同一套结构性防御。
 - **`Replan.feedback` 是关键设计** —— 它不是盲目 retry，而是一个**带诊断的 replan 信号**（这正是 impl → review → verify → amender 的内层 loop：verify 闸 ≈ Joiner，amender feedback ≈ `Replan.feedback`）。
 - **max-rounds 保险丝** —— 每个内层 loop 都必须有保险丝（打到轮数 / 调用上限就停）。没有 loop 可以无界地跑。
 - **dedup-against-seen** —— 把已否决的项目记下来，免得一个被否的选项每一轮又重新冒出来。
+<!-- ccm:k:end point:verification.loop-convergence -->
+<!-- ccm:k:nav:start point:verification.loop-convergence -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
+<!-- ccm:k:nav:end -->

@@ -1,0 +1,843 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:ccm.mind-model",
+  "owner_skill": "skill:using-ccm",
+  "title": "ccm 心智锚与协议职责",
+  "intent": "建立 using-ccm 的稳定操作心智：写入关卡、status 状态机、字段三档、唯一写路径、planning opt-in。",
+  "recognition_cues": [
+    "怎么用 ccm 动 board",
+    "status 能不能 --set",
+    "要不要手改 JSON"
+  ],
+  "boundary": {
+    "includes": [
+      "稳定心智锚",
+      "协议职责边界",
+      "何时翻开本 skill"
+    ],
+    "excludes": [
+      "命令 flag/exit 机械事实",
+      "号池算法实现"
+    ]
+  },
+  "access": {
+    "class": "critical",
+    "relevant_entries": [
+      "entry:using-ccm"
+    ],
+    "primary_points": [
+      "point:ccm.status-state-machine"
+    ],
+    "rationale": "误把 status 当赋值字段或绕开 ccm 会直接破坏 audit 与不变式。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module module:ccm.mind-model"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.using-ccm.k2"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:ccm.when-to-open",
+      "title": "何时翻开 using-ccm",
+      "point_kind": "boundary",
+      "summary": "任何 board 读写都走 ccm；按问题选 command-catalog 或 board-model-guide。",
+      "recognition_cues": [
+        "要对 board 读写",
+        "不知道该翻 catalog 还是 model guide"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.when-to-open",
+        "heading_hint": "何时翻开本 skill"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.when-to-open"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.when-to-open"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.write-gate",
+      "title": "ccm 是 board 写入关卡",
+      "point_kind": "principle",
+      "summary": "动 board 首选 ccm：持锁、校验、守状态机、守 attempt 边界；勿手改 JSON。",
+      "recognition_cues": [
+        "想 Write/Edit/sed 改 board",
+        "绕开 ccm 改一个字段"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.write-gate",
+        "heading_hint": "心智锚 1"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.write-gate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.write-gate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.status-state-machine",
+      "title": "status 是状态机不是赋值字段",
+      "point_kind": "principle",
+      "summary": "status 只能经生命周期 verb 转移；ready→done 非法；有 blocked_on 豁免自动门控。",
+      "recognition_cues": [
+        "想 --set status",
+        "illegal transition",
+        "task update --status"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.status-state-machine",
+        "heading_hint": "心智锚 2"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.status-state-machine"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.status-state-machine"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.field-tiers",
+      "title": "三档字段操作规则",
+      "point_kind": "decision_rule",
+      "summary": "🔒 专属命令；普通 ✎ 用 --set；合约 ✎ 走 domain verb；👁 走具名 flag。",
+      "recognition_cues": [
+        "--set 被拒",
+        "不知道字段走哪条命令",
+        "delivery_contract"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.field-tiers",
+        "heading_hint": "心智锚 3"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.field-tiers"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.field-tiers"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.single-write-path",
+      "title": "board 变更唯一写路径",
+      "point_kind": "principle",
+      "summary": "ccm 硬前置 + board-guard；瞬态失败也暂停写、绝不手改。",
+      "recognition_cues": [
+        "ccm 抽风",
+        "想降级手改",
+        "board-guard deny"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.single-write-path",
+        "heading_hint": "心智锚 4"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.single-write-path"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.single-write-path"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:ccm.planning-opt-in",
+      "title": "planning/routing 是 opt-in 合同",
+      "point_kind": "boundary",
+      "summary": "set-routing 不选中/不 spawn；缺合同 legacy 保持原行为。",
+      "recognition_cues": [
+        "set-routing 写完以为会自动派发",
+        "enable-contract",
+        "route-bind"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "marker": "point:ccm.planning-opt-in",
+        "heading_hint": "心智锚 5"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:ccm.planning-opt-in"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md#point:ccm.planning-opt-in"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:ccm.when-to-write-gate",
+      "type": "next",
+      "from": "point:ccm.when-to-open",
+      "to": "point:ccm.write-gate",
+      "when": [
+        "确认要用 ccm 后进入写入关卡心智"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.when-to-write-gate"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.write-gate-to-status",
+      "type": "requires",
+      "from": "point:ccm.write-gate",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "写 task 前必须懂 status 状态机"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.write-gate-to-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.status-to-tiers",
+      "type": "next",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.field-tiers",
+      "when": [
+        "知道 status 后要判字段走哪档写口"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.status-to-tiers"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.tiers-to-single-path",
+      "type": "deepens_to",
+      "from": "point:ccm.field-tiers",
+      "to": "point:ccm.single-write-path",
+      "when": [
+        "需要唯一写路径与 board-guard 机制边界"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.tiers-to-single-path"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.single-path-to-planning",
+      "type": "contrasts_with",
+      "from": "point:ccm.single-write-path",
+      "to": "point:ccm.planning-opt-in",
+      "when": [
+        "区分「写板必走 ccm」与「routing 合同不自动派发」"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.single-path-to-planning"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.planning-to-status",
+      "type": "routes_to",
+      "from": "point:ccm.planning-opt-in",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "派发前后回到 status/attempt 主规则"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.planning-to-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.x.pointers-to-board-status",
+      "type": "routes_to",
+      "from": "point:ccm.pointers-routing",
+      "to": "point:ccm.board.status-semantics",
+      "when": [
+        "Pointers 指向 board-model 后进入 status 语义"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.x.pointers-to-board-status"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.x.pointers-to-cmd-task",
+      "type": "routes_to",
+      "from": "point:ccm.pointers-routing",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "Pointers 指向 catalog 后进入 task 命令面"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.x.pointers-to-cmd-task"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.x.when-to-account",
+      "type": "routes_to",
+      "from": "point:ccm.when-to-open",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "要做号池/换号机制阅读"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.x.when-to-account"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.x.write-gate-single-path",
+      "type": "deepens_to",
+      "from": "point:ccm.write-gate",
+      "to": "point:ccm.single-write-path",
+      "when": [
+        "从写入关卡原则进入唯一写路径机制"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.x.write-gate-single-path"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.ret.pointccm.field-tiers.pri",
+      "type": "routes_to",
+      "from": "point:ccm.field-tiers",
+      "to": "point:ccm.status-state-machine",
+      "when": [
+        "缩短到本模块 primary 的 authored 路径"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge edge:ccm.ret.pointccm.field-tiers.pri"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.cmd.task",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.cmd.task",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.cmd.task"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.board.status-semantics",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.board.status-semantics",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.board.status-semantics"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.board.artifact-verified",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.board.artifact-verified"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.footgun-table",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.footgun-table",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.footgun-table"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.account-pool-model",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.account-pool-model",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.account-pool-model"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.cmd.usage",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.cmd.usage",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.cmd.usage"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm.entryfan.ccm.cmd.watchdog",
+      "type": "routes_to",
+      "from": "point:ccm.status-state-machine",
+      "to": "point:ccm.cmd.watchdog",
+      "when": [
+        "从入口落地的 critical 主点扇出到主要 command/board-model/account 知识"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "edge:ccm.entryfan.ccm.cmd.watchdog"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.using-ccm.entry-fanout"
+          }
+        ]
+      }
+    }
+  ]
+}

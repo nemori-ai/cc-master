@@ -1,0 +1,60 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:dispatch.parallel-mechanisms",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "并行派发机制",
+  "intent": "把 executor 规划语义映射为真实后台机制，并守住 dataflow、writer 隔离、escalation、admission 与 liveness。",
+  "recognition_cues": ["需要选择后台机制", "多个 writer 并行", "任务 hang 或需要 escalation"],
+  "boundary": {"includes": ["dataflow 高度", "后台机制", "隔离", "workflow lifecycle", "escalation", "watchdog"], "excludes": ["八段 worker 资格链", "动态模型事实"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "八段路由 hub 指出具体并行机制缺口时再 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-dispatch-review"}]},
+  "points": [
+    {
+      "id": "point:dispatch.dataflow-and-mechanisms",
+      "title": "dataflow 与后台机制",
+      "point_kind": "principle",
+      "summary": "executor 值与启动机制分离；在 task/agent/attempt 三层按 ready dataflow 推进。",
+      "recognition_cues": ["把 executor 当工具名", "需要外部状态后台追踪"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md", "marker": "point:dispatch.dataflow-and-mechanisms", "heading_hint": "先分清两件事"},
+      "authority": {"role": "canonical", "subject": "subject:dispatch.dataflow-and-mechanisms"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "dispatch.md dataflow/mechanisms"}], "verifiers": [{"kind": "review", "ref": "k2.point.dispatch.dataflow"}]}
+    },
+    {
+      "id": "point:dispatch.routing-and-isolation",
+      "title": "路由取证与 writer 隔离",
+      "point_kind": "check",
+      "summary": "派前取证真实 surface，并给每个并行 writer 独立 worktree 与可追踪 handle。",
+      "recognition_cues": ["多个 worker 要写文件", "跨 harness 调派"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md", "marker": "point:dispatch.routing-and-isolation", "heading_hint": "稳定路由合同入口"},
+      "authority": {"role": "canonical", "subject": "subject:dispatch.routing-and-isolation"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "dispatch.md routing/isolation"}], "verifiers": [{"kind": "review", "ref": "k2.point.dispatch.isolation"}]}
+    },
+    {
+      "id": "point:dispatch.workflow-and-escalation",
+      "title": "workflow 生命周期与 escalation",
+      "point_kind": "decision_rule",
+      "summary": "按生命周期耦合判 intra/inter workflow，靠证据 escalation 重定位并做 admission control。",
+      "recognition_cues": ["需要 fan-out/join", "尝试停滞要升级"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md", "marker": "point:dispatch.workflow-and-escalation", "heading_hint": "Intra vs inter workflow"},
+      "authority": {"role": "canonical", "subject": "subject:dispatch.workflow-and-escalation"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "dispatch.md workflow/escalation"}], "verifiers": [{"kind": "review", "ref": "k2.point.dispatch.escalation"}]}
+    },
+    {
+      "id": "point:dispatch.hygiene-and-liveness",
+      "title": "派发卫生与 liveness",
+      "point_kind": "procedure",
+      "summary": "记录 handle、stderr、cwd 与清理责任，并用 watchdog 补静默失败盲区。",
+      "recognition_cues": ["真实并行开始后", "后台长时间没消息"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md", "marker": "point:dispatch.hygiene-and-liveness", "heading_hint": "派发卫生"},
+      "authority": {"role": "canonical", "subject": "subject:dispatch.hygiene-and-liveness"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "dispatch.md hygiene/liveness"}], "verifiers": [{"kind": "review", "ref": "k2.point.dispatch.hygiene"}]}
+    }
+  ],
+  "edges": []
+}

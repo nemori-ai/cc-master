@@ -1,0 +1,173 @@
+{
+  "schema_version": "cc-master/skill-knowledge-validation/v1alpha1",
+  "kind": "change_validation",
+  "change_id": "change:20260723.endpoint-verification-split",
+  "base_ref": "origin/main",
+  "base_graph_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "scope": [
+    {
+      "path": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "candidate_valid": false,
+  "candidate_runtime_valid": false,
+  "optimistic_lock_valid": true,
+  "git_apply_check": true,
+  "patch_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "host_projection_witnesses": [
+    {
+      "host": "claude-code",
+      "ok": false,
+      "mode": "stub",
+      "artifacts": [],
+      "enabled_edges": 0,
+      "point_anchors": 0,
+      "hop_report": {
+        "H1": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "claude-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H2": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "claude-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H3": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "claude-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H4": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "claude-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        }
+      },
+      "budgets": {},
+      "executed_checks": ["host_coverage_stub_abstention"],
+      "conditional_route_policy": "abstained",
+      "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "host": "codex",
+      "ok": false,
+      "mode": "stub",
+      "artifacts": [],
+      "enabled_edges": 0,
+      "point_anchors": 0,
+      "hop_report": {
+        "H1": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "codex", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H2": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "codex", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H3": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "codex", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H4": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "codex", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        }
+      },
+      "budgets": {},
+      "executed_checks": ["host_coverage_stub_abstention"],
+      "conditional_route_policy": "abstained",
+      "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "host": "cursor",
+      "ok": false,
+      "mode": "stub",
+      "artifacts": [],
+      "enabled_edges": 0,
+      "point_anchors": 0,
+      "hop_report": {
+        "H1": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "cursor", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H2": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "cursor", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H3": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "cursor", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H4": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "cursor", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        }
+      },
+      "budgets": {},
+      "executed_checks": ["host_coverage_stub_abstention"],
+      "conditional_route_policy": "abstained",
+      "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "host": "kimi-code",
+      "ok": false,
+      "mode": "stub",
+      "artifacts": [],
+      "enabled_edges": 0,
+      "point_anchors": 0,
+      "hop_report": {
+        "H1": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "kimi-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H2": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "kimi-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H3": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "kimi-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        },
+        "H4": {
+          "ok": true,
+          "witness": { "abstained": true, "host": "kimi-code", "mode": "stub" },
+          "remediation": "Host coverage is stub; point hop gates are abstained."
+        }
+      },
+      "budgets": {},
+      "executed_checks": ["host_coverage_stub_abstention"],
+      "conditional_route_policy": "abstained",
+      "result_graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "SKG-CHANGE-VALIDATION-EXAMPLE-NON-SUCCESS",
+      "message": "This examples/ validation.json is an explicit non-success schema fixture, not a live runtime green witness.",
+      "location": "design_docs/skill-knowledge-graph/examples/endpoint-verification-split.validation.json",
+      "witness": {
+        "example_role": "non-success-shape-fixture"
+      },
+      "remediation": "Use change validate on a real workspace for success witnesses; keep this example as envelope shape only."
+    }
+  ]
+}

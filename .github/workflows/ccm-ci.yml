@@ -1,6 +1,5 @@
-# ccm-ci —— ccm monorepo（packages/engine + apps/cli）的持续集成门。
-# 只在 ccm/** 或本 workflow 自身变更时触发，避免与 cc-master 插件改动互相打扰。
-# 这些步骤逐条镜像本地可跑命令（pnpm -C ccm run <x>），改 CI 前先在本地把它们跑绿。
+# ccm-ci —— ccm 产品门 + plugin maintainer-contract 门。
+# required status `build-and-check` 保持稳定，内部聚合 ccm 与 plugin-contracts 两条独立证据线。
 name: ccm-ci
 
 on:
@@ -16,7 +15,8 @@ on:
       - '.github/workflows/ccm-ci.yml'
 
 jobs:
-  build-and-check:
+  ccm:
+    name: ccm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,3 +53,37 @@ jobs:
 
       - name: Test
         run: pnpm -C ccm run test
+
+  plugin-contracts:
+    name: plugin-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Skill knowledge scaffold contract tests
+        run: node --test tests/content/skill-knowledge-scaffold.test.mjs
+
+      - name: Skill knowledge K0 source check
+        run: node scripts/skill-knowledge.mjs check --stage K0 --json
+
+  # Branch protection depends on this exact job id. Keep it as the stable aggregate instead of
+  # renaming the required check every time an independent product/plugin gate is added.
+  build-and-check:
+    name: build-and-check
+    if: ${{ always() }}
+    needs: [ccm, plugin-contracts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every component gate
+        env:
+          CCM_RESULT: ${{ needs.ccm.result }}
+          PLUGIN_CONTRACTS_RESULT: ${{ needs.plugin-contracts.result }}
+        run: |
+          test "${CCM_RESULT}" = "success"
+          test "${PLUGIN_CONTRACTS_RESULT}" = "success"

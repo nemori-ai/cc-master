@@ -1,6 +1,6 @@
 ---
 name: curating-skill-portfolios
-description: 'Use when deciding whether a capability deserves its own skill, whether something should be a skill or a reference, where a new skill belongs, or whether two skills overlap — 当你在判断要不要新建一个 skill、这块该不该独立成 skill 还是塞进某个 reference、一组 skill 的边界与重叠时。Triggers: 立项一个新 skill、重构 skill 版图、"这是 skill 还是 reference"、portfolio 体检、两个 skill 触发条件打架。Do NOT use when you only need to write or pressure-test a single skill body (那是 cc-master-skillsmith); Do NOT use when you need to declare J / run trigger or behavior eval / measure a skill (那是 grounding-skill-evals).'
+description: 'Use when deciding whether a capability deserves its own skill, whether something should be a skill or a reference, where a new skill belongs, or whether two skills overlap — 当你在判断要不要新建一个 skill、这块该不该独立成 skill 还是塞进某个 reference、一组 skill 的边界与重叠时。Triggers: 立项一个新 skill、重构 skill 版图、"这是 skill 还是 reference"、portfolio 体检、两个 skill 触发条件打架。Do NOT use when you only need to write or pressure-test a single skill body (那是 cc-master-skillsmith); Do NOT use when you need to declare J / run trigger or behavior eval / measure a skill (那是 grounding-skill-evals); Do NOT use when 你要跑 skill knowledge graph 的 health / typed change / witness（走 design_docs/skill-knowledge-graph + skill-knowledge CLI）。'
 ---
 
 # curating-skill-portfolios — 一组 skill 的架构准入
@@ -9,7 +9,7 @@ description: 'Use when deciding whether a capability deserves its own skill, whe
 
 ## Overview
 
-**一个 skill 对 agent 的本质效应只有两种：增量（给它没有的）或覆写（纠正它默认会错的）；两者皆无 = 装饰，不建。** 本 skill 是 cc-master 这个小 portfolio（2 个分发 + 几个 dev-only）的**架构准入闸**——回答「要不要建」「该 skill 还是 reference」「放哪」「两个会不会重叠」，并给每个站得住的 skill 写一份设计宪法。分发 skill 的设计宪法落在 `.design/DESIGN.md`；dev-only skill 可保留根部 `DESIGN.md`。它**不**碰任何单个 skill 的 body 内容，也**不**碰度量。
+**一个 skill 对 agent 的本质效应只有两种：增量（给它没有的）或覆写（纠正它默认会错的）；两者皆无 = 装饰，不建。** 本 skill 是 cc-master **小 portfolio**（分发 skills 住 `plugin/src/skills/`，dev-only 住 `.claude/skills/`；具体库存以磁盘为准，本文不钉死个数）的**架构准入闸**——回答「要不要建」「该 skill 还是 reference」「放哪」「两个会不会重叠」，并给每个站得住的 skill 写一份设计宪法。分发 skill 的设计宪法落在 `.design/DESIGN.md`；dev-only skill 可保留根部 `DESIGN.md`。它**不**碰任何单个 skill 的 body 内容，也**不**碰度量。
 
 ## When to use
 
@@ -52,7 +52,7 @@ description: 'Use when deciding whether a capability deserves its own skill, whe
 
 ## cc-master 只用 3 条承重维
 
-cc-master 是 2+4 的小 portfolio（2 个分发 + 4 个 dev-only：造/评/治三件套 + `requirement-elicitation` 上游需求发现），**只用三条承重维**（audience-plane / bounded-context / Probe）：任一不过即拒，没有 trade-off 路径——
+cc-master 是**刻意保持小**的 portfolio（分发 + 若干 dev-only；库存以 `.claude/skills` / `plugin/src/skills` 磁盘为准），**只用三条承重维**（audience-plane / bounded-context / Probe）：任一不过即拒，没有 trade-off 路径——
 
 1. **audience-plane（受众面）**——受众是插件**用户**（装 cc-master 的人 / 替他们行动的 agent）还是仓库**维护者**？维护者用的 dev skill 进 `.claude/skills/`，**不进**分发的 `skills/`，更不进 marketplace。判错受众 = 把 dev 工具混进产品。
 2. **bounded-context（单一职责）**——候选是否落入**恰好一个**清晰职责方向？跨两个职责 = 它其实是两个 skill，先拆。

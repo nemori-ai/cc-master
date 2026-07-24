@@ -1,0 +1,313 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.levers",
+  "owner_skill": "skill:pacing-and-estimation",
+  "title": "单侧收紧 levers",
+  "intent": "把压力整理成上界收紧决策输入，不执行编排动作。",
+  "recognition_cues": [
+    "throttle",
+    "pacing lever"
+  ],
+  "boundary": {
+    "includes": [
+      "上界收紧原则",
+      "三类影响向量"
+    ],
+    "excludes": [
+      "换号授权",
+      "watchdog 创建"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.upper-bound-only"
+    ],
+    "rationale": "压力到来时先站稳无加速侧。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.levers"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.levers"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.upper-bound-only",
+      "title": "只在上界收紧",
+      "point_kind": "principle",
+      "summary": "无欠用加速侧；healthy≠放行其他门；按 target 解读 verdict。",
+      "recognition_cues": [
+        "额度空闲就加速"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
+        "marker": "point:pacing.upper-bound-only",
+        "heading_hint": "只在上界收紧"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.upper-bound-only"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.upper-bound-only"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.upper-bound-only"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:pacing.decision-vectors",
+      "title": "决策影响向量",
+      "point_kind": "reference",
+      "summary": "模型/effort、WIP、high-float 是输入不是动作；动作交回编排决策层。",
+      "recognition_cues": [
+        "throttle 后改什么"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
+        "marker": "point:pacing.decision-vectors",
+        "heading_hint": "影响向量"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.decision-vectors"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.decision-vectors"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.decision-vectors"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:pacing.upper-to-vectors",
+      "type": "operationalizes",
+      "from": "point:pacing.upper-bound-only",
+      "to": "point:pacing.decision-vectors",
+      "when": [
+        "整理可交给决策层的向量"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.upper-to-vectors"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.upper-to-vectors"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:pacing.levers-to-pool",
+      "type": "deepens_to",
+      "from": "point:pacing.upper-bound-only",
+      "to": "point:pacing.own-row",
+      "when": [
+        "多板同池需要相对分配"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.levers-to-pool"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.levers-to-pool"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.levers-to-tension",
+      "type": "applies_to",
+      "from": "point:pacing.decision-vectors",
+      "to": "point:pacing.usage-estimate-tension",
+      "when": [
+        "压力叠加长 ETA 形成张力"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.levers-to-tension"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.pacing.levers-to-tension"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.vectors-to-upper",
+      "type": "routes_to",
+      "from": "point:pacing.decision-vectors",
+      "to": "point:pacing.upper-bound-only",
+      "when": [
+        "从向量回到上界原则"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.vectors-to-upper"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.vectors-to-upper"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.upper-to-global",
+      "type": "routes_to",
+      "from": "point:pacing.upper-bound-only",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "lever 输入前复核信号"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.upper-to-global"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.upper-to-global"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:pacing.hub-from.vectors",
+      "type": "routes_to",
+      "from": "point:pacing.decision-vectors",
+      "to": "point:pacing.machine-wide-first",
+      "when": [
+        "向量回信号入口"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:pacing.hub-from.vectors"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:pacing.hub-from.vectors"
+          }
+        ]
+      }
+    }
+  ]
+}

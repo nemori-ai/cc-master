@@ -1,0 +1,1380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-master.dev/schemas/skill-knowledge-change-v1alpha1.json",
+  "title": "cc-master skill knowledge semantic change and workspace contract",
+  "description": "Normative contract for finalized ledger records and ignored begin/validate/apply workspace documents.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/finalChange"
+    },
+    {
+      "$ref": "#/$defs/changeWorkspace"
+    },
+    {
+      "$ref": "#/$defs/changeValidation"
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "globalId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9.:-]*$"
+    },
+    "pointId": {
+      "type": "string",
+      "pattern": "^point:[a-z0-9][a-z0-9.-]*$"
+    },
+    "moduleId": {
+      "type": "string",
+      "pattern": "^module:[a-z0-9][a-z0-9.-]*$"
+    },
+    "skillId": {
+      "type": "string",
+      "pattern": "^skill:[a-z0-9][a-z0-9.-]*$"
+    },
+    "edgeId": {
+      "type": "string",
+      "pattern": "^edge:[a-z0-9][a-z0-9.-]*$"
+    },
+    "changeId": {
+      "type": "string",
+      "pattern": "^change:[0-9]{8}\\.[a-z0-9][a-z0-9.-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "idList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/globalId"
+      },
+      "uniqueItems": true
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "design",
+            "research",
+            "test",
+            "migration",
+            "review",
+            "user-decision"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "note": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "repoScopePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "gitRef": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s\\u0000]+$"
+    },
+    "operationType": {
+      "enum": [
+        "add",
+        "wording",
+        "refine",
+        "move",
+        "split",
+        "merge",
+        "transfer_owner",
+        "deprecate",
+        "retire"
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scopedFileHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repoScopePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "scopedFileTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "before_sha256",
+        "after_sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/repoScopePath"
+        },
+        "before_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "after_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "parentChange": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "change_id",
+            "result_graph_sha256"
+          ],
+          "properties": {
+            "change_id": {
+              "$ref": "#/$defs/changeId"
+            },
+            "result_graph_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ]
+    },
+    "workspaceDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "location",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "debt",
+            "info"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^SKG-[A-Z0-9-]+$"
+        },
+        "message": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "location": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "witness": {
+          "type": "object"
+        },
+        "remediation": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "finalChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "change_id",
+        "base_ref",
+        "base_graph_sha256",
+        "result_graph_sha256",
+        "parent_change",
+        "scope",
+        "reason",
+        "operations",
+        "evidence",
+        "expected_effects"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "cc-master/skill-knowledge-change/v1alpha1"
+        },
+        "kind": {
+          "const": "change"
+        },
+        "change_id": {
+          "$ref": "#/$defs/changeId"
+        },
+        "base_ref": {
+          "$ref": "#/$defs/gitRef"
+        },
+        "base_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "result_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parent_change": {
+          "$ref": "#/$defs/parentChange"
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scopedFileTransition"
+          }
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "expected_effects": {
+          "$ref": "#/$defs/expectedEffects"
+        }
+      }
+    },
+    "changeWorkspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "change_id",
+        "operation",
+        "base_ref",
+        "base_graph_sha256",
+        "scope",
+        "candidate_root",
+        "status"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "cc-master/skill-knowledge-workspace/v1alpha1"
+        },
+        "kind": {
+          "const": "change_workspace"
+        },
+        "change_id": {
+          "$ref": "#/$defs/changeId"
+        },
+        "operation": {
+          "$ref": "#/$defs/operationType"
+        },
+        "base_ref": {
+          "$ref": "#/$defs/gitRef"
+        },
+        "base_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scopedFileHash"
+          }
+        },
+        "candidate_root": {
+          "$ref": "#/$defs/repoScopePath"
+        },
+        "status": {
+          "enum": [
+            "begun",
+            "validated",
+            "applied"
+          ]
+        }
+      }
+    },
+    "hopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "witness": {
+          "type": "object"
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "abstainedHopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "witness": {
+          "type": "object",
+          "required": [
+            "abstained"
+          ],
+          "properties": {
+            "abstained": {
+              "const": true
+            }
+          }
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "executedSuccessHopGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "witness",
+        "remediation"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "witness": {
+          "type": "object",
+          "properties": {
+            "abstained": {
+              "not": {
+                "const": true
+              }
+            },
+            "skipped": {
+              "not": {
+                "const": true
+              }
+            }
+          }
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hostProjectionWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "ok",
+        "mode",
+        "artifacts",
+        "enabled_edges",
+        "point_anchors",
+        "hop_report",
+        "budgets",
+        "executed_checks",
+        "conditional_route_policy",
+        "result_graph_sha256"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex",
+            "cursor",
+            "kimi-code"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "full",
+            "partial",
+            "stub",
+            "unsupported"
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "enabled_edges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "point_anchors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hop_report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H1",
+            "H2",
+            "H3",
+            "H4"
+          ],
+          "properties": {
+            "H1": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H2": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H3": {
+              "$ref": "#/$defs/hopGate"
+            },
+            "H4": {
+              "$ref": "#/$defs/hopGate"
+            }
+          }
+        },
+        "budgets": {
+          "type": "object"
+        },
+        "executed_checks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "conditional_route_policy": {
+          "type": "string",
+          "enum": [
+            "enabled_by_default-only",
+            "abstained"
+          ]
+        },
+        "result_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "final_surface_snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host",
+            "mode",
+            "final_root",
+            "fileset_manifest",
+            "fileset",
+            "skills",
+            "modules",
+            "points",
+            "edges",
+            "entries",
+            "enabled_edge_ids",
+            "enabled_adjacency"
+          ],
+          "properties": {
+            "host": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "partial"
+              ]
+            },
+            "final_root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fileset_manifest": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "fileset": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "kind"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "file",
+                      "dir",
+                      "symlink"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "file"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "bytes",
+                        "sha256"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "skills": {
+              "type": "array"
+            },
+            "modules": {
+              "type": "array"
+            },
+            "points": {
+              "type": "array"
+            },
+            "edges": {
+              "type": "array"
+            },
+            "entries": {
+              "type": "array"
+            },
+            "enabled_edge_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "enabled_adjacency": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "stub",
+                  "unsupported"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifacts": {
+                "maxItems": 0
+              },
+              "enabled_edges": {
+                "const": 0
+              },
+              "point_anchors": {
+                "const": 0
+              },
+              "conditional_route_policy": {
+                "const": "abstained"
+              },
+              "final_surface_snapshot": false,
+              "hop_report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "H1",
+                  "H2",
+                  "H3",
+                  "H4"
+                ],
+                "properties": {
+                  "H1": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H2": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H3": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  },
+                  "H4": {
+                    "$ref": "#/$defs/abstainedHopGate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              },
+              "ok": {
+                "const": true
+              }
+            },
+            "required": [
+              "mode",
+              "ok"
+            ]
+          },
+          "then": {
+            "required": [
+              "final_surface_snapshot"
+            ],
+            "properties": {
+              "conditional_route_policy": {
+                "const": "enabled_by_default-only"
+              },
+              "budgets": {
+                "type": "object",
+                "minProperties": 1
+              },
+              "executed_checks": {
+                "type": "array",
+                "allOf": [
+                  {
+                    "contains": {
+                      "const": "candidate_runtime_sync"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "candidate_runtime_verify"
+                    }
+                  }
+                ]
+              },
+              "hop_report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "H1",
+                  "H2",
+                  "H3",
+                  "H4"
+                ],
+                "properties": {
+                  "H1": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H2": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H3": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  },
+                  "H4": {
+                    "$ref": "#/$defs/executedSuccessHopGate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              },
+              "ok": {
+                "const": false
+              }
+            },
+            "required": [
+              "mode",
+              "ok"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conditional_route_policy": {
+                "const": "enabled_by_default-only"
+              },
+              "final_surface_snapshot": false
+            }
+          }
+        }
+      ]
+    },
+    "changeValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "change_id",
+        "base_ref",
+        "base_graph_sha256",
+        "scope",
+        "result_graph_sha256",
+        "candidate_valid",
+        "candidate_runtime_valid",
+        "optimistic_lock_valid",
+        "git_apply_check",
+        "patch_sha256",
+        "host_projection_witnesses",
+        "diagnostics"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "cc-master/skill-knowledge-validation/v1alpha1"
+        },
+        "kind": {
+          "const": "change_validation"
+        },
+        "change_id": {
+          "$ref": "#/$defs/changeId"
+        },
+        "base_ref": {
+          "$ref": "#/$defs/gitRef"
+        },
+        "base_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scopedFileHash"
+          }
+        },
+        "result_graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_valid": {
+          "type": "boolean"
+        },
+        "candidate_runtime_valid": {
+          "type": "boolean"
+        },
+        "optimistic_lock_valid": {
+          "type": "boolean"
+        },
+        "git_apply_check": {
+          "type": "boolean"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "host_projection_witnesses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "claude-code"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "codex"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "cursor"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/hostProjectionWitness"
+                },
+                {
+                  "properties": {
+                    "host": {
+                      "const": "kimi-code"
+                    }
+                  },
+                  "required": [
+                    "host"
+                  ]
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workspaceDiagnostic"
+          }
+        }
+      }
+    },
+    "bindingRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "marker"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+\\.md$"
+        },
+        "marker": {
+          "$ref": "#/$defs/pointId"
+        }
+      }
+    },
+    "edgeRewrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "edge"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "add",
+            "remove",
+            "retarget"
+          ]
+        },
+        "edge": {
+          "$ref": "#/$defs/edgeId"
+        },
+        "from": {
+          "$ref": "#/$defs/globalId"
+        },
+        "to": {
+          "$ref": "#/$defs/globalId"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "baseOperationFields": {
+      "type": "object",
+      "required": [
+        "op",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "addOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "entities",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "add"
+        },
+        "entities": {
+          "$ref": "#/$defs/idList"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "wordingOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "binding",
+        "before_sha256",
+        "after_sha256",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "wording"
+        },
+        "subject": {
+          "$ref": "#/$defs/pointId"
+        },
+        "binding": {
+          "$ref": "#/$defs/bindingRef"
+        },
+        "before_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "after_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "refineOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "changed_fields",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "refine"
+        },
+        "subject": {
+          "$ref": "#/$defs/globalId"
+        },
+        "changed_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "intent",
+              "boundary",
+              "summary",
+              "recognition_cues",
+              "access",
+              "authority.subject",
+              "edge.when",
+              "edge.avoid_when",
+              "edge.path_role",
+              "edge.runtime.enabled_by_default",
+              "hop_policy.critical_any_point_to_primary_max",
+              "hop_policy.primary_entry_to_primary_max"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "moveEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "module": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "binding": {
+          "$ref": "#/$defs/bindingRef"
+        }
+      }
+    },
+    "moveOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "from",
+        "to",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "move"
+        },
+        "subject": {
+          "$ref": "#/$defs/pointId"
+        },
+        "from": {
+          "$ref": "#/$defs/moveEndpoint"
+        },
+        "to": {
+          "$ref": "#/$defs/moveEndpoint"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "splitOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "results",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "split"
+        },
+        "subject": {
+          "$ref": "#/$defs/globalId"
+        },
+        "results": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/globalId"
+          },
+          "uniqueItems": true
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "mergeOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "result",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "merge"
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/globalId"
+          },
+          "uniqueItems": true
+        },
+        "result": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "transferOwnerOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subject",
+        "from_skill",
+        "to_skill",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "transfer_owner"
+        },
+        "subject": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "from_skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "to_skill": {
+          "$ref": "#/$defs/skillId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "deprecateOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "deprecate"
+        },
+        "subjects": {
+          "$ref": "#/$defs/idList"
+        },
+        "replacement": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "retireOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "subjects",
+        "edge_rewrites",
+        "rationale"
+      ],
+      "properties": {
+        "op": {
+          "const": "retire"
+        },
+        "subjects": {
+          "$ref": "#/$defs/idList"
+        },
+        "replacement": {
+          "$ref": "#/$defs/globalId"
+        },
+        "edge_rewrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edgeRewrite"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/addOperation"
+        },
+        {
+          "$ref": "#/$defs/wordingOperation"
+        },
+        {
+          "$ref": "#/$defs/refineOperation"
+        },
+        {
+          "$ref": "#/$defs/moveOperation"
+        },
+        {
+          "$ref": "#/$defs/splitOperation"
+        },
+        {
+          "$ref": "#/$defs/mergeOperation"
+        },
+        {
+          "$ref": "#/$defs/transferOwnerOperation"
+        },
+        {
+          "$ref": "#/$defs/deprecateOperation"
+        },
+        {
+          "$ref": "#/$defs/retireOperation"
+        }
+      ]
+    },
+    "expectedEffects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_delta",
+        "canonical_subject_delta",
+        "max_hop_regression_allowed",
+        "coverage_debt_allowed"
+      ],
+      "properties": {
+        "identity_delta": {
+          "type": "integer"
+        },
+        "canonical_subject_delta": {
+          "type": "integer"
+        },
+        "max_hop_regression_allowed": {
+          "const": 0
+        },
+        "coverage_debt_allowed": {
+          "type": "boolean"
+        },
+        "notes": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    }
+  }
+}

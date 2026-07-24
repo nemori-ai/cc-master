@@ -1,0 +1,49 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:scheduling.dependency-dag",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "依赖 DAG 排期",
+  "intent": "对已切好的当前增量按真实依赖、临界路径、并行度与节点契约排期。",
+  "recognition_cues": ["已有 DAG 需要排期", "要算临界路径或 lane", "准备派发节点"],
+  "boundary": {"includes": ["拓扑序", "CPM/float", "T1/T∞", "粒度", "节点契约"], "excludes": ["怎么切目标", "ccm 字段语法"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "已有当前增量 DAG 需要排期时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-scheduling-review"}]},
+  "points": [
+    {
+      "id": "point:scheduling.dag-and-critical-path",
+      "title": "DAG、临界路径与机器 graph",
+      "point_kind": "procedure",
+      "summary": "默认并行、逐边举证，用 CPM/float 或 ccm graph 找当前增量的临界链。",
+      "recognition_cues": ["需要删假依赖", "需要机器计算临界路径"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md", "marker": "point:scheduling.dag-and-critical-path", "heading_hint": "当前增量 = 一张 DAG"},
+      "authority": {"role": "canonical", "subject": "subject:scheduling.dag-and-critical-path"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "decomposition.md sections 1-3"}], "verifiers": [{"kind": "review", "ref": "k2.point.scheduling.dag"}]}
+    },
+    {
+      "id": "point:scheduling.parallelism-and-granularity",
+      "title": "并行度与粒度",
+      "point_kind": "decision_rule",
+      "summary": "用 work/span 估 lane，避免把假并行或过细协调成本画进 board。",
+      "recognition_cues": ["不知道开多少 lane", "任务粒度失衡"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md", "marker": "point:scheduling.parallelism-and-granularity", "heading_hint": "并行度 = T₁/T∞"},
+      "authority": {"role": "canonical", "subject": "subject:scheduling.parallelism-and-granularity"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "decomposition.md sections 4-5"}], "verifiers": [{"kind": "review", "ref": "k2.point.scheduling.parallelism"}]}
+    },
+    {
+      "id": "point:scheduling.node-contract",
+      "title": "派发前节点契约",
+      "point_kind": "check",
+      "summary": "每个节点先给 objective、acceptance、artifact、constraints、estimate 与 stop/restart 条件。",
+      "recognition_cues": ["准备派 dev worker", "节点无法一次验收"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md", "marker": "point:scheduling.node-contract", "heading_hint": "每节点契约"},
+      "authority": {"role": "canonical", "subject": "subject:scheduling.node-contract"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "decomposition.md node contract"}], "verifiers": [{"kind": "review", "ref": "k2.point.scheduling.contract"}]}
+    }
+  ],
+  "edges": []
+}

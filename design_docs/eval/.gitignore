@@ -1,0 +1,16 @@
+# Local eval execution exhaust. The public tree keeps decision-grade evidence.
+**/.runs/
+**/runs/
+**/raw/
+**/transcripts/
+**/outputs/
+**/tmp/
+
+# Volatile per-run files. Promote only a sanitized, curated summary.
+**/*.log
+**/stderr.txt
+**/timing.json
+**/raw.json
+**/raw.jsonl
+**/*-trace.jsonl
+**/*-run-[0-9]*.md

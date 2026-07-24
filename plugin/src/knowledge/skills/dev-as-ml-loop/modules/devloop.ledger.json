@@ -1,0 +1,551 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:devloop.ledger",
+  "owner_skill": "skill:dev-as-ml-loop",
+  "title": "optimization ledger",
+  "intent": "把外层优化状态持续写进 board，使 compact/换人后续接同一 loss。",
+  "recognition_cues": [
+    "compact 后续接",
+    "plateau 要记",
+    "优化状态只在聊天里"
+  ],
+  "boundary": {
+    "includes": [
+      "何时写",
+      "写什么",
+      "ccm 写入前问题",
+      "持续 handoff",
+      "反模式"
+    ],
+    "excludes": [
+      "ccm 命令语法表",
+      "内层八锚"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:dev-as-ml-loop"
+    ],
+    "primary_points": [
+      "point:devloop.ledger-when"
+    ],
+    "rationale": "跨 compact 的承重点是何时必须落 ledger。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:devloop.ledger"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.devloop.ledger"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:devloop.ledger-when",
+      "title": "何时必须写 ledger",
+      "point_kind": "check",
+      "summary": "长程/跨 compact/plateau/多 hypothesis 时必须把优化状态落 board。",
+      "recognition_cues": [
+        "长程任务不写 board"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "marker": "point:devloop.ledger-when",
+        "heading_hint": "什么时候必须写 ledger"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ledger-when"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ledger-when"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ledger-when"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.ledger-what",
+      "title": "ledger 写什么",
+      "point_kind": "procedure",
+      "summary": "只写改变下一轮方向的 objective/instrument/hypothesis/gradient/plateau/restart/validation。",
+      "recognition_cues": [
+        "把全部测试输出贴进 log"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "marker": "point:devloop.ledger-what",
+        "heading_hint": "写什么"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ledger-what"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ledger-what"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ledger-what"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.ledger-ccm",
+      "title": "用 ccm 管住优化目标",
+      "point_kind": "procedure",
+      "summary": "写入前先问 objective/instrument/hypothesis/gradient/restart/收敛是否变了。",
+      "recognition_cues": [
+        "把 ccm 当事后文书"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "marker": "point:devloop.ledger-ccm",
+        "heading_hint": "用 ccm 管住优化目标"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ledger-ccm"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ledger-ccm"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ledger-ccm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.ledger-handoff",
+      "title": "持续 handoff",
+      "point_kind": "procedure",
+      "summary": "load-bearing 变化立刻写回；合格 handoff 含六行优化状态。",
+      "recognition_cues": [
+        "等 compact 前再总结"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "marker": "point:devloop.ledger-handoff",
+        "heading_hint": "continuous handoff"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ledger-handoff"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ledger-handoff"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ledger-handoff"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:devloop.ledger-antipatterns",
+      "title": "ledger 反模式",
+      "point_kind": "check",
+      "summary": "聊天当记忆、堆原始日志、做完再补 board、把 restart 当 failed 遮羞。",
+      "recognition_cues": [
+        "board 有任务状态就够了"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "marker": "point:devloop.ledger-antipatterns",
+        "heading_hint": "anti-patterns"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:devloop.ledger-antipatterns"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:devloop.ledger-antipatterns"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.devloop.ledger-antipatterns"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:devloop.ledger-when-to-what",
+      "type": "next",
+      "from": "point:devloop.ledger-when",
+      "to": "point:devloop.ledger-what",
+      "when": [
+        "确认必须写后决定字段"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-when-to-what"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.ledger-when-to-what"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:devloop.ledger-what-to-ccm",
+      "type": "operationalizes",
+      "from": "point:devloop.ledger-what",
+      "to": "point:devloop.ledger-ccm",
+      "when": [
+        "要把类别落到 ccm 写入判断"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-what-to-ccm"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.ledger-what-to-ccm"
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "edge:devloop.ledger-ccm-to-handoff",
+      "type": "next",
+      "from": "point:devloop.ledger-ccm",
+      "to": "point:devloop.ledger-handoff",
+      "when": [
+        "建立持续 handoff 节奏"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-ccm-to-handoff"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.ledger-ccm-to-handoff"
+          }
+        ]
+      },
+      "order": 3
+    },
+    {
+      "id": "edge:devloop.ledger-handoff-to-anti",
+      "type": "contrasts_with",
+      "from": "point:devloop.ledger-handoff",
+      "to": "point:devloop.ledger-antipatterns",
+      "when": [
+        "对照常见失败写法"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-handoff-to-anti"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.ledger-handoff-to-anti"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.ledger-anti-to-when",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-antipatterns",
+      "to": "point:devloop.ledger-when",
+      "when": [
+        "从反模式回到何时必须写"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-anti-to-when"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.devloop.ledger-anti-to-when"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.ledger-when-to-objective",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-when",
+      "to": "point:devloop.objective",
+      "when": [
+        "ledger 触发后回到目标函数"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.ledger-when-to-objective"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.ledger-when-to-objective"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.ledger-what",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-what",
+      "to": "point:devloop.objective",
+      "when": [
+        "ledger 回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.ledger-what"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.ledger-what"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.ledger-ccm",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-ccm",
+      "to": "point:devloop.objective",
+      "when": [
+        "ledger 回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.ledger-ccm"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.ledger-ccm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.ledger-handoff",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-handoff",
+      "to": "point:devloop.objective",
+      "when": [
+        "ledger 回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.ledger-handoff"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.ledger-handoff"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop.hub-from.devloop.ledger-antipatterns",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-antipatterns",
+      "to": "point:devloop.objective",
+      "when": [
+        "ledger 回目标函数主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:devloop.hub-from.devloop.ledger-antipatterns"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:devloop.hub-from.devloop.ledger-antipatterns"
+          }
+        ]
+      }
+    }
+  ]
+}

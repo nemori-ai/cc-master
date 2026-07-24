@@ -1,0 +1,284 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:distill.taxonomy",
+  "owner_skill": "skill:distilling-lessons-into-assets",
+  "title": "资产分类法",
+  "intent": "给出四类资产各自适合承载的知识性质。",
+  "recognition_cues": [
+    "资产类型定义",
+    "判据速查"
+  ],
+  "boundary": {
+    "includes": [
+      "速查摘要",
+      "完整 taxonomy"
+    ],
+    "excludes": [
+      "决策树流程"
+    ]
+  },
+  "access": {
+    "class": "primary",
+    "relevant_entries": [
+      "entry:distilling-lessons-into-assets"
+    ],
+    "primary_points": [
+      "point:distill.taxonomy"
+    ],
+    "rationale": "路由依赖资产定义。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:distill.taxonomy"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.distill.taxonomy"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:distill.taxonomy-quick",
+      "title": "四类资产判据速查",
+      "point_kind": "reference",
+      "summary": "纪律文档/skill/workflow/subagent 适合与不适合承载的速查表。",
+      "recognition_cues": [
+        "这条经验该进哪种资产"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "marker": "point:distill.taxonomy-quick",
+        "heading_hint": "四类资产判据速查"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:distill.taxonomy",
+        "canonical": "point:distill.taxonomy",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "1d759439d83d6e4fcf6b20996067c7ef7c8b2030789fc71be6c701a16d19f9c2"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.taxonomy-quick"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.taxonomy-quick"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:distill.taxonomy",
+      "title": "四类资产定义与判据",
+      "point_kind": "reference",
+      "summary": "纪律文档/skill/workflow/subagent 的适合与不适合完整定义。",
+      "recognition_cues": [
+        "资产类型定义"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/asset-taxonomy.md",
+        "marker": "point:distill.taxonomy",
+        "heading_hint": "四类资产"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:distill.taxonomy"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:distill.taxonomy"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.distill.taxonomy"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:distill.quick-to-tax",
+      "type": "deepens_to",
+      "from": "point:distill.taxonomy-quick",
+      "to": "point:distill.taxonomy",
+      "when": [
+        "速查不够要完整定义"
+      ],
+      "path_role": "next",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.quick-to-tax"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.quick-to-tax"
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "edge:distill.tax-to-tree",
+      "type": "routes_to",
+      "from": "point:distill.taxonomy",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "定义清楚后走决策树"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tax-to-tree"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.distill.tax-to-tree"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.tax-to-evidence",
+      "type": "requires",
+      "from": "point:distill.taxonomy",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "分类定义不授权泛化"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.tax-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.tax-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.quick-to-evidence",
+      "type": "requires",
+      "from": "point:distill.taxonomy-quick",
+      "to": "point:distill.evidence-fidelity",
+      "when": [
+        "速查后落笔仍守证据"
+      ],
+      "path_role": "check",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.quick-to-evidence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.quick-to-evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:distill.hub-from.quick",
+      "type": "routes_to",
+      "from": "point:distill.taxonomy-quick",
+      "to": "point:distill.routing-tree",
+      "when": [
+        "速查回决策树主点"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:distill.hub-from.quick"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:distill.hub-from.quick"
+          }
+        ]
+      }
+    }
+  ]
+}

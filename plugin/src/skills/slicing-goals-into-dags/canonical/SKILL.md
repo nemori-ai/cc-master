@@ -13,12 +13,15 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:start point:slicing.why-cut -->
 ## 为什么这一刀最值钱
 
 **你怎么切,定死了后面一切的天花板。** 并行度、多快能 ship、多快拿到反馈——全在切的那一刻就定了,**排期再优、派发再快也救不回一张切坏的图**。一张横切的图,哪怕关键路径算得再准,也照样把价值堆到最后、把本可并行的活人为串成一条线。所以:**切,是高杠杆决策;别急着排和派,先把它切对。**
 
 ---
 
+<!-- ccm:k:end point:slicing.why-cut -->
+<!-- ccm:k:start point:slicing.vertical-rule -->
 ## 心智锚 1:纵切,不要横切 ★硬规则
 
 把目标切成**薄的、端到端的纵向增量**——每一片自己穿过所有需要的层、交付一个用户(或下一个消费者)**真能触碰**的能力;**不要**按技术层横切(全做数据模型 → 全做 API → 全做 UI)。
@@ -42,6 +45,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.vertical-rule -->
+<!-- ccm:k:start point:slicing.walking-skeleton -->
 ## 心智锚 2:walking skeleton —— 地基切到最小可用子集,而非一次定全
 
 第一片不是"地基层",是一根**最薄的端到端线**(walking skeleton):穿过所有层、但每层都只做让这一根线跑起来的最小量。它一举两得——**早早打通集成**(最贵的风险:各层接不上,提前暴露)+ **立起共享脊椎**(后续纵切都挂在它上面)。
@@ -51,6 +56,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.walking-skeleton -->
+<!-- ccm:k:start point:slicing.grain -->
 ## 心智锚 3:粒度,为并行与可验收而定
 
 每个节点的大小,由两个问题校准,不由"感觉差不多"定:
@@ -64,6 +71,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.grain -->
+<!-- ccm:k:start point:slicing.value-risk -->
 ## 心智锚 4:按 价值 × 风险 排序
 
 切完是一组片,**先做哪片**有讲究:
@@ -76,6 +85,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.value-risk -->
+<!-- ccm:k:start point:slicing.board-landing -->
 ## 落到 board
 
 - **一片纵切 → 一个 task**;若这片自身还需内部并行,做成一个 owner 父节点 + 若干 leaf 子节点(嵌套 depth=1)。
@@ -88,6 +99,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.board-landing -->
+<!-- ccm:k:start point:slicing.antipatterns -->
 ## anti-pattern 速查
 
 | 反模式 | 为什么坏 / 怎么改 |
@@ -102,6 +115,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ---
 
+<!-- ccm:k:end point:slicing.antipatterns -->
 ## Pointers
 
 - **[references/worked-example.md](references/worked-example.md)** —— 同一个目标的横切 vs 纵切对照样例；当你脑中还只有"先 schema/API/UI"这种横切本能时，先看它校准切法。

@@ -1,0 +1,78 @@
+{
+  "schema": "cc-master/skill-knowledge-behavior-cases/v1",
+  "split": "holdout",
+  "cases": [
+    {
+      "id": "holdout-authoring-streaming",
+      "prompt": "后一步应当在前一步每个结果产生时立刻消费，而不是等待整个前一步批次结束。请定位区分 barrier 与 streaming 语义的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:workflow.barrier-vs-streaming",
+        "module_id": "module:workflow.runtime-contract",
+        "owner_skill": "skill:authoring-workflows"
+      }
+    },
+    {
+      "id": "holdout-devloop-ledger",
+      "prompt": "任务优化过程要跨 compaction 交接，下一位执行者必须继续同一个 loss，而不是重新猜目标。请定位规定 ledger handoff 内容的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:devloop.ledger-handoff",
+        "module_id": "module:devloop.ledger",
+        "owner_skill": "skill:dev-as-ml-loop"
+      }
+    },
+    {
+      "id": "holdout-distill-dual-dest",
+      "prompt": "同一条经验同时包含项目专属事实与可复用判断力。请定位说明何时应拆成两个资产落点的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:distill.dual-dest",
+        "module_id": "module:distill.routing",
+        "owner_skill": "skill:distilling-lessons-into-assets"
+      }
+    },
+    {
+      "id": "holdout-craft-aggregate",
+      "prompt": "一个业务不变式跨两个 entity，团队按表结构划 aggregate 后无法原子守住它。请定位决定 aggregate ownership 的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:ddd.aggregate-ownership",
+        "module_id": "module:craft.domain-modeling",
+        "owner_skill": "skill:engineering-with-craft"
+      }
+    },
+    {
+      "id": "holdout-master-handle",
+      "prompt": "调度者准备把任务标成 in_flight，但实际 worker 调用尚未返回可追踪 handle。请定位禁止这种状态跃迁的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:routing.handle-gate",
+        "module_id": "module:routing.worker-chain",
+        "owner_skill": "skill:master-orchestrator-guide"
+      }
+    },
+    {
+      "id": "holdout-pacing-target",
+      "prompt": "跨 harness 选定执行目标后，需要把 surface、模型、配额与 payer binding 绑定后再判断是否 eligible。请定位这条目标事实合同的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:pacing.selected-target-facts",
+        "module_id": "module:pacing.target-facts",
+        "owner_skill": "skill:pacing-and-estimation"
+      }
+    },
+    {
+      "id": "holdout-slicing-grain",
+      "prompt": "一个任务切片大到无法并行，小到又只剩机械步骤。请定位判断任务粒度是否合适的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:slicing.grain",
+        "module_id": "module:slicing.craft",
+        "owner_skill": "skill:slicing-goals-into-dags"
+      }
+    },
+    {
+      "id": "holdout-ccm-blocked",
+      "prompt": "一个 task 等待用户决定而不是等待另一个 task 完成。请定位 blocked_on 应如何表达这种阻塞来源的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:ccm.board.blocked-on",
+        "module_id": "module:ccm.board-model.lifecycle",
+        "owner_skill": "skill:using-ccm"
+      }
+    }
+  ]
+}

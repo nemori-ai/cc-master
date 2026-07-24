@@ -1,0 +1,60 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:coordination.async-hitl",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "异步完成与 HITL",
+  "intent": "把后台 in-flight、用户决策、step-6 ledger 与 watchdog 组成不阻塞整板的异步协调协议。",
+  "recognition_cues": ["任务在后台飞行", "出现 blocked_on:user", "准备等待但后台可能静默失败"],
+  "boundary": {"includes": ["in-flight 追踪", "用户异步依赖", "decision_package", "step-6 ledger", "watchdog"], "excludes": ["board 字段语法", "worker 选型"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "仅在异步 HITL、ledger 或 watchdog 场景命中时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-async-hitl-review"}]},
+  "points": [
+    {
+      "id": "point:hitl.inflight-and-user",
+      "title": "in-flight 与用户异步依赖",
+      "point_kind": "principle",
+      "summary": "追踪在飞任务，把用户当特殊 async worker，并先派不依赖回答的后台活。",
+      "recognition_cues": ["需要同时处理前台问答与后台派发"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md", "marker": "point:hitl.inflight-and-user", "heading_hint": "In-flight 追踪"},
+      "authority": {"role": "canonical", "subject": "subject:hitl.inflight-and-user"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "async-hitl.md in-flight/HITL"}], "verifiers": [{"kind": "review", "ref": "k2.point.hitl.inflight"}]}
+    },
+    {
+      "id": "point:hitl.decision-package",
+      "title": "采访式 decision package",
+      "point_kind": "procedure",
+      "summary": "预取决策依据、处理 sidecar 与 freshness，再让 goal hook 机械检查漏项。",
+      "recognition_cues": ["准备 surface 用户决策", "需要消化 decision sidecar"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md", "marker": "point:hitl.decision-package", "heading_hint": "采访式决策"},
+      "authority": {"role": "canonical", "subject": "subject:hitl.decision-package"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "async-hitl.md decision package"}], "verifiers": [{"kind": "review", "ref": "k2.point.hitl.package"}]}
+    },
+    {
+      "id": "point:hitl.step6-ledger",
+      "title": "step-6 ledger 固定形态",
+      "point_kind": "check",
+      "summary": "等待或收口前逐条记录每条 path 的真实状态与证据。",
+      "recognition_cues": ["准备 Stop", "准备合法等待"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md", "marker": "point:hitl.step6-ledger", "heading_hint": "step-6 ledger"},
+      "authority": {"role": "canonical", "subject": "subject:hitl.step6-ledger"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "async-hitl.md ledger"}], "verifiers": [{"kind": "review", "ref": "k2.point.hitl.ledger"}]}
+    },
+    {
+      "id": "point:hitl.watchdog",
+      "title": "等待前 watchdog",
+      "point_kind": "procedure",
+      "summary": "仅为可能静默失败的后台路径 arm 自唤醒，ceiling 触发 recon 而非直接判死。",
+      "recognition_cues": ["后台可能 hang", "准备在 in_flight 上等待"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md", "marker": "point:hitl.watchdog", "heading_hint": "等待前 arm watchdog"},
+      "authority": {"role": "canonical", "subject": "subject:hitl.watchdog"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "async-hitl.md watchdog"}], "verifiers": [{"kind": "review", "ref": "k2.point.hitl.watchdog"}]}
+    }
+  ],
+  "edges": []
+}

@@ -15,6 +15,7 @@
 
 ---
 
+<!-- ccm:k:start point:oop.four-pillars -->
 ## 四柱：同时透视的四个镜头
 
 四柱不是依次勾选的清单——每个类**同时**过这四个镜头。发现冲突，就在注释里**显式权衡**；沉默妥协才是失败，不是权衡本身。
@@ -26,6 +27,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.four-pillars -->
+<!-- ccm:k:start point:oop.solid-judgment -->
 ## SOLID as Judgment
 
 ### SRP — 编排与规则分离
@@ -91,6 +94,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.solid-judgment -->
+<!-- ccm:k:start point:oop.encapsulation-vocabulary -->
 ## 封装即词汇
 
 **聚合根是唯一的变更入口**，每个变更都是 ubiquitous language 的动词：`workspace.archive()`，永不是状态戳。如果调用者"需要设置一个字段"，设计出它真正意图的那个动词。守卫、命名异常、状态翻转、时间戳一起封进那个动词——调用者无法"半归档"。
@@ -108,6 +113,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.encapsulation-vocabulary -->
+<!-- ccm:k:start point:oop.composition-over-inheritance -->
 ## 组合优于继承
 
 继承是**最后**的答案，不是第一个：子类永远耦合父类每一个 protected 细节；组合协作者只耦合一份合约。
@@ -141,6 +148,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.composition-over-inheritance -->
+<!-- ccm:k:start point:oop.abstraction-cost -->
 ## 这个抽象配得上它的开销吗？
 
 每个新抽象都增加协调成本；默认是最简单可行的东西。判断标准：**near-decomposability**——一个责任、一条干净接口、可独立理解和测试。
@@ -156,6 +165,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.abstraction-cost -->
+<!-- ccm:k:start point:oop.red-lines -->
 ## 红线
 
 硬边界，违背字面就是违背精神。每一条都因为它防止的失败在生产前不可见而存在。
@@ -177,6 +188,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.red-lines -->
+<!-- ccm:k:start point:oop.failure-radar -->
 ## 8 类反模式雷达
 
 `ruff` / `pyright` / 静态分析捕不到的 OO 失败模式，速查表：
@@ -194,6 +207,8 @@
 
 ---
 
+<!-- ccm:k:end point:oop.failure-radar -->
+<!-- ccm:k:start point:oop.shared-root-links -->
 ## 回扣共享根
 
 五条共享根让 DDD / OOP / SDD / TDD 凝成同一个 skill 的脊椎。本文回扣其中三条：
@@ -201,3 +216,4 @@
 - **根 1（不变式即锚）**：不变式住在能**原子持有**它的最小所有者——聚合根的单一方法，守卫与状态翻转不可分割（见[封装即词汇](#封装即词汇)）。
 - **根 3（组合优于包装）**：idle wrapper 是死重——无 hook / 无翻译 / 无合约变化的层删掉；ACL 只在真实边界（见[组合优于继承](#组合优于继承) + [红线](#红线)）。
 - **根 4（分层思维）**：依赖单向（domain 从不导入 persistence）；编排与规则分离——应用层纯编排、领域层纯规则，双因改变的症状是测试要 mock 一堆 I/O（见 [SOLID as Judgment · SRP](#srp--编排与规则分离) + [DIP](#dip--domain-拥有接口)）。
+<!-- ccm:k:end point:oop.shared-root-links -->

@@ -1,0 +1,145 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:pacing-and-estimation",
+  "name": "pacing-and-estimation",
+  "package_root": "plugin/src/skills/pacing-and-estimation",
+  "intent": "消费 ccm 只读 advisory：配额信号、单侧 levers、池感知、估算与模型事实；ccm 出 verdict，编排决策另归。",
+  "modules": [
+    {
+      "id": "module:pacing.signals",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.signals.json"
+    },
+    {
+      "id": "module:pacing.target-facts",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.target-facts.json"
+    },
+    {
+      "id": "module:pacing.levers",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.levers.json"
+    },
+    {
+      "id": "module:pacing.pool",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.pool.json"
+    },
+    {
+      "id": "module:pacing.estimation",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.estimation.json"
+    },
+    {
+      "id": "module:pacing.model-facts",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/modules/pacing.model-facts.json"
+    }
+  ],
+  "entry_modules": [
+    "module:pacing.signals",
+    "module:pacing.estimation",
+    "module:pacing.levers"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/SKILL.md",
+      "coverage": "non_knowledge",
+      "point_ids": [],
+      "reviewed_unbound_sha256": "ded364228b74086fb1541b430192b03f7dcf3d9d84306e93a9b491e9a26354fe",
+      "review": {
+        "reviewer": "k2-01-spoke",
+        "rationale": "Canonical SKILL.md is only a host slot shell (description + read-only capability placeholders); knowledge lives in references/*.md."
+      }
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.machine-wide-first",
+        "point:pacing.refresh-hint",
+        "point:pacing.window-contracts",
+        "point:pacing.signal-ceiling"
+      ],
+      "reviewed_unbound_sha256": "5362b3227be06d9065c2836ca13564983d5a151a6b8837fb613d0adce69f9523"
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.selected-target-facts"
+      ],
+      "reviewed_unbound_sha256": "a3013275078a8a741ff0689938666dd8c723de8e58b56ff101f1ddc8b0f56b69"
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.upper-bound-only",
+        "point:pacing.decision-vectors"
+      ],
+      "reviewed_unbound_sha256": "8693393130e538cb16f5532a6461cdc4f7f819607290cc3a2509b713c7b909ce"
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.own-row",
+        "point:pacing.pool-vs-usage",
+        "point:pacing.pool-rationalization"
+      ],
+      "reviewed_unbound_sha256": "aa35483896eb5c7835dab7718d0295f33f5ecfe2e2f863f67389095bd67ba6f4"
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.estimate-verbs",
+        "point:pacing.deadline-risk",
+        "point:pacing.baseline-precondition",
+        "point:pacing.honest-fields",
+        "point:pacing.usage-estimate-tension"
+      ],
+      "reviewed_unbound_sha256": "ba51ef8bbaa9b886febe3ff021194c91f61b4665824f462726c52069e1c6420f"
+    },
+    {
+      "path": "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:pacing.model-tier-facts"
+      ],
+      "reviewed_unbound_sha256": "ed07adebf0107d4f114a12d53448a802c7f95fe2cff0b22d3c02017b6c6e487d"
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "skill:pacing-and-estimation"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.skill.pacing-and-estimation"
+      }
+    ]
+  }
+}

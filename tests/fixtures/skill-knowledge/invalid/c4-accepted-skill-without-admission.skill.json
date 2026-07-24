@@ -1,0 +1,61 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "skill",
+  "id": "skill:master-orchestrator-guide",
+  "name": "master-orchestrator-guide",
+  "package_root": "plugin/src/skills/master-orchestrator-guide",
+  "intent": "让主会话 agent 对长程目标做调度、收割、端点验收、replan 与收口。",
+  "modules": [
+    {
+      "id": "module:verification.endpoint",
+      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json"
+    }
+  ],
+  "entry_modules": [
+    "module:verification.endpoint"
+  ],
+  "canonical_source_inventory": [
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+      "coverage": "full",
+      "point_ids": [
+        "point:verification.terminal-is-not-done",
+        "point:verification.terminal-summary"
+      ],
+      "reviewed_unbound_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+      "coverage": "partial",
+      "point_ids": [
+        "point:verification.endpoint-procedure"
+      ],
+      "reviewed_unbound_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "unresolved_coverage_debt": [
+        "该文件中 verification pilot 之外的 canonical prose 尚未切成 admitted points。"
+      ]
+    }
+  ],
+  "host_coverage": [
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
+    {
+      "host": "codex",
+      "state": "full"
+    },
+    {
+      "host": "cursor",
+      "state": "full"
+    },
+    {
+      "host": "kimi-code",
+      "state": "full"
+    }
+  ],
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  }
+}

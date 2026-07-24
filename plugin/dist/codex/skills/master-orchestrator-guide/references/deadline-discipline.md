@@ -4,10 +4,20 @@
 
 ## 两条约束轴，别混
 
+<a id="ccm-k-point-deadline-constraint-axes"></a>
+<!-- ccm:k:start point:deadline.constraint-axes -->
 你已经在一条走廊里配速：**配额消耗**走廊（5h / 7d / billing-period 窗口，别顶满）。DDL 是**另一条正交的轴**——**挂钟时间**。配额没烧穿不代表你按期，按期也不代表配额够。两条各有各的信号源、各有各的收紧动作：配额侧读 `usage` verdict（消费机制见 `pacing-and-estimation`），DDL 侧读 `estimate deadline-risk` verdict（同上）。别拿一条替另一条判。
 
+<!-- ccm:k:end point:deadline.constraint-axes -->
+<!-- ccm:k:nav:start point:deadline.constraint-axes -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
+<!-- ccm:k:nav:end -->
 ## 九条纪律（决策锚 + 单向引用）
 
+<a id="ccm-k-point-deadline-nine-disciplines"></a>
+<!-- ccm:k:start point:deadline.nine-disciplines -->
 **1 · 从验收和 DDL 反向规划。** 先锁最小可验收 outcome / non-goals（跑 Goal Framing Test·见 `references/goal-contract.md`），**再从 DDL 往回倒排**：集成、review、修复、文档、发布这些 load-bearing 收口工作占多长挂钟窗口，减出来的才是「实现」能用的时间。怎么把「倒排 + 收口任务进 DAG」切成纵切薄增量归 `slicing-goals-into-dags`；一张已切好的 DAG 怎么算临界路径 / float 归 `references/decomposition.md`。你负责**在什么时刻锁定这条倒排约束**，不复述切分或 CPM 手艺。
 
 **2 · 按时交付优先于扩张产出。** DDL 在场时，默认交付**最小完整纵切主线**；任何不在当前 acceptance 里的增强、打磨、抽象都不是「更完整」，是**拿交付窗口换没人要的产出**（gold-plating）。判据一句话：当你为「再加一点」找的理由是「还有时间 / 更完整更亮眼 / 想收个漂亮的尾」——那理由本身就是 scope creep 的症状，**acceptance 才是目标函数**，不是你的完成感。新增能力先过 Goal Trace Test（`references/goal-contract.md`）、增强进 `follow-up`，别反向偷偷扩 goal。**已端点验收过的切片是你此刻最值钱的资产**——每派一次新活就把它 un-verify 掉，尾声疲惫时尤其如此。
@@ -26,8 +36,16 @@
 
 **9 · 停止过拟合。** 达到当前 revision 的**全局 acceptance** 就收敛、停——剩下的「顺便做的」不占交付窗口。DDL 在场时这条尤其硬：验收通过后继续镀金，是拿已经买到的按期交付去赌一个没人要的完善。「一个任务优化到验收就停、别过拟合意图」的循环形状归 `dev-as-ml-loop`；这里是它在整场编排层的镜像——**收敛即停，别让完成感把交付窗口烧掉**。
 
+<!-- ccm:k:end point:deadline.nine-disciplines -->
+<!-- ccm:k:nav:start point:deadline.nine-disciplines -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
+<!-- ccm:k:nav:end -->
 ## 合理化 → 现实
 
+<a id="ccm-k-point-deadline-guards-and-boundary"></a>
+<!-- ccm:k:start point:deadline.guards-and-boundary -->
 下表每一行都是真实压力场景里**被命名并拒绝的诱惑**（不是编造的失败）——强模型能自己推翻它们，但跨 compaction 失忆、更浑浊的真实局面、或更弱的执行者未必。抓到自己在想左列，回到决策程序。
 
 | 诱惑（DDL 场景下真实浮现的拉力） | 现实 |
@@ -46,3 +64,9 @@
 - **`pacing-and-estimation`** = 消费 `ccm estimate deadline-risk` 只读 verdict（band / margin / on_time_probability / 诚实字段），纪律 4/5 的读数机制——ccm 出 verdict、你决策。
 - **`using-ccm`** = `ccm goal deadline` 命令面 + deadline 字段取值 / 校验规则。
 - **`engineering-with-craft`**（纪律 3 手艺内容）/ **`dev-as-ml-loop`**（纪律 9 循环形状）/ **`references/goal-contract.md`**（识别·确认·过期·Delta Classifier·amendment）/ **`references/decomposition.md`**（CPM·float）/ **`references/async-hitl.md`**（decision_package）——各管一段，你在决策点引用，不复述其正文。
+<!-- ccm:k:end point:deadline.guards-and-boundary -->
+<!-- ccm:k:nav:start point:deadline.guards-and-boundary -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
+<!-- ccm:k:nav:end -->
