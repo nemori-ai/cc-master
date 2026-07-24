@@ -4,6 +4,8 @@
 
 ## 这管的是第三根轴：假设的外部有效性
 
+<a id="ccm-k-point-outside-evidence-levels"></a>
+<!-- ccm:k:start point:outside.evidence-levels -->
 你已经有两根检查轴，本文是正交的第三根，与它们**协作但不复述**：
 
 - **goal 对齐**（`references/goal-contract.md` 的 Goal Trace Test / Delta Classifier）——问「这项工作还追溯得到既定 goal 吗」，管**内部一致性**。
@@ -34,8 +36,16 @@
 
 **绝不为此新增 `board.assumptions` 之类顶层字段**——`log` + `jc` + `references` 已足够，新增字段是 scope creep、还会逼近 hook 依赖的窄腰。字段怎么填、会撞哪条校验规则，见 `using-ccm`。
 
+<!-- ccm:k:end point:outside.evidence-levels -->
+<!-- ccm:k:nav:start point:outside.evidence-levels -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:evidence.outside-in](../../../knowledge/modules/evidence.outside-in.md#ccm-k-module-evidence-outside-in)
+<!-- ccm:k:nav:end -->
 ## 组件 B — 「最可能被哪项外部事实推翻」检查点
 
+<a id="ccm-k-point-outside-falsification-and-calibration"></a>
+<!-- ccm:k:start point:outside.falsification-and-calibration -->
 把 falsification-first 的 pre-mortem 钉在具体决策步：它就搭 Goal Trace Test 那一拍——recon / dispatch / fill / 扩大投入之前。
 
 先列出方案的承重假设，对每一个问：**哪一项外部事实若为真，会推翻它？该事实的校准成本有多低？** 取「高 stakes × 低校准成本」的那个，先验再投。
@@ -55,8 +65,16 @@
 
 阶梯不是「总取最便宜」，而是「取**能真正落定这个假设**的最便宜手段」。「这个接口到底怎么行为」只有 1 / 3 / 6 能答，问用户是白问；「用户要不要这个 scope / 格式」只有 2 / 5 能答，跑 dogfood 是白跑。**手段配假设类型，成本配 stakes。**
 
+<!-- ccm:k:end point:outside.falsification-and-calibration -->
+<!-- ccm:k:nav:start point:outside.falsification-and-calibration -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:evidence.outside-in](../../../knowledge/modules/evidence.outside-in.md#ccm-k-module-evidence-outside-in)
+<!-- ccm:k:nav:end -->
 ## 组件 D — 无外部通道时：诚实记未知 + 可逆有限实验
 
+<a id="ccm-k-point-outside-unknown-and-amendment"></a>
+<!-- ccm:k:start point:outside.unknown-and-amendment -->
 无通道时有两个反面要一起堵：编造信心（「应该没问题吧」）和永久停摆（干等到用户上线）。协议五步：
 
 1. **诚实记未知**——`ccm log add "假设 X 未验证·当前无外部通道" --kind finding` 记下这个假设本身；你**决定**在无通道时仍可逆推进（见下两步），这个决定才追加一条 `ccm jc add "决定在假设 X 未验证时可逆推进" --category drift --severity <按风险>`（`pending_review`）——jc 记的是这个决定，不是假设本身。
@@ -75,10 +93,24 @@
 
 外部证据是 amendment 的**触发源**；amendment 的**机制**（怎么 amend、revision 规则、重切纪律）归 `references/goal-contract.md`，本文不复述。
 
+<!-- ccm:k:end point:outside.unknown-and-amendment -->
+<!-- ccm:k:nav:start point:outside.unknown-and-amendment -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:evidence.outside-in](../../../knowledge/modules/evidence.outside-in.md#ccm-k-module-evidence-outside-in)
+<!-- ccm:k:nav:end -->
 ## 组件 F — 低风险可逆豁免（过度求证是另一侧悬崖）
 
+<a id="ccm-k-point-outside-low-risk-exception"></a>
+<!-- ccm:k:start point:outside.low-risk-exception -->
 **豁免**（不加任何额外校准仪式，至多记一条 low-severity 的 note / jc 后照常推进）当且仅当三者全中：**低 blast radius ∧ 可逆 ∧ 已有充分事实支撑**。
 
 outside-in 不是「永远向外求证」——那会造出另一种「装忙 / 镀金」：对一个可逆、事实清楚的小改（一个拼写、一行文案）堆问用户 / 起 dogfood / 造 review，是把靶向纪律过度泛化成仪式，和它镜像同源（一个是「闲着就顺手多审别的活」，一个是「怕了就顺手多验这一个活」，本质都是把注意力与预算烧在临界路径外）。
 
 它是**靶向**的：只校准「承重 ∧ 内部推断唯一支撑 ∧ 门控大 / 不可逆投入」的假设；不满足就记为假设、照常推进。**校准过度和校准不足是同一根走廊的两侧悬崖**——一侧是闭门造车（在未验证假设上不可逆大投入），另一侧是过度求证（对低风险可逆事把资源烧在无谓校准上）。走廊中间：与风险相称、能落定假设、最低成本。
+<!-- ccm:k:end point:outside.low-risk-exception -->
+<!-- ccm:k:nav:start point:outside.low-risk-exception -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:evidence.outside-in](../../../knowledge/modules/evidence.outside-in.md#ccm-k-module-evidence-outside-in)
+<!-- ccm:k:nav:end -->

@@ -17,6 +17,10 @@ import {
 } from './compile/surface-verifier.mjs';
 import { resolveTrustedCandidateHostDist } from './compile/trusted-host-dist.mjs';
 import { estimateBudget } from './hash.mjs';
+import {
+  projectCoverageSubgraph,
+  resolveHostCoveragePlan,
+} from './host-coverage.mjs';
 
 function publicDiagnostics(diagnostics) {
   return diagnostics.map(outputDiagnostic);
@@ -83,9 +87,19 @@ function checkRouterBudgets(host, graph, artifacts, diagnostics) {
 
 function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = null }) {
   const diagnostics = [];
+  const { plan, diagnostics: coverageDiagnostics } = resolveHostCoveragePlan(graph);
+  diagnostics.push(...coverageDiagnostics);
+  const hostPlan = plan[host] ?? { mode: 'unsupported', moduleIds: [] };
+  const projectedGraph =
+    hostPlan.mode === 'full'
+      ? graph
+      : projectCoverageSubgraph(graph, hostPlan.moduleIds ?? [], { host });
+  const surfaceMode =
+    hostPlan.mode === 'partial' ? 'partial' : hostPlan.mode === 'full' ? 'canonical' : 'stub';
+
   const built = buildHostArtifacts({
     host,
-    graph,
+    graph: projectedGraph,
     repoRoot,
     hostDistAbsolute,
   });
@@ -134,11 +148,11 @@ function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = n
   const payloadRoot = hostDistAbsolute
     ? path.resolve(hostDistAbsolute)
     : path.join(repoRoot, 'plugin/dist', host);
-  const skillDirs = (graph.skills ?? []).map(
+  const skillDirs = (projectedGraph.skills ?? []).map(
     (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
   );
   const scopedRoots = ['knowledge', ...skillDirs];
-  for (const entry of graph.entries ?? []) {
+  for (const entry of projectedGraph.entries ?? []) {
     for (const surfaceSpec of entry.surfaces ?? []) {
       if (surfaceSpec.host !== host) continue;
       const distRel = entrySurfaceToDistPath(host, surfaceSpec.source_file);
@@ -151,27 +165,27 @@ function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = n
     host,
     payloadRoot,
     repoRoot,
-    mode: 'canonical',
+    mode: surfaceMode === 'partial' ? 'partial' : surfaceMode === 'stub' ? 'stub' : 'canonical',
     scopedRoots,
   });
   diagnostics.push(...surface.diagnostics);
 
   const hops = verifyHopContracts({
     host,
-    graph,
+    graph: projectedGraph,
     surface,
     repoRoot,
     payloadRoot,
   });
   diagnostics.push(...hops.diagnostics);
 
-  const budgets = checkRouterBudgets(host, graph, built.artifacts, diagnostics);
+  const budgets = checkRouterBudgets(host, projectedGraph, built.artifacts, diagnostics);
   const ok = diagnostics.every((item) => item.severity !== 'error');
 
   return {
     host,
     ok,
-    mode: 'canonical',
+    mode: hostPlan.mode === 'full' ? 'canonical' : hostPlan.mode,
     artifacts: [...built.artifacts.keys()]
       .sort()
       .map((item) => ({

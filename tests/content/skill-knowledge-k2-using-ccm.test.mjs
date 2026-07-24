@@ -346,18 +346,22 @@ test('SKG-K2-USING-CCM-04: authored hop budget to critical primary + entry fan-o
   });
 });
 
-test('SKG-K2-USING-CCM-05: live knowledge root still orphans using-ccm until portfolio integration', async () => {
+test('SKG-K2-USING-CCM-05: live knowledge root admits using-ccm in the integrated portfolio', async () => {
   const { buildAndValidateGraph } = await loadGraphTools();
   const built = buildAndValidateGraph({
     repoRoot,
     sourceRoot: 'plugin/src/knowledge',
   });
+  assert.equal(built.ok, true, JSON.stringify(built.diagnostics.filter((d) => d.severity === 'error'), null, 2));
+  assert.ok(
+    built.graph.skills.some((skill) => skill.id === 'skill:using-ccm'),
+    'using-ccm must be present in the integrated portfolio graph',
+  );
   const orphan = built.diagnostics.find(
     (item) =>
       item.code === 'SKG-OWNERSHIP-ORPHAN' && item.witness?.skill === 'skill:using-ccm',
   );
-  assert.ok(orphan, 'expected SKG-OWNERSHIP-ORPHAN until K2-05 adds portfolio.skills');
-  assert.equal(built.ok, false);
+  assert.equal(orphan, undefined, 'using-ccm must not remain an ownership orphan after K2-05');
 });
 
 /**

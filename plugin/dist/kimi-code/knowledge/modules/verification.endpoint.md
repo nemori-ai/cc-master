@@ -8,6 +8,10 @@
 ## Member points
 
 - [端点验收 procedure](../../skills/master-orchestrator-guide/references/resume-verify.md#ccm-k-point-verification-endpoint-procedure)
+- [content hash 与 stale](../../skills/master-orchestrator-guide/references/resume-verify.md#ccm-k-point-verification-hash-and-stale)
+- [异构族系第二视角](../../skills/master-orchestrator-guide/references/resume-verify.md#ccm-k-point-verification-heterogeneous-review)
+- [Loop 收敛闸](../../skills/master-orchestrator-guide/references/resume-verify.md#ccm-k-point-verification-loop-convergence)
+- [resume 接管基线](../../skills/master-orchestrator-guide/references/resume-verify.md#ccm-k-point-verification-resume-takeover)
 - [runtime terminal 不等于 task done](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
 - [summary: routing 链中的 terminal 提醒](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-summary)
 - [canonicalize → runtime terminal 不等于 task done](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done)

@@ -10,6 +10,10 @@
 - [executor 不等于 target surface](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-executor-vs-target)
 - [拿到真实 handle 才算派发](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-handle-gate)
 - [不可换序的八段路由链](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-ordered-chain)
+- [路由承重 owner 地图](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-owner-map)
+- [effect floor、资格与同档 fallback](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-qualification-and-fallback)
+- [任务形状决定 executor](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-task-shape)
+- [workflow 规划语义边界](../../skills/master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-workflow-boundary)
 
 ## Back to atlas
 

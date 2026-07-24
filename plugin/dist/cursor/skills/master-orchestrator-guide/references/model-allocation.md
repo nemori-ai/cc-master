@@ -4,6 +4,8 @@
 
 ## 先判任务，再分模型
 
+<a id="ccm-k-point-capacity-task-first-allocation"></a>
+<!-- ccm:k:start point:capacity.task-first-allocation -->
 同时看三轴：**复杂性**（问题结构有多难）、**不确定性 / 风险**（错了代价多大）、**duration**（会占用多久）。duration 是成本与排期信号，不是智力需求信号：
 
 - 长机械任务优先拆小、切薄；降低 WIP，把非临界部分推迟或放到有真实 handle 的 background，而不是仅因耗时长就升档。
@@ -16,8 +18,16 @@
 
 你先在 [`worker-routing.md`](worker-routing.md#确定-effect-floor) 定 floor，再用本页三轴检查边界案例。不要因为任务很长就升档，不要因为任务在 float 上就降档，也不要因为 master 坐在前台就把组织角色误当 O 资格。具体 target 必须再过 hub 的 [exact qualification](worker-routing.md#做-exact-qualification)；本页不维护型号、surface、窗口或价格目录。
 
+<!-- ccm:k:end point:capacity.task-first-allocation -->
+<!-- ccm:k:nav:start point:capacity.task-first-allocation -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
+<!-- ccm:k:nav:end -->
 ## 可执行排序与 fallback
 
+<a id="ccm-k-point-capacity-ranking-and-contraction"></a>
+<!-- ccm:k:start point:capacity.ranking-and-contraction -->
 排序、taste tie-break 与 fallback 的不可换序合同以 [`worker-routing.md`](worker-routing.md#同档排序与-fallback) 为准。这里额外强调：排序 advisory 不做 provider probe、不写 board、也不替你发车；它只能消费调用方已经完成 live qualification 的候选。把最终选择用到的策略 revision、task taxonomy、evidence refs 与取舍理由记入 routing rationale，不把易腐社区台账复制进 board。
 
 ## 容量收紧时按顺序决策
@@ -31,3 +41,9 @@
 5. 若目标仍要求越过当前容量边界，把范围 / 期限 / 继续消耗的选择立即 surface 给用户；不要替用户跨硬总闸。
 
 账号切换与容量来源只服从 selected-target 的当前事实和既存 policy；未证明的 payer、容量或授权不得作为 fallback。各 provider 的当前边界只从 `pacing-and-estimation` 读取，不在本文复制。
+<!-- ccm:k:end point:capacity.ranking-and-contraction -->
+<!-- ccm:k:nav:start point:capacity.ranking-and-contraction -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
+<!-- ccm:k:nav:end -->

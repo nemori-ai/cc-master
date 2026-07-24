@@ -18,6 +18,8 @@
 
 ---
 
+<a id="ccm-k-point-tdd-iron-law"></a>
+<!-- ccm:k:start point:tdd.iron-law -->
 ## 铁律
 
 ```
@@ -34,6 +36,22 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.iron-law -->
+<!-- ccm:k:nav:start point:tdd.iron-law -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine)
+- [deepens_to: 完成证据闸](./tdd.md#ccm-k-point-tdd-completion-gate)
+- [deepens_to: Constraint parity](./tdd.md#ccm-k-point-tdd-constraint-parity)
+- [deepens_to: 测试困难是设计反馈](./tdd.md#ccm-k-point-tdd-design-feedback)
+- [deepens_to: TDD 与执行循环边界](./tdd.md#ccm-k-point-tdd-loop-boundary)
+- [deepens_to: TDD 合理化与红旗](./tdd.md#ccm-k-point-tdd-rationalizations)
+- [deepens_to: 验证 RED 原因](./tdd.md#ccm-k-point-tdd-red-evidence)
+- [deepens_to: 红绿重构循环](./tdd.md#ccm-k-point-tdd-red-green-loop)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-red-green-loop"></a>
+<!-- ccm:k:start point:tdd.red-green-loop -->
 ## 红绿重构循环
 
 每一个行为变更，无例外地走完这五步：
@@ -78,6 +96,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.red-green-loop -->
+<!-- ccm:k:nav:start point:tdd.red-green-loop -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-red-evidence"></a>
+<!-- ccm:k:start point:tdd.red-evidence -->
 ## 验证失败原因，不只是看它失败
 
 这一点值得单独强调，因为它是最常被跳过的。
@@ -94,6 +121,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.red-evidence -->
+<!-- ccm:k:nav:start point:tdd.red-evidence -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-constraint-parity"></a>
+<!-- ccm:k:start point:tdd.constraint-parity -->
 ## Constraint-Parity Trap：行为一致 ≠ 约束一致
 
 > 回扣根2（契约即 SSOT）：test double 必须强制与真实后端**同样的约束**。
@@ -114,6 +150,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.constraint-parity -->
+<!-- ccm:k:nav:start point:tdd.constraint-parity -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-completion-gate"></a>
+<!-- ccm:k:start point:tdd.completion-gate -->
 ## Completion Gate：证据优于声称
 
 > 回扣根5（证据优于声称）：「done」是关于世界的声称，要事后证据，不接自述。
@@ -132,6 +177,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.completion-gate -->
+<!-- ccm:k:nav:start point:tdd.completion-gate -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-design-feedback"></a>
+<!-- ccm:k:start point:tdd.design-feedback -->
 ## 卡住时怎么读
 
 不知道如何写测试，不等于跳过测试。
@@ -148,6 +202,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.design-feedback -->
+<!-- ccm:k:nav:start point:tdd.design-feedback -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-loop-boundary"></a>
+<!-- ccm:k:start point:tdd.loop-boundary -->
 ## 与 dev-as-ml-loop 的接缝
 
 本文讲「test-first 纪律本身怎么执行」：铁律、红绿重构步骤、constraint-parity、completion gate。
@@ -158,6 +221,15 @@
 
 ---
 
+<!-- ccm:k:end point:tdd.loop-boundary -->
+<!-- ccm:k:nav:start point:tdd.loop-boundary -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-tdd-rationalizations"></a>
+<!-- ccm:k:start point:tdd.rationalizations -->
 ## Rationalization 表
 
 以下每一条都曾被有能力的工程师（或 agent）在即将交付未验证的改动前真诚地说出。读这张表的最佳时机，是**你发现自己开始和纪律谈判的那个时刻**——谈判本身就是症状。
@@ -191,3 +263,10 @@
 - 你准备报告「全绿」，但最后一次编辑之后你没有运行过任何测试。
 
 **恢复路径永远一样**：删掉未测试的产品代码，写失败测试，诚实地重新开始循环。
+<!-- ccm:k:end point:tdd.rationalizations -->
+<!-- ccm:k:nav:start point:tdd.rationalizations -->
+Knowledge navigation:
+- [Knowledge atlas](../../../knowledge/atlas.md)
+- [Module module:craft.test-first](../../../knowledge/modules/craft.test-first.md#ccm-k-module-craft-test-first)
+- [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+<!-- ccm:k:nav:end -->

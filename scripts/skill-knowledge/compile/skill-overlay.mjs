@@ -14,7 +14,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizePointAnchor } from '../host-portability/anchors.mjs';
+import {
+  normalizePointAnchor,
+  sanitizeMarkdownLinkLabel,
+} from '../host-portability/anchors.mjs';
+import {
+  projectCoverageSubgraph,
+  resolveHostCoveragePlan,
+} from '../host-coverage.mjs';
 import {
   atlasDistPath,
   canonicalBindingToDistPath,
@@ -69,7 +76,8 @@ export function ensureTrailingNewline(text) {
 
 function linkLine(label, fromFile, toFile, fragment) {
   const relative = posixRelative(fromFile, toFile);
-  return `- [${label}](${relative}${fragment})`;
+  const safe = sanitizeMarkdownLinkLabel(label);
+  return `- [${safe}](${relative}${fragment})`;
 }
 
 function pointDistPath(host, point) {
@@ -401,8 +409,11 @@ export function applyPointOverlaysToSkillMarkdown({
     }
   }
 
+  // Preserve entry-pin layer: nav ⊥ entry-pin. Compare/rebuild the nav layer only.
+  const preservedPins = [...source.matchAll(ENTRY_PIN_BLOCK_RE)].map((match) => match[0]).join('');
+  const sourceWithoutPins = ensureTrailingNewline(stripEntryPinOverlay(source));
   const base = stripCompilerOwnedOverlay(source);
-  const expected = rebuildPointOverlaysFromBase({
+  const expectedNav = rebuildPointOverlaysFromBase({
     baseText: base,
     host,
     graph,
@@ -411,14 +422,19 @@ export function applyPointOverlaysToSkillMarkdown({
     skillId,
   });
 
-  if (inspection.has_overlay && source !== expected) {
+  if (
+    (inspection.nav_blocks > 0 ||
+      inspection.point_anchors > 0 ||
+      inspection.skill_anchors > 0) &&
+    sourceWithoutPins !== expectedNav
+  ) {
     throw new SkillOverlayError(
       'SKG-OVERLAY-PLAN-MISMATCH',
       `existing compiler-owned overlay does not equal current plan for ${distRel}`,
       { host, distRel },
     );
   }
-  return expected;
+  return ensureTrailingNewline(`${expectedNav.trimEnd()}\n${preservedPins}`);
 }
 
 export function buildEntryPinBlock({ host, entry, graph, distRel }) {
@@ -468,6 +484,23 @@ export function buildEntryPinBlock({ host, entry, graph, distRel }) {
   return `${pinLines.join('\n')}\n`;
 }
 
+/**
+ * Strip only entry-pin blocks. Preserve nav / point anchors / skill anchors so
+ * knowledge SKILL.md surfaces can carry both compiler-owned layers.
+ */
+export function stripEntryPinOverlay(text) {
+  const source = String(text ?? '');
+  const inspection = inspectCompilerOwnedOverlay(source);
+  if (!inspection.ok) {
+    throw new SkillOverlayError(
+      'SKG-OVERLAY-MALFORMED',
+      inspection.issues.map((item) => item.message).join('; '),
+      { issues: inspection.issues },
+    );
+  }
+  return source.replace(ENTRY_PIN_BLOCK_RE, '');
+}
+
 export function applyEntryPinOverlay({ text, host, entry, graph, distRel }) {
   const source = ensureTrailingNewline(text);
   const inspection = inspectCompilerOwnedOverlay(source);
@@ -478,17 +511,11 @@ export function applyEntryPinOverlay({ text, host, entry, graph, distRel }) {
       { issues: inspection.issues, host, distRel },
     );
   }
-  const base = stripCompilerOwnedOverlay(source);
+  // Keep nav/anchors; always rebuild the entry-pin layer (compiler-owned).
+  // Idempotent when already correct; overwrites stale pins after portfolio changes.
+  const base = ensureTrailingNewline(stripEntryPinOverlay(source));
   const pinBlock = buildEntryPinBlock({ host, entry, graph, distRel });
-  const expected = ensureTrailingNewline(`${ensureTrailingNewline(base)}${pinBlock.trimEnd()}\n`);
-  if (inspection.has_overlay && source !== expected) {
-    throw new SkillOverlayError(
-      'SKG-OVERLAY-PLAN-MISMATCH',
-      `existing entry-pin overlay does not equal current plan for ${distRel}`,
-      { host, distRel, entry: entry.id },
-    );
-  }
-  return expected;
+  return ensureTrailingNewline(`${base}${pinBlock.trimEnd()}\n`);
 }
 
 export function applySkillLevelAnchor({ text, skillId }) {
@@ -1032,9 +1059,21 @@ export function applyFinalSkillOverlaysToTree({
   }
 
   const skillId = `skill:${safeSkill}`;
-  const points = (graph.points ?? []).filter((point) => {
+  // Lock nav edges to the same coverage subgraph compile uses. Filtering
+  // pointsForFile alone is not enough — buildPointNavBlock walks graph edges,
+  // so a full graph would emit links to excluded points and diverge from compile.
+  const { plan } = resolveHostCoveragePlan(graph);
+  const hostPlan = plan[safeHost] ?? { mode: 'unsupported', moduleIds: [] };
+  const overlayGraph =
+    hostPlan.mode === 'full'
+      ? graph
+      : projectCoverageSubgraph(graph, hostPlan.moduleIds ?? [], { host: safeHost });
+
+  const points = (overlayGraph.points ?? []).filter((point) => {
     const distRel = pointDistPath(safeHost, point);
-    return distRel && distRel.startsWith(`plugin/dist/${safeHost}/skills/${safeSkill}/`);
+    return Boolean(
+      distRel && distRel.startsWith(`plugin/dist/${safeHost}/skills/${safeSkill}/`),
+    );
   });
   const byDistRel = new Map();
   for (const point of points) {
@@ -1043,7 +1082,7 @@ export function applyFinalSkillOverlaysToTree({
     byDistRel.get(distRel).push(point);
   }
 
-  const skillInGraph = (graph.skills ?? []).some((item) => item.id === skillId);
+  const skillInGraph = (overlayGraph.skills ?? []).some((item) => item.id === skillId);
   if (points.length === 0 && !skillInGraph) {
     // Deterministic no-op: validated graph, known canonical skill slug with no authored coverage.
     return {
@@ -1081,7 +1120,7 @@ export function applyFinalSkillOverlaysToTree({
     const finalBytes = applyPointOverlaysToSkillMarkdown({
       text: raw,
       host: safeHost,
-      graph,
+      graph: overlayGraph,
       distRel,
       pointsForFile: filePoints,
       skillId: relativeInside === 'SKILL.md' && skillInGraph ? skillId : null,
@@ -1143,10 +1182,21 @@ export function applySkillsScopedEntryPins({
     });
   }
 
+  // Same coverage subgraph as compile / point overlays — entry pin module lists
+  // must not advertise excluded modules on partial hosts.
+  const { plan } = resolveHostCoveragePlan(graph);
+  const hostPlan = plan[safeHost] ?? { mode: 'unsupported', moduleIds: [] };
+  const overlayGraph =
+    hostPlan.mode === 'full'
+      ? graph
+      : projectCoverageSubgraph(graph, hostPlan.moduleIds ?? [], { host: safeHost });
+
   const applied = [];
-  for (const entry of graph.entries ?? []) {
+  for (const entry of overlayGraph.entries ?? []) {
     for (const surface of entry.surfaces ?? []) {
       if (surface.host !== safeHost) continue;
+      const targets = surface.targets ?? [];
+      if (targets.length === 0) continue;
       const distRel = entrySurfaceToDistPath(safeHost, surface.source_file);
       if (!distRel) continue;
       const skillsPrefix = `plugin/dist/${safeHost}/skills/`;
@@ -1176,7 +1226,7 @@ export function applySkillsScopedEntryPins({
         text: raw,
         host: safeHost,
         entry,
-        graph,
+        graph: overlayGraph,
         distRel,
       });
       if (stagingRootAbsolute) {

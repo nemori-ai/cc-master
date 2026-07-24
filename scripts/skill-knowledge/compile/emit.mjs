@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizePointAnchor } from '../host-portability/anchors.mjs';
+import {
+  normalizePointAnchor,
+  sanitizeMarkdownLinkLabel,
+} from '../host-portability/anchors.mjs';
 import { estimateBudget } from '../hash.mjs';
 import {
   atlasDistPath,
@@ -376,7 +379,8 @@ function pointDistPath(host, point) {
 
 function linkLine(label, fromFile, toFile, fragment) {
   const relative = posixRelative(fromFile, toFile);
-  return `- [${label}](${relative}${fragment})`;
+  const safe = sanitizeMarkdownLinkLabel(label);
+  return `- [${safe}](${relative}${fragment})`;
 }
 
 /**
@@ -601,10 +605,15 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
         continue;
       }
       try {
+        // Prefer already-materialized nav/anchor bytes from this compile over raw
+        // disk SAP so entry pins compose with point nav on the same SKILL.md.
+        const baseText = artifacts.has(distRel)
+          ? artifacts.get(distRel)
+          : fs.readFileSync(absolute, 'utf8');
         artifacts.set(
           distRel,
           applyEntryPinOverlay({
-            text: fs.readFileSync(absolute, 'utf8'),
+            text: baseText,
             host,
             entry,
             graph,

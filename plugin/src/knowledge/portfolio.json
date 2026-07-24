@@ -12,6 +12,34 @@
     {
       "id": "skill:master-orchestrator-guide",
       "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/skill.json"
+    },
+    {
+      "id": "skill:authoring-workflows",
+      "manifest": "plugin/src/knowledge/skills/authoring-workflows/skill.json"
+    },
+    {
+      "id": "skill:engineering-with-craft",
+      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/skill.json"
+    },
+    {
+      "id": "skill:using-ccm",
+      "manifest": "plugin/src/knowledge/skills/using-ccm/skill.json"
+    },
+    {
+      "id": "skill:dev-as-ml-loop",
+      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/skill.json"
+    },
+    {
+      "id": "skill:slicing-goals-into-dags",
+      "manifest": "plugin/src/knowledge/skills/slicing-goals-into-dags/skill.json"
+    },
+    {
+      "id": "skill:pacing-and-estimation",
+      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/skill.json"
+    },
+    {
+      "id": "skill:distilling-lessons-into-assets",
+      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/skill.json"
     }
   ],
   "entries": [
@@ -122,6 +150,762 @@
           }
         ]
       }
+    },
+    {
+      "id": "entry:workflow-authoring",
+      "label": "Workflow authoring skill entry",
+      "recognition_cues": [
+        "要写或调试 Claude Code Workflow 脚本",
+        "提到 agent()/parallel()/pipeline() 工作流 API"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:workflow.shape-tree"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:authoring-workflows",
+              "module": "module:workflow.selection",
+              "point": "point:workflow.shape-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:workflow.shape-tree"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:authoring-workflows",
+              "module": "module:workflow.selection",
+              "point": "point:workflow.shape-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:workflow.shape-tree"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:authoring-workflows",
+              "module": "module:workflow.selection",
+              "point": "point:workflow.shape-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:workflow.shape-tree"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:authoring-workflows",
+              "module": "module:workflow.selection",
+              "point": "point:workflow.shape-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.workflow-authoring"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:engineering-craft",
+      "label": "Engineering craft skill entry",
+      "recognition_cues": [
+        "设计或实现真实代码时要落地 DDD/OOP/SDD/TDD",
+        "需要共享工程根与工程红线"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:craft.shared-spine"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:engineering-with-craft",
+              "module": "module:craft.foundation",
+              "point": "point:craft.shared-spine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:craft.shared-spine"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:engineering-with-craft",
+              "module": "module:craft.foundation",
+              "point": "point:craft.shared-spine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:craft.shared-spine"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:engineering-with-craft",
+              "module": "module:craft.foundation",
+              "point": "point:craft.shared-spine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:craft.shared-spine"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:engineering-with-craft",
+              "module": "module:craft.foundation",
+              "point": "point:craft.shared-spine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.engineering-craft"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:using-ccm",
+      "label": "using-ccm skill entry",
+      "recognition_cues": [
+        "要用 ccm 操作 board",
+        "查 command catalog 或 board-model"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:ccm.when-to-open"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:using-ccm",
+              "module": "module:ccm.mind-model",
+              "point": "point:ccm.status-state-machine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:ccm.when-to-open"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:using-ccm",
+              "module": "module:ccm.mind-model",
+              "point": "point:ccm.status-state-machine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:ccm.when-to-open"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:using-ccm",
+              "module": "module:ccm.mind-model",
+              "point": "point:ccm.status-state-machine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:ccm.when-to-open"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:using-ccm",
+              "module": "module:ccm.mind-model",
+              "point": "point:ccm.status-state-machine"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/using-ccm/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.using-ccm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:dev-as-ml-loop",
+      "label": "dev-as-ml-loop skill entry",
+      "recognition_cues": [
+        "把一个已切好的任务当 ML 优化循环做到验收",
+        "需要 objective / 迭代测量 / plateau→restart"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:devloop.objective"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:dev-as-ml-loop",
+              "module": "module:devloop.core",
+              "point": "point:devloop.objective"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:devloop.objective"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:dev-as-ml-loop",
+              "module": "module:devloop.core",
+              "point": "point:devloop.objective"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:devloop.objective"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:dev-as-ml-loop",
+              "module": "module:devloop.core",
+              "point": "point:devloop.objective"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:devloop.objective"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:dev-as-ml-loop",
+              "module": "module:devloop.core",
+              "point": "point:devloop.objective"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.dev-as-ml-loop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:slicing-goals-into-dags",
+      "label": "slicing-goals-into-dags skill entry",
+      "recognition_cues": [
+        "要把目标切成 board DAG",
+        "需要纵切薄增量或 walking skeleton"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:slicing.vertical-rule"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:slicing-goals-into-dags",
+              "module": "module:slicing.vertical",
+              "point": "point:slicing.vertical-rule"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:slicing.vertical-rule"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:slicing-goals-into-dags",
+              "module": "module:slicing.vertical",
+              "point": "point:slicing.vertical-rule"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:slicing.vertical-rule"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:slicing-goals-into-dags",
+              "module": "module:slicing.vertical",
+              "point": "point:slicing.vertical-rule"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:slicing.vertical-rule"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:slicing-goals-into-dags",
+              "module": "module:slicing.vertical",
+              "point": "point:slicing.vertical-rule"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.slicing-goals-into-dags"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:pacing-and-estimation",
+      "label": "pacing-and-estimation skill entry",
+      "recognition_cues": [
+        "读 ccm usage/estimate advisory 做配速",
+        "选模型档或读配额信号"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/pacing-and-estimation/canonical/SKILL.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "pacing-and-estimation"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:pacing-and-estimation",
+              "module": "module:pacing.signals",
+              "point": "point:pacing.machine-wide-first"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/pacing-and-estimation/canonical/SKILL.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "pacing-and-estimation"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:pacing-and-estimation",
+              "module": "module:pacing.signals",
+              "point": "point:pacing.machine-wide-first"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/pacing-and-estimation/canonical/SKILL.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "pacing-and-estimation"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:pacing-and-estimation",
+              "module": "module:pacing.signals",
+              "point": "point:pacing.machine-wide-first"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/pacing-and-estimation/canonical/SKILL.md",
+          "binding": {
+            "kind": "anchor",
+            "value": "pacing-and-estimation"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:pacing-and-estimation",
+              "module": "module:pacing.signals",
+              "point": "point:pacing.machine-wide-first"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.pacing-and-estimation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "entry:distilling-lessons-into-assets",
+      "label": "distilling-lessons-into-assets skill entry",
+      "recognition_cues": [
+        "把候选经验路由到纪律文档/skill/workflow/subagent",
+        "蒸馏时要守证据忠实性"
+      ],
+      "surfaces": [
+        {
+          "host": "claude-code",
+          "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:distill.routing-overview"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:distilling-lessons-into-assets",
+              "module": "module:distill.routing",
+              "point": "point:distill.routing-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "codex",
+          "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:distill.routing-overview"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:distilling-lessons-into-assets",
+              "module": "module:distill.routing",
+              "point": "point:distill.routing-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "cursor",
+          "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:distill.routing-overview"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:distilling-lessons-into-assets",
+              "module": "module:distill.routing",
+              "point": "point:distill.routing-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        },
+        {
+          "host": "kimi-code",
+          "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+          "binding": {
+            "kind": "marker",
+            "value": "point:distill.routing-overview"
+          },
+          "surface_kind": "skill_entry",
+          "targets": [
+            {
+              "skill": "skill:distilling-lessons-into-assets",
+              "module": "module:distill.routing",
+              "point": "point:distill.routing-tree"
+            }
+          ],
+          "lifecycle": {
+            "state": "accepted",
+            "since": "2026-07-24"
+          }
+        }
+      ],
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "golden.entry.distilling-lessons-into-assets"
+          }
+        ]
+      }
     }
   ],
   "hop_policy": {
@@ -132,15 +916,15 @@
     "primary_entry_to_primary_max": 2
   },
   "critical_pin_budget": {
-    "max_modules": 2,
-    "max_fraction": 1
+    "max_modules": 4,
+    "max_fraction": 0.1
   },
   "router_budget": {
-    "atlas_max_lines": 120,
-    "atlas_max_tokens": 1800,
+    "atlas_max_lines": 220,
+    "atlas_max_tokens": 2800,
     "module_max_lines": 80,
     "module_max_tokens": 1200,
     "point_nav_max_lines": 4
   },
-  "rollout": "K1"
+  "rollout": "K2"
 }

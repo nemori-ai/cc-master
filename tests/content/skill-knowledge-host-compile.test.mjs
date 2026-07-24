@@ -16,33 +16,18 @@ const validateOutput = require('../../scripts/skill-knowledge/validators/validat
 
 const PRODUCT_HOSTS = Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']);
 
-const EXPECTED_POINT_IDS = Object.freeze([
-  'point:conduct.deserting-podium',
-  'point:conduct.never-play',
-  'point:conduct.red-lines',
-  'point:routing.executor-vs-target',
-  'point:routing.handle-gate',
-  'point:routing.ordered-chain',
-  'point:verification.endpoint-procedure',
-  'point:verification.terminal-is-not-done',
-  'point:verification.terminal-summary',
+const REQUIRED_SKILL_IDS = Object.freeze([
+  'skill:master-orchestrator-guide',
+  'skill:authoring-workflows',
+  'skill:engineering-with-craft',
+  'skill:using-ccm',
+  'skill:dev-as-ml-loop',
+  'skill:slicing-goals-into-dags',
+  'skill:pacing-and-estimation',
+  'skill:distilling-lessons-into-assets',
 ]);
 
 /** Runtime edge classes counted from final clickable relative links (not prose). */
-const EXPECTED_EDGE_CLASS_BREAKDOWN = Object.freeze({
-  'entry->point': 3,
-  'entry->module': 3,
-  'knowledge->point': 11,
-  'knowledge->module': 3,
-  'knowledge->atlas': 3,
-  'point->atlas': 9,
-  'point->module': 9,
-  'point->point': 10,
-});
-const EXPECTED_ENABLED_EDGES = Object.freeze(
-  Object.values(EXPECTED_EDGE_CLASS_BREAKDOWN).reduce((sum, n) => sum + n, 0),
-);
-
 function classifyEnabledEdge(edge) {
   const from = edge.from_file.startsWith('knowledge/')
     ? 'knowledge'
@@ -72,6 +57,7 @@ function runCli(args, options = {}) {
   return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: options.cwd ?? repoRoot,
     encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
     env: { ...process.env, ...(options.env ?? {}) },
   });
 }
@@ -225,7 +211,7 @@ test('SKG-COMPILE-01: contract flips runtime_projection and lists compile+change
   assert.ok(body.implemented_commands.includes('change'));
 });
 
-test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves host-native entry/token divergence', async () => {
+test('SKG-COMPILE-02: four-host compile proves honest coverage modes, H1-H4, and host-native entry/token divergence', async () => {
   await withIsolatedSkillKnowledgeRepo(
     async ({ repoRoot: isoRoot, runCli: isoCli }) => {
       const body = parseJson(isoCli(['compile', '--json']));
@@ -242,20 +228,30 @@ test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves 
       } = await import('../../scripts/skill-knowledge/compile/surface-verifier.mjs');
       const { entrySurfaceToDistPath } = await import('../../scripts/skill-knowledge/compile/paths.mjs');
       const { buildAndValidateGraph } = await import('../../scripts/skill-knowledge/graph.mjs');
+      const {
+        resolveHostCoveragePlan,
+        projectCoverageSubgraph,
+      } = await import('../../scripts/skill-knowledge/host-coverage.mjs');
       const { executeHostTokenContract } = await import(
         '../../scripts/skill-knowledge/host-portability/adapter-contract.mjs'
       );
 
-      const graph = buildAndValidateGraph({
+      const built = buildAndValidateGraph({
         repoRoot: isoRoot,
         sourceRoot: 'plugin/src/knowledge',
-      }).graph;
+      });
+      assert.equal(built.ok, true);
+      const graph = built.graph;
       assert.deepEqual(
-        graph.points.map((point) => point.id).sort(),
-        [...EXPECTED_POINT_IDS],
-        'authored point identities must be exactly the K1 pilot set',
+        graph.skills.map((skill) => skill.id).sort(),
+        [...REQUIRED_SKILL_IDS].sort(),
+        'authored skills must be the full eight-skill portfolio',
       );
+      assert.equal(graph.entries.length, 8, 'portfolio must expose eight entry surfaces');
+      assert.ok(graph.points.length >= 200, `expected full-portfolio points, got ${graph.points.length}`);
+      assert.equal(new Set(graph.points.map((point) => point.id)).size, graph.points.length);
 
+      const { plan } = resolveHostCoveragePlan(graph);
       const knowledgeDigests = new Map();
       const nativeFingerprints = new Map();
 
@@ -263,25 +259,50 @@ test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves 
         const result = body.host_results.find((item) => item.host === host);
         assert.ok(result, `missing host_results for ${host}`);
         assert.equal(result.ok, true, `${host}: ${JSON.stringify(result)}`);
-        assert.equal(result.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} enabled edge count`);
-        assert.equal(result.point_anchors, EXPECTED_POINT_IDS.length, `${host} point anchors`);
+
+        const hostPlan = plan[host];
+        assert.ok(hostPlan, `${host} coverage plan`);
+        const expectedMode = hostPlan.mode === 'full' ? 'canonical' : hostPlan.mode;
+        assert.equal(result.mode, expectedMode, `${host} compile mode must match coverage honesty`);
+
+        const coverageGraph =
+          hostPlan.mode === 'full'
+            ? graph
+            : projectCoverageSubgraph(graph, hostPlan.moduleIds ?? [], { host });
+        assert.equal(
+          result.point_anchors,
+          coverageGraph.points.length,
+          `${host} point anchors must equal coverage denominator`,
+        );
+        assert.ok(result.enabled_edges > 0, `${host} must expose enabled runtime edges`);
 
         for (const gate of ['H1', 'H2', 'H3', 'H4']) {
           assert.equal(result.hop_report[gate].ok, true, `${host} ${gate}`);
           assert.ok(result.hop_report[gate].witness, `${host} ${gate} witness`);
           assert.ok(result.hop_report[gate].remediation, `${host} ${gate} remediation`);
         }
+        if (result.hop_report.H2.witness?.diameter != null) {
+          assert.ok(
+            result.hop_report.H2.witness.diameter <= 3,
+            `${host} H2 diameter must be ≤3`,
+          );
+        }
 
         const knowledge = snapshotKnowledgeTree(host, isoRoot);
         assert.ok(knowledge.files.length > 0, `${host} knowledge tree`);
         knowledgeDigests.set(host, knowledge.digest);
+        assert.equal(
+          knowledge.files.filter((file) => file.path.startsWith('modules/')).length,
+          coverageGraph.modules.length,
+          `${host} module routers must match coverage modules`,
+        );
 
         const payloadRoot = path.join(isoRoot, 'plugin/dist', host);
-        const skillDirs = (graph.skills ?? []).map(
+        const skillDirs = (coverageGraph.skills ?? []).map(
           (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
         );
         const scopedRoots = ['knowledge', ...skillDirs];
-        for (const entry of graph.entries ?? []) {
+        for (const entry of coverageGraph.entries ?? []) {
           for (const surfaceSpec of entry.surfaces ?? []) {
             if (surfaceSpec.host !== host) continue;
             const distRel = entrySurfaceToDistPath(host, surfaceSpec.source_file);
@@ -294,18 +315,27 @@ test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves 
           host,
           payloadRoot,
           repoRoot: isoRoot,
-          mode: 'canonical',
+          mode: expectedMode === 'canonical' ? 'canonical' : expectedMode,
           scopedRoots,
         });
-        assert.equal(surface.enabled_edges, EXPECTED_ENABLED_EDGES, `${host} reparsed edges`);
+        assert.equal(surface.enabled_edges, result.enabled_edges, `${host} reparsed edges`);
         const breakdown = {};
         for (const edge of surface.enabled_edge_list) {
           const key = classifyEnabledEdge(edge);
           breakdown[key] = (breakdown[key] ?? 0) + 1;
         }
-        assert.deepEqual(breakdown, { ...EXPECTED_EDGE_CLASS_BREAKDOWN }, `${host} edge-class breakdown`);
+        assert.ok(
+          Object.keys(breakdown).length >= 4,
+          `${host} must expose multiple edge classes, got ${JSON.stringify(breakdown)}`,
+        );
+        assert.ok(
+          (breakdown['point->atlas'] ?? 0) > 0 && (breakdown['point->module'] ?? 0) > 0,
+          `${host} point nav must reach atlas and modules`,
+        );
 
-        const entry = (graph.entries ?? [])[0];
+        const entry = (coverageGraph.entries ?? []).find((item) =>
+          (item.surfaces ?? []).some((surfaceSpec) => surfaceSpec.host === host),
+        );
         const surfaceSpec = (entry?.surfaces ?? []).find((item) => item.host === host);
         assert.ok(surfaceSpec, `${host} entry surface`);
         const entryDist = entrySurfaceToDistPath(host, surfaceSpec.source_file);
@@ -332,11 +362,15 @@ test('SKG-COMPILE-02: four-host compile keeps shared knowledge bytes and proves 
       }
 
       assert.equal(nativeFingerprints.size, PRODUCT_HOSTS.length);
-      // Shared knowledge bytes across hosts are allowed and honestly accepted.
+      // Full host keeps the complete knowledge tree; partial hosts may share a pruned digest.
+      assert.ok(
+        knowledgeDigests.get('claude-code') !== knowledgeDigests.get('codex'),
+        'full-host knowledge tree must differ from partial-host pruned projection',
+      );
       assert.equal(
-        new Set(knowledgeDigests.values()).size,
-        1,
-        'K1 pilot knowledge routers are host-shared byte-identical; anti-relabel must not require knowledge forks',
+        knowledgeDigests.get('codex'),
+        knowledgeDigests.get('cursor'),
+        'codex/cursor share the same partial coverage denominator today',
       );
     },
     { warmHosts: [...PRODUCT_HOSTS] },

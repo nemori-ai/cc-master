@@ -424,6 +424,7 @@ export function withIsolatedSkillKnowledgeRepo(fn, options = {}) {
       spawnSync(process.execPath, [cliPath, ...args], {
         cwd: spawnOptions.cwd ?? repoCopy,
         encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
         env: { ...process.env, ...(spawnOptions.env ?? {}) },
       });
     const result = fn({

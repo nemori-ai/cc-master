@@ -143,7 +143,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.equal(body.hardening_contract.C14.governance_meta_skill_is_runtime, false);
 });
 
-test('SKG-CLI-02: K0 check reads the admitted pilot inventory without coverage-empty debt', () => {
+test('SKG-CLI-02: K0 check reads the admitted full-portfolio inventory without coverage-empty debt', () => {
   const result = runCli(['check', '--stage', 'K0', '--json']);
   assert.equal(result.status, 0, result.stderr);
   const body = parseJson(result);
@@ -154,10 +154,10 @@ test('SKG-CLI-02: K0 check reads the admitted pilot inventory without coverage-e
   assert.equal(body.result_kind, 'check');
   assert.equal(body.stage, 'K0');
   assert.equal(body.source_root, 'plugin/src/knowledge');
-  assert.equal(body.summary.documents, 5);
+  assert.ok(body.summary.documents >= 50, `expected full-portfolio documents, got ${body.summary.documents}`);
   assert.equal(body.summary.portfolio, 1);
-  assert.equal(body.summary.skill, 1);
-  assert.equal(body.summary.module, 3);
+  assert.equal(body.summary.skill, 8);
+  assert.ok(body.summary.module >= 40, `expected full-portfolio modules, got ${body.summary.module}`);
   assert.equal(body.summary.errors, 0);
   assert.equal(body.summary.debts, 0);
   assert.equal(body.capabilities.full_json_schema_validation, true);
@@ -626,7 +626,7 @@ test('SKG-DOC-01: K0 check success sample uses the executable capability map', (
   );
 });
 
-test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/src/AGENTS stay truthful about K1', () => {
+test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/src/AGENTS stay truthful about K2', () => {
   const knowledgeContract = fs.readFileSync(
     path.join(repoRoot, 'plugin', 'src', 'knowledge', 'CONTRACT.md'),
     'utf8',
@@ -643,6 +643,17 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
   const pluginSrcAgents = fs.readFileSync(
     path.join(repoRoot, 'plugin', 'src', 'AGENTS.md'),
     'utf8',
+  );
+
+  assert.match(
+    knowledgeContract,
+    /\bK2\b/,
+    'knowledge CONTRACT must state current maturity is K2',
+  );
+  assert.match(
+    knowledgeContract,
+    /eight\s+runtime\s+skills|8\s+runtime\s+skills|full\s+portfolio/i,
+    'knowledge CONTRACT must state eight-skill full portfolio inventory',
   );
 
   // Host portability: four-host fixture probe is delivered (capability=true); check --host CLI is not.
@@ -679,12 +690,17 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
     'must acknowledge standalone Draft 2020-12 validators / three bundles are landed',
   );
 
-  // design_docs README: current maturity is K1 pilot with real inventory + delivered query surface.
-  assert.match(designReadme, /K1\s+pilot/i, 'README must state current maturity is K1 pilot');
+  // design_docs README: current maturity is K2 full portfolio with real inventory + delivered query surface.
+  assert.match(designReadme, /\bK2\b/, 'README must state current maturity is K2');
   assert.match(
     designReadme,
-    /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
-    'README must state real inventory is 3 modules / 9 points',
+    /8\s+(admitted\s+)?runtime\s+skills?|eight\s+runtime\s+skills?|full\s+portfolio\s+inventory/i,
+    'README must state real inventory is eight runtime skills / full portfolio',
+  );
+  assert.doesNotMatch(
+    designReadme,
+    /当前是\s*\*\*K1\s+pilot\*\*|已落真实 inventory[：:]\s*\*\*1\*\*\s+admitted skill|3\s+modules?\s*\/\s*9\s+points?/i,
+    'README must not keep the retired K1 pilot inventory claim as current truth',
   );
   for (const command of ['change', 'check', 'contract', 'compile', 'report', 'path', 'explain']) {
     assert.match(
@@ -826,13 +842,18 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
   );
   assert.match(
     pluginSrcAgents,
-    /K1\s+pilot/i,
-    'plugin/src/AGENTS.md must state current knowledge maturity is K1 pilot',
+    /\bK2\b/,
+    'plugin/src/AGENTS.md must state current knowledge maturity is K2',
   );
   assert.match(
     pluginSrcAgents,
-    /3\s+modules?[\s\/,与和]+9\s+points?|three\s+modules?[\s\/,and]+9\s+points?/i,
-    'plugin/src/AGENTS.md must state authored inventory is 3 modules / 9 points',
+    /8\s+runtime\s+skills?|full\s+portfolio\s+inventory/i,
+    'plugin/src/AGENTS.md must state authored inventory is eight runtime skills / full portfolio',
+  );
+  assert.doesNotMatch(
+    pluginSrcAgents,
+    /K1\s+pilot\s+已落\s*3\s+modules?[\s\/,与和]+9\s+points?/i,
+    'plugin/src/AGENTS.md must not keep the retired K1 pilot inventory claim',
   );
   for (const command of ['change', 'check', 'compile', 'contract', 'explain', 'path', 'report']) {
     assert.match(

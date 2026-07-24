@@ -19,6 +19,7 @@ export {
   inspectHtmlAnchorIds,
   isPortableAnchorId,
   normalizePointAnchor,
+  sanitizeMarkdownLinkLabel,
   splitLinkTarget,
 } from './anchors.mjs';
 export { probeAllHostFixtures, probeHostPayload } from './probe.mjs';

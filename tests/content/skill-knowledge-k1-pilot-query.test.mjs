@@ -86,18 +86,18 @@ function copyPilotSource(targetRoot, sourceRepoRoot = repoRoot) {
   fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
 }
 
-test('SKG-PILOT-01: K1 check loads three modules and 8-12 points with stable graph hash', () => {
-  const first = parseJson(runCli(['check', '--stage', 'K1', '--json']));
-  const second = parseJson(runCli(['check', '--stage', 'K1', '--json']));
+test('SKG-PILOT-01: check loads full portfolio inventory with stable graph hash', () => {
+  const first = parseJson(runCli(['check', '--stage', 'K2', '--json']));
+  const second = parseJson(runCli(['check', '--stage', 'K2', '--json']));
   assertValidCliOutput(first, 'check success');
   assert.equal(first.ok, true);
-  assert.equal(first.summary.module, 3);
-  assert.equal(first.summary.skill, 1);
+  assert.equal(first.summary.skill, 8);
   assert.equal(first.summary.portfolio, 1);
+  assert.ok(first.summary.module >= 40, `expected full-portfolio modules, got ${first.summary.module}`);
   assert.equal(typeof first.graph_hash, 'string');
   assert.match(first.graph_hash, /^[a-f0-9]{64}$/);
   assert.equal(first.graph_hash, second.graph_hash);
-  assert.ok(first.summary.debts >= 1);
+  assert.equal(first.summary.errors, 0);
   assert.equal(
     first.diagnostics.every((item) => item.severity !== 'error' || Boolean(item.witness)),
     true,
@@ -106,12 +106,13 @@ test('SKG-PILOT-01: K1 check loads three modules and 8-12 points with stable gra
   const report = parseJson(runCli(['report', '--json']));
   assertValidCliOutput(report, 'report success');
   assert.equal(report.result_kind, 'report');
-  assert.equal(report.structural_status.state, 'debt');
+  assert.equal(report.structural_status.state, 'pass');
   assert.equal(report.behavioral_evidence_status.state, 'not_run');
   assert.equal(Object.hasOwn(report, 'improvement_claim'), false);
-  assert.ok(report.structural_status.counts.point >= 8);
-  assert.ok(report.structural_status.counts.point <= 12);
-  assert.equal(report.structural_status.counts.point, 9);
+  assert.equal(report.structural_status.counts.skill, 8);
+  assert.equal(report.structural_status.counts.entry, 8);
+  assert.ok(report.structural_status.counts.point >= 200);
+  assert.equal(report.structural_status.counts.module, first.summary.module);
   assert.equal(report.graph_hash, first.graph_hash);
 });
 

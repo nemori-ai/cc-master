@@ -375,6 +375,7 @@ function projectSkillsIntoStaging({
   const skillsStaging = path.join(stagingAbsolute, 'skills');
   requireDir(skillsSrc);
   fs.mkdirSync(skillsStaging, { recursive: true });
+  const deferredGuidance = [];
 
   for (const skill of fs.readdirSync(skillsSrc).sort()) {
     if (skill.startsWith('_')) continue;
@@ -399,20 +400,19 @@ function projectSkillsIntoStaging({
       skillTree: projectionTarget,
       stagingRoot: stagingAbsolute,
     });
-    if (mode === 'accepted') {
-      attestProjectedSkillTree({
-        plan,
-        projectionTarget,
-        repoRoot,
-        attestationMode: mode,
-      });
-    } else if (plan.readOnlyContract) {
+    // Pacing registry fingerprints overlay-only trees (no entry pins).
+    if (plan.readOnlyContract) {
       assertPacingRenderedArtifact(
         plan.pacingRegistry,
         plan.readOnlyContract.host,
         plan.pacingRenderedBody,
       );
       assertPacingRuntimeTree(plan.pacingRegistry, plan.readOnlyContract.host, projectionTarget);
+    }
+    // Provider-guidance accepted_final includes skills-scoped entry pins when the
+    // guidance skill is itself a skill_entry surface — defer until after pins.
+    if (mode === 'accepted' && plan.providerGuidanceContract) {
+      deferredGuidance.push({ plan, projectionTarget });
     }
   }
 
@@ -423,6 +423,18 @@ function projectSkillsIntoStaging({
     stagingRoot: stagingAbsolute,
     skillsTree: skillsStaging,
   });
+
+  if (mode === 'accepted') {
+    for (const { plan, projectionTarget } of deferredGuidance) {
+      const registry = loadProviderGuidanceRegistry(plan.providerGuidanceRegistryPath, repoRoot);
+      assertProviderGuidanceRuntimeTree(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
+  }
 }
 
 function projectNonSkillSurfaces({ repoRoot, host, stagingAbsolute }) {
@@ -705,13 +717,8 @@ function projectAndPublishHostSurface({
             projectionTarget,
           );
         }
-        if (plan.readOnlyContract) {
-          assertPacingRuntimeTree(
-            plan.pacingRegistry,
-            plan.readOnlyContract.host,
-            projectionTarget,
-          );
-        }
+        // Do not re-assert pacing here: entry pins may already be on SKILL.md, and
+        // the pacing registry fingerprints overlay-only trees (asserted pre-pin above).
       }
     }
 

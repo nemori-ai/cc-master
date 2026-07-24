@@ -144,6 +144,7 @@ function projectAndPublishSkillsSurface({
   }
 
   try {
+    const deferredGuidance = [];
     for (const skill of fs.readdirSync(skillsSrc).sort()) {
       if (skill.startsWith('_')) continue;
       if (!fs.statSync(path.join(skillsSrc, skill)).isDirectory()) continue;
@@ -162,16 +163,7 @@ function projectAndPublishSkillsSurface({
         stagingRoot: stagingAbsolute,
       });
       if (plan.providerGuidanceContract) {
-        const registry = loadProviderGuidanceRegistry(
-          plan.providerGuidanceRegistryPath,
-          root,
-        );
-        assertProviderGuidanceRuntimeTree(
-          registry,
-          plan.providerGuidanceContract.host,
-          plan.providerGuidanceContract.skill,
-          projectionTarget,
-        );
+        deferredGuidance.push({ plan, projectionTarget });
       }
       if (plan.readOnlyContract) {
         assertPacingRenderedArtifact(
@@ -190,6 +182,19 @@ function projectAndPublishSkillsSurface({
       stagingRoot: stagingAbsolute,
       skillsTree: stagingAbsolute,
     });
+
+    for (const { plan, projectionTarget } of deferredGuidance) {
+      const registry = loadProviderGuidanceRegistry(
+        plan.providerGuidanceRegistryPath,
+        root,
+      );
+      assertProviderGuidanceRuntimeTree(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
 
     // Dev-test-only seam: runs after initial check + staging fill, before publish.
     // Production sync must not pass beforePublish.

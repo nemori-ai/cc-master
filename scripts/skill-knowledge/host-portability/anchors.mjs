@@ -227,6 +227,17 @@ export function extractMarkdownLinks(markdown) {
   return links;
 }
 
+/**
+ * Make a label safe inside `[label](target)` — ASCII `[]` would truncate the
+ * CommonMark link text matcher (`[^\]]*`) and silently drop the edge.
+ * Fullwidth brackets preserve the visual cue without breaking parse.
+ */
+export function sanitizeMarkdownLinkLabel(label) {
+  return String(label ?? '')
+    .replace(/\[/g, '［')
+    .replace(/\]/g, '］');
+}
+
 export function splitLinkTarget(target) {
   const hashIndex = target.indexOf('#');
   if (hashIndex < 0) {

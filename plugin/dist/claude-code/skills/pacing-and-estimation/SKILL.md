@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-pacing-and-estimation"></a>
 ---
 name: pacing-and-estimation
 description: 'Use when 你（orchestrator/agent）从 Claude Code origin 读取 ccm 的只读 advisory 与估算——包括全机 Claude Code / Codex / Cursor / Kimi Code target 的 quota posture、四 provider 统一 `model-policy` 的 O/T1/T2/T3 候选，以及 ETA、EVM、风险和 cost-to-complete。Triggers: 读 `ccm quota status --machine-wide`、`ccm usage show|advise`、`ccm model-policy show|advise`、estimate 输出或 pacing hook 通知，判断某个 target 的窗口、来源、freshness、verdict、affinity 或 forecast 是否可信。Do NOT use when要决定减速、换号、停派、replan、用户升级、最终模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、account 操作、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要写 workflow 脚本（归 authoring-workflows）。所有 origin 共享同一 machine-wide target 视角；信号仍须绑定精确 surface，ccm 只提供事实与 advisory。'
@@ -55,3 +56,16 @@ description: 'Use when 你（orchestrator/agent）从 Claude Code origin 读取 
 - **[references/estimation.md](references/estimation.md)** — estimate 字段、baseline-derived 事实与不确定性读法。
 - **[references/pool-aware-advice.md](references/pool-aware-advice.md)** — 已经产出的 own row 与 pool-aware 通知读法。
 - **[references/cross-harness-target-facts.md](references/cross-harness-target-facts.md)** — 从任意 origin 解释 selected target 的 inventory、model 与 quota envelope。
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:pacing-and-estimation:
+- [先全局再下钻](./references/usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [Module module:pacing.estimation](../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
+- [primary: 六 estimate verb 消费映射](./references/estimation.md#ccm-k-point-pacing-estimate-verbs)
+- [Module module:pacing.levers](../../knowledge/modules/pacing.levers.md#ccm-k-module-pacing-levers)
+- [primary: 只在上界收紧](./references/pacing-levers.md#ccm-k-point-pacing-upper-bound-only)
+- [Module module:pacing.model-facts](../../knowledge/modules/pacing.model-facts.md#ccm-k-module-pacing-model-facts)
+- [Module module:pacing.pool](../../knowledge/modules/pacing.pool.md#ccm-k-module-pacing-pool)
+- [Module module:pacing.signals](../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
+- [Module module:pacing.target-facts](../../knowledge/modules/pacing.target-facts.md#ccm-k-module-pacing-target-facts)
+- [primary: selected target 事实绑定](./references/cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts)
+<!-- ccm:k:entry-pin:end -->
