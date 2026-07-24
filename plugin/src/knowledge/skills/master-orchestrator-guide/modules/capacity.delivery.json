@@ -1,0 +1,71 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:capacity.delivery",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "容量与截止期决策",
+  "intent": "在 effect floor、selected-target 事实、容量走廊与交付 DDL 之间做守边界的资源决策。",
+  "recognition_cues": ["容量收紧", "需要分配模型档", "board 背着交付 DDL"],
+  "boundary": {"includes": ["模型分配", "容量收缩顺序", "DDL 编排纪律"], "excludes": ["动态 provider catalog", "account 换号授权与命令"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "仅在模型容量或交付 DDL 场景命中时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "model-allocation.md + deadline-discipline.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-capacity-delivery-review"}]},
+  "points": [
+    {
+      "id": "point:capacity.task-first-allocation",
+      "title": "先判任务再分模型",
+      "point_kind": "decision_rule",
+      "summary": "先由复杂性、风险与错误代价定 effect floor，再看具体 target 与 duration。",
+      "recognition_cues": ["按品牌先选模型", "临界任务想直接升档"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md", "marker": "point:capacity.task-first-allocation", "heading_hint": "先判任务"},
+      "authority": {"role": "canonical", "subject": "subject:capacity.task-first-allocation"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "model-allocation.md task first"}], "verifiers": [{"kind": "review", "ref": "k2.point.capacity.task-first"}]}
+    },
+    {
+      "id": "point:capacity.ranking-and-contraction",
+      "title": "同档排序与容量收缩",
+      "point_kind": "procedure",
+      "summary": "只排已资格化同档候选；容量紧时先换同档、降 WIP、推迟 float，再 surface 重 lever。",
+      "recognition_cues": ["容量不足但不能降 floor", "需要排序 fallback"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md", "marker": "point:capacity.ranking-and-contraction", "heading_hint": "可执行排序与 fallback"},
+      "authority": {"role": "canonical", "subject": "subject:capacity.ranking-and-contraction"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "model-allocation.md ranking"}], "verifiers": [{"kind": "review", "ref": "k2.point.capacity.contraction"}]}
+    },
+    {
+      "id": "point:deadline.constraint-axes",
+      "title": "交付 DDL 与容量轴正交",
+      "point_kind": "principle",
+      "summary": "截止期是交付约束，quota 是资源约束；两轴不能互相冒充。",
+      "recognition_cues": ["把 quota 紧当成 DDL", "把 DDL 当成降质量授权"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md", "marker": "point:deadline.constraint-axes", "heading_hint": "两条约束轴"},
+      "authority": {"role": "canonical", "subject": "subject:deadline.constraint-axes"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "deadline-discipline.md axes"}], "verifiers": [{"kind": "review", "ref": "k2.point.deadline.axes"}]}
+    },
+    {
+      "id": "point:deadline.nine-disciplines",
+      "title": "DDL 九条编排纪律",
+      "point_kind": "decision_rule",
+      "summary": "倒排、守 acceptance、以简单性和 slack 管风险、尽早 surface、提前收口且不镀金。",
+      "recognition_cues": ["当前 board 有 asserted/confirmed DDL"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md", "marker": "point:deadline.nine-disciplines", "heading_hint": "九条纪律"},
+      "authority": {"role": "canonical", "subject": "subject:deadline.nine-disciplines"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "deadline-discipline.md nine rules"}], "verifiers": [{"kind": "review", "ref": "k2.point.deadline.rules"}]}
+    },
+    {
+      "id": "point:deadline.guards-and-boundary",
+      "title": "DDL 合理化守卫与 owner 边界",
+      "point_kind": "check",
+      "summary": "识别以速度之名扩 scope、隐瞒风险或复述其它 owner 机制的合理化。",
+      "recognition_cues": ["想等风险确定再 surface", "准备复制别处的方法论"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md", "marker": "point:deadline.guards-and-boundary", "heading_hint": "合理化"},
+      "authority": {"role": "canonical", "subject": "subject:deadline.guards-and-boundary"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "deadline-discipline.md guards"}], "verifiers": [{"kind": "review", "ref": "k2.point.deadline.guards"}]}
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:capacity.account-switch",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "账号切换决策锚",
+  "intent": "仅在订阅账号池语义存在时守住换号 lever 的授权 gate 与切后重验序列。",
+  "recognition_cues": ["selected target hard quota 烧穿", "考虑换账号", "需要重验 payer/quota binding"],
+  "boundary": {"includes": ["换号触发条件", "用户授权边界", "切换后 recon"], "excludes": ["account CLI 实现", "不支持订阅号池的 host"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "仅在 host 支持订阅账号池且真实触发换号 lever 时 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-account-switch-review"}]},
+  "points": [
+    {
+      "id": "point:capacity.account-switch-gate",
+      "title": "换号 lever 授权 gate",
+      "point_kind": "boundary",
+      "summary": "仅在 selected target 窗口确实烧穿、备号存在且 policy/用户授权允许时考虑换号。",
+      "recognition_cues": ["想换账号绕过容量", "selected target hard boundary"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md", "marker": "point:capacity.account-switch-gate", "heading_hint": "换号 lever"},
+      "authority": {"role": "canonical", "subject": "subject:capacity.account-switch-gate"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "cost-decisions.md gate"}], "verifiers": [{"kind": "review", "ref": "k2.point.capacity.switch-gate"}]}
+    },
+    {
+      "id": "point:capacity.account-switch-sequence",
+      "title": "换号决策序列",
+      "point_kind": "procedure",
+      "summary": "先停派与 surface，再经 policy 执行，切后重验 payer/quota binding。",
+      "recognition_cues": ["换号已获明确授权"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md", "marker": "point:capacity.account-switch-sequence", "heading_hint": "编排决策序列"},
+      "authority": {"role": "canonical", "subject": "subject:capacity.account-switch-sequence"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "cost-decisions.md sequence"}], "verifiers": [{"kind": "review", "ref": "k2.point.capacity.switch-sequence"}]}
+    }
+  ],
+  "edges": []
+}

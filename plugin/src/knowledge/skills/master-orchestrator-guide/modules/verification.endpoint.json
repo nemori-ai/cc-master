@@ -160,6 +160,78 @@
           }
         ]
       }
+    },
+    {
+      "id": "point:verification.hash-and-stale",
+      "title": "content hash 与 stale",
+      "point_kind": "procedure",
+      "summary": "用 action-key 式 content hash 判断可复用结果，并在依赖变化时显式标 stale。",
+      "recognition_cues": ["resume 时判断能否跳过", "上游 artifact 发生变化"],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.hash-and-stale",
+        "heading_hint": "content-hash 续跑"
+      },
+      "authority": {"role": "canonical", "subject": "subject:verification.hash-and-stale"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md hash/stale"}],
+        "verifiers": [{"kind": "review", "ref": "k2.point.verification.hash"}]
+      }
+    },
+    {
+      "id": "point:verification.resume-takeover",
+      "title": "resume 接管基线",
+      "point_kind": "procedure",
+      "summary": "先进入 board worktree、核对干净基线，再 probe/attach/验收或重派孤儿 runtime。",
+      "recognition_cues": ["新 session 接管旧 board", "存在 orphaned in_flight"],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.resume-takeover",
+        "heading_hint": "resume 第 0 步"
+      },
+      "authority": {"role": "canonical", "subject": "subject:verification.resume-takeover"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md takeover"}],
+        "verifiers": [{"kind": "review", "ref": "k2.point.verification.takeover"}]
+      }
+    },
+    {
+      "id": "point:verification.heterogeneous-review",
+      "title": "异构族系第二视角",
+      "point_kind": "procedure",
+      "summary": "对高杠杆或临界 correctness-critical 结果换模型族复核，并逐条 reconcile finding。",
+      "recognition_cues": ["高杠杆裁决", "临界 correctness-critical done"],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.heterogeneous-review",
+        "heading_hint": "异构族系第二视角"
+      },
+      "authority": {"role": "canonical", "subject": "subject:verification.heterogeneous-review"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md heterogeneous review"}],
+        "verifiers": [{"kind": "review", "ref": "k2.point.verification.heterogeneous"}]
+      }
+    },
+    {
+      "id": "point:verification.loop-convergence",
+      "title": "Loop 收敛闸",
+      "point_kind": "decision_rule",
+      "summary": "只在 FinalResponse 与带诊断 Replan 之间做结构化选择，并设置 max-rounds 与 dedup。",
+      "recognition_cues": ["执行图依赖未知中间结果", "review loop 可能无界"],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.loop-convergence",
+        "heading_hint": "Loop 收敛"
+      },
+      "authority": {"role": "canonical", "subject": "subject:verification.loop-convergence"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md convergence"}],
+        "verifiers": [{"kind": "review", "ref": "k2.point.verification.convergence"}]
+      }
     }
   ],
   "edges": [

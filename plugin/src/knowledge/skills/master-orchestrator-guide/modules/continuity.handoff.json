@@ -1,0 +1,49 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:continuity.handoff",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "Session 交接",
+  "intent": "在新 session 接手前 drain 在飞工作，只写 board 装不下的 judgment-bearing 叙事并保留可复核依据。",
+  "recognition_cues": ["准备跨 session handoff", "有 straggler 或孤儿任务", "handoff 文档开始复制 board"],
+  "boundary": {"includes": ["交接步骤", "drain", "叙事模板", "归档 rationale", "噪声守卫"], "excludes": ["resume 端点验收细节", "board 状态全集"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "仅在跨 session 交接时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-handoff-review"}]},
+  "points": [
+    {
+      "id": "point:handoff.procedure-and-drain",
+      "title": "交接 procedure 与 drain",
+      "point_kind": "procedure",
+      "summary": "冻结新派发、收割或显式登记 straggler、flush board，再生成 handoff。",
+      "recognition_cues": ["准备换 session", "仍有 in-flight"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md", "marker": "point:handoff.procedure-and-drain", "heading_hint": "交接的 6 步"},
+      "authority": {"role": "canonical", "subject": "subject:handoff.procedure-and-drain"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "handoff.md procedure"}], "verifiers": [{"kind": "review", "ref": "k2.point.handoff.procedure"}]}
+    },
+    {
+      "id": "point:handoff.judgment-template",
+      "title": "Judgment-bearing 叙事模板",
+      "point_kind": "procedure",
+      "summary": "只写态势、孤儿、关键判断、用户决策与下一步，不复抄可查询状态。",
+      "recognition_cues": ["需要写 handoff 文档", "需要保存 board 装不下的判断"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md", "marker": "point:handoff.judgment-template", "heading_hint": "叙事层"},
+      "authority": {"role": "canonical", "subject": "subject:handoff.judgment-template"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "handoff.md narrative/template"}], "verifiers": [{"kind": "review", "ref": "k2.point.handoff.template"}]}
+    },
+    {
+      "id": "point:handoff.rationale-and-guards",
+      "title": "交接 rationale 与噪声守卫",
+      "point_kind": "check",
+      "summary": "用可归档叙事换无摩擦 resume，同时拒绝状态走查、日志倾倒与未 drain 的假完成。",
+      "recognition_cues": ["handoff 文档越来越长", "准备把 status dump 当叙事"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md", "marker": "point:handoff.rationale-and-guards", "heading_hint": "归档换无摩擦 resume"},
+      "authority": {"role": "canonical", "subject": "subject:handoff.rationale-and-guards"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "handoff.md rationale/guards"}], "verifiers": [{"kind": "review", "ref": "k2.point.handoff.guards"}]}
+    }
+  ],
+  "edges": []
+}

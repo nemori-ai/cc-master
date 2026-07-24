@@ -1,0 +1,60 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:goal.contract",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "Goal Contract 不漂移",
+  "intent": "把原始需求证据变成可检验的当前目标 revision，并在 DDL、trace、delta 与收口检查点持续守义。",
+  "recognition_cues": ["fresh 开板", "需求很长需 Goal Brief", "新发现可能改变目标语义"],
+  "boundary": {"includes": ["fresh framing", "DDL lifecycle", "Goal Brief", "trace", "delta classifier", "alignment"], "excludes": ["怎么切 DAG", "实现方案正文"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "fresh framing、目标修订或收口追溯时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-goal-contract-review"}]},
+  "points": [
+    {
+      "id": "point:goal.fresh-contract",
+      "title": "Fresh Goal Contract",
+      "point_kind": "procedure",
+      "summary": "先从需求证据形成 outcome、acceptance、constraints、non-goals 与 revision，再切 DAG。",
+      "recognition_cues": ["fresh 开工", "原始请求仍只是散文"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md", "marker": "point:goal.fresh-contract", "heading_hint": "Fresh"},
+      "authority": {"role": "canonical", "subject": "subject:goal.fresh-contract"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "goal-contract.md fresh"}], "verifiers": [{"kind": "review", "ref": "k2.point.goal.fresh"}]}
+    },
+    {
+      "id": "point:goal.deadline-and-brief",
+      "title": "DDL lifecycle 与 Goal Brief",
+      "point_kind": "procedure",
+      "summary": "识别/确认/过期交付 DDL，并在目标复杂时用 brief 保存证据与边界。",
+      "recognition_cues": ["用户提到截止日期", "需求证据跨多段材料"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md", "marker": "point:goal.deadline-and-brief", "heading_hint": "交付 DDL"},
+      "authority": {"role": "canonical", "subject": "subject:goal.deadline-and-brief"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "goal-contract.md deadline/brief"}], "verifiers": [{"kind": "review", "ref": "k2.point.goal.brief"}]}
+    },
+    {
+      "id": "point:goal.trace-and-delta",
+      "title": "Goal trace 与 delta 分类",
+      "point_kind": "decision_rule",
+      "summary": "每个节点回指 acceptance；新发现按 clarification、scope change 或 amendment 分类。",
+      "recognition_cues": ["工作中怀疑 scope 漂移", "出现新事实"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md", "marker": "point:goal.trace-and-delta", "heading_hint": "Goal Trace Test"},
+      "authority": {"role": "canonical", "subject": "subject:goal.trace-and-delta"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "goal-contract.md trace/delta"}], "verifiers": [{"kind": "review", "ref": "k2.point.goal.delta"}]}
+    },
+    {
+      "id": "point:goal.alignment-checkpoints",
+      "title": "六个目标对齐检查点",
+      "point_kind": "check",
+      "summary": "在 framing、切分、派发、replan、HITL 与收口六处复核当前 Goal Contract。",
+      "recognition_cues": ["准备 replan", "准备最终收口"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md", "marker": "point:goal.alignment-checkpoints", "heading_hint": "六个对齐检查点"},
+      "authority": {"role": "canonical", "subject": "subject:goal.alignment-checkpoints"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "goal-contract.md checkpoints"}], "verifiers": [{"kind": "review", "ref": "k2.point.goal.checkpoints"}]}
+    }
+  ],
+  "edges": []
+}

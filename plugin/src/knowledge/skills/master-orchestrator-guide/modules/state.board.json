@@ -1,0 +1,60 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:state.board",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "Board 长程状态纪律",
+  "intent": "把 board 作为跨 compaction/session 的单一真相源，并守住窄腰、审计、续跑与采访协议。",
+  "recognition_cues": ["需要解释 board 的职责边界", "准备 resume", "需要 decision_package 或 worked board"],
+  "boundary": {"includes": ["narrow waist", "读写与审计", "graph advisory", "resume signals", "decision_package"], "excludes": ["完整 ccm 命令表", "引擎 schema SSOT"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "需要 board 长程协议叙事或 worked example 时按需 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-board-review"}]},
+  "points": [
+    {
+      "id": "point:board.waist-and-write",
+      "title": "窄腰与读写纪律",
+      "point_kind": "principle",
+      "summary": "board 是单一真相源；窄腰稳定，状态变更与 flush 经受控入口。",
+      "recognition_cues": ["想直接编辑 board", "准备改 hook-dependent 字段"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md", "marker": "point:board.waist-and-write", "heading_hint": "关键决策"},
+      "authority": {"role": "canonical", "subject": "subject:board.waist-and-write"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "board.md waist/write"}], "verifiers": [{"kind": "review", "ref": "k2.point.board.waist"}]}
+    },
+    {
+      "id": "point:board.audit-and-graph",
+      "title": "审计、lint 与图 advisory",
+      "point_kind": "procedure",
+      "summary": "用显式 supersession、append-only log、lint 与只读图分析保持状态可审计。",
+      "recognition_cues": ["需要审计历史", "需要临界路径 advisory"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md", "marker": "point:board.audit-and-graph", "heading_hint": "Supersession"},
+      "authority": {"role": "canonical", "subject": "subject:board.audit-and-graph"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "board.md audit/graph"}], "verifiers": [{"kind": "review", "ref": "k2.point.board.audit"}]}
+    },
+    {
+      "id": "point:board.resume-and-interview",
+      "title": "续跑信号与采访协议",
+      "point_kind": "procedure",
+      "summary": "heartbeat/session_id 帮助续跑，decision_package 保留用户决策上下文。",
+      "recognition_cues": ["resume 旧 board", "用户决策需要结构化依据"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md", "marker": "point:board.resume-and-interview", "heading_hint": "owner.heartbeat"},
+      "authority": {"role": "canonical", "subject": "subject:board.resume-and-interview"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "board.md resume/interview"}], "verifiers": [{"kind": "review", "ref": "k2.point.board.resume"}]}
+    },
+    {
+      "id": "point:board.worked-example",
+      "title": "Worked board 全字段样例",
+      "point_kind": "example",
+      "summary": "用完整样例展示长程 board 的任务、owner、log、decision 与 wakeup 形状。",
+      "recognition_cues": ["需要对照完整 board 样例"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md", "marker": "point:board.worked-example", "heading_hint": "示例"},
+      "authority": {"role": "canonical", "subject": "subject:board.worked-example"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "board.md worked example"}], "verifiers": [{"kind": "review", "ref": "k2.point.board.example"}]}
+    }
+  ],
+  "edges": []
+}

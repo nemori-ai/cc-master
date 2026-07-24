@@ -1,0 +1,60 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:evidence.outside-in",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "Outside-in 证据校准",
+  "intent": "让承重判断接触外部现实，用与风险相称的最低成本证据校准假设而不陷入仪式化求证。",
+  "recognition_cues": ["承重假设只由内部推断支撑", "多份内部报告一致却无外部证据", "校准成本可能失控"],
+  "boundary": {"includes": ["证据等级", "可证伪检查", "校准成本阶梯", "未知/实验", "amendment", "低风险豁免"], "excludes": ["端点代码验收", "provider 动态事实目录"]},
+  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "承重假设缺外部证据时才按风险靶向 drill。"},
+  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-outside-in-review"}]},
+  "points": [
+    {
+      "id": "point:outside.evidence-levels",
+      "title": "外部有效性与证据等级",
+      "point_kind": "principle",
+      "summary": "内部共识不等于外部验证；按可复核强度把假设与证据落进 board。",
+      "recognition_cues": ["只有内部推断", "需要给证据分级"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md", "marker": "point:outside.evidence-levels", "heading_hint": "第三根轴"},
+      "authority": {"role": "canonical", "subject": "subject:outside.evidence-levels"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "outside-in.md evidence levels"}], "verifiers": [{"kind": "review", "ref": "k2.point.outside.evidence"}]}
+    },
+    {
+      "id": "point:outside.falsification-and-calibration",
+      "title": "可证伪检查与校准阶梯",
+      "point_kind": "decision_rule",
+      "summary": "先问哪项外部事实最可能推翻假设，再选能落定它的最低成本手段。",
+      "recognition_cues": ["要扩大不可逆投入", "不知道该做多重的外部验证"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md", "marker": "point:outside.falsification-and-calibration", "heading_hint": "最可能被哪项外部事实推翻"},
+      "authority": {"role": "canonical", "subject": "subject:outside.falsification-and-calibration"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "outside-in.md falsification/calibration"}], "verifiers": [{"kind": "review", "ref": "k2.point.outside.calibration"}]}
+    },
+    {
+      "id": "point:outside.unknown-and-amendment",
+      "title": "未知、可逆实验与 amendment",
+      "point_kind": "procedure",
+      "summary": "无外部通道时诚实记 unknown 并做有限实验；外部事实改义则显式修订 Goal Contract。",
+      "recognition_cues": ["没有外部验证通道", "证据改变了目标语义"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md", "marker": "point:outside.unknown-and-amendment", "heading_hint": "无外部通道时"},
+      "authority": {"role": "canonical", "subject": "subject:outside.unknown-and-amendment"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "outside-in.md unknown/amendment"}], "verifiers": [{"kind": "review", "ref": "k2.point.outside.unknown"}]}
+    },
+    {
+      "id": "point:outside.low-risk-exception",
+      "title": "低风险可逆豁免",
+      "point_kind": "boundary",
+      "summary": "低风险、可逆且事实充分的小动作可直接推进；高杠杆与不可逆判断不得借用豁免。",
+      "recognition_cues": ["担心过度求证", "想把可逆小改也升级成仪式"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md", "marker": "point:outside.low-risk-exception", "heading_hint": "低风险可逆豁免"},
+      "authority": {"role": "canonical", "subject": "subject:outside.low-risk-exception"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "outside-in.md low-risk exception"}], "verifiers": [{"kind": "review", "ref": "k2.point.outside.exception"}]}
+    }
+  ],
+  "edges": []
+}

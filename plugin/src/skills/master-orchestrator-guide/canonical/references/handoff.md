@@ -18,6 +18,7 @@
 
 ## 交接的 6 步
 
+<!-- ccm:k:start point:handoff.procedure-and-drain -->
 命令体（`handoff-to-new-session.md`）给的是逐步落地；这里只钉每步的**为什么**与纪律边界：
 
 1. **Quiesce** —— 立刻停止派发新活（本回合起不再有新任务进 WIP）。已在飞的让它跑，只是不再开新的——因为你正要离场，开新活就是给新 session 多留一个盲验的孤儿。
@@ -39,8 +40,11 @@
 
 ---
 
+<!-- ccm:k:end point:handoff.procedure-and-drain -->
+
 ## 叙事层 / 无噪声纪律（judgment-bearing）
 
+<!-- ccm:k:start point:handoff.judgment-template -->
 **board 本就承载结构化状态**——DAG、每个 task 的 status/deps/artifact/handle、log。新 session `--resume` 会原样读到它。所以交接文档的价值，**恰恰是 board 装不下的那些东西**：你试过又放弃了什么、为什么这么决策、坑埋在哪、临界路径心算落在哪条链、下一步该往哪使劲。**噪声 = 复述 board。** 文档纯叙事层、指向 board。
 
 判据——一段内容该不该进 handoff 文档，问它**这东西 board 里有没有**：
@@ -100,8 +104,11 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 
 ---
 
+<!-- ccm:k:end point:handoff.judgment-template -->
+
 ## 归档换无摩擦 resume 的 rationale
 
+<!-- ccm:k:start point:handoff.rationale-and-guards -->
 交接的最后一步是把 board **归档**（`owner.active:false`，同 `/stop` 机制）。这看着反直觉——「我在交接，为什么要停用它」——但它正是让新 session 接手最顺的那一步：
 
 - **归档板的 `--resume` 走无摩擦路径**：`as-master-orchestrator --resume` 对一块 `owner.active:false` 的归档板**无需 `--force-takeover`**——直接复活（`false → true` + 重盖 `owner.session_id`），因为归档是「这块板当前没有活 owner」的显式信号，不存在跨 session 抢占活 owner 的风险（这正是「复活归档板」的无摩擦路径）。反之，若你把板留成 `owner.active:true` 就切走，新 session resume 会撞上「这板看着仍有活 session」的接管安全闸（heartbeat + mtime 探测），要 `--force-takeover` 二次确认——平白给交接加一道摩擦。
@@ -132,3 +139,4 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 - 你正在为「*这次*交接特殊，多 dump 点 board 内容总没坏处」构建论证——那套论证本身就是症状。
 
 > **违背字面就是违背精神。** handoff 文档的纪律是「叙事层 carries board 装不下的，绝不复抄 board 已装下的」——当你开始论证「这段 status 走查写成了英文所以算叙事」，那正是噪声穿叙事外衣的那一刻。
+<!-- ccm:k:end point:handoff.rationale-and-guards -->
