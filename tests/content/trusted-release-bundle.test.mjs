@@ -12,6 +12,9 @@ import {
   computeArtifactId,
   scanTree,
 } from '../../scripts/trusted-release-bundle.mjs';
+import {
+  inspectReleaseKnowledgeBoundary,
+} from '../../scripts/check-release-knowledge-boundary.mjs';
 import { validateJsonSchema } from './helpers/trusted-projection/json-schema-validator.mjs';
 
 const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
@@ -26,7 +29,11 @@ function writeFile(root, relative, body, mode = 0o644) {
   fs.writeFileSync(target, body, { mode });
 }
 
-function fixtureManifest(root, transactionId = 'tpt:tx:release-0001') {
+function fixtureManifest(
+  root,
+  transactionId = 'tpt:tx:release-0001',
+  { knowledgeHost = '' } = {},
+) {
   const docsRoot = path.join(root, 'docs');
   writeFile(docsRoot, 'README.md', 'frozen docs\n');
   writeFile(docsRoot, 'LICENSE', 'frozen license\n');
@@ -38,6 +45,9 @@ function fixtureManifest(root, transactionId = 'tpt:tx:release-0001') {
     const snapshotRoot = path.join(root, 'snapshots', host);
     writeFile(snapshotRoot, `skills/${host}/SKILL.md`, `${host}\n`);
     writeFile(snapshotRoot, 'bin/run.sh', '#!/bin/sh\nexit 0\n', 0o755);
+    if (host === knowledgeHost) {
+      writeFile(snapshotRoot, 'knowledge/atlas.md', 'repo-only knowledge\n');
+    }
     const snapshot = scanTree(snapshotRoot, `host-${host}`);
     const expectedRoot = path.join(root, 'expected', host, 'cc-master');
     fs.cpSync(snapshotRoot, expectedRoot, { recursive: true });
@@ -120,6 +130,35 @@ function fixtureManifest(root, transactionId = 'tpt:tx:release-0001') {
   };
 }
 
+function useArchiveSnapshotLocators(root, manifest) {
+  const archiveSnapshot = (snapshotRoot, archiveName) => {
+    const archive = path.join(root, archiveName);
+    const zipped = spawnSync('zip', ['-q', '-X', '-r', archive, '.'], {
+      cwd: snapshotRoot,
+      encoding: 'utf8',
+    });
+    assert.equal(zipped.status, 0, zipped.stderr);
+    return {
+      kind: 'zip',
+      path: path.relative(root, archive),
+      sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
+    };
+  };
+  for (const host of manifest.hosts) {
+    host.snapshot_locator = archiveSnapshot(
+      host.snapshot_root,
+      `snapshot-${host.host}.zip`,
+    );
+    delete host.snapshot_root;
+  }
+  manifest.docs.snapshot_locator = archiveSnapshot(
+    manifest.docs.snapshot_root,
+    'snapshot-docs.zip',
+  );
+  delete manifest.docs.snapshot_root;
+  return manifest;
+}
+
 test('builds and audits one exact four-host release directory', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'trusted-release-test-'));
   try {
@@ -168,6 +207,72 @@ test('builds and audits one exact four-host release directory', () => {
   }
 });
 
+test('repo-only knowledge fails closed at final-dist, staging, and archive boundaries', () => {
+  assert.deepEqual(
+    inspectReleaseKnowledgeBoundary([
+      { path: 'plugin/dist/claude-code/knowledge/atlas.md', content: '' },
+      {
+        path: 'plugin/dist/codex/skills/example/SKILL.md',
+        content: 'See [atlas](../../knowledge/atlas.md).\n',
+      },
+      {
+        path: 'plugin/dist/cursor/skills/example/references/details.md',
+        content: 'Source: plugin/src/knowledge/modules/example.module.json\n',
+      },
+    ]),
+    [
+      'plugin/dist/claude-code/knowledge/atlas.md: path component "knowledge" is forbidden',
+      'plugin/dist/codex/skills/example/SKILL.md: Markdown points to forbidden knowledge/atlas.md',
+      'plugin/dist/cursor/skills/example/references/details.md: Markdown points to forbidden '
+      + 'knowledge/modules/',
+      'plugin/dist/cursor/skills/example/references/details.md: Markdown points to forbidden '
+      + 'plugin/src/knowledge',
+    ],
+  );
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'trusted-release-knowledge-'));
+  try {
+    const manifest = fixtureManifest(
+      root,
+      'tpt:tx:release-knowledge',
+      { knowledgeHost: 'claude-code' },
+    );
+    assert.throws(
+      () => buildReleaseBundle(manifest, path.join(root, 'out')),
+      /TPT-PLAN-DRIFT: repo-only knowledge\/meta path is forbidden/u,
+    );
+
+    useArchiveSnapshotLocators(root, manifest);
+    const manifestPath = path.join(root, 'release-input-knowledge.json');
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const packaged = spawnSync(
+      'bash',
+      ['scripts/package-plugin.sh', '--manifest', manifestPath, '--out-dir', path.join(root, 'out')],
+      { cwd: path.resolve(import.meta.dirname, '../..'), encoding: 'utf8' },
+    );
+    assert.notEqual(packaged.status, 0);
+    assert.match(
+      packaged.stderr,
+      /TPT-PLAN-DRIFT: repo-only knowledge\/meta path is forbidden/u,
+    );
+
+    const archiveRoot = path.join(root, 'archive');
+    writeFile(archiveRoot, 'cc-master/knowledge/atlas.md', 'repo-only knowledge\n');
+    const archive = path.join(root, 'knowledge.zip');
+    const zipped = spawnSync('zip', ['-q', '-X', '-r', archive, '.'], {
+      cwd: archiveRoot,
+      encoding: 'utf8',
+    });
+    assert.equal(zipped.status, 0, zipped.stderr);
+    assert.throws(
+      () => auditArchiveMembers(archive),
+      /TPT-PLAN-DRIFT: repo-only knowledge\/meta path is forbidden/u,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('source drift fails closed and preserves the previous good release', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'trusted-release-drift-'));
   try {
@@ -195,32 +300,7 @@ test('source drift fails closed and preserves the previous good release', () => 
 test('manifest-only shell adapter emits exactly the sealed upload set', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'trusted-release-shell-'));
   try {
-    const manifest = fixtureManifest(root);
-    const archiveSnapshot = (snapshotRoot, archiveName) => {
-      const archive = path.join(root, archiveName);
-      const zipped = spawnSync('zip', ['-q', '-X', '-r', archive, '.'], {
-        cwd: snapshotRoot,
-        encoding: 'utf8',
-      });
-      assert.equal(zipped.status, 0, zipped.stderr);
-      return {
-        kind: 'zip',
-        path: path.relative(root, archive),
-        sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
-      };
-    };
-    for (const host of manifest.hosts) {
-      host.snapshot_locator = archiveSnapshot(
-        host.snapshot_root,
-        `snapshot-${host.host}.zip`,
-      );
-      delete host.snapshot_root;
-    }
-    manifest.docs.snapshot_locator = archiveSnapshot(
-      manifest.docs.snapshot_root,
-      'snapshot-docs.zip',
-    );
-    delete manifest.docs.snapshot_root;
+    const manifest = useArchiveSnapshotLocators(root, fixtureManifest(root));
     const manifestPath = path.join(root, 'release-input.json');
     fs.writeFileSync(manifestPath, JSON.stringify(manifest));
     const result = spawnSync(

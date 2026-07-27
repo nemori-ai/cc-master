@@ -72,6 +72,15 @@ jobs:
       - name: Skill knowledge K0 source check
         run: node scripts/skill-knowledge.mjs check --stage K0 --json
 
+      - name: Final dist knowledge boundary
+        run: node scripts/check-release-knowledge-boundary.mjs
+
+      - name: Package and archive knowledge boundary
+        run: >-
+          node --test
+          tests/content/plugin-release-package-contract.test.mjs
+          tests/content/trusted-release-bundle.test.mjs
+
   # Branch protection depends on this exact job id. Keep it as the stable aggregate instead of
   # renaming the required check every time an independent product/plugin gate is added.
   build-and-check:
