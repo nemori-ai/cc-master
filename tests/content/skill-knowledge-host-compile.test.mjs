@@ -565,7 +565,7 @@ test('SKG-COMPILE-06: per-host compile and unknown host / check --host remain ho
   assert.equal(parseJson(checkHost).diagnostics[0].code, 'SKG-CAPABILITY-NOT-IMPLEMENTED');
 });
 
-test('SKG-COMPILE-07: sync-plugin-dist post-pass keeps knowledge in package allowlist and out of hooks', () => {
+test('SKG-COMPILE-07: knowledge remains repo/dist metadata and never enters release packages', () => {
   const sync = fs.readFileSync(path.join(repoRoot, 'scripts/sync-plugin-dist.sh'), 'utf8');
   const hostSurface = fs.readFileSync(
     path.join(repoRoot, 'scripts/skill-knowledge/sync-host-surface.cjs'),
@@ -584,11 +584,13 @@ test('SKG-COMPILE-07: sync-plugin-dist post-pass keeps knowledge in package allo
   );
 
   const packager = fs.readFileSync(path.join(repoRoot, 'scripts/package-plugin.sh'), 'utf8');
-  assert.match(
+  assert.doesNotMatch(
     packager,
-    /include_dirs=\(.*\bknowledge\b/,
-    'package-plugin allowlist must include knowledge/',
+    /\bknowledge\b|plugin\/dist|sync-plugin-dist/,
+    'manifest-only package adapter must not rediscover knowledge or live dist',
   );
+  const bundler = fs.readFileSync(path.join(repoRoot, 'scripts/trusted-release-bundle.mjs'), 'utf8');
+  assert.match(bundler, /repo-only knowledge\/meta path is forbidden/);
 });
 
 test('SKG-COMPILE-08: docs lockstep — compile+change delivered; check --host still exit 10', () => {

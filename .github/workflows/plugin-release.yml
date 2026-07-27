@@ -1,145 +1,97 @@
-# plugin-release —— cc-master plugin 的 per-harness「解压即装」分发制品。
+# Attested plugin package qualification.
 #
-# 版本线解耦（ADR-022）：plugin 与 ccm 是**两条独立版本线**，各自独立的 tag 触发各自独立的
-# release workflow——
-#   - 本文件（plugin-release.yml）只认裸 `v*` tag（plugin 线·延续历史 tag 命名），只打 plugin zip。
-#   - ccm 二进制（build-sea）已搬去 `ccm-release.yml`，只认 `ccm-v*` tag。
-#   - 两个 glob 天然互斥：裸 `v*` 不匹配 `ccm-v*`（后者以 `c` 开头），零交叉触发。
-#
-# plugin 是纯 prose/脚本分发物（无 build 步），由 dev-only 脚本 scripts/package-plugin.sh
-# 从 repo 根 allowlist 打包；同一个裸 `v*` plugin tag 下发布按 harness 区分的 asset：
-#   - cc-master-plugin-claude-code-<tag>.zip
-#   - cc-master-plugin-codex-<tag>.zip
-#   - cc-master-plugin-cursor-<tag>.zip
-#   - cc-master-plugin-kimi-code-<tag>.zip
-#   - SHA256SUMS（install.sh 安装前必须校验）
-name: plugin-release
+# Draft boundary: this workflow uploads the exact transaction outputs as a workflow artifact.
+# It intentionally has no tag trigger and no GitHub Release action. TX4 may promote these exact
+# bytes only after wiring the trusted snapshot producer and approving the release attestation.
+name: plugin-release-draft
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      attestation_run_id:
+        description: Run ID that produced the immutable trusted-release-input artifact
+        required: true
+        type: string
+      attestation_artifact:
+        description: Artifact containing release-input.json and its immutable snapshot roots
+        required: true
+        default: trusted-release-input
+        type: string
 
 permissions:
-  contents: write # 需写权限把产物 attach 到 GitHub release
+  actions: read
+  contents: read
 
 jobs:
   package-plugin:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Download attested immutable release inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.attestation_artifact }}
+          run-id: ${{ inputs.attestation_run_id }}
+          github-token: ${{ github.token }}
+          path: trusted-release-input
 
-      # 仅为 `claude plugin validate` 提供 node 运行时（plugin validate 是纯本地 manifest 校验·不联网/不需认证）。
+      - name: Resolve attested source commit
+        id: input
+        run: |
+          MANIFEST="${GITHUB_WORKSPACE}/trusted-release-input/release-input.json"
+          test -f "${MANIFEST}"
+          COMMIT="$(node -e '
+            const fs = require("node:fs");
+            const input = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (!/^[0-9a-f]{40}$/.test(input.commit || "")) process.exit(2);
+            process.stdout.write(input.commit);
+          ' "${MANIFEST}")"
+          TAG="$(node -e '
+            const fs = require("node:fs");
+            const input = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (!/^[A-Za-z0-9._+-]+$/.test(input.tag || "")) process.exit(2);
+            process.stdout.write(input.tag);
+          ' "${MANIFEST}")"
+          echo "manifest=${MANIFEST}" >> "${GITHUB_OUTPUT}"
+          echo "commit=${COMMIT}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout attested packaging code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.input.outputs.commit }}
+          path: source
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
-
-      # tag 触发传 tag 名（产物名 cc-master-plugin-<harness>-<tag>.zip）；
-      # 非 tag（workflow_dispatch）留空 → 脚本回退到 plugin.json version。
-      - name: Package plugin
-        id: pkg
+      - name: Build and audit exact four-host release
         run: |
-          TAG=""
-          case "${GITHUB_REF}" in
-            refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
-          esac
-          mkdir -p dist
-          bash scripts/package-plugin.sh --all-hosts "${TAG}" > /tmp/cc-master-plugin-zips.txt
-          if [ -z "$TAG" ]; then
-            TAG="v$(node -e 'process.stdout.write(require("./plugin/src/.claude-plugin/plugin.json").version)')"
-          fi
-          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "zips<<EOF" >> "${GITHUB_OUTPUT}"
-          cat /tmp/cc-master-plugin-zips.txt >> "${GITHUB_OUTPUT}"
-          echo "EOF" >> "${GITHUB_OUTPUT}"
-          test -f dist/SHA256SUMS
+          mkdir -p "${GITHUB_WORKSPACE}/dist"
+          bash source/scripts/package-plugin.sh \
+            --manifest "${{ steps.input.outputs.manifest }}" \
+            --out-dir "${GITHUB_WORKSPACE}/dist" \
+            > "${RUNNER_TEMP}/cc-master-plugin-upload-set.txt"
+          RELEASE_DIR="${GITHUB_WORKSPACE}/dist/cc-master-plugin-${{ steps.input.outputs.tag }}"
+          test -d "${RELEASE_DIR}"
+          test "$(wc -l < "${RUNNER_TEMP}/cc-master-plugin-upload-set.txt")" -eq 6
+          while IFS= read -r file; do
+            test -f "${file}"
+            case "${file}" in
+              "${RELEASE_DIR}"/*) ;;
+              *) echo "output escaped attested release directory: ${file}" >&2; exit 1 ;;
+            esac
+          done < "${RUNNER_TEMP}/cc-master-plugin-upload-set.txt"
 
-      - name: Validate checksum manifest
-        run: |
-          cd dist
-          sha256sum --check SHA256SUMS
+      - name: Verify checksum manifest from the attested bytes
+        working-directory: dist/cc-master-plugin-${{ steps.input.outputs.tag }}
+        run: sha256sum --check SHA256SUMS
 
-      # 制品自证：Claude Code zip 解压后 `claude plugin validate` 须过。
-      - name: Validate Claude Code packaged plugin
-        run: |
-          DEST="$(mktemp -d)"
-          unzip -q "dist/cc-master-plugin-claude-code-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
-          test -f "${DEST}/cc-master/LICENSE"
-          test -f "${DEST}/cc-master/LICENSING.md"
-          test -f "${DEST}/cc-master/TRADEMARKS.md"
-          claude plugin validate "${DEST}/cc-master"
-
-      - name: Validate Codex packaged adapter
-        run: |
-          DEST="$(mktemp -d)"
-          unzip -q "dist/cc-master-plugin-codex-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
-          test -d "${DEST}/cc-master/skills"
-          test -d "${DEST}/cc-master/hooks"
-          test -f "${DEST}/cc-master/.codex-plugin/plugin.json"
-          test -f "${DEST}/cc-master/LICENSE"
-          test -f "${DEST}/cc-master/LICENSING.md"
-          test -f "${DEST}/cc-master/TRADEMARKS.md"
-
-      - name: Validate Cursor packaged adapter
-        run: |
-          DEST="$(mktemp -d)"
-          unzip -q "dist/cc-master-plugin-cursor-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
-          test -f "${DEST}/cc-master/.cursor-plugin/plugin.json"
-          test -d "${DEST}/cc-master/hooks"
-          test -d "${DEST}/cc-master/skills"
-          test -d "${DEST}/cc-master/rules"
-          test -f "${DEST}/cc-master/LICENSE"
-          test -f "${DEST}/cc-master/LICENSING.md"
-          test -f "${DEST}/cc-master/TRADEMARKS.md"
-
-      # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ dir; commands and
-      # hooks both project host-native. Because the manifest registers hook commands inline, hooks/
-      # is a load-bearing package contract rather than an optional directory.
-      - name: Validate kimi-code packaged adapter
-        run: |
-          DEST="$(mktemp -d)"
-          unzip -q "dist/cc-master-plugin-kimi-code-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
-          test -f "${DEST}/cc-master/kimi.plugin.json"
-          test -d "${DEST}/cc-master/skills"
-          test -d "${DEST}/cc-master/commands"
-          test -d "${DEST}/cc-master/hooks"
-          test -f "${DEST}/cc-master/LICENSE"
-          test -f "${DEST}/cc-master/LICENSING.md"
-          test -f "${DEST}/cc-master/TRADEMARKS.md"
-
-      # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
-      - name: Upload artifact
+      - name: Upload exact attested release bytes
         uses: actions/upload-artifact@v4
         with:
-          name: cc-master-plugin
-          path: |
-            dist/cc-master-plugin-*.zip
-            dist/SHA256SUMS
+          name: cc-master-plugin-${{ steps.input.outputs.tag }}
+          path: dist/cc-master-plugin-${{ steps.input.outputs.tag }}/*
           if-no-files-found: error
-
-      - name: Plan GitHub release metadata
-        id: release_meta
-        if: startsWith(github.ref, 'refs/tags/')
-        run: >-
-          node scripts/release-metadata.mjs plan
-          --tag "${GITHUB_REF_NAME}"
-          --repository "${GITHUB_REPOSITORY}"
-          --github-output "${GITHUB_OUTPUT}"
-
-      # 仅 tag 触发时 attach 到 GitHub release。
-      - name: Attach to GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ steps.release_meta.outputs.title }}
-          prerelease: ${{ steps.release_meta.outputs.prerelease }}
-          body: ${{ steps.release_meta.outputs.body }}
-          files: |
-            dist/cc-master-plugin-*.zip
-            dist/SHA256SUMS
+          include-hidden-files: true
