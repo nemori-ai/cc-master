@@ -651,7 +651,7 @@ test('SKG-DOC-01: K0 check success sample uses the executable capability map', (
   );
 });
 
-test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/src/AGENTS stay truthful about K2', () => {
+test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/src/AGENTS stay truthful about K3', () => {
   const knowledgeContract = fs.readFileSync(
     path.join(repoRoot, 'plugin', 'src', 'knowledge', 'CONTRACT.md'),
     'utf8',
@@ -672,8 +672,8 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
 
   assert.match(
     knowledgeContract,
-    /\bK2\b/,
-    'knowledge CONTRACT must state current maturity is K2',
+    /\bK3\b/,
+    'knowledge CONTRACT must state current maturity is K3',
   );
   assert.match(
     knowledgeContract,
@@ -715,8 +715,8 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
     'must acknowledge standalone Draft 2020-12 validators / three bundles are landed',
   );
 
-  // design_docs README: current maturity is K2 full portfolio with real inventory + delivered query surface.
-  assert.match(designReadme, /\bK2\b/, 'README must state current maturity is K2');
+  // design_docs README: current maturity is K3 full portfolio with real inventory + delivered query surface.
+  assert.match(designReadme, /\bK3\b/, 'README must state current maturity is K3');
   assert.match(
     designReadme,
     /8\s+(admitted\s+)?runtime\s+skills?|eight\s+runtime\s+skills?|full\s+portfolio\s+inventory/i,
@@ -876,13 +876,13 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
   );
   assert.match(
     pluginSrcAgents,
-    /\bK2\b/,
-    'plugin/src/AGENTS.md must state current knowledge maturity is K2',
+    /graph-first/i,
+    'plugin/src/AGENTS.md must state the current K3 graph-first knowledge truth',
   );
   assert.match(
     pluginSrcAgents,
-    /8\s+runtime\s+skills?|full\s+portfolio\s+inventory/i,
-    'plugin/src/AGENTS.md must state authored inventory is eight runtime skills / full portfolio',
+    /8\s*个\s+accepted\s+composition/i,
+    'plugin/src/AGENTS.md must state the K3 inventory is eight accepted compositions',
   );
   assert.doesNotMatch(
     pluginSrcAgents,
