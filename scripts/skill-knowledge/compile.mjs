@@ -16,12 +16,11 @@ import {
   verifyHopContracts,
 } from './compile/surface-verifier.mjs';
 import { resolveTrustedCandidateHostDist } from './compile/trusted-host-dist.mjs';
-import { estimateBudget } from './hash.mjs';
 import {
   projectCoverageSubgraph,
   resolveHostCoveragePlan,
 } from './host-coverage.mjs';
-import { materializeRuntimeArtifacts } from './compile/skill-overlay.mjs';
+import { buildRuntimeRouterPlan } from './compile/runtime-router-plan.mjs';
 
 function publicDiagnostics(diagnostics) {
   return diagnostics.map(outputDiagnostic);
@@ -37,10 +36,11 @@ function envelopeBase(extra = {}) {
   };
 }
 
-function checkRouterBudgets(host, graph, artifacts, diagnostics) {
+function checkRouterBudgets(host, graph, budgetReport, diagnostics) {
   const limits = graph.portfolio?.router_budget ?? {};
-  const atlasPath = `plugin/dist/${host}/knowledge/atlas.md`;
-  const atlasBudget = estimateBudget(artifacts.get(atlasPath) ?? '');
+  const routerPlan = buildRuntimeRouterPlan({ host, graph });
+  const atlasPath = routerPlan.atlas.path;
+  const atlasBudget = budgetReport.atlas;
   if (
     (typeof limits.atlas_max_tokens === 'number' &&
       atlasBudget.estimated_tokens > limits.atlas_max_tokens) ||
@@ -59,9 +59,8 @@ function checkRouterBudgets(host, graph, artifacts, diagnostics) {
     );
   }
   for (const module of graph.modules) {
-    const slug = module.id.replace(/^module:/, '');
-    const routerPath = `plugin/dist/${host}/knowledge/modules/${slug}.md`;
-    const budget = estimateBudget(artifacts.get(routerPath) ?? '');
+    const routerPath = routerPlan.modules.get(module.id)?.path ?? module.id;
+    const budget = budgetReport.modules[module.id];
     if (
       (typeof limits.module_max_tokens === 'number' &&
         budget.estimated_tokens > limits.module_max_tokens) ||
@@ -152,7 +151,7 @@ function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = n
   const skillDirs = (projectedGraph.skills ?? []).map(
     (skill) => `skills/${skill.id.replace(/^skill:/, '')}`,
   );
-  const scopedRoots = ['knowledge', ...skillDirs];
+  const scopedRoots = [...skillDirs];
   for (const entry of projectedGraph.entries ?? []) {
     for (const surfaceSpec of entry.surfaces ?? []) {
       if (surfaceSpec.host !== host) continue;
@@ -180,29 +179,13 @@ function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = n
   });
   diagnostics.push(...hops.diagnostics);
 
-  const budgets = checkRouterBudgets(host, projectedGraph, built.artifacts, diagnostics);
-  let returnedArtifacts = built.artifacts;
-  if (!checkOnly && diagnostics.every((item) => item.severity !== 'error')) {
-    returnedArtifacts = materializeRuntimeArtifacts(built.artifacts, { host });
-    try {
-      // The first write is the private compiler proof surface. Only after all
-      // hop contracts pass do these sanitized bytes become runtime material.
-      writeArtifacts(repoRoot, returnedArtifacts, { candidateHostRoots });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      diagnostics.push(
-        diagnostic({
-          severity: 'error',
-          code: 'SKG-COMPILE-RUNTIME-MATERIALIZE',
-          message,
-          location: `plugin/dist/${host}`,
-          witness: { host, error: message },
-          remediation: 'Refuse publication unless the verified surface can be sanitized atomically.',
-          exitCode: EXIT_CODES.projection,
-        }),
-      );
-    }
-  }
+  const budgets = checkRouterBudgets(
+    host,
+    projectedGraph,
+    built.budgetReport,
+    diagnostics,
+  );
+  const returnedArtifacts = built.artifacts;
   const ok = diagnostics.every((item) => item.severity !== 'error');
 
   return {

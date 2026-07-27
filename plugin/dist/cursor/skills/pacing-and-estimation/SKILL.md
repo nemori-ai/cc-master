@@ -59,7 +59,13 @@ description: 'Use when 你（orchestrator/agent）从 Cursor origin 读取 ccm �
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:pacing-and-estimation:
 - [先全局再下钻](./references/usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [Module module:pacing.estimation](./references/estimation.md#ccm-k-module-pacing-estimation)
 - [primary: 六 estimate verb 消费映射](./references/estimation.md#ccm-k-point-pacing-estimate-verbs)
+- [Module module:pacing.levers](./references/pacing-levers.md#ccm-k-module-pacing-levers)
 - [primary: 只在上界收紧](./references/pacing-levers.md#ccm-k-point-pacing-upper-bound-only)
+- [Module module:pacing.model-facts](./references/model-tiers.md#ccm-k-module-pacing-model-facts)
+- [Module module:pacing.pool](./references/pool-aware-advice.md#ccm-k-module-pacing-pool)
+- [Module module:pacing.signals](./references/usage-signals.md#ccm-k-module-pacing-signals)
+- [Module module:pacing.target-facts](./references/cross-harness-target-facts.md#ccm-k-module-pacing-target-facts)
 - [primary: selected target 事实绑定](./references/cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts)
 <!-- ccm:k:entry-pin:end -->

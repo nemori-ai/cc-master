@@ -43,6 +43,10 @@ const {
   applySkillProjection,
   planSkillProjection,
 } = require('./project-skill.cjs');
+const {
+  compileIntoCandidate,
+  projectNonSkillSurfaces,
+} = require('./skill-knowledge/sync-host-surface.cjs');
 
 const root = path.resolve(__dirname, '..');
 const target = path.join(root, 'plugin/src/skills/provider-guidance-runtime.json');
@@ -132,7 +136,7 @@ function applySkillsScopedEntryPins({ host, stagingRoot, skillsTree }) {
  * Projects the FULL runtime skills tree (sync parity), applies overlays + entry pins,
  * then records accepted_sap / accepted_final only for the three guidance skills.
  */
-function buildHostSkillDualManifests(scratchRoot) {
+function buildHostSkillDualManifests(scratchRoot, controlledFinalRoots) {
   const skillsSrc = path.join(root, 'plugin/src/skills');
   const skillNames = listRuntimeSkillNames(skillsSrc);
   const hosts = {};
@@ -180,7 +184,16 @@ function buildHostSkillDualManifests(scratchRoot) {
       };
     }
 
-    const finalSkills = path.join(scratchRoot, host, 'final', 'skills');
+    const finalRoot = fs.mkdtempSync(
+      path.join(root, 'plugin/dist', `${host}.write-provider-guidance-`),
+    );
+    controlledFinalRoots.push(finalRoot);
+    const finalSkills = path.join(finalRoot, 'skills');
+    projectNonSkillSurfaces({
+      repoRoot: root,
+      host,
+      stagingAbsolute: finalRoot,
+    });
     copyTreeNoSymlinks(sapSkills, finalSkills);
 
     for (const skill of projected) {
@@ -189,17 +202,22 @@ function buildHostSkillDualManifests(scratchRoot) {
         host,
         skill,
         skillTree: path.join(finalSkills, skill),
-        stagingRoot: scratchRoot,
+        stagingRoot: finalRoot,
       });
     }
     const pinResult = applySkillsScopedEntryPins({
       host,
-      stagingRoot: scratchRoot,
+      stagingRoot: finalRoot,
       skillsTree: finalSkills,
     });
     const entryPinFiles = Array.isArray(pinResult.entry_pin_files)
       ? [...pinResult.entry_pin_files].sort()
       : [];
+    compileIntoCandidate({
+      repoRoot: root,
+      host,
+      candidateRoot: finalRoot,
+    });
 
     for (const skill of SKILLS) {
       skills[skill].accepted_final = providerGuidanceRuntimeManifest(
@@ -290,10 +308,11 @@ function migrateOrRegenerate() {
   fs.mkdirSync(scratchParent, { recursive: true });
   const scratchA = fs.mkdtempSync(path.join(scratchParent, 'ccm-provider-guidance-'));
   const scratchB = fs.mkdtempSync(path.join(scratchParent, 'ccm-provider-guidance-'));
+  const controlledFinalRoots = [];
 
   try {
     // Pass 1: fresh whole-tree projection.
-    const hostsA = buildHostSkillDualManifests(scratchA);
+    const hostsA = buildHostSkillDualManifests(scratchA, controlledFinalRoots);
 
     // v1 equality BEFORE any write.
     if (priorV1) {
@@ -309,7 +328,7 @@ function migrateOrRegenerate() {
     }
 
     // Pass 2: independent rebuild; must be byte-stable with pass 1.
-    const hostsB = buildHostSkillDualManifests(scratchB);
+    const hostsB = buildHostSkillDualManifests(scratchB, controlledFinalRoots);
     assertDualManifestsByteStable(hostsA, hostsB, 'regen');
 
     const next = {
@@ -342,6 +361,7 @@ function migrateOrRegenerate() {
       ),
     };
   } finally {
+    for (const controlledRoot of controlledFinalRoots) rmTree(controlledRoot);
     rmTree(scratchA);
     rmTree(scratchB);
     try {

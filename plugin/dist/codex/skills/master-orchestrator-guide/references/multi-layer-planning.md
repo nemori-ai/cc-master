@@ -39,6 +39,8 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 <!-- ccm:k:end point:multilayer.orthogonality -->
 <!-- ccm:k:nav:start point:multilayer.orthogonality -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 派发契约：把「发现并遵循本项目 planning 规范」写进去
 
@@ -56,6 +58,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.handoff-contract -->
 <!-- ccm:k:nav:start point:multilayer.handoff-contract -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 识别启发：哪些节点够格用这一层
 
@@ -90,6 +94,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.admission-and-escalation -->
 <!-- ccm:k:nav:start point:multilayer.admission-and-escalation -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 计划文档维护：落点与分工
 
@@ -110,4 +116,24 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.maintenance -->
 <!-- ccm:k:nav:start point:multilayer.maintenance -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 项目内多层 planning
+
+<a id="ccm-k-module-planning-multi-layer"></a>
+
+当一个 board 节点内部本身是复杂规划问题时，保持 board 与被编排项目 planning 层正交。
+
+## Member points
+
+- [多层 planning 准入与 escalation 边界](./multi-layer-planning.md#ccm-k-point-multilayer-admission-and-escalation)
+- [项目 planning handoff contract](./multi-layer-planning.md#ccm-k-point-multilayer-handoff-contract)
+- [计划文档维护责任](./multi-layer-planning.md#ccm-k-point-multilayer-maintenance)
+- [Board 与项目 planning 正交](./multi-layer-planning.md#ccm-k-point-multilayer-orthogonality)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

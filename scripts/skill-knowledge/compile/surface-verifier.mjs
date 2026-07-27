@@ -16,12 +16,11 @@ import {
 } from '../host-portability/anchors.mjs';
 import { compareCodePoint } from '../hash.mjs';
 import {
-  atlasDistPath,
   canonicalBindingToDistPath,
   entrySurfaceToDistPath,
   moduleAnchorId,
-  moduleRouterDistPath,
 } from './paths.mjs';
+import { buildRuntimeRouterPlan } from './runtime-router-plan.mjs';
 
 const FORBIDDEN_PATH_TOKEN_RE =
   /\$\{(?:CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|CODEX_PLUGIN_ROOT|PLUGIN_ROOT|PLUGIN_DATA|CURSOR_PLUGIN_ROOT|CURSOR_SKILL_DIR|KIMI_PLUGIN_ROOT|KIMI_SKILL_DIR|CC_MASTER_PLUGIN_ROOT)\}/;
@@ -270,7 +269,7 @@ export function countEnabledRuntimeEdges({
       if (scopedRoots != null && !inKnowledge) {
         const inGenerated = [
           ...markdown.matchAll(
-            /<!--\s*ccm:k:(?:nav:start|entry-pin:start)[\s\S]*?<!--\s*ccm:k:(?:nav:end|entry-pin:end)\s*-->/g,
+            /<!--\s*ccm:k:(?:nav:start|entry-pin:start)[\s\S]*?<!--\s*ccm:k:(?:nav:end|entry-pin:end)\s*-->|<!--\s*ccm:k:generated\s*-->[\s\S]*$/g,
           ),
         ].some((match) => {
           const start = match.index ?? 0;
@@ -697,7 +696,9 @@ function resolveTargetNode(host, relativePath, fragment, graph) {
         }),
       };
     }
-    const expected = moduleRouterDistPath(host, matchedModule.id);
+    const expected = buildRuntimeRouterPlan({ host, graph }).modules.get(
+      matchedModule.id,
+    )?.path;
     if (expected !== fullPath) {
       return {
         diagnostic: diagnostic({
@@ -711,32 +712,34 @@ function resolveTargetNode(host, relativePath, fragment, graph) {
             actual_path: fullPath,
             expected_path: expected,
           },
-          remediation: 'Place module anchors only in moduleRouterDistPath(host, module.id).',
+          remediation: 'Place module anchors only at the deterministic skill-local router placement.',
         }),
       };
     }
     return { node: nodeKey('module', matchedModule.id) };
   }
 
-  const atlasExpected = atlasDistPath(host);
-  if (fullPath === atlasExpected && !fragment) {
+  const routerPlan = buildRuntimeRouterPlan({ host, graph });
+  const atlasExpected = routerPlan.atlas.path;
+  const atlasFragment = routerPlan.atlas.fragment.slice(1);
+  if (fullPath === atlasExpected && fragment === atlasFragment) {
     return { node: nodeKey('atlas', 'knowledge-atlas') };
   }
-  if (fullPath === atlasExpected && fragment) {
+  if (fullPath === atlasExpected) {
     return {
       diagnostic: diagnostic({
         code: 'SKG-SURFACE-TARGET-UNRESOLVED',
-        message: `Atlas target has unexpected fragment "#${fragment}"`,
+        message: `Atlas target has unexpected fragment "${fragment ? `#${fragment}` : '(none)'}"`,
         location: normalized,
         witness: { host, fragment, path: fullPath },
         remediation:
-          'Atlas file links use no fragment; module/point fragments bind to their own files.',
+          `Atlas links must target ${routerPlan.atlas.fragment} on the accepted skill-local surface.`,
       }),
     };
   }
 
   for (const module of graph.modules) {
-    const expected = moduleRouterDistPath(host, module.id);
+    const expected = routerPlan.modules.get(module.id)?.path;
     if (fullPath === expected && !fragment) {
       return { node: nodeKey('module', module.id) };
     }
@@ -842,12 +845,27 @@ function resolveSourceNode(host, relativePath, markdown, linkIndex, graph) {
     }
   }
 
-  if (fullPath === atlasDistPath(host)) {
-    return { node: nodeKey('atlas', 'knowledge-atlas') };
-  }
-  for (const module of graph.modules) {
-    if (fullPath === moduleRouterDistPath(host, module.id)) {
-      return { node: nodeKey('module', module.id) };
+  const generatedIndex = markdown.indexOf('<!-- ccm:k:generated -->');
+  if (generatedIndex >= 0 && linkIndex > generatedIndex) {
+    const routerPlan = buildRuntimeRouterPlan({ host, graph });
+    const prefix = markdown.slice(generatedIndex, linkIndex);
+    let matchedModule = null;
+    let matchedIndex = -1;
+    for (const module of graph.modules) {
+      const placement = routerPlan.modules.get(module.id);
+      if (placement?.path !== fullPath) continue;
+      const anchor = `<a id="${moduleAnchorId(module.id)}"></a>`;
+      const anchorIndex = prefix.lastIndexOf(anchor);
+      if (anchorIndex > matchedIndex) {
+        matchedIndex = anchorIndex;
+        matchedModule = module;
+      }
+    }
+    if (matchedModule && matchedIndex >= 0) {
+      return { node: nodeKey('module', matchedModule.id) };
+    }
+    if (fullPath === routerPlan.atlas.path) {
+      return { node: nodeKey('atlas', 'knowledge-atlas') };
     }
   }
 
@@ -884,9 +902,11 @@ function validateAnchorPlacements({
     files.add(edge.from_file.split(path.sep).join('/'));
     files.add(edge.to_file.split(path.sep).join('/'));
   }
-  files.add(distPathToHostRelative(host, atlasDistPath(host)));
+  const routerPlan = buildRuntimeRouterPlan({ host, graph });
+  files.add(distPathToHostRelative(host, routerPlan.atlas.path));
   for (const module of graph.modules) {
-    files.add(distPathToHostRelative(host, moduleRouterDistPath(host, module.id)));
+    const placement = routerPlan.modules.get(module.id);
+    if (placement) files.add(distPathToHostRelative(host, placement.path));
   }
   for (const point of graph.points) {
     const expected = canonicalBindingToDistPath(host, point.binding.path);
@@ -967,7 +987,7 @@ function validateAnchorPlacements({
           );
           continue;
         }
-        const expected = moduleRouterDistPath(host, module.id);
+        const expected = routerPlan.modules.get(module.id)?.path;
         if (expected !== fullPath) {
           diagnostics.push(
             diagnostic({
@@ -981,7 +1001,7 @@ function validateAnchorPlacements({
                 actual_path: fullPath,
                 expected_path: expected,
               },
-              remediation: 'Emit module anchors only in moduleRouterDistPath(host, module.id).',
+              remediation: 'Emit module anchors only at their deterministic skill-local placement.',
             }),
           );
         }
@@ -1237,9 +1257,12 @@ export function verifyHopContracts({
     }
   }
 
+  const routerPlan = buildRuntimeRouterPlan({ host, graph });
   const budgets = {
-    atlas_path: atlasDistPath(host),
-    module_paths: graph.modules.map((module) => moduleRouterDistPath(host, module.id)),
+    atlas_path: routerPlan.atlas.path,
+    module_paths: graph.modules
+      .map((module) => routerPlan.modules.get(module.id)?.path)
+      .filter(Boolean),
   };
 
   const hopReport = {

@@ -65,6 +65,24 @@
 <!-- ccm:k:end point:slicing.example-contrast -->
 <!-- ccm:k:nav:start point:slicing.example-contrast -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.example](./worked-example.md#ccm-k-module-slicing-example)
 - [Canonical: 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule)
 - [routes_to: 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.example-to-vertical -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 横切纵切对照样例
+
+<a id="ccm-k-module-slicing-example"></a>
+
+用同一目标对照横切病灶与纵切收益，校准切法直觉。
+
+## Member points
+
+- [example: 横切 vs 纵切对照样例](./worked-example.md#ccm-k-point-slicing-example-contrast)
+- [canonicalize → 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

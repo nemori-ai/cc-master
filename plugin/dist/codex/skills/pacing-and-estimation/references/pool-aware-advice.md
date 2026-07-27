@@ -24,6 +24,8 @@
 <!-- ccm:k:end point:pacing.own-row -->
 <!-- ccm:k:nav:start point:pacing.own-row -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
 - [requires: pool 相对轴 vs usage 绝对轴](./pool-aware-advice.md#ccm-k-point-pacing-pool-vs-usage) <!-- ccm:k:edge edge:pacing.own-to-vs -->
 - [routes_to: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.own-to-upper -->
 <!-- ccm:k:nav:end -->
@@ -38,6 +40,8 @@ selected-target `usage advise` 是绝对配额压力轴：这个池有多满、�
 <!-- ccm:k:end point:pacing.pool-vs-usage -->
 <!-- ccm:k:nav:start point:pacing.pool-vs-usage -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.vs -->
 - [contrasts_with: pool 合理化表与消费顺序](./pool-aware-advice.md#ccm-k-point-pacing-pool-rationalization) <!-- ccm:k:edge edge:pacing.vs-to-rat -->
 <!-- ccm:k:nav:end -->
@@ -61,6 +65,25 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.pool-rationalization -->
 <!-- ccm:k:nav:start point:pacing.pool-rationalization -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.rat -->
 - [routes_to: 读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row) <!-- ccm:k:edge edge:pacing.rat-to-own -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 池感知建议
+
+<a id="ccm-k-module-pacing-pool"></a>
+
+消费同池 own_row 相对分配，不与绝对 usage 轴混淆。
+
+## Member points
+
+- [读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row)
+- [pool 合理化表与消费顺序](./pool-aware-advice.md#ccm-k-point-pacing-pool-rationalization)
+- [pool 相对轴 vs usage 绝对轴](./pool-aware-advice.md#ccm-k-point-pacing-pool-vs-usage)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

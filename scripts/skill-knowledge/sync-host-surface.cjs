@@ -380,7 +380,6 @@ function projectSkillsIntoStaging({
   const skillsStaging = path.join(stagingAbsolute, 'skills');
   requireDir(skillsSrc);
   fs.mkdirSync(skillsStaging, { recursive: true });
-  const deferredGuidance = [];
 
   for (const skill of fs.readdirSync(skillsSrc).sort()) {
     if (skill.startsWith('_')) continue;
@@ -414,11 +413,6 @@ function projectSkillsIntoStaging({
       );
       assertPacingRuntimeTree(plan.pacingRegistry, plan.readOnlyContract.host, projectionTarget);
     }
-    // Provider-guidance accepted_final includes skills-scoped entry pins when the
-    // guidance skill is itself a skill_entry surface — defer until after pins.
-    if (mode === 'accepted' && plan.providerGuidanceContract) {
-      deferredGuidance.push({ plan, projectionTarget });
-    }
   }
 
   // Codex (and any future skill_entry host): entry pins whose targets are under skills/.
@@ -429,17 +423,9 @@ function projectSkillsIntoStaging({
     skillsTree: skillsStaging,
   });
 
-  if (mode === 'accepted') {
-    for (const { plan, projectionTarget } of deferredGuidance) {
-      const registry = loadProviderGuidanceRegistry(plan.providerGuidanceRegistryPath, repoRoot);
-      assertProviderGuidanceRuntimeTree(
-        registry,
-        plan.providerGuidanceContract.host,
-        plan.providerGuidanceContract.skill,
-        projectionTarget,
-      );
-    }
-  }
+  // accepted_final is the whole final skill tree, including full-compiler router
+  // relocation. Its one strict comparison therefore lives after compile in
+  // buildHostCandidate; pre-compile SAP/pacing attestations remain above.
 }
 
 function projectNonSkillSurfaces({ repoRoot, host, stagingAbsolute }) {
@@ -755,5 +741,7 @@ function projectAndPublishHostSurface({
 module.exports = {
   assertHostDistPathIntegrity,
   assertSafeStamp,
+  compileIntoCandidate,
   projectAndPublishHostSurface,
+  projectNonSkillSurfaces,
 };

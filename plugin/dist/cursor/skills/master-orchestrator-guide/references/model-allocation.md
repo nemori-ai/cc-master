@@ -21,6 +21,8 @@
 <!-- ccm:k:end point:capacity.task-first-allocation -->
 <!-- ccm:k:nav:start point:capacity.task-first-allocation -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.delivery](./model-allocation.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->
 ## 可执行排序与 fallback
 
@@ -42,4 +44,25 @@ Knowledge navigation:
 <!-- ccm:k:end point:capacity.ranking-and-contraction -->
 <!-- ccm:k:nav:start point:capacity.ranking-and-contraction -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.delivery](./model-allocation.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 容量与截止期决策
+
+<a id="ccm-k-module-capacity-delivery"></a>
+
+在 effect floor、selected-target 事实、容量走廊与交付 DDL 之间做守边界的资源决策。
+
+## Member points
+
+- [同档排序与容量收缩](./model-allocation.md#ccm-k-point-capacity-ranking-and-contraction)
+- [先判任务再分模型](./model-allocation.md#ccm-k-point-capacity-task-first-allocation)
+- [交付 DDL 与容量轴正交](./deadline-discipline.md#ccm-k-point-deadline-constraint-axes)
+- [DDL 合理化守卫与 owner 边界](./deadline-discipline.md#ccm-k-point-deadline-guards-and-boundary)
+- [DDL 九条编排纪律](./deadline-discipline.md#ccm-k-point-deadline-nine-disciplines)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

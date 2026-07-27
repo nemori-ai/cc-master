@@ -39,6 +39,8 @@
 <!-- ccm:k:end point:tdd.iron-law -->
 <!-- ccm:k:nav:start point:tdd.iron-law -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.test-first.to-shared-spine -->
 - [deepens_to: 完成证据闸](./tdd.md#ccm-k-point-tdd-completion-gate) <!-- ccm:k:edge edge:craft.test-first.iron-law-to-completion-gate -->
 - [deepens_to: Constraint parity](./tdd.md#ccm-k-point-tdd-constraint-parity) <!-- ccm:k:edge edge:craft.test-first.iron-law-to-constraint-parity -->
@@ -97,6 +99,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.red-green-loop -->
 <!-- ccm:k:nav:start point:tdd.red-green-loop -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.red-green-loop-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-red-evidence"></a>
@@ -120,6 +124,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.red-evidence -->
 <!-- ccm:k:nav:start point:tdd.red-evidence -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.red-evidence-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-constraint-parity"></a>
@@ -147,6 +153,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.constraint-parity -->
 <!-- ccm:k:nav:start point:tdd.constraint-parity -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.constraint-parity-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-completion-gate"></a>
@@ -172,6 +180,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.completion-gate -->
 <!-- ccm:k:nav:start point:tdd.completion-gate -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.completion-gate-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-design-feedback"></a>
@@ -195,6 +205,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.design-feedback -->
 <!-- ccm:k:nav:start point:tdd.design-feedback -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.design-feedback-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-loop-boundary"></a>
@@ -212,6 +224,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.loop-boundary -->
 <!-- ccm:k:nav:start point:tdd.loop-boundary -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.loop-boundary-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-rationalizations"></a>
@@ -252,5 +266,29 @@ Knowledge navigation:
 <!-- ccm:k:end point:tdd.rationalizations -->
 <!-- ccm:k:nav:start point:tdd.rationalizations -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.rationalizations-to-iron-law -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## TDD Test-first
+
+<a id="ccm-k-module-craft-test-first"></a>
+
+执行可验证的 RED→GREEN→REFACTOR，并用真实约束和末端证据守住完成声明。
+
+## Member points
+
+- [完成证据闸](./tdd.md#ccm-k-point-tdd-completion-gate)
+- [Constraint parity](./tdd.md#ccm-k-point-tdd-constraint-parity)
+- [测试困难是设计反馈](./tdd.md#ccm-k-point-tdd-design-feedback)
+- [TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law)
+- [TDD 与执行循环边界](./tdd.md#ccm-k-point-tdd-loop-boundary)
+- [TDD 合理化与红旗](./tdd.md#ccm-k-point-tdd-rationalizations)
+- [验证 RED 原因](./tdd.md#ccm-k-point-tdd-red-evidence)
+- [红绿重构循环](./tdd.md#ccm-k-point-tdd-red-green-loop)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

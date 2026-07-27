@@ -22,6 +22,8 @@
 <!-- ccm:k:end point:pacing.estimate-verbs -->
 <!-- ccm:k:nav:start point:pacing.estimate-verbs -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
 - [requires: baseline 是 EVM 前置](./estimation.md#ccm-k-point-pacing-baseline-precondition) <!-- ccm:k:edge edge:pacing.verbs-to-baseline -->
 - [deepens_to: 交付 DDL 风险消费](./estimation.md#ccm-k-point-pacing-deadline-risk) <!-- ccm:k:edge edge:pacing.verbs-to-ddl -->
 - [requires: 估算诚实字段](./estimation.md#ccm-k-point-pacing-honest-fields) <!-- ccm:k:edge edge:pacing.verbs-to-honest -->
@@ -43,6 +45,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.deadline-risk -->
 <!-- ccm:k:nav:start point:pacing.deadline-risk -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
 - [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.ddl-to-verbs -->
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.ddl -->
 <!-- ccm:k:nav:end -->
@@ -60,6 +64,8 @@ EVM 只在此前已经建立 plan baseline 时可计算。baseline 是 board 内
 <!-- ccm:k:end point:pacing.baseline-precondition -->
 <!-- ccm:k:nav:start point:pacing.baseline-precondition -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
 - [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.baseline-to-verbs -->
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.baseline -->
 <!-- ccm:k:nav:end -->
@@ -80,6 +86,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.honest-fields -->
 <!-- ccm:k:nav:start point:pacing.honest-fields -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.honest -->
 - [applies_to: usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension) <!-- ccm:k:edge edge:pacing.honest-to-tension -->
 <!-- ccm:k:nav:end -->
@@ -94,6 +102,27 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.usage-estimate-tension -->
 <!-- ccm:k:nav:start point:pacing.usage-estimate-tension -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
 - [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.tension-to-verbs -->
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.tension -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 估算消费
+
+<a id="ccm-k-module-pacing-estimation"></a>
+
+召回并正确消费 ccm estimate 只读 advisory 与诚实字段。
+
+## Member points
+
+- [baseline 是 EVM 前置](./estimation.md#ccm-k-point-pacing-baseline-precondition)
+- [交付 DDL 风险消费](./estimation.md#ccm-k-point-pacing-deadline-risk)
+- [六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs)
+- [估算诚实字段](./estimation.md#ccm-k-point-pacing-honest-fields)
+- [usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

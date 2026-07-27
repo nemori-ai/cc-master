@@ -63,6 +63,8 @@
 <!-- ccm:k:end point:board.waist-and-write -->
 <!-- ccm:k:nav:start point:board.waist-and-write -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## Supersession —— 显式状态，非隐式 GC
 
@@ -108,6 +110,8 @@ lint 守「board 写得对不对」；**图分析**则在 board 写对之后回�
 <!-- ccm:k:end point:board.audit-and-graph -->
 <!-- ccm:k:nav:start point:board.audit-and-graph -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## `owner.heartbeat` —— resume 探测信号
 
@@ -157,6 +161,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:board.resume-and-interview -->
 <!-- ccm:k:nav:start point:board.resume-and-interview -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## 示例（worked board 全字段样例）
 
@@ -192,4 +198,24 @@ Knowledge navigation:
 <!-- ccm:k:end point:board.worked-example -->
 <!-- ccm:k:nav:start point:board.worked-example -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Board 长程状态纪律
+
+<a id="ccm-k-module-state-board"></a>
+
+把 board 作为跨 compaction/session 的单一真相源，并守住窄腰、审计、续跑与采访协议。
+
+## Member points
+
+- [审计、lint 与图 advisory](./board.md#ccm-k-point-board-audit-and-graph)
+- [续跑信号与采访协议](./board.md#ccm-k-point-board-resume-and-interview)
+- [窄腰与读写纪律](./board.md#ccm-k-point-board-waist-and-write)
+- [Worked board 全字段样例](./board.md#ccm-k-point-board-worked-example)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

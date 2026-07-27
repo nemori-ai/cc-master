@@ -316,6 +316,8 @@ ccm <alias> [args] [flags]
 <!-- ccm:k:end point:ccm.cmd.overview -->
 <!-- ccm:k:nav:start point:ccm.cmd.overview -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [next: namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board) <!-- ccm:k:edge edge:ccm.cmd-core.0 -->
 - [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.overview.pri -->
 <!-- ccm:k:nav:end -->
@@ -384,6 +386,8 @@ ccm worker dispatch --board /abs/run.board.json --harness <codex|claude-code|cur
 <!-- ccm:k:end point:ccm.cmd.cross-harness-facts -->
 <!-- ccm:k:nav:start point:ccm.cmd.cross-harness-facts -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.cross-harness-facts.pri -->
 - [next: worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota) <!-- ccm:k:edge edge:ccm.cmd-ext.0 -->
 <!-- ccm:k:nav:end -->
@@ -651,6 +655,8 @@ projection 再返回。
 <!-- ccm:k:end point:ccm.cmd.worker-quota -->
 <!-- ccm:k:nav:start point:ccm.cmd.worker-quota -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps) <!-- ccm:k:edge edge:ccm.cmd-ext.1 -->
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.worker-quota.pri -->
 <!-- ccm:k:nav:end -->
@@ -867,6 +873,8 @@ ccm board enable-contract [--preflight] [--json]
 <!-- ccm:k:end point:ccm.cmd.board -->
 <!-- ccm:k:nav:start point:ccm.cmd.board -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [routes_to: task 字段三档速查](./board-model-guide.md#ccm-k-point-ccm-board-task-fields) <!-- ccm:k:edge edge:ccm.cmd-board-to-fields -->
 - [next: namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal) <!-- ccm:k:edge edge:ccm.cmd-core.1 -->
 <!-- ccm:k:nav:end -->
@@ -966,6 +974,8 @@ ccm goal deadline show [--json]
 <!-- ccm:k:end point:ccm.cmd.goal -->
 <!-- ccm:k:nav:start point:ccm.cmd.goal -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [next: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-core.2 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-capability-deps"></a>
@@ -1077,6 +1087,8 @@ qualification 与 diagnostic codes；不持久化布尔。显式 edge 一律先�
 <!-- ccm:k:end point:ccm.cmd.capability-deps -->
 <!-- ccm:k:nav:start point:ccm.cmd.capability-deps -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord) <!-- ccm:k:edge edge:ccm.cmd-ext.2 -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.capability-deps.to-critical -->
 <!-- ccm:k:nav:end -->
@@ -1566,6 +1578,8 @@ ccm task rm <id> [flags]
 <!-- ccm:k:end point:ccm.cmd.task -->
 <!-- ccm:k:nav:start point:ccm.cmd.task -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [next: namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log) <!-- ccm:k:edge edge:ccm.cmd-core.3 -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-task-to-critical -->
 <!-- ccm:k:nav:end -->
@@ -1624,6 +1638,8 @@ ccm log list [flags]
 <!-- ccm:k:end point:ccm.cmd.log -->
 <!-- ccm:k:nav:start point:ccm.cmd.log -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [next: --json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape) <!-- ccm:k:edge edge:ccm.cmd-core.4 -->
 - [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.log.pri -->
 <!-- ccm:k:nav:end -->
@@ -1733,6 +1749,8 @@ ccm jc resolve <id> --status <upheld|overturned> [flags]
 <!-- ccm:k:end point:ccm.cmd.jc -->
 <!-- ccm:k:nav:start point:ccm.cmd.jc -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [next: namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence) <!-- ccm:k:edge edge:ccm.cmd-jc-cadence -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.jc.to-critical -->
 <!-- ccm:k:nav:end -->
@@ -1828,6 +1846,8 @@ ccm cadence status [flags]
 <!-- ccm:k:end point:ccm.cmd.cadence -->
 <!-- ccm:k:nav:start point:ccm.cmd.cadence -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [next: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.cmd-cadence-watchdog -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-watchdog"></a>
@@ -1892,6 +1912,8 @@ ccm watchdog status [flags]
 <!-- ccm:k:end point:ccm.cmd.watchdog -->
 <!-- ccm:k:nav:start point:ccm.cmd.watchdog -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [next: namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent) <!-- ccm:k:edge edge:ccm.cmd-watchdog-agent -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-sched-to-critical -->
 <!-- ccm:k:nav:end -->
@@ -1979,6 +2001,8 @@ ccm baseline reset [flags]
 <!-- ccm:k:end point:ccm.cmd.baseline -->
 <!-- ccm:k:nav:start point:ccm.cmd.baseline -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.baseline.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-agent"></a>
@@ -2185,6 +2209,8 @@ ccm agent rm <id> [--yes] [flags]
 <!-- ccm:k:end point:ccm.cmd.agent -->
 <!-- ccm:k:nav:start point:ccm.cmd.agent -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [next: namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline) <!-- ccm:k:edge edge:ccm.cmd-agent-baseline -->
 - [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.agent.pri -->
 <!-- ccm:k:nav:end -->
@@ -2316,6 +2342,8 @@ ccm coordination arbitrate [flags]
 <!-- ccm:k:end point:ccm.cmd.peers-coord -->
 <!-- ccm:k:nav:start point:ccm.cmd.peers-coord -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.cmd-ext.3 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-usage"></a>
@@ -2447,6 +2475,8 @@ ccm usage runway [flags]
 <!-- ccm:k:end point:ccm.cmd.usage -->
 <!-- ccm:k:nav:start point:ccm.cmd.usage -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces) <!-- ccm:k:edge edge:ccm.cmd-ext.4 -->
 - [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-ext-to-core -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-ext-to-critical -->
@@ -2880,6 +2910,8 @@ ccm runtime rollback [--json]
 <!-- ccm:k:end point:ccm.cmd.ops-surfaces -->
 <!-- ccm:k:nav:start point:ccm.cmd.ops-surfaces -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate) <!-- ccm:k:edge edge:ccm.cmd-ext.5 -->
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.ops-surfaces.pri -->
 <!-- ccm:k:nav:end -->
@@ -3046,6 +3078,8 @@ ccm estimate deadline-risk [flags]
 <!-- ccm:k:end point:ccm.cmd.estimate -->
 <!-- ccm:k:nav:start point:ccm.cmd.estimate -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration) <!-- ccm:k:edge edge:ccm.cmd-ext.6 -->
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.estimate.pri -->
 <!-- ccm:k:nav:end -->
@@ -3084,6 +3118,8 @@ ccm calibration capture [flags]
 <!-- ccm:k:end point:ccm.cmd.calibration -->
 <!-- ccm:k:nav:start point:ccm.cmd.calibration -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [next: statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns) <!-- ccm:k:edge edge:ccm.cmd-ext.7 -->
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.calibration.pri -->
 <!-- ccm:k:nav:end -->
@@ -3129,6 +3165,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:ccm.cmd.account -->
 <!-- ccm:k:nav:start point:ccm.cmd.account -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
 - [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.account.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-misc-ns"></a>
@@ -3271,6 +3309,8 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 <!-- ccm:k:end point:ccm.cmd.misc-ns -->
 <!-- ccm:k:nav:start point:ccm.cmd.misc-ns -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
 - [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.misc-ns.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-json-shape"></a>
@@ -3952,5 +3992,67 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 <!-- ccm:k:end point:ccm.cmd.json-shape -->
 <!-- ccm:k:nav:start point:ccm.cmd.json-shape -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
 - [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.json-shape.pri -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 命令面：board/goal/task 核心
+
+<a id="ccm-k-module-ccm-commands-core"></a>
+
+提供易腐 CLI 事实的 canonical 段：board/goal/task/log 与 --json 形状。
+
+## Member points
+
+- [namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board)
+- [namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal)
+- [--json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape)
+- [namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log)
+- [ccm 顶层结构与 namespaces](./command-catalog.md#ccm-k-point-ccm-cmd-overview)
+- [namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 命令面：cross-harness / advisory / ops
+
+<a id="ccm-k-module-ccm-commands-extended"></a>
+
+覆盖其余易腐 CLI namespace：cross-harness、usage/estimate、ops surfaces。
+
+## Member points
+
+- [namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration)
+- [capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps)
+- [跨 harness 目标事实查询](./command-catalog.md#ccm-k-point-ccm-cmd-cross-harness-facts)
+- [namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate)
+- [statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns)
+- [status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces)
+- [peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord)
+- [namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 命令面：jc/cadence/watchdog/agent
+
+<a id="ccm-k-module-ccm-commands-scheduling"></a>
+
+调度与运行时登记相关 namespace 的机械命令事实。
+
+## Member points
+
+- [namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent)
+- [namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline)
+- [namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence)
+- [namespace jc](./command-catalog.md#ccm-k-point-ccm-cmd-jc)
+- [namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -52,7 +52,11 @@ $ARGUMENTS
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:master-orchestrator:
 - [runtime terminal 不等于 task done](../master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [Module module:conduct.never-play](../master-orchestrator-guide/SKILL.md#ccm-k-module-conduct-never-play)
 - [primary: 指挥不演奏原则](../master-orchestrator-guide/SKILL.md#ccm-k-point-conduct-never-play)
+- [Module module:control.decision-loop](../master-orchestrator-guide/SKILL.md#ccm-k-module-control-decision-loop)
 - [primary: 每回合确定性决策程序](../master-orchestrator-guide/SKILL.md#ccm-k-point-control-decision-program)
+- [Module module:routing.worker-chain](../master-orchestrator-guide/references/worker-routing.md#ccm-k-module-routing-worker-chain)
 - [primary: 不可换序的八段路由链](../master-orchestrator-guide/references/worker-routing.md#ccm-k-point-routing-ordered-chain)
+- [Module module:verification.endpoint](../master-orchestrator-guide/references/worker-routing.md#ccm-k-module-verification-endpoint)
 <!-- ccm:k:entry-pin:end -->

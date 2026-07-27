@@ -33,6 +33,8 @@ ccm goal confirm --board <board> --user-authorized
 <!-- ccm:k:end point:goal.fresh-contract -->
 <!-- ccm:k:nav:start point:goal.fresh-contract -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:goal.contract](./goal-contract.md#ccm-k-module-goal-contract)
 <!-- ccm:k:nav:end -->
 ## 交付 DDL：识别、确认、过期
 
@@ -91,6 +93,8 @@ Goal Brief 至少包含：Outcome；背景与需求证据指针；in-scope / non
 <!-- ccm:k:end point:goal.deadline-and-brief -->
 <!-- ccm:k:nav:start point:goal.deadline-and-brief -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:goal.contract](./goal-contract.md#ccm-k-module-goal-contract)
 <!-- ccm:k:nav:end -->
 ## 工作中：Goal Trace Test
 
@@ -129,6 +133,8 @@ ccm goal check --board <board> --json
 <!-- ccm:k:end point:goal.trace-and-delta -->
 <!-- ccm:k:nav:start point:goal.trace-and-delta -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:goal.contract](./goal-contract.md#ccm-k-module-goal-contract)
 <!-- ccm:k:nav:end -->
 ## 六个对齐检查点
 
@@ -145,4 +151,24 @@ Legacy board 没有 `goal_contract` 时保持可续跑；不要在恢复现场�
 <!-- ccm:k:end point:goal.alignment-checkpoints -->
 <!-- ccm:k:nav:start point:goal.alignment-checkpoints -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:goal.contract](./goal-contract.md#ccm-k-module-goal-contract)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Goal Contract 不漂移
+
+<a id="ccm-k-module-goal-contract"></a>
+
+把原始需求证据变成可检验的当前目标 revision，并在 DDL、trace、delta 与收口检查点持续守义。
+
+## Member points
+
+- [六个目标对齐检查点](./goal-contract.md#ccm-k-point-goal-alignment-checkpoints)
+- [DDL lifecycle 与 Goal Brief](./goal-contract.md#ccm-k-point-goal-deadline-and-brief)
+- [Fresh Goal Contract](./goal-contract.md#ccm-k-point-goal-fresh-contract)
+- [Goal trace 与 delta 分类](./goal-contract.md#ccm-k-point-goal-trace-and-delta)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

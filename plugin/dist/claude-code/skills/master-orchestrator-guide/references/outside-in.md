@@ -39,6 +39,8 @@
 <!-- ccm:k:end point:outside.evidence-levels -->
 <!-- ccm:k:nav:start point:outside.evidence-levels -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:evidence.outside-in](./outside-in.md#ccm-k-module-evidence-outside-in)
 <!-- ccm:k:nav:end -->
 ## 组件 B — 「最可能被哪项外部事实推翻」检查点
 
@@ -66,6 +68,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:outside.falsification-and-calibration -->
 <!-- ccm:k:nav:start point:outside.falsification-and-calibration -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:evidence.outside-in](./outside-in.md#ccm-k-module-evidence-outside-in)
 <!-- ccm:k:nav:end -->
 ## 组件 D — 无外部通道时：诚实记未知 + 可逆有限实验
 
@@ -92,6 +96,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:outside.unknown-and-amendment -->
 <!-- ccm:k:nav:start point:outside.unknown-and-amendment -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:evidence.outside-in](./outside-in.md#ccm-k-module-evidence-outside-in)
 <!-- ccm:k:nav:end -->
 ## 组件 F — 低风险可逆豁免（过度求证是另一侧悬崖）
 
@@ -105,4 +111,24 @@ outside-in 不是「永远向外求证」——那会造出另一种「装忙 / 
 <!-- ccm:k:end point:outside.low-risk-exception -->
 <!-- ccm:k:nav:start point:outside.low-risk-exception -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:evidence.outside-in](./outside-in.md#ccm-k-module-evidence-outside-in)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Outside-in 证据校准
+
+<a id="ccm-k-module-evidence-outside-in"></a>
+
+让承重判断接触外部现实，用与风险相称的最低成本证据校准假设而不陷入仪式化求证。
+
+## Member points
+
+- [外部有效性与证据等级](./outside-in.md#ccm-k-point-outside-evidence-levels)
+- [可证伪检查与校准阶梯](./outside-in.md#ccm-k-point-outside-falsification-and-calibration)
+- [低风险可逆豁免](./outside-in.md#ccm-k-point-outside-low-risk-exception)
+- [未知、可逆实验与 amendment](./outside-in.md#ccm-k-point-outside-unknown-and-amendment)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

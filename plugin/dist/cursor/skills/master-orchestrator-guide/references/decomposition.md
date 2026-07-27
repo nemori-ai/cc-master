@@ -73,6 +73,8 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 <!-- ccm:k:end point:scheduling.dag-and-critical-path -->
 <!-- ccm:k:nav:start point:scheduling.dag-and-critical-path -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->
 ## 4. 并行度 = T₁/T∞ —— 值得开几条道
 
@@ -108,6 +110,8 @@ work-span 模型量化并行到底值不值、天花板在哪（这些量由 `cc
 <!-- ccm:k:end point:scheduling.parallelism-and-granularity -->
 <!-- ccm:k:nav:start point:scheduling.parallelism-and-granularity -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->
 ## 6. 每节点契约 —— 派发前定义
 
@@ -127,4 +131,23 @@ Knowledge navigation:
 <!-- ccm:k:end point:scheduling.node-contract -->
 <!-- ccm:k:nav:start point:scheduling.node-contract -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 依赖 DAG 排期
+
+<a id="ccm-k-module-scheduling-dependency-dag"></a>
+
+对已切好的当前增量按真实依赖、临界路径、并行度与节点契约排期。
+
+## Member points
+
+- [DAG、临界路径与机器 graph](./decomposition.md#ccm-k-point-scheduling-dag-and-critical-path)
+- [派发前节点契约](./decomposition.md#ccm-k-point-scheduling-node-contract)
+- [并行度与粒度](./decomposition.md#ccm-k-point-scheduling-parallelism-and-granularity)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

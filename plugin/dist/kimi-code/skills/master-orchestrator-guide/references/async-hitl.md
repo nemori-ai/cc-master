@@ -57,6 +57,8 @@ kimi-code 下不要等待其他 harness 的后台完成通知语义。当 Task s
 <!-- ccm:k:end point:hitl.inflight-and-user -->
 <!-- ccm:k:nav:start point:hitl.inflight-and-user -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
 <!-- ccm:k:nav:end -->
 ## 采访式决策 —— 为 awaiting-user 节点准备采访包 + 消化结论 sidecar
 
@@ -98,6 +100,8 @@ cc-master 对抗"过早停止"的确定性守卫是 **goal-hook**（`verify-boar
 <!-- ccm:k:end point:hitl.decision-package -->
 <!-- ccm:k:nav:start point:hitl.decision-package -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
 <!-- ccm:k:nav:end -->
 ### step-6 ledger —— 固定形态（单一来源）
 
@@ -118,6 +122,8 @@ hook 对 board 状态设闸；这份写下的 ledger 才是让"done"*可信*、�
 <!-- ccm:k:end point:hitl.step6-ledger -->
 <!-- ccm:k:nav:start point:hitl.step6-ledger -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
 <!-- ccm:k:nav:end -->
 ## 等待前 arm watchdog —— 静默失败盲区的安全网
 
@@ -210,4 +216,24 @@ canonical `watchdog` / legacy `wakeup`。只有带 nonblank `job_id` 且 `fire_a
 <!-- ccm:k:end point:hitl.watchdog -->
 <!-- ccm:k:nav:start point:hitl.watchdog -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 异步完成与 HITL
+
+<a id="ccm-k-module-coordination-async-hitl"></a>
+
+把后台 in-flight、用户决策、step-6 ledger 与 watchdog 组成不阻塞整板的异步协调协议。
+
+## Member points
+
+- [采访式 decision package](./async-hitl.md#ccm-k-point-hitl-decision-package)
+- [in-flight 与用户异步依赖](./async-hitl.md#ccm-k-point-hitl-inflight-and-user)
+- [step-6 ledger 固定形态](./async-hitl.md#ccm-k-point-hitl-step6-ledger)
+- [等待前 watchdog](./async-hitl.md#ccm-k-point-hitl-watchdog)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

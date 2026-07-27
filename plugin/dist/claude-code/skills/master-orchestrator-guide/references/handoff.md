@@ -44,6 +44,8 @@
 <!-- ccm:k:end point:handoff.procedure-and-drain -->
 <!-- ccm:k:nav:start point:handoff.procedure-and-drain -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:continuity.handoff](./handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->
 ## 叙事层 / 无噪声纪律（judgment-bearing）
 
@@ -111,6 +113,8 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 <!-- ccm:k:end point:handoff.judgment-template -->
 <!-- ccm:k:nav:start point:handoff.judgment-template -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:continuity.handoff](./handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->
 ## 归档换无摩擦 resume 的 rationale
 
@@ -149,4 +153,23 @@ Knowledge navigation:
 <!-- ccm:k:end point:handoff.rationale-and-guards -->
 <!-- ccm:k:nav:start point:handoff.rationale-and-guards -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:continuity.handoff](./handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Session 交接
+
+<a id="ccm-k-module-continuity-handoff"></a>
+
+在新 session 接手前 drain 在飞工作，只写 board 装不下的 judgment-bearing 叙事并保留可复核依据。
+
+## Member points
+
+- [Judgment-bearing 叙事模板](./handoff.md#ccm-k-point-handoff-judgment-template)
+- [交接 procedure 与 drain](./handoff.md#ccm-k-point-handoff-procedure-and-drain)
+- [交接 rationale 与噪声守卫](./handoff.md#ccm-k-point-handoff-rationale-and-guards)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

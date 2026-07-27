@@ -110,6 +110,8 @@ Cursor agent runtime 可用后台 Shell 等外部状态，但没有 Claude Code 
 <!-- ccm:k:end point:dispatch.dataflow-and-mechanisms -->
 <!-- ccm:k:nav:start point:dispatch.dataflow-and-mechanisms -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## 稳定路由合同入口
 
@@ -144,6 +146,8 @@ origin 不是 worker pool 边界；target surface、真实 help、资格硬门�
 <!-- ccm:k:end point:dispatch.routing-and-isolation -->
 <!-- ccm:k:nav:start point:dispatch.routing-and-isolation -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## Intra vs inter workflow —— 轴 = 生命周期耦合
 
@@ -185,6 +189,8 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 <!-- ccm:k:end point:dispatch.workflow-and-escalation -->
 <!-- ccm:k:nav:start point:dispatch.workflow-and-escalation -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
@@ -215,4 +221,24 @@ Knowledge navigation:
 <!-- ccm:k:end point:dispatch.hygiene-and-liveness -->
 <!-- ccm:k:nav:start point:dispatch.hygiene-and-liveness -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 并行派发机制
+
+<a id="ccm-k-module-dispatch-parallel-mechanisms"></a>
+
+把 executor 规划语义映射为真实后台机制，并守住 dataflow、writer 隔离、escalation、admission 与 liveness。
+
+## Member points
+
+- [dataflow 与后台机制](./dispatch.md#ccm-k-point-dispatch-dataflow-and-mechanisms)
+- [派发卫生与 liveness](./dispatch.md#ccm-k-point-dispatch-hygiene-and-liveness)
+- [路由取证与 writer 隔离](./dispatch.md#ccm-k-point-dispatch-routing-and-isolation)
+- [workflow 生命周期与 escalation](./dispatch.md#ccm-k-point-dispatch-workflow-and-escalation)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

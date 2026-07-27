@@ -36,6 +36,8 @@ Spec 就是那个**先于实现达成的外部标准**：消费者与实现者�
 <!-- ccm:k:end point:sdd.core-belief -->
 <!-- ccm:k:nav:start point:sdd.core-belief -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.spec-first.to-shared-spine -->
 - [deepens_to: SDD 适用性判断](./sdd.md#ccm-k-point-sdd-admission) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-admission -->
 - [deepens_to: Spec、实现与测试对齐](./sdd.md#ccm-k-point-sdd-alignment) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-alignment -->
@@ -72,6 +74,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:sdd.spec-boundary -->
 <!-- ccm:k:nav:start point:sdd.spec-boundary -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.spec-boundary-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-alignment"></a>
@@ -95,6 +99,8 @@ spec（合约 SSOT）
 <!-- ccm:k:end point:sdd.alignment -->
 <!-- ccm:k:nav:start point:sdd.alignment -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.alignment-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-change-order"></a>
@@ -116,6 +122,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:sdd.change-order -->
 <!-- ccm:k:nav:start point:sdd.change-order -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.change-order-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-admission"></a>
@@ -149,6 +157,8 @@ SDD 不是对一切代码适用的万能方法——spec-first 带来的收益�
 <!-- ccm:k:end point:sdd.admission -->
 <!-- ccm:k:nav:start point:sdd.admission -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.admission-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-implementation-gate"></a>
@@ -175,6 +185,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:sdd.implementation-gate -->
 <!-- ccm:k:nav:start point:sdd.implementation-gate -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.implementation-gate-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-theory-handoff"></a>
@@ -211,6 +223,8 @@ design ──────────── build ──────────
 <!-- ccm:k:end point:sdd.theory-handoff -->
 <!-- ccm:k:nav:start point:sdd.theory-handoff -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.theory-handoff-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-drift-red-line"></a>
@@ -247,6 +261,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:sdd.drift-red-line -->
 <!-- ccm:k:nav:start point:sdd.drift-red-line -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.drift-red-line-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-practice-anchors"></a>
@@ -267,5 +283,30 @@ SDD 的精神在业界有多种形态的具体落地——本节列锚点供参�
 <!-- ccm:k:end point:sdd.practice-anchors -->
 <!-- ccm:k:nav:start point:sdd.practice-anchors -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.spec-first](./sdd.md#ccm-k-module-craft-spec-first)
 - [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.practice-anchors-to-core-belief -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## SDD Spec-first
+
+<a id="ccm-k-module-craft-spec-first"></a>
+
+判断何时需要 spec-first，并让 spec 成为实现、测试和变更的唯一契约裁判。
+
+## Member points
+
+- [SDD 适用性判断](./sdd.md#ccm-k-point-sdd-admission)
+- [Spec、实现与测试对齐](./sdd.md#ccm-k-point-sdd-alignment)
+- [先改 spec 的变更顺序](./sdd.md#ccm-k-point-sdd-change-order)
+- [Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [Spec 漂移红线](./sdd.md#ccm-k-point-sdd-drift-red-line)
+- [实现前 Spec 硬闸](./sdd.md#ccm-k-point-sdd-implementation-gate)
+- [SDD 当代实践锚](./sdd.md#ccm-k-point-sdd-practice-anchors)
+- [Spec 的职责边界](./sdd.md#ccm-k-point-sdd-spec-boundary)
+- [SDD 与 DDD/OOP/TDD 接力](./sdd.md#ccm-k-point-sdd-theory-handoff)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -64,6 +64,8 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 <!-- ccm:k:end point:control.identity-mandate -->
 <!-- ccm:k:nav:start point:control.identity-mandate -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ② 行动风格 · 哲学 · 纪律（action style · philosophy · discipline）
 
@@ -85,6 +87,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.role-consequences -->
 <!-- ccm:k:nav:start point:control.role-consequences -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 七镜头（The seven lenses）——操作哲学
 
@@ -94,6 +98,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.never-play -->
 <!-- ccm:k:nav:start point:conduct.never-play -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:conduct.never-play](./SKILL.md#ccm-k-module-conduct-never-play)
 - [operationalizes: 红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines) <!-- ccm:k:edge edge:conduct.principle-to-red-lines -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-control-operating-lenses"></a>
@@ -108,6 +114,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.operating-lenses -->
 <!-- ccm:k:nav:start point:control.operating-lenses -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 好编排长什么样——正向审美
 
@@ -122,6 +130,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.good-orchestration -->
 <!-- ccm:k:nav:start point:control.good-orchestration -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 红线（Red lines）——完整体
 
@@ -140,6 +150,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.red-lines -->
 <!-- ccm:k:nav:start point:conduct.red-lines -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:conduct.never-play](./SKILL.md#ccm-k-module-conduct-never-play)
 - [contrasts_with: 离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium) <!-- ccm:k:edge edge:conduct.red-lines-to-deserting -->
 - [applies_to: 端点验收 procedure](./references/resume-verify.md#ccm-k-point-verification-endpoint-procedure) <!-- ccm:k:edge edge:conduct.to-verification-exception -->
 <!-- ccm:k:nav:end -->
@@ -158,6 +170,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.deserting-podium -->
 <!-- ccm:k:nav:start point:conduct.deserting-podium -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:conduct.never-play](./SKILL.md#ccm-k-module-conduct-never-play)
 <!-- ccm:k:nav:end -->
 ### Rationalization Table（合理化对照表）—— 借口，与真相
 
@@ -209,6 +223,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.rationalization-guards -->
 <!-- ccm:k:nav:start point:control.rationalization-guards -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ③ 你的工具箱：skills 地图（progressive disclosure）
 
@@ -270,6 +286,8 @@ Codex 有内置 slash commands（如 `/status`、`/usage`、`/skills`、`/plugin
 <!-- ccm:k:end point:control.navigation-map -->
 <!-- ccm:k:nav:start point:control.navigation-map -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ④ 最高频行为 / 范式：决策程序 + 操作指导
 
@@ -385,4 +403,97 @@ prefetch / surface 一个 `blocked_on:"user"` 决策时，**连判断依据一�
 <!-- ccm:k:end point:control.decision-program -->
 <!-- ccm:k:nav:start point:control.decision-program -->
 Knowledge navigation:
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Knowledge atlas router
+
+Generated runtime navigation surface. Prefer these links over prose mentions.
+
+## Critical pins
+
+- [status 是状态机不是赋值字段](../using-ccm/SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [泛化 vs 收窄细则](../distilling-lessons-into-assets/references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [纵切不要横切硬规则](../slicing-goals-into-dags/SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [runtime terminal 不等于 task done](./references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+
+## Modules
+
+- [容量与截止期决策](./references/model-allocation.md#ccm-k-module-capacity-delivery)
+- [board 模型：合同、节奏与校验判断](../using-ccm/references/board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [board 模型：字段与生命周期判断](../using-ccm/references/board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [命令面：board/goal/task 核心](../using-ccm/references/command-catalog.md#ccm-k-module-ccm-commands-core)
+- [命令面：cross-harness / advisory / ops](../using-ccm/references/command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [命令面：jc/cadence/watchdog/agent](../using-ccm/references/command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [热路径与 footgun](../using-ccm/SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [ccm 心智锚与协议职责](../using-ccm/SKILL.md#ccm-k-module-ccm-mind-model)
+- [指挥不演奏](./SKILL.md#ccm-k-module-conduct-never-play)
+- [总指挥决策循环](./SKILL.md#ccm-k-module-control-decision-loop)
+- [异步完成与 HITL](./references/async-hitl.md#ccm-k-module-coordination-async-hitl)
+- [DDD 领域建模](../engineering-with-craft/references/ddd.md#ccm-k-module-craft-domain-modeling)
+- [工程手艺共享脊椎](../engineering-with-craft/SKILL.md#ccm-k-module-craft-foundation)
+- [OOP 对象设计](../engineering-with-craft/references/oop.md#ccm-k-module-craft-object-design)
+- [SDD Spec-first](../engineering-with-craft/references/sdd.md#ccm-k-module-craft-spec-first)
+- [TDD Test-first](../engineering-with-craft/references/tdd.md#ccm-k-module-craft-test-first)
+- [优化循环心智锚](../dev-as-ml-loop/SKILL.md#ccm-k-module-devloop-core)
+- [optimization ledger](../dev-as-ml-loop/references/optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [外层编排与组件分工](../dev-as-ml-loop/SKILL.md#ccm-k-module-devloop-outer)
+- [并行派发机制](./references/dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
+- [证据忠实性](../distilling-lessons-into-assets/references/evidence-fidelity.md#ccm-k-module-distill-evidence)
+- [落地手艺](../distilling-lessons-into-assets/references/landing-craft-by-asset-type.md#ccm-k-module-distill-landing)
+- [归宿路由](../distilling-lessons-into-assets/references/routing-decision-tree.md#ccm-k-module-distill-routing)
+- [资产分类法](../distilling-lessons-into-assets/references/asset-taxonomy.md#ccm-k-module-distill-taxonomy)
+- [Outside-in 证据校准](./references/outside-in.md#ccm-k-module-evidence-outside-in)
+- [Goal Contract 不漂移](./references/goal-contract.md#ccm-k-module-goal-contract)
+- [估算消费](../pacing-and-estimation/references/estimation.md#ccm-k-module-pacing-estimation)
+- [单侧收紧 levers](../pacing-and-estimation/references/pacing-levers.md#ccm-k-module-pacing-levers)
+- [模型档位事实](../pacing-and-estimation/references/model-tiers.md#ccm-k-module-pacing-model-facts)
+- [池感知建议](../pacing-and-estimation/references/pool-aware-advice.md#ccm-k-module-pacing-pool)
+- [配额信号消费](../pacing-and-estimation/references/usage-signals.md#ccm-k-module-pacing-signals)
+- [跨 harness 目标事实](../pacing-and-estimation/references/cross-harness-target-facts.md#ccm-k-module-pacing-target-facts)
+- [项目内多层 planning](./references/multi-layer-planning.md#ccm-k-module-planning-multi-layer)
+- [Worker 路由链](./references/worker-routing.md#ccm-k-module-routing-worker-chain)
+- [依赖 DAG 排期](./references/decomposition.md#ccm-k-module-scheduling-dependency-dag)
+- [切分手艺与落地](../slicing-goals-into-dags/SKILL.md#ccm-k-module-slicing-craft)
+- [横切纵切对照样例](../slicing-goals-into-dags/references/worked-example.md#ccm-k-module-slicing-example)
+- [纵切硬规则](../slicing-goals-into-dags/SKILL.md#ccm-k-module-slicing-vertical)
+- [Board 长程状态纪律](./references/board.md#ccm-k-module-state-board)
+- [终端态与端点验收](./references/worker-routing.md#ccm-k-module-verification-endpoint)
+
+## 指挥不演奏
+
+<a id="ccm-k-module-conduct-never-play"></a>
+
+守住 orchestrator 的岗位：拆图 / 派发 / 验收 / 整合，绝不亲手实现或 review，并能命名离席方向。
+
+## Member points
+
+- [离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium)
+- [指挥不演奏原则](./SKILL.md#ccm-k-point-conduct-never-play)
+- [红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines)
+
+## Back to atlas
+
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 总指挥决策循环
+
+<a id="ccm-k-module-control-decision-loop"></a>
+
+维持 master orchestrator 身份、操作镜头与每回合决策程序，同时用渐进披露导航避免把 SKILL A 膨胀成全图目录。
+
+## Member points
+
+- [每回合确定性决策程序](./SKILL.md#ccm-k-point-control-decision-program)
+- [好编排的正向形状](./SKILL.md#ccm-k-point-control-good-orchestration)
+- [总指挥身份与 mandate](./SKILL.md#ccm-k-point-control-identity-mandate)
+- [渐进披露导航地图](./SKILL.md#ccm-k-point-control-navigation-map)
+- [其余六个操作镜头](./SKILL.md#ccm-k-point-control-operating-lenses)
+- [合理化表与红旗](./SKILL.md#ccm-k-point-control-rationalization-guards)
+- [纪律来自角色后果](./SKILL.md#ccm-k-point-control-role-consequences)
+
+## Back to atlas
+
+- [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -41,6 +41,8 @@ task shape
 <!-- ccm:k:end point:verification.terminal-summary -->
 <!-- ccm:k:nav:start point:verification.terminal-summary -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:verification.endpoint](./worker-routing.md#ccm-k-module-verification-endpoint)
 - [Canonical: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
 <!-- ccm:k:nav:end -->
 任一承重证据是 unknown、stale、conflicting 或 deny，就停在对应硬门，不用感觉补值。
@@ -60,6 +62,8 @@ endpoint_verdict: <artifact + checks + acceptance evidence>
 <!-- ccm:k:end point:routing.ordered-chain -->
 <!-- ccm:k:nav:start point:routing.ordered-chain -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 - [deepens_to: executor 不等于 target surface](./worker-routing.md#ccm-k-point-routing-executor-vs-target) <!-- ccm:k:edge edge:routing.chain-to-executor -->
 - [next: 拿到真实 handle 才算派发](./worker-routing.md#ccm-k-point-routing-handle-gate) <!-- ccm:k:edge edge:routing.chain-to-handle -->
 - [requires: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:routing.chain-to-terminal -->
@@ -85,6 +89,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:routing.task-shape -->
 <!-- ccm:k:nav:start point:routing.task-shape -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 <!-- ccm:k:nav:end -->
 ## executor 不等于 target surface
 
@@ -99,6 +105,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:routing.executor-vs-target -->
 <!-- ccm:k:nav:start point:routing.executor-vs-target -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 <!-- ccm:k:nav:end -->
 ## workflow 是规划语义，不保证同名 runtime
 
@@ -113,6 +121,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:routing.workflow-boundary -->
 <!-- ccm:k:nav:start point:routing.workflow-boundary -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 <!-- ccm:k:nav:end -->
 ## 确定 effect floor
 
@@ -156,6 +166,8 @@ effect floor 只定义门槛，不证明任何具体 target 已过门。对每�
 <!-- ccm:k:end point:routing.qualification-and-fallback -->
 <!-- ccm:k:nav:start point:routing.qualification-and-fallback -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 <!-- ccm:k:nav:end -->
 ## 拿到真实 handle 才算派发
 
@@ -168,6 +180,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:routing.handle-gate -->
 <!-- ccm:k:nav:start point:routing.handle-gate -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 - [next: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:routing.handle-to-terminal -->
 <!-- ccm:k:nav:end -->
 ## 终端态之后做端点验收
@@ -183,6 +197,8 @@ external issue closed、CI green、空 review 与 worker 自报成功都只是�
 <!-- ccm:k:end point:verification.terminal-is-not-done -->
 <!-- ccm:k:nav:start point:verification.terminal-is-not-done -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:verification.endpoint](./worker-routing.md#ccm-k-module-verification-endpoint)
 - [deepens_to: 端点验收 procedure](./resume-verify.md#ccm-k-point-verification-endpoint-procedure) <!-- ccm:k:edge edge:verification.principle-to-procedure -->
 <!-- ccm:k:nav:end -->
 ## 权威 owner 地图
@@ -202,4 +218,48 @@ Knowledge navigation:
 <!-- ccm:k:end point:routing.owner-map -->
 <!-- ccm:k:nav:start point:routing.owner-map -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Worker 路由链
+
+<a id="ccm-k-module-routing-worker-chain"></a>
+
+按不可换序的八段链完成派发记录：任务形状 → executor → target → floor → qualification → fallback → handle → 端点验收。
+
+## Member points
+
+- [executor 不等于 target surface](./worker-routing.md#ccm-k-point-routing-executor-vs-target)
+- [拿到真实 handle 才算派发](./worker-routing.md#ccm-k-point-routing-handle-gate)
+- [不可换序的八段路由链](./worker-routing.md#ccm-k-point-routing-ordered-chain)
+- [路由承重 owner 地图](./worker-routing.md#ccm-k-point-routing-owner-map)
+- [effect floor、资格与同档 fallback](./worker-routing.md#ccm-k-point-routing-qualification-and-fallback)
+- [任务形状决定 executor](./worker-routing.md#ccm-k-point-routing-task-shape)
+- [workflow 规划语义边界](./worker-routing.md#ccm-k-point-routing-workflow-boundary)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 终端态与端点验收
+
+<a id="ccm-k-module-verification-endpoint"></a>
+
+在 worker/runtime 停止后，区分运行终态与父任务真完成，并在自己的端点独立验收。
+
+## Member points
+
+- [端点验收 procedure](./resume-verify.md#ccm-k-point-verification-endpoint-procedure)
+- [content hash 与 stale](./resume-verify.md#ccm-k-point-verification-hash-and-stale)
+- [异构族系第二视角](./resume-verify.md#ccm-k-point-verification-heterogeneous-review)
+- [Loop 收敛闸](./resume-verify.md#ccm-k-point-verification-loop-convergence)
+- [resume 接管基线](./resume-verify.md#ccm-k-point-verification-resume-takeover)
+- [runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [summary: routing 链中的 terminal 提醒](./worker-routing.md#ccm-k-point-verification-terminal-summary)
+- [canonicalize → runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

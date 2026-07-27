@@ -32,11 +32,13 @@ import {
   PRODUCT_HOSTS,
   skillAnchorId,
 } from './paths.mjs';
+import { buildRuntimeRouterPlan } from './runtime-router-plan.mjs';
 
 export const NAV_END = '<!-- ccm:k:nav:end -->';
+export const RUNTIME_ROUTER_START = '<!-- ccm:k:generated -->';
 
 const REPO_ONLY_KNOWLEDGE_LINK_LINE_RE =
-  /^- \[(?:Knowledge atlas|Module module:[^\]]+)\]\((?:\.\.\/)*knowledge\/(?:atlas\.md|modules\/[^)]+)\)\n?/gmu;
+  /^- \[(?:Knowledge atlas|Module module:[^\]]+)\]\([^)]+\)\n?/gmu;
 
 /**
  * Remove only compiler-owned links to the repo-only atlas/module router tree.
@@ -50,16 +52,29 @@ export function stripRuntimeKnowledgeRouterLinks(text) {
 }
 
 export function materializeRuntimeArtifacts(artifacts, { host }) {
-  const runtimePrefix = `plugin/dist/${assertSafeOverlayHost(host)}/`;
-  const knowledgePrefix = `${runtimePrefix}knowledge/`;
-  return new Map(
-    [...artifacts].map(([artifactPath, text]) => [
-      artifactPath,
-      artifactPath.startsWith(runtimePrefix) && !artifactPath.startsWith(knowledgePrefix)
-        ? stripRuntimeKnowledgeRouterLinks(text)
-        : text,
-    ]),
-  );
+  assertSafeOverlayHost(host);
+  return new Map(artifacts);
+}
+
+export function stripRuntimeRouterBundle(text) {
+  const source = String(text ?? '');
+  const exactMatches = [...source.matchAll(/<!-- ccm:k:generated -->/g)];
+  const markerTokenCount = [...source.matchAll(/ccm:k:generated/g)].length;
+  if (
+    exactMatches.length > 1 ||
+    markerTokenCount !== exactMatches.length
+  ) {
+    throw new SkillOverlayError(
+      'SKG-OVERLAY-MALFORMED',
+      'runtime router bundle marker must be one exact compiler-owned marker at most',
+      {
+        exact_markers: exactMatches.length,
+        marker_tokens: markerTokenCount,
+      },
+    );
+  }
+  const index = exactMatches[0]?.index ?? -1;
+  return index < 0 ? source : ensureTrailingNewline(source.slice(0, index));
 }
 
 /** Trailing compiler-owned authored-edge identity marker on nav link lines. */
@@ -374,7 +389,7 @@ export function inspectCompilerOwnedOverlay(text) {
  * Strip compiler-owned overlays. Always fail-closed on malformed / extra / duplicate markers.
  */
 export function stripCompilerOwnedOverlay(text) {
-  const source = String(text ?? '');
+  const source = stripRuntimeRouterBundle(String(text ?? ''));
   const inspection = inspectCompilerOwnedOverlay(source);
   if (!inspection.ok) {
     throw new SkillOverlayError(
@@ -403,20 +418,45 @@ export function stripCompilerOwnedOverlay(text) {
   return cleaned.join('\n');
 }
 
-export function buildPointNavBlock({ point, host, graph, fromFile }) {
-  const atlasPath = atlasDistPath(host);
+export function buildPointNavBlock({
+  point,
+  host,
+  graph,
+  fromFile,
+  runtimeRouterLinks = false,
+}) {
+  const routerPlan = runtimeRouterLinks
+    ? buildRuntimeRouterPlan({ host, graph })
+    : null;
   const pointById = new Map((graph.points ?? []).map((item) => [item.id, item]));
   const navLines = [
     `<!-- ccm:k:nav:start ${point.id} -->`,
     'Knowledge navigation:',
   ];
-  navLines.push(linkLine('Knowledge atlas', fromFile, atlasPath, ''));
+  navLines.push(
+    linkLine(
+      'Knowledge atlas',
+      fromFile,
+      routerPlan?.atlas.path ?? atlasDistPath(host),
+      routerPlan?.atlas.fragment ?? '',
+    ),
+  );
   const moduleId = point.module_id;
   if (moduleId) {
-    const routerPath = moduleRouterDistPath(host, moduleId);
-    navLines.push(
-      linkLine(`Module ${moduleId}`, fromFile, routerPath, `#${moduleAnchorId(moduleId)}`),
-    );
+    const modulePlacement = routerPlan?.modules.get(moduleId) ?? {
+      path: moduleRouterDistPath(host, moduleId),
+      fragment: `#${moduleAnchorId(moduleId)}`,
+    };
+    if (modulePlacement) {
+      navLines.push(
+        linkLine(
+          `Module ${moduleId}`,
+          fromFile,
+          modulePlacement.path,
+          modulePlacement.fragment,
+        ),
+      );
+    }
   }
   if (point.authority?.role !== 'canonical' && point.authority?.canonical) {
     const canonical = pointById.get(point.authority.canonical);
@@ -466,6 +506,7 @@ function rebuildPointOverlaysFromBase({
   distRel,
   pointsForFile,
   skillId = null,
+  runtimeRouterLinks = false,
 }) {
   let next = baseText;
   const filePoints = [...pointsForFile].sort((a, b) => a.id.localeCompare(b.id));
@@ -481,7 +522,13 @@ function rebuildPointOverlaysFromBase({
       );
     }
     next = next.replace(startMarker, `${anchor.html}\n${startMarker}`);
-    const navBlock = buildPointNavBlock({ point, host, graph, fromFile: distRel });
+    const navBlock = buildPointNavBlock({
+      point,
+      host,
+      graph,
+      fromFile: distRel,
+      runtimeRouterLinks,
+    });
     next = next.replace(
       new RegExp(`${endMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n*`),
       `${endMarker}\n${navBlock}`,
@@ -505,6 +552,7 @@ export function applyPointOverlaysToSkillMarkdown({
   distRel,
   pointsForFile,
   skillId = null,
+  runtimeRouterLinks = false,
 }) {
   const source = ensureTrailingNewline(text);
   const inspection = inspectCompilerOwnedOverlay(source);
@@ -529,7 +577,9 @@ export function applyPointOverlaysToSkillMarkdown({
 
   // Preserve entry-pin layer: nav ⊥ entry-pin. Compare/rebuild the nav layer only.
   const preservedPins = [...source.matchAll(ENTRY_PIN_BLOCK_RE)].map((match) => match[0]).join('');
-  const sourceWithoutPins = ensureTrailingNewline(stripEntryPinOverlay(source));
+  const sourceWithoutPins = ensureTrailingNewline(
+    stripRuntimeRouterBundle(stripEntryPinOverlay(source)),
+  );
   const base = stripCompilerOwnedOverlay(source);
   const expectedNav = rebuildPointOverlaysFromBase({
     baseText: base,
@@ -538,6 +588,7 @@ export function applyPointOverlaysToSkillMarkdown({
     distRel,
     pointsForFile,
     skillId,
+    runtimeRouterLinks,
   });
 
   if (
@@ -556,7 +607,16 @@ export function applyPointOverlaysToSkillMarkdown({
   return ensureTrailingNewline(`${expectedNav.trimEnd()}\n${preservedPins}`);
 }
 
-export function buildEntryPinBlock({ host, entry, graph, distRel }) {
+export function buildEntryPinBlock({
+  host,
+  entry,
+  graph,
+  distRel,
+  runtimeRouterLinks = false,
+}) {
+  const routerPlan = runtimeRouterLinks
+    ? buildRuntimeRouterPlan({ host, graph })
+    : null;
   const pointById = new Map((graph.points ?? []).map((item) => [item.id, item]));
   const modules = [...(graph.modules ?? [])].sort((a, b) => a.id.localeCompare(b.id));
   const surface = (entry.surfaces ?? []).find((item) => item.host === host);
@@ -577,10 +637,20 @@ export function buildEntryPinBlock({ host, entry, graph, distRel }) {
   }
   for (const module of modules) {
     if (!(module.access?.relevant_entries ?? []).includes(entry.id)) continue;
-    const routerPath = moduleRouterDistPath(host, module.id);
-    pinLines.push(
-      linkLine(`Module ${module.id}`, distRel, routerPath, `#${moduleAnchorId(module.id)}`),
-    );
+    const modulePlacement = routerPlan?.modules.get(module.id) ?? {
+      path: moduleRouterDistPath(host, module.id),
+      fragment: `#${moduleAnchorId(module.id)}`,
+    };
+    if (modulePlacement) {
+      pinLines.push(
+        linkLine(
+          `Module ${module.id}`,
+          distRel,
+          modulePlacement.path,
+          modulePlacement.fragment,
+        ),
+      );
+    }
     for (const primaryId of module.access.primary_points ?? []) {
       if ((surface.targets ?? []).some((item) => item.point === primaryId)) continue;
       const point = pointById.get(primaryId);
@@ -620,7 +690,14 @@ export function stripEntryPinOverlay(text) {
   return source.replace(ENTRY_PIN_BLOCK_RE, '');
 }
 
-export function applyEntryPinOverlay({ text, host, entry, graph, distRel }) {
+export function applyEntryPinOverlay({
+  text,
+  host,
+  entry,
+  graph,
+  distRel,
+  runtimeRouterLinks = false,
+}) {
   const source = ensureTrailingNewline(text);
   const inspection = inspectCompilerOwnedOverlay(source);
   if (!inspection.ok) {
@@ -633,7 +710,13 @@ export function applyEntryPinOverlay({ text, host, entry, graph, distRel }) {
   // Keep nav/anchors; always rebuild the entry-pin layer (compiler-owned).
   // Idempotent when already correct; overwrites stale pins after portfolio changes.
   const base = ensureTrailingNewline(stripEntryPinOverlay(source));
-  const pinBlock = buildEntryPinBlock({ host, entry, graph, distRel });
+  const pinBlock = buildEntryPinBlock({
+    host,
+    entry,
+    graph,
+    distRel,
+    runtimeRouterLinks,
+  });
   return ensureTrailingNewline(`${base}${pinBlock.trimEnd()}\n`);
 }
 

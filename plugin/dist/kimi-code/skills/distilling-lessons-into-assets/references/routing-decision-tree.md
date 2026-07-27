@@ -45,6 +45,8 @@
 <!-- ccm:k:end point:distill.routing-tree -->
 <!-- ccm:k:nav:start point:distill.routing-tree -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.routing](./routing-decision-tree.md#ccm-k-module-distill-routing)
 - [next: 允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest) <!-- ccm:k:edge edge:distill.tree-to-dual -->
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.tree-to-evidence -->
 - [fallback_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop) <!-- ccm:k:edge edge:distill.tree-to-fallback -->
@@ -62,6 +64,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.dual-dest -->
 <!-- ccm:k:nav:start point:distill.dual-dest -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.routing](./routing-decision-tree.md#ccm-k-module-distill-routing)
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.dual-to-evidence -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.dual-to-tree -->
 <!-- ccm:k:nav:end -->
@@ -86,6 +90,28 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.fallback-no-drop -->
 <!-- ccm:k:nav:start point:distill.fallback-no-drop -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.routing](./routing-decision-tree.md#ccm-k-module-distill-routing)
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.fallback-to-evidence -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.fallback-to-tree -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 归宿路由
+
+<a id="ccm-k-module-distill-routing"></a>
+
+判断一条候选经验该落哪类资产，并处理双落点与不确定兜底。
+
+## Member points
+
+- [与其他判断力边界](../SKILL.md#ccm-k-point-distill-boundary)
+- [允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest)
+- [不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop)
+- [summary: 归宿判断三问概览](../SKILL.md#ccm-k-point-distill-routing-overview)
+- [canonicalize → 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

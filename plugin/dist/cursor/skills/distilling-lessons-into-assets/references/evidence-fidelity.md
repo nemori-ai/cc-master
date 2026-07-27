@@ -57,7 +57,26 @@
 <!-- ccm:k:end point:distill.evidence-fidelity -->
 <!-- ccm:k:nav:start point:distill.evidence-fidelity -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.evidence](./evidence-fidelity.md#ccm-k-module-distill-evidence)
 - [routes_to: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line) <!-- ccm:k:edge edge:distill.fidelity-to-hardline -->
 - [applies_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop) <!-- ccm:k:edge edge:distill.fidelity-to-fallback -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.fidelity-to-tree -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 证据忠实性
+
+<a id="ccm-k-module-distill-evidence"></a>
+
+守住本 skill 唯一硬约束：不脱离证据泛化，弱证据收窄托底。
+
+## Member points
+
+- [泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [summary: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line)
+- [canonicalize → 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

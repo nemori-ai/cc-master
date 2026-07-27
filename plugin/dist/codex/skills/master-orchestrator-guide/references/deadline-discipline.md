@@ -11,6 +11,8 @@
 <!-- ccm:k:end point:deadline.constraint-axes -->
 <!-- ccm:k:nav:start point:deadline.constraint-axes -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.delivery](./model-allocation.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->
 ## 九条纪律（决策锚 + 单向引用）
 
@@ -37,6 +39,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:deadline.nine-disciplines -->
 <!-- ccm:k:nav:start point:deadline.nine-disciplines -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.delivery](./model-allocation.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->
 ## 合理化 → 现实
 
@@ -63,4 +67,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:deadline.guards-and-boundary -->
 <!-- ccm:k:nav:start point:deadline.guards-and-boundary -->
 Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.delivery](./model-allocation.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->

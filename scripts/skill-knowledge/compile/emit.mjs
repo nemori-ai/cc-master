@@ -6,20 +6,21 @@ import {
 } from '../host-portability/anchors.mjs';
 import { estimateBudget } from '../hash.mjs';
 import {
-  atlasDistPath,
   canonicalBindingToDistPath,
   entrySurfaceToDistPath,
   moduleAnchorId,
-  moduleRouterDistPath,
   posixRelative,
 } from './paths.mjs';
+import { buildRuntimeRouterPlan } from './runtime-router-plan.mjs';
 import {
   applyEntryPinOverlay,
   applyPointOverlaysToSkillMarkdown,
   applySkillLevelAnchor,
   ensureTrailingNewline,
   inspectCompilerOwnedOverlay,
+  RUNTIME_ROUTER_START,
   stripCompilerOwnedOverlay,
+  stripRuntimeRouterBundle,
 } from './skill-overlay.mjs';
 import {
   assertSafeCompileHostId,
@@ -393,7 +394,8 @@ function linkLine(label, fromFile, toFile, fragment) {
 export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = null }) {
   const artifacts = new Map();
   const diagnostics = [];
-  const atlasPath = atlasDistPath(host);
+  const routerPlan = buildRuntimeRouterPlan({ host, graph });
+  const atlasPath = routerPlan.atlas.path;
   const modules = [...graph.modules].sort((a, b) => a.id.localeCompare(b.id));
   const points = [...graph.points].sort((a, b) => a.id.localeCompare(b.id));
   const pointById = new Map(points.map((point) => [point.id, point]));
@@ -412,8 +414,7 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
 
   // --- atlas ---
   const atlasLines = [
-    '<!-- ccm:k:generated -->',
-    '# Knowledge atlas',
+    '## Knowledge atlas router',
     '',
     'Generated runtime navigation surface. Prefer these links over prose mentions.',
     '',
@@ -433,22 +434,41 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
   }
   atlasLines.push('', '## Modules', '');
   for (const module of modules) {
-    const routerPath = moduleRouterDistPath(host, module.id);
-    const fragment = `#${moduleAnchorId(module.id)}`;
+    const placement = routerPlan.modules.get(module.id);
+    if (!placement) continue;
     atlasLines.push(
-      linkLine(module.title || module.id, atlasPath, routerPath, fragment),
+      linkLine(
+        module.title || module.id,
+        atlasPath,
+        placement.path,
+        placement.fragment,
+      ),
     );
   }
   atlasLines.push('');
-  artifacts.set(atlasPath, ensureTrailingNewline(atlasLines.join('\n')));
+  const atlasRouter = ensureTrailingNewline(atlasLines.join('\n'));
 
   // --- module routers ---
+  const moduleRouters = new Map();
   for (const module of modules) {
-    const routerPath = moduleRouterDistPath(host, module.id);
+    const placement = routerPlan.modules.get(module.id);
+    if (!placement) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'SKG-COMPILE-MODULE-PLACEMENT',
+        message: `No accepted skill-local placement for ${module.id}`,
+        location: module.id,
+        witness: { host, module: module.id },
+        remediation:
+          'Give the accepted module a primary point or at least one accepted member point.',
+        exit_code: 5,
+      });
+      continue;
+    }
+    const routerPath = placement.path;
     const members = points.filter((point) => point.module_id === module.id);
     const lines = [
-      '<!-- ccm:k:generated -->',
-      `# ${module.title || module.id}`,
+      `## ${module.title || module.id}`,
       '',
       `<a id="${moduleAnchorId(module.id)}"></a>`,
       '',
@@ -483,9 +503,16 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
       }
     }
     lines.push('', '## Back to atlas', '');
-    lines.push(linkLine('Knowledge atlas', routerPath, atlasPath, ''));
+    lines.push(
+      linkLine(
+        'Knowledge atlas',
+        routerPath,
+        routerPlan.atlas.path,
+        routerPlan.atlas.fragment,
+      ),
+    );
     lines.push('');
-    artifacts.set(routerPath, ensureTrailingNewline(lines.join('\n')));
+    moduleRouters.set(module.id, ensureTrailingNewline(lines.join('\n')));
   }
 
   // --- inject anchors + nav into skill markdown ---
@@ -546,6 +573,7 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
           distRel,
           pointsForFile: filePoints,
           skillId,
+          runtimeRouterLinks: true,
         }),
       );
     } catch (error) {
@@ -618,6 +646,7 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
             entry,
             graph,
             distRel,
+            runtimeRouterLinks: true,
           }),
         );
       } catch (error) {
@@ -646,9 +675,12 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
           materialized === undefined
             ? fs.readFileSync(physicalFor(skillPath), 'utf8')
             : materialized;
-        inspectCompilerOwnedOverlay(raw);
+        const withoutRouter = stripRuntimeRouterBundle(raw);
+        inspectCompilerOwnedOverlay(withoutRouter);
         const base =
-          materialized === undefined ? stripCompilerOwnedOverlay(raw) : raw;
+          materialized === undefined
+            ? stripCompilerOwnedOverlay(withoutRouter)
+            : withoutRouter;
         artifacts.set(skillPath, applySkillLevelAnchor({ text: base, skillId: skill.id }));
       } catch (error) {
         diagnostics.push({
@@ -664,13 +696,51 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
     }
   }
 
+  // Existing atlas/module topology is emitted only into accepted skill-local
+  // Markdown. One compiler-owned suffix per file keeps rebuilds deterministic.
+  const routersByPath = new Map();
+  routersByPath.set(atlasPath, [atlasRouter]);
+  for (const module of modules) {
+    const placement = routerPlan.modules.get(module.id);
+    const router = moduleRouters.get(module.id);
+    if (!placement || !router) continue;
+    if (!routersByPath.has(placement.path)) routersByPath.set(placement.path, []);
+    routersByPath.get(placement.path).push(router);
+  }
+  for (const [distRel, routers] of [...routersByPath].sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    const absolute = physicalFor(distRel);
+    const current = artifacts.get(distRel) ??
+      (fs.existsSync(absolute) ? fs.readFileSync(absolute, 'utf8') : null);
+    if (current === null) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'SKG-COMPILE-ROUTER-PLACEMENT-MISSING',
+        message: `Skill-local router placement is missing: ${distRel}`,
+        location: distRel,
+        witness: { host, path: distRel },
+        remediation: 'Restore the accepted projected skill Markdown.',
+        exit_code: 5,
+      });
+      continue;
+    }
+    const base = ensureTrailingNewline(stripRuntimeRouterBundle(current));
+    artifacts.set(
+      distRel,
+      ensureTrailingNewline(
+        `${base.trimEnd()}\n\n${RUNTIME_ROUTER_START}\n${routers.join('\n')}`,
+      ),
+    );
+  }
+
   const budgetReport = {
-    atlas: estimateBudget(artifacts.get(atlasPath) ?? ''),
+    atlas: estimateBudget(atlasRouter),
     modules: Object.fromEntries(
-      modules.map((module) => {
-        const routerPath = moduleRouterDistPath(host, module.id);
-        return [module.id, estimateBudget(artifacts.get(routerPath) ?? '')];
-      }),
+      modules.map((module) => [
+        module.id,
+        estimateBudget(moduleRouters.get(module.id) ?? ''),
+      ]),
     ),
   };
 

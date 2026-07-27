@@ -24,6 +24,8 @@ description: '当你（作为某个经验蒸馏流程的执行者，例如把一
 <!-- ccm:k:end point:distill.taxonomy-quick -->
 <!-- ccm:k:nav:start point:distill.taxonomy-quick -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.taxonomy](./references/asset-taxonomy.md#ccm-k-module-distill-taxonomy)
 - [Canonical: 四类资产定义与判据](./references/asset-taxonomy.md#ccm-k-point-distill-taxonomy)
 - [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.quick-to-evidence -->
 - [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.quick -->
@@ -47,6 +49,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.routing-overview -->
 <!-- ccm:k:nav:start point:distill.routing-overview -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.routing](./references/routing-decision-tree.md#ccm-k-module-distill-routing)
 - [Canonical: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
 - [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.overview-to-evidence -->
 - [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.overview -->
@@ -65,6 +69,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.evidence-hard-line -->
 <!-- ccm:k:nav:start point:distill.evidence-hard-line -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.evidence](./references/evidence-fidelity.md#ccm-k-module-distill-evidence)
 - [Canonical: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
 - [deepens_to: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.hardline-to-fidelity -->
 - [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hardline-to-tree -->
@@ -82,6 +88,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.landing-preview -->
 <!-- ccm:k:nav:start point:distill.landing-preview -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.landing](./references/landing-craft-by-asset-type.md#ccm-k-module-distill-landing)
 - [Canonical: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
 - [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.preview-to-evidence -->
 - [deepens_to: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft) <!-- ccm:k:edge edge:distill.preview-to-craft -->
@@ -106,6 +114,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.boundary -->
 <!-- ccm:k:nav:start point:distill.boundary -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.routing](./references/routing-decision-tree.md#ccm-k-module-distill-routing)
 - [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.boundary-to-evidence -->
 - [routes_to: 归宿判断三问概览](./SKILL.md#ccm-k-point-distill-routing-overview) <!-- ccm:k:edge edge:distill.boundary-to-overview -->
 - [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.boundary -->
@@ -123,7 +133,11 @@ Knowledge navigation:
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:distilling-lessons-into-assets:
 - [归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [Module module:distill.evidence](./references/evidence-fidelity.md#ccm-k-module-distill-evidence)
 - [critical: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [Module module:distill.landing](./references/landing-craft-by-asset-type.md#ccm-k-module-distill-landing)
 - [primary: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
+- [Module module:distill.routing](./references/routing-decision-tree.md#ccm-k-module-distill-routing)
+- [Module module:distill.taxonomy](./references/asset-taxonomy.md#ccm-k-module-distill-taxonomy)
 - [primary: 四类资产定义与判据](./references/asset-taxonomy.md#ccm-k-point-distill-taxonomy)
 <!-- ccm:k:entry-pin:end -->

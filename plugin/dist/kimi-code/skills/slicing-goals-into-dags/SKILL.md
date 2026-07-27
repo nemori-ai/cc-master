@@ -25,6 +25,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 <!-- ccm:k:end point:slicing.why-cut -->
 <!-- ccm:k:nav:start point:slicing.why-cut -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.vertical](./SKILL.md#ccm-k-module-slicing-vertical)
 - [applies_to: 横切 vs 纵切对照样例](./references/worked-example.md#ccm-k-point-slicing-example-contrast) <!-- ccm:k:edge edge:slicing.why-to-example -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.hub-from.why-cut -->
 - [operationalizes: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.why-to-vertical -->
@@ -57,6 +59,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.vertical-rule -->
 <!-- ccm:k:nav:start point:slicing.vertical-rule -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.vertical](./SKILL.md#ccm-k-module-slicing-vertical)
 - [applies_to: 横切 vs 纵切对照样例](./references/worked-example.md#ccm-k-point-slicing-example-contrast) <!-- ccm:k:edge edge:slicing.vertical-to-example -->
 - [deepens_to: walking skeleton](./SKILL.md#ccm-k-point-slicing-walking-skeleton) <!-- ccm:k:edge edge:slicing.vertical-to-skeleton -->
 - [routes_to: 切是高杠杆决策](./SKILL.md#ccm-k-point-slicing-why-cut) <!-- ccm:k:edge edge:slicing.vertical-to-why -->
@@ -75,6 +79,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.walking-skeleton -->
 <!-- ccm:k:nav:start point:slicing.walking-skeleton -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [next: 粒度为并行与验收](./SKILL.md#ccm-k-point-slicing-grain) <!-- ccm:k:edge edge:slicing.skeleton-to-grain -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.skeleton-to-vertical -->
 <!-- ccm:k:nav:end -->
@@ -96,6 +102,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.grain -->
 <!-- ccm:k:nav:start point:slicing.grain -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [next: 价值×风险排序](./SKILL.md#ccm-k-point-slicing-value-risk) <!-- ccm:k:edge edge:slicing.grain-to-value -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.grain-to-vertical -->
 <!-- ccm:k:nav:end -->
@@ -116,6 +124,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.value-risk -->
 <!-- ccm:k:nav:start point:slicing.value-risk -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [operationalizes: 落到 board](./SKILL.md#ccm-k-point-slicing-board-landing) <!-- ccm:k:edge edge:slicing.value-to-board -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.value-to-vertical -->
 <!-- ccm:k:nav:end -->
@@ -136,6 +146,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.board-landing -->
 <!-- ccm:k:nav:start point:slicing.board-landing -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [contrasts_with: 切分反模式速查](./SKILL.md#ccm-k-point-slicing-antipatterns) <!-- ccm:k:edge edge:slicing.board-to-anti -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.board-to-vertical -->
 <!-- ccm:k:nav:end -->
@@ -158,6 +170,8 @@ Knowledge navigation:
 <!-- ccm:k:end point:slicing.antipatterns -->
 <!-- ccm:k:nav:start point:slicing.antipatterns -->
 Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.anti-to-vertical -->
 <!-- ccm:k:nav:end -->
 ## Pointers
@@ -171,5 +185,42 @@ Knowledge navigation:
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:slicing-goals-into-dags:
 - [纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
 - [primary: walking skeleton](./SKILL.md#ccm-k-point-slicing-walking-skeleton)
+- [Module module:slicing.example](./references/worked-example.md#ccm-k-module-slicing-example)
+- [Module module:slicing.vertical](./SKILL.md#ccm-k-module-slicing-vertical)
 <!-- ccm:k:entry-pin:end -->
+
+<!-- ccm:k:generated -->
+## 切分手艺与落地
+
+<a id="ccm-k-module-slicing-craft"></a>
+
+用 walking skeleton、粒度、价值风险排序与 board 落地把纵切做成可排派的图。
+
+## Member points
+
+- [切分反模式速查](./SKILL.md#ccm-k-point-slicing-antipatterns)
+- [落到 board](./SKILL.md#ccm-k-point-slicing-board-landing)
+- [粒度为并行与验收](./SKILL.md#ccm-k-point-slicing-grain)
+- [价值×风险排序](./SKILL.md#ccm-k-point-slicing-value-risk)
+- [walking skeleton](./SKILL.md#ccm-k-point-slicing-walking-skeleton)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 纵切硬规则
+
+<a id="ccm-k-module-slicing-vertical"></a>
+
+守住纵切不横切，并理解为何这一刀是高杠杆。
+
+## Member points
+
+- [纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [切是高杠杆决策](./SKILL.md#ccm-k-point-slicing-why-cut)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

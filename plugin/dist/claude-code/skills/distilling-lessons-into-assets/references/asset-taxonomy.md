@@ -68,6 +68,25 @@
 <!-- ccm:k:end point:distill.taxonomy -->
 <!-- ccm:k:nav:start point:distill.taxonomy -->
 Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.taxonomy](./asset-taxonomy.md#ccm-k-module-distill-taxonomy)
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.tax-to-evidence -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.tax-to-tree -->
 <!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 资产分类法
+
+<a id="ccm-k-module-distill-taxonomy"></a>
+
+给出四类资产各自适合承载的知识性质。
+
+## Member points
+
+- [四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
+- [summary: 四类资产判据速查](../SKILL.md#ccm-k-point-distill-taxonomy-quick)
+- [canonicalize → 四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
