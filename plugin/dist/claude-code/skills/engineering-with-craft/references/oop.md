@@ -33,14 +33,14 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine)
-- [deepens_to: 抽象成本审计](./oop.md#ccm-k-point-oop-abstraction-cost)
-- [deepens_to: 组合优于继承](./oop.md#ccm-k-point-oop-composition-over-inheritance)
-- [deepens_to: 封装即词汇](./oop.md#ccm-k-point-oop-encapsulation-vocabulary)
-- [deepens_to: OOP 反模式雷达](./oop.md#ccm-k-point-oop-failure-radar)
-- [deepens_to: OOP 红线](./oop.md#ccm-k-point-oop-red-lines)
-- [deepens_to: OOP 与共享根接缝](./oop.md#ccm-k-point-oop-shared-root-links)
-- [deepens_to: SOLID 判断法](./oop.md#ccm-k-point-oop-solid-judgment)
+- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.object-design.to-shared-spine -->
+- [deepens_to: 抽象成本审计](./oop.md#ccm-k-point-oop-abstraction-cost) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-abstraction-cost -->
+- [deepens_to: 组合优于继承](./oop.md#ccm-k-point-oop-composition-over-inheritance) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-composition-over-inheritance -->
+- [deepens_to: 封装即词汇](./oop.md#ccm-k-point-oop-encapsulation-vocabulary) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-encapsulation-vocabulary -->
+- [deepens_to: OOP 反模式雷达](./oop.md#ccm-k-point-oop-failure-radar) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-failure-radar -->
+- [deepens_to: OOP 红线](./oop.md#ccm-k-point-oop-red-lines) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-red-lines -->
+- [deepens_to: OOP 与共享根接缝](./oop.md#ccm-k-point-oop-shared-root-links) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-shared-root-links -->
+- [deepens_to: SOLID 判断法](./oop.md#ccm-k-point-oop-solid-judgment) <!-- ccm:k:edge edge:craft.object-design.four-pillars-to-solid-judgment -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-solid-judgment"></a>
 <!-- ccm:k:start point:oop.solid-judgment -->
@@ -114,7 +114,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.solid-judgment-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-encapsulation-vocabulary"></a>
 <!-- ccm:k:start point:oop.encapsulation-vocabulary -->
@@ -140,7 +140,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.encapsulation-vocabulary-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-composition-over-inheritance"></a>
 <!-- ccm:k:start point:oop.composition-over-inheritance -->
@@ -182,7 +182,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.composition-over-inheritance-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-abstraction-cost"></a>
 <!-- ccm:k:start point:oop.abstraction-cost -->
@@ -206,7 +206,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.abstraction-cost-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-red-lines"></a>
 <!-- ccm:k:start point:oop.red-lines -->
@@ -236,7 +236,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.red-lines-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-failure-radar"></a>
 <!-- ccm:k:start point:oop.failure-radar -->
@@ -262,7 +262,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.failure-radar-to-four-pillars -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-oop-shared-root-links"></a>
 <!-- ccm:k:start point:oop.shared-root-links -->
@@ -278,5 +278,5 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.object-design](../../../knowledge/modules/craft.object-design.md#ccm-k-module-craft-object-design)
-- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars)
+- [routes_to: OOP 四柱](./oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.object-design.shared-root-links-to-four-pillars -->
 <!-- ccm:k:nav:end -->

@@ -30,10 +30,10 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 
 ## 当前成熟度
 
-当前是 **K2 — eight runtime skills / full portfolio inventory**：
+当前是 **K2 — eight runtime skills / full portfolio inventory**，并已落地 **K3-00 graph-first walking skeleton**（`dev-as-ml-loop` composition）：
 
-- `plugin/src/knowledge/` 已落真实 inventory：**8** admitted runtime skills（full portfolio），module/point 以 `check --stage K2 --json` 的 `summary` 为准，绑定 canonical Markdown marker/span；
-- `check` / `contract` / `compile` / `change` / `report` / `path` / `explain` 已实现（K2 查询面 + 四 host runtime projection + typed change transactions）；
+- `plugin/src/knowledge/` 已落真实 inventory：**8** admitted runtime skills（full portfolio），其中 `dev-as-ml-loop` 经 `composition` + `candidate_analysis` 消费全局 `graph/modules/`；其余 skill 仍为过渡期 skill shard；module/point 以 `check --stage K2 --json` 的 `summary` 为准；
+- `check` / `contract` / `compile` / `materialize` / `change` / `report` / `path` / `explain` 已实现（K2 查询面 + 四 host runtime projection + typed change + K3-00 materialize）；
 - standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仍覆盖 authored navigation plane；final-host H1–H4 由 `compile` 证明）；
 - 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI `check --host` integration；
 - `runtime_projection=true`：`compile` 写入 `plugin/dist/<host>/knowledge/` 与 skill nav/anchors，final verifier 只计真实可点击边；host honesty 保留 stub/partial coverage（workflow stubs；using-ccm / master-orchestrator partial hosts）；

@@ -29,13 +29,13 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [deepens_to: 组合优于包装](./SKILL.md#ccm-k-point-craft-composition-over-wrapper)
-- [deepens_to: 契约即 SSOT](./SKILL.md#ccm-k-point-craft-contract-ssot)
-- [deepens_to: 证据优于声称](./SKILL.md#ccm-k-point-craft-evidence-over-claim)
-- [deepens_to: 不变式即锚](./SKILL.md#ccm-k-point-craft-invariant-anchor)
-- [deepens_to: 分层思维](./SKILL.md#ccm-k-point-craft-layered-thinking)
-- [deepens_to: 工程共享红线](./SKILL.md#ccm-k-point-craft-red-lines)
-- [deepens_to: 四理论阶段接力](./SKILL.md#ccm-k-point-craft-stage-handoff)
+- [deepens_to: 组合优于包装](./SKILL.md#ccm-k-point-craft-composition-over-wrapper) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-composition-over-wrapper -->
+- [deepens_to: 契约即 SSOT](./SKILL.md#ccm-k-point-craft-contract-ssot) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-contract-ssot -->
+- [deepens_to: 证据优于声称](./SKILL.md#ccm-k-point-craft-evidence-over-claim) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-evidence-over-claim -->
+- [deepens_to: 不变式即锚](./SKILL.md#ccm-k-point-craft-invariant-anchor) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-invariant-anchor -->
+- [deepens_to: 分层思维](./SKILL.md#ccm-k-point-craft-layered-thinking) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-layered-thinking -->
+- [deepens_to: 工程共享红线](./SKILL.md#ccm-k-point-craft-red-lines) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-red-lines -->
+- [deepens_to: 四理论阶段接力](./SKILL.md#ccm-k-point-craft-stage-handoff) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-stage-handoff -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-invariant-anchor"></a>
 <!-- ccm:k:start point:craft.invariant-anchor -->
@@ -54,7 +54,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.invariant-anchor-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-contract-ssot"></a>
 <!-- ccm:k:start point:craft.contract-ssot -->
@@ -74,7 +74,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.contract-ssot-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-composition-over-wrapper"></a>
 <!-- ccm:k:start point:craft.composition-over-wrapper -->
@@ -93,7 +93,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.composition-over-wrapper-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-layered-thinking"></a>
 <!-- ccm:k:start point:craft.layered-thinking -->
@@ -112,7 +112,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.layered-thinking-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-evidence-over-claim"></a>
 <!-- ccm:k:start point:craft.evidence-over-claim -->
@@ -130,7 +130,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.evidence-over-claim-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-stage-handoff"></a>
 <!-- ccm:k:start point:craft.stage-handoff -->
@@ -155,11 +155,11 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
-- [routes_to: DDD 准入问题](./references/ddd.md#ccm-k-point-ddd-admission-question)
-- [routes_to: OOP 四柱](./references/oop.md#ccm-k-point-oop-four-pillars)
-- [routes_to: Spec 先于实现](./references/sdd.md#ccm-k-point-sdd-core-belief)
-- [routes_to: TDD 铁律](./references/tdd.md#ccm-k-point-tdd-iron-law)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.stage-handoff-to-shared-spine -->
+- [routes_to: DDD 准入问题](./references/ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.foundation.stage-to-ddd -->
+- [routes_to: OOP 四柱](./references/oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.foundation.stage-to-oop -->
+- [routes_to: Spec 先于实现](./references/sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.foundation.stage-to-sdd -->
+- [routes_to: TDD 铁律](./references/tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.foundation.stage-to-tdd -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-red-lines"></a>
 <!-- ccm:k:start point:craft.red-lines -->
@@ -179,7 +179,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:craft.foundation](../../knowledge/modules/craft.foundation.md#ccm-k-module-craft-foundation)
-- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine)
+- [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.red-lines-to-shared-spine -->
 <!-- ccm:k:nav:end -->
 ---
 

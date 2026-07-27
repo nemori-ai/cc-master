@@ -35,6 +35,7 @@ node scripts/skill-knowledge.mjs <command> [options]
 | `contract [--json]` | implemented | 返回能力、plane、operation、invariant 与 exit-code registry |
 | `check [--source <dir>] [--stage K0\|K1\|K2\|K3] [--host <host>] [--base <git-ref>] [--json]` | implemented-k1-pilot | K0 只执行 scaffold；K1+ 对 pilot source 跑 schema + binding + inventory + graph invariants。`--host/--base` 仍 exit 10 |
 | `compile [--host <host>] [--check] [--json]` | implemented-k1-pilot | 四 host runtime projection + final surface verifier；`result_kind=compile`；`--check` 对已提交 dist 做 byte drift 门 |
+| `materialize --composition <id> [--check] [--json]` | implemented-k3-00 | graph-first skill-as-artifact：只物化 lifecycle=accepted 且 **derived** verdict=admit 的 composition；禁止 `--analysis-override`；`result_kind=materialize`；复用四 host compile 投影 |
 | `report [--format json\|markdown] [--host <host>] [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=report`；分轨 `structural_status` / `behavioral_evidence_status`；含 graph hash、counts、witness、remediation。`--host` 仍 exit 10 |
 | `path --from <id> --to <id> --host <host> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=path`；在 **authored navigation plane**（`runtime.enabled_by_default`）上 BFS；对不存在 / 歧义 / 不可达 fail closed，带 shortest-path witness |
 | `explain <id-or-code> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=explain`；解释 entity 或 diagnostic code；歧义 / 缺失 fail closed |
@@ -127,7 +128,7 @@ JSON 结果必须包含：
   "C3": {"derived_fields": ["canonical", "review_policy", "reviewed_canonical_sha256"]},
   "C4": {"accepted_skill_requires_admission": true},
   "C5": {"change_workflow": ["begin", "validate", "apply"], "workspace_root": ".skill-knowledge/workspaces/<change-id>"},
-  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"]},
+  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module", "composition", "candidate_analysis"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"], "candidate_admission": {"inventory_max_utf8_bytes": 65536, "inventory_max_lines": 2000, "inventory_max_tokens": 20000, "min_internal_cohesion": 0.5, "max_external_edge_count": 0, "max_overlap_shared_modules": 2, "require_ssot_closure": true, "require_four_host_denominator": true, "reject_all_hosts_unsupported": true, "require_declared_projection": true, "hop_gate": "directed_projection_topology"}},
   "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
   "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
   "C9": {
@@ -146,6 +147,14 @@ JSON 结果必须包含：
 ```
 
 数组顺序是 contract 输出顺序；消费者不得按 object key 的序号推断语义。
+
+`C6.candidate_admission` 阈值依据真实 candidate metrics（非 form-only）：
+- `min_internal_cohesion`：`internal_edges / points`（点数 `< 2` 时 vacuously `1.0`）；当前 pilot `dev-as-ml-loop` 观测约 `2.29`，默认门槛 `0.5`。
+- `max_overlap_shared_modules`：与任一其他 accepted composition 共享的 module 数上界（默认 `2`）；gate 名 `overlap_within_budget`。
+- `require_declared_projection`：declared `full`/`partial` 必须由只读 `planSkillProjection` 支撑（`mode:copy` + 缺失 slot replacement → analysis reject）。
+- `hop_gate=directed_projection_topology`：admission 依据 expected directed projection topology（atlas/module 结构弧 + authored edges）要求 SCC=1 且 directed diameter ≤ `hop_policy.point_diameter_max`；undirected 仅观测。最终权威仍是每 host materialized Markdown 的 `verifyHopContracts`。
+- Authored edge identity：compiler nav 对每条 authored edge 发出 `<!-- ccm:k:edge edge:… -->`；snapshot 按 marker ID 严格核对，禁止 from+to 猜边。
+- 持久化 `candidate_analysis.witness` 为闭集（`additionalProperties:false`）；与规范化重算 witness/`graph_metrics` 做 stable exact equality；额外字段（如 `untrusted_payload`）→ `SKG-ANALYSIS-WITNESS-EXTRA`。
 
 `capabilities` 在当前 K1 pilot 切片必须诚实声明已交付能力：
 

@@ -35,8 +35,8 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.account-pool](../../../knowledge/modules/ccm.account-pool.md#ccm-k-module-ccm-account-pool)
-- [next: 录号机制 why + refreshToken 硬要求](./account-pool.md#ccm-k-point-ccm-account-enroll-why)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: 录号机制 why + refreshToken 硬要求](./account-pool.md#ccm-k-point-ccm-account-enroll-why) <!-- ccm:k:edge edge:ccm.account-model-enroll -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.account-to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-account-enroll-why"></a>
 <!-- ccm:k:start point:ccm.account-enroll-why -->
@@ -56,8 +56,8 @@ vault 必须存**含非空 refreshToken 的完整 blob**。换号是**无重启�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.account-pool](../../../knowledge/modules/ccm.account-pool.md#ccm-k-module-ccm-account-pool)
-- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model)
-- [next: 选号方法论判据](./account-pool.md#ccm-k-point-ccm-account-select-method)
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-enroll-why.pri -->
+- [next: 选号方法论判据](./account-pool.md#ccm-k-point-ccm-account-select-method) <!-- ccm:k:edge edge:ccm.account-enroll-select -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-account-select-method"></a>
 <!-- ccm:k:start point:ccm.account-select-method -->
@@ -75,8 +75,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.account-pool](../../../knowledge/modules/ccm.account-pool.md#ccm-k-module-ccm-account-pool)
-- [next: policy 硬闸 + vault/token-blind](./account-pool.md#ccm-k-point-ccm-account-policy-vault)
-- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model)
+- [next: policy 硬闸 + vault/token-blind](./account-pool.md#ccm-k-point-ccm-account-policy-vault) <!-- ccm:k:edge edge:ccm.account-select-policy -->
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-select-method.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-account-policy-vault"></a>
 <!-- ccm:k:start point:ccm.account-policy-vault -->
@@ -103,6 +103,6 @@ vault 路径必须在 gitignored 用户级区（`${CC_MASTER_HOME:-$HOME/.cc_mas
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.account-pool](../../../knowledge/modules/ccm.account-pool.md#ccm-k-module-ccm-account-pool)
-- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model)
-- [operationalizes: namespace account 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-account)
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-policy-vault.pri -->
+- [operationalizes: namespace account 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-account) <!-- ccm:k:edge edge:ccm.account-policy-ops-cmd -->
 <!-- ccm:k:nav:end -->

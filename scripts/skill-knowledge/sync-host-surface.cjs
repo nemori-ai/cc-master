@@ -322,25 +322,25 @@ function runCandidateGuidanceAttestationBridge({
   graphSha256,
 }) {
   const script = path.join(repoRoot, 'scripts/skill-knowledge/candidate-attestation.mjs');
-  const result = spawnSync(
-    process.execPath,
-    [
-      script,
-      '--repo-root',
-      repoRoot,
-      '--host',
-      host,
-      '--skills-staging',
-      skillsStaging,
-      '--staging-root',
-      stagingRoot,
-      '--registry',
-      registryPath,
-      '--graph-sha256',
-      graphSha256,
-    ],
-    { encoding: 'utf8' },
-  );
+  const args = [
+    script,
+    '--repo-root',
+    repoRoot,
+    '--host',
+    host,
+    '--skills-staging',
+    skillsStaging,
+    '--staging-root',
+    stagingRoot,
+    '--registry',
+    registryPath,
+    '--graph-sha256',
+    graphSha256,
+  ];
+  const result = spawnSync(process.execPath, args, {
+    encoding: 'utf8',
+    env: process.env,
+  });
   let parsed;
   try {
     const { parseStructuredJsonStdout } = require('./json-framing.cjs');

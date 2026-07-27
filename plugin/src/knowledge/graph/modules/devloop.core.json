@@ -2,7 +2,6 @@
   "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
   "kind": "module",
   "id": "module:devloop.core",
-  "owner_skill": "skill:dev-as-ml-loop",
   "title": "优化循环心智锚",
   "intent": "把单任务/内层下降建成带目标函数、测量、迭代、收敛的优化循环。",
   "recognition_cues": [

@@ -4,7 +4,7 @@
 >
 > Version: **v1alpha1**
 >
-> Last updated: **2026-07-23**
+> Last updated: **2026-07-24**
 >
 > Scope: `plugin/src/skills` 的知识身份、Markdown binding、跨 skill 导航、语义变更、
 > host projection、健康诊断与研发治理。
@@ -44,23 +44,30 @@ cc-master 要把八个分发 skill 从“若干 Markdown 文件”治理成一�
 
 ## 2. 领域对象与真相源
 
-### 2.1 四类 authored node
+### 2.1 authored node（graph-first / skill-as-artifact）
+
+> **K3-00 起正式确认**：知识点与 typed relation 是原始全局事实；module 是图分析可用的全局聚合；
+> skill 是经候选边界分析与治理准入后、由显式 composition manifest 物化的产品视图。Markdown
+> 路径 / anchor / 行区间只是 binding/evidence，**绝不**推导 owner 或 membership。
 
 | Node | 身份 | 拥有什么 | 不拥有什么 |
 |---|---|---|---|
 | `EntryNode` | 一个 runtime 入口或已注册 intent | 入口 cue、host scope、目标 module/point | 知识正文 |
-| `SkillNode` | 一个分发 skill | skill 边界、module manifest 列表、host coverage | module 内 HOW |
-| `ModuleNode` | 一个可路由的任务意图单元 | intent、boundary、point membership、access、router metadata | 完整正文 |
-| `PointNode` | 一个最小可权威引用的知识单元 | semantic subject、role、binding、authority、cue | portfolio 策略 |
+| `PointNode` | 最小可权威引用的知识单元（全局原始事实） | semantic subject、role、binding、authority、cue | skill 归属、目录名推导的 membership |
+| `ModuleNode` | 图分析可用的全局聚合 | intent、boundary、point membership、access、router metadata | skill 所有权；完整正文 |
+| `Composition` / skill artifact | 经 admit 的产品视图 | 显式 `consumes.modules`、package_root、host coverage、analysis_ref | 对 module/point 的语义所有权 |
+| `candidate_analysis` | 候选边界治理记录 | scoresheet（D1/D2/D3）+ witness + verdict | 运行时正文 |
 
 `ProjectionSurface`、source map 与生成 router 是 compiled/runtime 对象，不是 authored knowledge node。
+
+多 skill 可消费同一 SSOT module/point；反向 `consumers` 只能由 composition 派生，不得从路径名反推。
 
 ### 2.2 一个知识模块长什么样
 
 一个 module 是跨表示层对象：
 
 ```text
-module JSON shard
+module JSON shard（全局；不嵌套在 skill 目录语义下）
   ├── intent / recognition cues / boundary
   ├── access class / relevant entries / primary points
   ├── point membership
@@ -70,26 +77,29 @@ module JSON shard
           ├── point B ──binds──> Markdown file X / another marker
           └── point C ──binds──> Markdown file Y / stable marker
                                       │
-                                      ▼ compile
-                         per-host module router + point anchors
+                                      ▼ composition.admit → materialize
+                         skill package Markdown + per-host surfaces
 ```
 
 它不等于一个文件，也不要求 points 连续或同文件。它只拥有一个明确 task intent；若一句话无法概括
-职责，或 points 属于两个独立决策瞬间，module 必须拆分。
+职责，或 points 属于两个独立决策瞬间，module 必须拆分。**移动 binding.path 不改变 point 的
+module membership。**
 
 ### 2.3 SSOT 分层
 
 | Concern | 唯一权威 |
 |---|---|
 | exact principle/procedure/checklist/example 正文 | canonical Markdown point span |
-| module intent、boundary、membership、access、routing cue | module JSON shard |
+| module intent、boundary、membership、access、routing cue | **全局** module JSON shard |
 | portfolio entry、global hop policy、critical pin budget | `portfolio.json` |
-| skill/module inventory 与 host coverage 声明 | per-skill `skill.json` |
+| skill 产品边界与 host coverage | **composition manifest**（经 candidate_analysis admit） |
 | point semantic identity、canonical/summary/example authority | point record |
 | 身份 split/merge/move/retire 的语义解释 | immutable change set |
 | final host 路径、anchor、实际可点击 link | generated projection + final-dist verifier |
 
 JSON 中的 `summary`、`intent`、`recognition_cues` 只作路由元数据，不能复制完整正文。
+过渡期仍允许未迁移 skill 携带遗留 `owner_skill`；K3-00 walking skeleton（`dev-as-ml-loop`）
+已改为 composition 消费全局 module，不得再把 skill 目录当成 membership SSOT。
 
 ### 2.4 K1 contract-hardening registry
 
@@ -104,7 +114,7 @@ K1 的编译器、编辑器和 host verifier 不得自行补设计。以下 `C1`
 | `C3` | summary/example authority 直接指向 canonical point，并声明 `review_policy` 与 `reviewed_canonical_sha256`；canonical span hash 改变使 review-on-change 记录失效 |
 | `C4` | lifecycle 为 `accepted` 的 SkillNode 与 accepted module/point/edge/entry 一样必须有 admission evidence 与 verifier，不留 `K-I08` 例外 |
 | `C5` | typed change 只表达语义操作和审计，不承载任意 Markdown bytes；`begin → candidate edit → validate → apply` 在 ignored workspace 中执行，任何 optimistic-lock、scope hash 或 patch dry-run 失败都不得部分写入 |
-| `C6` | canonical graph hash 只纳入 accepted portfolio/skill/module manifests、canonical span hashes、source inventory 与 accepted change-head digest；digest 排除当前 record 的 `result_graph_sha256` 防自引用，按 §10.2 稳定序列化 |
+| `C6` | canonical graph hash 只纳入 accepted portfolio/skill/module/**composition**/**candidate_analysis** manifests、canonical span hashes、source inventory 与 accepted change-head digest；digest 排除当前 record 的 `result_graph_sha256` 防自引用，按 §10.2 稳定序列化；`candidate_admission` 阈值（`min_internal_cohesion` / `max_overlap_shared_modules` / `require_declared_projection` / `hop_gate=directed_projection_topology`）以真实 metrics + projection topology + `planSkillProjection` 为 gate；witness 闭集 exact equality；authored edge 经 `ccm:k:edge` marker 身份化 |
 | `C7` | Markdown span hash 在 UTF-8、CRLF→LF 后计算 start/end marker 之间的精确 bytes；marker 与 span 外 generated block 不纳入，nested crossing/overlap/unclosed/duplicate fail closed |
 | `C8` | budget 只报告 `estimated_tokens`、lines、UTF-8 bytes；v1 估算器是确定性的 `ceil(utf8_bytes / 3)`，不声称等于任一模型 tokenizer |
 | `C9` | K1 的 host portability probe 固定覆盖 `claude-code / codex / cursor / kimi-code`，分别验证 explicit anchor、relative link、path rewrite 与 canonical/partial/stub payload；冻结 `worker_allowlist=[codex,cursor]`（与四产品 host 分界）、`anchor_form=explicit-html-id`、`path_policy=relative-final-host-path`；heading auto-slug 与 live click-through 标为 unverifiable 且 fail closed |
@@ -120,15 +130,21 @@ K1 的编译器、编辑器和 host verifier 不得自行补设计。以下 `C1`
 
 ### 3.1 Structural plane
 
-严格 ownership tree：
+graph-first 结构（K3-00）：
 
 ```text
-portfolio ─owns→ skill ─owns→ module ─contains→ point
+portfolio ─lists→ composition(skill artifact) ─consumes→ module ─contains→ point
+                 ↘ candidate_analysis (admit|reject|reference|decompose)
 ```
 
-- 一个 active module 恰属一个 skill。
-- 一个 active point 恰属一个 module。
-- containment 不计 runtime hop。
+- 一个 active point 恰属一个 module（membership 来自 module.points[]，不来自路径）。
+- module **不**语义嵌套在 skill 下；skill/composition 只声明 `consumes`。
+- 同一 module 可被多个 admitted composition 消费（共享 SSOT）；反向 consumers 只能派生。
+- containment / consumption 不计 runtime hop。
+- 过渡期：未迁移 skill 仍可带遗留 `owner_skill`；新全局 module 禁止依赖目录名冒充归属。
+
+> 历史 skill-first 叙事（`portfolio → skill → module → point` 且「module 被唯一 skill 拥有」）
+> 已被本段 supersede；实现与测试必须以 composition 消费为准。
 
 ### 3.2 Authority plane
 
@@ -387,21 +403,26 @@ canonicalize 到对应 canonical point。
 目标 authored layout：
 
 ```text
-plugin/src/knowledge/
+plugin/src/knowledge/          # repo-only authored/meta source（不分发进用户 runtime package 硬化；K3-01P）
 ├── portfolio.json
+├── graph/modules/             # global modules（graph-first；非 skill 嵌套）
+├── compositions/              # skill-as-artifact product views（consumes.modules 为唯一消费 SSOT）
+├── analyses/                  # candidate_analysis（Counterfactual evidence + derived verdict）
 ├── changes/
-│   └── change.20260723.endpoint-verification-split.json
-└── skills/
-    └── master-orchestrator-guide/
+└── skills/                    # 过渡期 skill-first shards（未迁移 skill）
+    └── <skill>/
         ├── skill.json
         └── modules/
-            └── verification.endpoint.json
 ```
+
+`plugin/dist/<host>/knowledge/` 只是 **generated runtime atlas/router**（compile/materialize 产物），
+不是第二 authored SSOT。package 硬化剔除/收口属后续 **K3-01P**，不在 K3-00 walking skeleton 范围。
 
 机器合同：
 
-- [knowledge-source.schema.json](schemas/knowledge-source.schema.json)：portfolio、skill、module。
+- [knowledge-source.schema.json](schemas/knowledge-source.schema.json)：portfolio、skill、module、composition、candidate_analysis。
 - [knowledge-change.schema.json](schemas/knowledge-change.schema.json)：语义变更事务。
+- [knowledge-cli-output.schema.json](schemas/knowledge-cli-output.schema.json)：CLI envelope（含 `materialize`）。
 
 文件按 module 分片，而非一张巨型 JSON：
 
@@ -505,8 +526,13 @@ Host coverage 与条件边（validate 硬门）：
   K1 **不**假装已执行自由文本 `when`/`avoid_when` cue 匹配。
 - Success full/partial witness 的 `enabled_edges`、`final_surface_snapshot.enabled_edge_ids`、
   `edges`、`enabled_adjacency` 必须计数与集合双向一致（edge id 唯一；每条 edge 的 id/from/to
-  与 adjacency 完整对应）；JSON Schema 只守 shape，语义门守集合。观测到的 nav surface 链接若
-  不能唯一映射到恰好一条 enabled edge，必须 fail closed 且失败 witness 不得携带 snapshot。
+  与 adjacency 完整对应）；JSON Schema 只守 shape，语义门守集合。snapshot 必须从 authored graph
+  与当前 host coverage 重算 expected enabled edge 闭集，并与最终 Markdown 中观测到的
+  `ccm:k:edge` marker 闭集双向严格等价；每条按
+  `{id,type,from,to,enabled}` 与 adjacency 核对，其中 snapshot `enabled:true` 派生自 authored
+  `runtime.enabled_by_default:true`；合法 parallel endpoints 仍按 edge ID 分别保留。snapshot
+  读取最终字节时必须重新运行 compiler-owned overlay 完整性检查；块外、
+  畸形、重复、孤儿 marker 或 expected edge 缺失均 fail closed，失败 witness 不得携带 snapshot。
 
 `change begin` 后 agent 不直接编辑 accepted tree。`change apply` 前必须重新读取 working tree scope
 并与 frozen hashes 比较；scope 外修改不触碰，scope 内任一 stale/dirty/写失败都恢复原 bytes、拒绝
@@ -517,7 +543,7 @@ finalize。任何一步失败都不落半张图。Git 保留跨进程与 reviewe
 | ID | Hard invariant |
 |---|---|
 | `K-I01` | node/edge ID 全局唯一，retired ID 不复用 |
-| `K-I02` | module 恰属一个 skill；point 恰属一个 module |
+| `K-I02` | point 恰属一个 module；module 由 composition `consumes` 引用（可被多 skill 共享）；禁止用路径/目录名推导 membership |
 | `K-I03` | active accepted canonical point 恰有一个 primary Markdown binding |
 | `K-I04` | spans 只分离或嵌套，不 partial crossing |
 | `K-I05` | 每 subject 恰有一个 active canonical；summary/example 直接指向它 |
@@ -567,9 +593,10 @@ finalize。任何一步失败都不落半张图。Git 保留跨进程与 reviewe
 
 canonical graph hash v1 使用以下规范：
 
-1. 收集 accepted portfolio/skill/module manifests、每个 active canonical point 的 span SHA-256、
+1. 收集 accepted portfolio/skill/module/**composition**/**candidate_analysis** manifests、每个 active canonical point 的 span SHA-256、
    完整 canonical source inventory，以及 accepted change-head digest。change manifest 不作为普通 authored
-   manifest 再次整份纳入。
+   manifest 再次整份纳入。graph-first 下 composition 与 candidate_analysis 是治理事实，任一字段变化必须改变
+   `graph_hash`（见 K3-00 mutation tests）。
 2. change-head digest 是对当前 finalized head record 按同一稳定序列化规则计算的 SHA-256，但排除自引用字段
    `result_graph_sha256`；`base_graph_sha256`、`parent_change`、scope、operations 与 evidence 仍纳入该 digest。
    genesis 没有 head 时使用显式 `null`。这样 result hash 绑定 ledger 内容但不存在固定点计算。

@@ -70,6 +70,6 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:distill.taxonomy](../../../knowledge/modules/distill.taxonomy.md#ccm-k-module-distill-taxonomy)
-- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.tax-to-evidence -->
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.tax-to-tree -->
 <!-- ccm:k:nav:end -->

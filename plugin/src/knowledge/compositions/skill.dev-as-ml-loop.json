@@ -1,24 +1,27 @@
 {
   "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
-  "kind": "skill",
-  "id": "skill:dev-as-ml-loop",
+  "kind": "composition",
+  "id": "composition:skill.dev-as-ml-loop",
+  "skill_id": "skill:dev-as-ml-loop",
   "name": "dev-as-ml-loop",
   "package_root": "plugin/src/skills/dev-as-ml-loop",
   "intent": "把开发工作建成可测优化循环：验收=目标函数、迭代测量、plateau→restart、收敛即停；外层编排与 ledger 一并覆盖。",
-  "modules": [
-    {
-      "id": "module:devloop.core",
-      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.core.json"
-    },
-    {
-      "id": "module:devloop.outer",
-      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.outer.json"
-    },
-    {
-      "id": "module:devloop.ledger",
-      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/modules/devloop.ledger.json"
-    }
-  ],
+  "consumes": {
+    "modules": [
+      {
+        "id": "module:devloop.core",
+        "manifest": "plugin/src/knowledge/graph/modules/devloop.core.json"
+      },
+      {
+        "id": "module:devloop.outer",
+        "manifest": "plugin/src/knowledge/graph/modules/devloop.outer.json"
+      },
+      {
+        "id": "module:devloop.ledger",
+        "manifest": "plugin/src/knowledge/graph/modules/devloop.ledger.json"
+      }
+    ]
+  },
   "entry_modules": [
     "module:devloop.core",
     "module:devloop.outer",
@@ -75,6 +78,7 @@
       "state": "full"
     }
   ],
+  "analysis_ref": "analysis:candidate.dev-as-ml-loop",
   "lifecycle": {
     "state": "accepted",
     "since": "2026-07-24"
@@ -83,13 +87,13 @@
     "evidence": [
       {
         "kind": "canonical-prose",
-        "ref": "skill:dev-as-ml-loop"
+        "ref": "analysis:candidate.dev-as-ml-loop"
       }
     ],
     "verifiers": [
       {
         "kind": "golden",
-        "ref": "golden.skill.dev-as-ml-loop"
+        "ref": "golden.composition.dev-as-ml-loop"
       }
     ]
   }

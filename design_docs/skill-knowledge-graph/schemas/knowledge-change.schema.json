@@ -39,6 +39,34 @@
       "type": "string",
       "pattern": "^edge:[a-z0-9][a-z0-9.-]*$"
     },
+    "snapshotEnabledEdgeRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "from",
+        "to",
+        "enabled"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/edgeId"
+        },
+        "type": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "from": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "to": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "enabled": {
+          "const": true
+        }
+      }
+    },
     "changeId": {
       "type": "string",
       "pattern": "^change:[0-9]{8}\\.[a-z0-9][a-z0-9.-]*$"
@@ -628,7 +656,11 @@
               "type": "array"
             },
             "edges": {
-              "type": "array"
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/snapshotEnabledEdgeRow"
+              },
+              "uniqueItems": true
             },
             "entries": {
               "type": "array"
@@ -638,10 +670,18 @@
               "items": {
                 "type": "string",
                 "minLength": 1
-              }
+              },
+              "uniqueItems": true
             },
             "enabled_adjacency": {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/snapshotEnabledEdgeRow"
+                },
+                "uniqueItems": true
+              }
             }
           }
         }
@@ -1093,7 +1133,11 @@
               "edge.path_role",
               "edge.runtime.enabled_by_default",
               "hop_policy.critical_any_point_to_primary_max",
-              "hop_policy.primary_entry_to_primary_max"
+              "hop_policy.primary_entry_to_primary_max",
+              "scoresheet.D1.evidence",
+              "scoresheet.D2.evidence",
+              "scoresheet.D3.evidence",
+              "scoresheet.D3.evidence_refs"
             ]
           },
           "uniqueItems": true

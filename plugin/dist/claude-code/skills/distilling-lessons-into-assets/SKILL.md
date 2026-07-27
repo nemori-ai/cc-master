@@ -27,9 +27,9 @@ Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:distill.taxonomy](../../knowledge/modules/distill.taxonomy.md#ccm-k-module-distill-taxonomy)
 - [Canonical: 四类资产定义与判据](./references/asset-taxonomy.md#ccm-k-point-distill-taxonomy)
-- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
-- [deepens_to: 四类资产定义与判据](./references/asset-taxonomy.md#ccm-k-point-distill-taxonomy)
+- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.quick-to-evidence -->
+- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.quick -->
+- [deepens_to: 四类资产定义与判据](./references/asset-taxonomy.md#ccm-k-point-distill-taxonomy) <!-- ccm:k:edge edge:distill.quick-to-tax -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-routing-overview"></a>
 <!-- ccm:k:start point:distill.routing-overview -->
@@ -52,9 +52,9 @@ Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:distill.routing](../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
 - [Canonical: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
-- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
-- [deepens_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.overview-to-evidence -->
+- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.overview -->
+- [deepens_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.overview-to-tree -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-evidence-hard-line"></a>
 <!-- ccm:k:start point:distill.evidence-hard-line -->
@@ -72,8 +72,8 @@ Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:distill.evidence](../../knowledge/modules/distill.evidence.md#ccm-k-module-distill-evidence)
 - [Canonical: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [deepens_to: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [deepens_to: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.hardline-to-fidelity -->
+- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hardline-to-tree -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-landing-preview"></a>
 <!-- ccm:k:start point:distill.landing-preview -->
@@ -91,9 +91,9 @@ Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:distill.landing](../../knowledge/modules/distill.landing.md#ccm-k-module-distill-landing)
 - [Canonical: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
-- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [deepens_to: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
-- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.preview-to-evidence -->
+- [deepens_to: 按资产类型的落地手艺](./references/landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft) <!-- ccm:k:edge edge:distill.preview-to-craft -->
+- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.preview -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-boundary"></a>
 <!-- ccm:k:start point:distill.boundary -->
@@ -116,9 +116,9 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:distill.routing](../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
-- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断三问概览](./SKILL.md#ccm-k-point-distill-routing-overview)
-- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./references/evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.boundary-to-evidence -->
+- [routes_to: 归宿判断三问概览](./SKILL.md#ccm-k-point-distill-routing-overview) <!-- ccm:k:edge edge:distill.boundary-to-overview -->
+- [routes_to: 归宿判断决策树完整体](./references/routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.boundary -->
 <!-- ccm:k:nav:end -->
 ## Pointers
 

@@ -32,18 +32,35 @@ cc-master 的分发知识目前以 Markdown 文件组织。文件级 progressive
 我们选择：
 
 1. canonical Markdown span 继续拥有 exact knowledge prose；
-2. module-sharded strict JSON 拥有 semantic identity、module intent/boundary/membership、
-   point authority、routing、access 与 lifecycle；
-3. stable Markdown markers 把 point ID 绑定到正文 span；
-4. immutable JSON change sets 解释 materialized diff 中的语义身份变化；
-5. JSON Schema Draft 2020-12 定义 source/change 合同。
+2. **全局** module-sharded strict JSON 拥有 semantic identity、module intent/boundary/membership、
+   point authority、routing、access 与 lifecycle（**不**把 module 语义嵌套在 skill 下）；
+3. stable Markdown markers 把 point ID 绑定到正文 span；binding path/anchor/line-range 只是
+   evidence，移动路径不改变 membership；
+4. **skill 是 artifact**：经 candidate analysis（scoresheet + witness）与 admit verdict 后，由
+   显式 composition manifest 物化；多 composition 可消费同一 SSOT；
+5. immutable JSON change sets 解释 materialized diff 中的语义身份变化；
+6. JSON Schema Draft 2020-12 定义 source/change 合同（含 `composition` / `candidate_analysis`）。
 
 行号、heading 与 content hash 是 compiled source map，不是 identity。
+
+> **Amendment (2026-07-24, K3-00)**：用户确认 **graph-first / skill-as-artifact**。原
+> 「skill 拥有 module」的 structural ownership 叙事被 supersede；实现以 composition
+> `consumes.modules`（id+manifest locator）为**唯一消费 SSOT**（禁止并行 `modules[]`）。
+> 候选 `candidate_analysis` 的 verdict 必须由 graph metrics + authored Counterfactual
+> evidence **确定性推导**；禁止 `--analysis-override`；stored verdict 须与 derived 精确一致。
+> canonical graph hash 纳入规范化 composition / candidate_analysis。K3-00 walking skeleton
+> 以 `dev-as-ml-loop` 贯通 schema→analysis→admit→materialize→四 host；其余 skill 全量迁移与
+> package 硬化（K3-01P）属后续任务。
 
 ### 2.2 图是 multipane typed contract
 
 Structural、authority、navigation、trigger、constraint、lineage 与 projection plane 分开。
 只有 final host 中真实可点击的 navigation edge 计 runtime hop。
+Authored edge 在 compiler nav 中以稳定 `<!-- ccm:k:edge edge:… -->` 身份化；
+snapshot 按 marker ID 核对，禁止 from+to 猜边。同端点多 typed relation 全部保留。
+Candidate admission 的 hop gate 使用 expected directed projection topology
+（atlas/module 结构弧 + authored edges）要求 SCC=1 与 diameter≤3；undirected 仅观测。
+最终权威仍是每 host materialized Markdown 的 `verifyHopContracts`。
 
 对每个 covered host：
 
@@ -52,7 +69,8 @@ Structural、authority、navigation、trigger、constraint、lineage 与 project
 - registered entry→expected point discovery distance `≤3`；
 - critical module 的 relevant entry→primary point `≤1`，any point→critical primary `≤2`。
 
-Containment、authority、lineage、manifest-only edge、搜索或 embedding hit 不得用于满足 hop gate。
+Containment、composition consumption、authority、lineage、manifest-only edge、搜索或 embedding hit
+不得用于满足 hop gate。
 
 ### 2.3 权威以 point subject 为粒度
 

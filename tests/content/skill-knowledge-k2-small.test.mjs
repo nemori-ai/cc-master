@@ -22,6 +22,38 @@ const SKILLS = [
   'distilling-lessons-into-assets',
 ];
 
+/** Graph-first K3-00 pilot — product view is a composition, not a skill shard. */
+const COMPOSITION_SKILLS = new Set(['dev-as-ml-loop']);
+
+function skillProductRel(skill) {
+  if (COMPOSITION_SKILLS.has(skill)) {
+    return `plugin/src/knowledge/compositions/skill.${skill}.json`;
+  }
+  return `plugin/src/knowledge/skills/${skill}/skill.json`;
+}
+
+/** Normalize skill shard or composition into a skill-shaped product view. */
+function readSkillProductView(skill) {
+  const doc = readJson(skillProductRel(skill));
+  if (doc.kind === 'composition') {
+    return {
+      ...doc,
+      kind: 'skill',
+      id: doc.skill_id,
+      modules: doc.consumes?.modules ?? [],
+      _composition_id: doc.id,
+    };
+  }
+  return doc;
+}
+
+function pointsConsumedBySkill(builtGraph, skillId) {
+  const skill = builtGraph.skills.find((item) => item.id === skillId);
+  assert.ok(skill, `missing skill product view ${skillId}`);
+  const moduleIds = new Set((skill.modules ?? []).map((ref) => ref.id));
+  return builtGraph.points.filter((point) => moduleIds.has(point.module_id));
+}
+
 const ENTRY_BY_SKILL = {
   'dev-as-ml-loop': {
     id: 'entry:dev-as-ml-loop',
@@ -111,22 +143,54 @@ function buildClosedSetSource() {
   const entries = [];
 
   for (const skill of SKILLS) {
-    const from = path.join(repoRoot, 'plugin/src/knowledge/skills', skill);
-    const to = path.join(sourceRoot, 'skills', skill);
-    copyTree(from, to);
+    if (COMPOSITION_SKILLS.has(skill)) {
+      const compositionFrom = path.join(
+        repoRoot,
+        'plugin/src/knowledge/compositions',
+        `skill.${skill}.json`,
+      );
+      const compositionTo = path.join(sourceRoot, 'compositions', `skill.${skill}.json`);
+      fs.mkdirSync(path.dirname(compositionTo), { recursive: true });
+      const compositionDoc = JSON.parse(fs.readFileSync(compositionFrom, 'utf8'));
+      for (const ref of compositionDoc.consumes?.modules ?? []) {
+        const moduleName = path.basename(ref.manifest);
+        const moduleFrom = path.join(repoRoot, ref.manifest);
+        const moduleTo = path.join(sourceRoot, 'graph', 'modules', moduleName);
+        fs.mkdirSync(path.dirname(moduleTo), { recursive: true });
+        fs.copyFileSync(moduleFrom, moduleTo);
+        ref.manifest = displayRepoPath(moduleTo);
+      }
+      const analysisFrom = path.join(
+        repoRoot,
+        'plugin/src/knowledge/analyses',
+        `candidate.${skill}.json`,
+      );
+      const analysisTo = path.join(sourceRoot, 'analyses', `candidate.${skill}.json`);
+      fs.mkdirSync(path.dirname(analysisTo), { recursive: true });
+      fs.copyFileSync(analysisFrom, analysisTo);
+      writeJson(compositionTo, compositionDoc);
+      skillRefs.push({
+        id: `skill:${skill}`,
+        manifest: displayRepoPath(compositionTo),
+      });
+    } else {
+      const from = path.join(repoRoot, 'plugin/src/knowledge/skills', skill);
+      const to = path.join(sourceRoot, 'skills', skill);
+      copyTree(from, to);
 
-    // Rewrite module manifests to loader-visible paths (absolute when outside repo).
-    const skillDoc = JSON.parse(fs.readFileSync(path.join(to, 'skill.json'), 'utf8'));
-    for (const ref of skillDoc.modules) {
-      const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-      ref.manifest = displayRepoPath(path.join(sourceRoot, suffix));
+      // Rewrite module manifests to loader-visible paths (absolute when outside repo).
+      const skillDoc = JSON.parse(fs.readFileSync(path.join(to, 'skill.json'), 'utf8'));
+      for (const ref of skillDoc.modules) {
+        const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
+        ref.manifest = displayRepoPath(path.join(sourceRoot, suffix));
+      }
+      writeJson(path.join(to, 'skill.json'), skillDoc);
+
+      skillRefs.push({
+        id: `skill:${skill}`,
+        manifest: displayRepoPath(path.join(to, 'skill.json')),
+      });
     }
-    writeJson(path.join(to, 'skill.json'), skillDoc);
-
-    skillRefs.push({
-      id: `skill:${skill}`,
-      manifest: displayRepoPath(path.join(to, 'skill.json')),
-    });
 
     const entry = ENTRY_BY_SKILL[skill];
     const hosts = ['claude-code', 'codex', 'cursor', 'kimi-code'];
@@ -196,7 +260,7 @@ test('SKG-K2-SMALL-01: git denominator equals inventory for each of four skills'
   for (const skill of SKILLS) {
     const denominator = gitCanonicalMarkdown(skill);
     assert.ok(denominator.length > 0, skill);
-    const skillDoc = readJson(`plugin/src/knowledge/skills/${skill}/skill.json`);
+    const skillDoc = readSkillProductView(skill);
     const inventoryPaths = skillDoc.canonical_source_inventory.map((entry) => entry.path).sort();
     assert.deepEqual(inventoryPaths, denominator, skill);
     for (const entry of skillDoc.canonical_source_inventory) {
@@ -213,10 +277,15 @@ test('SKG-K2-SMALL-02: standalone schema accepts every authored shard', async ()
   assert.equal(schema.validatorsAvailable(), true);
 
   for (const skill of SKILLS) {
-    const skillDoc = readJson(`plugin/src/knowledge/skills/${skill}/skill.json`);
-    const skillResult = schema.validateAuthoredDocument(skillDoc, 'source');
-    assert.equal(skillResult.ok, true, `${skill} skill.json: ${JSON.stringify(skillResult.errors)}`);
+    const authored = readJson(skillProductRel(skill));
+    const authoredResult = schema.validateAuthoredDocument(authored, 'source');
+    assert.equal(
+      authoredResult.ok,
+      true,
+      `${skill} product view: ${JSON.stringify(authoredResult.errors)}`,
+    );
 
+    const skillDoc = readSkillProductView(skill);
     for (const ref of skillDoc.modules) {
       const moduleDoc = readJson(ref.manifest);
       const moduleResult = schema.validateAuthoredDocument(moduleDoc, 'source');
@@ -234,7 +303,7 @@ test('SKG-K2-SMALL-03: markers bind uniquely to declared binding.path', async ()
   const seen = new Map();
 
   for (const skill of SKILLS) {
-    const skillDoc = readJson(`plugin/src/knowledge/skills/${skill}/skill.json`);
+    const skillDoc = readSkillProductView(skill);
     for (const ref of skillDoc.modules) {
       const moduleDoc = readJson(ref.manifest);
       for (const point of moduleDoc.points) {
@@ -321,23 +390,26 @@ test('SKG-K2-SMALL-04: closed-set graph invariants + authored hop budgets', asyn
       }
     }
 
-    // Critical primary reachability from any point in the same skill ≤ 2.
+    // Critical primary reachability from any point consumed by the same skill ≤ 2.
     for (const module of built.graph.modules) {
       if (module.access?.class !== 'critical') continue;
-      const skillId = module.owner_skill;
-      const skillPoints = built.graph.points.filter((point) => point.owner_skill === skillId);
-      for (const primary of module.access.primary_points) {
-        for (const point of skillPoints) {
-          const pathResult = graph.shortestPath(built.graph, point.id, primary);
-          assert.equal(
-            pathResult.reachable,
-            true,
-            `${point.id} → critical ${primary} unreachable`,
-          );
-          assert.ok(
-            pathResult.hops <= hopPolicy.critical_any_point_to_primary_max,
-            `${point.id} → ${primary} hops ${pathResult.hops}`,
-          );
+      const consumers = module.consumers ?? [];
+      assert.ok(consumers.length > 0, `${module.id} missing derived consumers`);
+      for (const skillId of consumers) {
+        const skillPoints = pointsConsumedBySkill(built.graph, skillId);
+        for (const primary of module.access.primary_points) {
+          for (const point of skillPoints) {
+            const pathResult = graph.shortestPath(built.graph, point.id, primary);
+            assert.equal(
+              pathResult.reachable,
+              true,
+              `${point.id} → critical ${primary} unreachable`,
+            );
+            assert.ok(
+              pathResult.hops <= hopPolicy.critical_any_point_to_primary_max,
+              `${point.id} → ${primary} hops ${pathResult.hops}`,
+            );
+          }
         }
       }
     }
@@ -348,7 +420,7 @@ test('SKG-K2-SMALL-04: closed-set graph invariants + authored hop budgets', asyn
     for (const skill of SKILLS) {
       const skillId = `skill:${skill}`;
       const hub = ENTRY_BY_SKILL[skill].point;
-      const points = built.graph.points.filter((point) => point.owner_skill === skillId);
+      const points = pointsConsumedBySkill(built.graph, skillId);
       for (const point of points) {
         const pathResult = graph.shortestPath(built.graph, point.id, hub);
         assert.equal(
@@ -369,7 +441,7 @@ test('SKG-K2-SMALL-04: closed-set graph invariants + authored hop budgets', asyn
 
 test('SKG-K2-SMALL-05: host_coverage mirrors copy strategies (all full)', () => {
   for (const skill of SKILLS) {
-    const skillDoc = readJson(`plugin/src/knowledge/skills/${skill}/skill.json`);
+    const skillDoc = readSkillProductView(skill);
     assert.equal(skillDoc.host_coverage.length, 4);
     for (const host of ['claude-code', 'codex', 'cursor', 'kimi-code']) {
       const row = skillDoc.host_coverage.find((item) => item.host === host);
@@ -394,7 +466,7 @@ test('SKG-K2-SMALL-06: enabled edges have unique (type, from, to) across four sh
   /** @type {Map<string, string[]>} */
   const seen = new Map();
   for (const skill of SKILLS) {
-    const skillDoc = readJson(`plugin/src/knowledge/skills/${skill}/skill.json`);
+    const skillDoc = readSkillProductView(skill);
     for (const ref of skillDoc.modules) {
       const moduleDoc = readJson(ref.manifest);
       for (const edge of moduleDoc.edges ?? []) {

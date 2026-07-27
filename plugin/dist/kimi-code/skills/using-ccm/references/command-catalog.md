@@ -318,8 +318,8 @@ ccm <alias> [args] [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [next: namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board)
-- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+- [next: namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board) <!-- ccm:k:edge edge:ccm.cmd-core.0 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.overview.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-cross-harness-facts"></a>
 <!-- ccm:k:start point:ccm.cmd.cross-harness-facts -->
@@ -388,8 +388,8 @@ ccm worker dispatch --board /abs/run.board.json --harness <codex|claude-code|cur
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
-- [next: worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota)
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.cross-harness-facts.pri -->
+- [next: worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota) <!-- ccm:k:edge edge:ccm.cmd-ext.0 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-worker-quota"></a>
 <!-- ccm:k:start point:ccm.cmd.worker-quota -->
@@ -657,8 +657,8 @@ projection 再返回。
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [next: capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps) <!-- ccm:k:edge edge:ccm.cmd-ext.1 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.worker-quota.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-board"></a>
 <!-- ccm:k:start point:ccm.cmd.board -->
@@ -875,8 +875,8 @@ ccm board enable-contract [--preflight] [--json]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [routes_to: task 字段三档速查](./board-model-guide.md#ccm-k-point-ccm-board-task-fields)
-- [next: namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal)
+- [routes_to: task 字段三档速查](./board-model-guide.md#ccm-k-point-ccm-board-task-fields) <!-- ccm:k:edge edge:ccm.cmd-board-to-fields -->
+- [next: namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal) <!-- ccm:k:edge edge:ccm.cmd-core.1 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-goal"></a>
 <!-- ccm:k:start point:ccm.cmd.goal -->
@@ -976,7 +976,7 @@ ccm goal deadline show [--json]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [next: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+- [next: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-core.2 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-capability-deps"></a>
 <!-- ccm:k:start point:ccm.cmd.capability-deps -->
@@ -1089,8 +1089,8 @@ qualification 与 diagnostic codes；不持久化布尔。显式 edge 一律先�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord) <!-- ccm:k:edge edge:ccm.cmd-ext.2 -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.capability-deps.to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-task"></a>
 <!-- ccm:k:start point:ccm.cmd.task -->
@@ -1580,8 +1580,8 @@ ccm task rm <id> [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [next: namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log) <!-- ccm:k:edge edge:ccm.cmd-core.3 -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-task-to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-log"></a>
 <!-- ccm:k:start point:ccm.cmd.log -->
@@ -1640,8 +1640,8 @@ ccm log list [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [next: --json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape)
-- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+- [next: --json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape) <!-- ccm:k:edge edge:ccm.cmd-core.4 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.log.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-jc"></a>
 <!-- ccm:k:start point:ccm.cmd.jc -->
@@ -1751,8 +1751,8 @@ ccm jc resolve <id> --status <upheld|overturned> [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.scheduling](../../../knowledge/modules/ccm.commands.scheduling.md#ccm-k-module-ccm-commands-scheduling)
-- [next: namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence) <!-- ccm:k:edge edge:ccm.cmd-jc-cadence -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.jc.to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-cadence"></a>
 <!-- ccm:k:start point:ccm.cmd.cadence -->
@@ -1848,7 +1848,7 @@ ccm cadence status [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.scheduling](../../../knowledge/modules/ccm.commands.scheduling.md#ccm-k-module-ccm-commands-scheduling)
-- [next: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
+- [next: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.cmd-cadence-watchdog -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-watchdog"></a>
 <!-- ccm:k:start point:ccm.cmd.watchdog -->
@@ -1914,8 +1914,8 @@ ccm watchdog status [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.scheduling](../../../knowledge/modules/ccm.commands.scheduling.md#ccm-k-module-ccm-commands-scheduling)
-- [next: namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent) <!-- ccm:k:edge edge:ccm.cmd-watchdog-agent -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-sched-to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-baseline"></a>
 <!-- ccm:k:start point:ccm.cmd.baseline -->
@@ -2003,7 +2003,7 @@ ccm baseline reset [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.scheduling](../../../knowledge/modules/ccm.commands.scheduling.md#ccm-k-module-ccm-commands-scheduling)
-- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
+- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.baseline.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-agent"></a>
 <!-- ccm:k:start point:ccm.cmd.agent -->
@@ -2211,8 +2211,8 @@ ccm agent rm <id> [--yes] [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.scheduling](../../../knowledge/modules/ccm.commands.scheduling.md#ccm-k-module-ccm-commands-scheduling)
-- [next: namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline)
-- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
+- [next: namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline) <!-- ccm:k:edge edge:ccm.cmd-agent-baseline -->
+- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.agent.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-peers-coord"></a>
 <!-- ccm:k:start point:ccm.cmd.peers-coord -->
@@ -2344,7 +2344,7 @@ ccm coordination arbitrate [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [next: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.cmd-ext.3 -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-usage"></a>
 <!-- ccm:k:start point:ccm.cmd.usage -->
@@ -2477,9 +2477,9 @@ ccm usage runway [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces)
-- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
-- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [next: status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces) <!-- ccm:k:edge edge:ccm.cmd-ext.4 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-ext-to-core -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-ext-to-critical -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-ops-surfaces"></a>
 <!-- ccm:k:start point:ccm.cmd.ops-surfaces -->
@@ -2912,8 +2912,8 @@ ccm runtime rollback [--json]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [next: namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate) <!-- ccm:k:edge edge:ccm.cmd-ext.5 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.ops-surfaces.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-estimate"></a>
 <!-- ccm:k:start point:ccm.cmd.estimate -->
@@ -3080,8 +3080,8 @@ ccm estimate deadline-risk [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [next: namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration) <!-- ccm:k:edge edge:ccm.cmd-ext.6 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.estimate.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-calibration"></a>
 <!-- ccm:k:start point:ccm.cmd.calibration -->
@@ -3120,8 +3120,8 @@ ccm calibration capture [flags]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [next: statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [next: statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns) <!-- ccm:k:edge edge:ccm.cmd-ext.7 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.calibration.pri -->
 <!-- ccm:k:nav:end -->
 <!-- ccm:k:start point:ccm.cmd.account -->
 ## namespace account
@@ -3300,7 +3300,7 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.extended](../../../knowledge/modules/ccm.commands.extended.md#ccm-k-module-ccm-commands-extended)
-- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.misc-ns.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-cmd-json-shape"></a>
 <!-- ccm:k:start point:ccm.cmd.json-shape -->
@@ -3979,5 +3979,5 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:ccm.commands.core](../../../knowledge/modules/ccm.commands.core.md#ccm-k-module-ccm-commands-core)
-- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.json-shape.pri -->
 <!-- ccm:k:nav:end -->

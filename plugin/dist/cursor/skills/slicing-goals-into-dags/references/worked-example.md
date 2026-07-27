@@ -68,5 +68,5 @@ Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:slicing.example](../../../knowledge/modules/slicing.example.md#ccm-k-module-slicing-example)
 - [Canonical: 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule)
-- [routes_to: 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule)
+- [routes_to: 纵切不要横切硬规则](../SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.example-to-vertical -->
 <!-- ccm:k:nav:end -->

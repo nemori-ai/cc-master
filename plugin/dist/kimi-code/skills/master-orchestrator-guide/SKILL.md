@@ -100,7 +100,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
-- [operationalizes: 红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines)
+- [operationalizes: 红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines) <!-- ccm:k:edge edge:conduct.principle-to-red-lines -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-control-operating-lenses"></a>
 <!-- ccm:k:start point:control.operating-lenses -->
@@ -152,8 +152,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
-- [contrasts_with: 离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium)
-- [applies_to: 端点验收 procedure](./references/resume-verify.md#ccm-k-point-verification-endpoint-procedure)
+- [contrasts_with: 离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium) <!-- ccm:k:edge edge:conduct.red-lines-to-deserting -->
+- [applies_to: 端点验收 procedure](./references/resume-verify.md#ccm-k-point-verification-endpoint-procedure) <!-- ccm:k:edge edge:conduct.to-verification-exception -->
 <!-- ccm:k:nav:end -->
 ### 坏编排有一个名字：离席（deserting the podium）
 

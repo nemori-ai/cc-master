@@ -59,26 +59,26 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [deepens_to: agent API](./api-reference.md#ccm-k-point-workflow-api-agent)
-- [deepens_to: args 注入](./api-reference.md#ccm-k-point-workflow-api-args)
-- [deepens_to: 共享 budget API](./api-reference.md#ccm-k-point-workflow-api-budget)
-- [deepens_to: Resume cache key](./api-reference.md#ccm-k-point-workflow-api-cache-key)
-- [deepens_to: API 硬 caps](./api-reference.md#ccm-k-point-workflow-api-caps)
-- [deepens_to: workflow 组合 API](./api-reference.md#ccm-k-point-workflow-api-composition)
-- [deepens_to: Workflow failure 语义](./api-reference.md#ccm-k-point-workflow-api-failure)
-- [deepens_to: meta 脚本头](./api-reference.md#ccm-k-point-workflow-api-meta)
-- [deepens_to: parallel API](./api-reference.md#ccm-k-point-workflow-api-parallel)
-- [deepens_to: pipeline API](./api-reference.md#ccm-k-point-workflow-api-pipeline)
-- [deepens_to: phase 与 log API](./api-reference.md#ccm-k-point-workflow-api-progress)
-- [deepens_to: 起草与 launch 契约](../SKILL.md#ccm-k-point-workflow-authoring-contract)
-- [deepens_to: 后台执行契约](./mechanism.md#ccm-k-point-workflow-background-contract)
-- [deepens_to: Barrier 与 streaming 判断](./mechanism.md#ccm-k-point-workflow-barrier-vs-streaming)
-- [deepens_to: Determinism 三禁](./mechanism.md#ccm-k-point-workflow-determinism)
-- [deepens_to: 确定性协调器本质](./mechanism.md#ccm-k-point-workflow-execution-model)
-- [deepens_to: Primitive 与注入对象模型](./mechanism.md#ccm-k-point-workflow-primitive-model)
-- [deepens_to: Workflow 资源上限](./mechanism.md#ccm-k-point-workflow-resource-caps)
-- [deepens_to: 最长未变前缀 Resume](./mechanism.md#ccm-k-point-workflow-resume-prefix)
-- [routes_to: Workflow 形状决策树](../SKILL.md#ccm-k-point-workflow-shape-tree)
+- [deepens_to: agent API](./api-reference.md#ccm-k-point-workflow-api-agent) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-agent -->
+- [deepens_to: args 注入](./api-reference.md#ccm-k-point-workflow-api-args) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-args -->
+- [deepens_to: 共享 budget API](./api-reference.md#ccm-k-point-workflow-api-budget) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-budget -->
+- [deepens_to: Resume cache key](./api-reference.md#ccm-k-point-workflow-api-cache-key) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-cache-key -->
+- [deepens_to: API 硬 caps](./api-reference.md#ccm-k-point-workflow-api-caps) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-caps -->
+- [deepens_to: workflow 组合 API](./api-reference.md#ccm-k-point-workflow-api-composition) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-composition -->
+- [deepens_to: Workflow failure 语义](./api-reference.md#ccm-k-point-workflow-api-failure) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-failure -->
+- [deepens_to: meta 脚本头](./api-reference.md#ccm-k-point-workflow-api-meta) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-meta -->
+- [deepens_to: parallel API](./api-reference.md#ccm-k-point-workflow-api-parallel) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-parallel -->
+- [deepens_to: pipeline API](./api-reference.md#ccm-k-point-workflow-api-pipeline) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-pipeline -->
+- [deepens_to: phase 与 log API](./api-reference.md#ccm-k-point-workflow-api-progress) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-progress -->
+- [deepens_to: 起草与 launch 契约](../SKILL.md#ccm-k-point-workflow-authoring-contract) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-authoring-contract -->
+- [deepens_to: 后台执行契约](./mechanism.md#ccm-k-point-workflow-background-contract) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-background-contract -->
+- [deepens_to: Barrier 与 streaming 判断](./mechanism.md#ccm-k-point-workflow-barrier-vs-streaming) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-barrier-vs-streaming -->
+- [deepens_to: Determinism 三禁](./mechanism.md#ccm-k-point-workflow-determinism) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-determinism -->
+- [deepens_to: 确定性协调器本质](./mechanism.md#ccm-k-point-workflow-execution-model) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-execution-model -->
+- [deepens_to: Primitive 与注入对象模型](./mechanism.md#ccm-k-point-workflow-primitive-model) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-primitive-model -->
+- [deepens_to: Workflow 资源上限](./mechanism.md#ccm-k-point-workflow-resource-caps) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-resource-caps -->
+- [deepens_to: 最长未变前缀 Resume](./mechanism.md#ccm-k-point-workflow-resume-prefix) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-resume-prefix -->
+- [routes_to: Workflow 形状决策树](../SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.runtime-contract.to-selection -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-execution-model"></a>
 <!-- ccm:k:start point:workflow.execution-model -->
@@ -97,7 +97,7 @@ JavaScript 脚本**。LLM 把脚本写一次；runtime 在后台执行它。中�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.execution-model-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-primitive-model"></a>
 <!-- ccm:k:start point:workflow.primitive-model -->
@@ -124,7 +124,7 @@ model 重试。被用户跳过的 agent 返回 `null`，这就是到处都见 `.
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.primitive-model-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-barrier-vs-streaming"></a>
 <!-- ccm:k:start point:workflow.barrier-vs-streaming -->
@@ -173,7 +173,7 @@ const c = await parallel(b.map(...))
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.barrier-vs-streaming-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-determinism"></a>
 <!-- ccm:k:start point:workflow.determinism -->
@@ -203,7 +203,7 @@ resume——脚本必须确定，最长未变前缀的 cache 才成立。
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.determinism-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-resume-prefix"></a>
 <!-- ccm:k:start point:workflow.resume-prefix -->
@@ -231,7 +231,7 @@ content-hash。
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.resume-prefix-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-resource-caps"></a>
 <!-- ccm:k:start point:workflow.resource-caps -->
@@ -254,7 +254,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.resource-caps-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-background-contract"></a>
 <!-- ccm:k:start point:workflow.background-contract -->
@@ -271,5 +271,5 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
-- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.background-contract-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->

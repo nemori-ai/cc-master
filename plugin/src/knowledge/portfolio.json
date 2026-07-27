@@ -27,7 +27,7 @@
     },
     {
       "id": "skill:dev-as-ml-loop",
-      "manifest": "plugin/src/knowledge/skills/dev-as-ml-loop/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.dev-as-ml-loop.json"
     },
     {
       "id": "skill:slicing-goals-into-dags",
@@ -925,6 +925,19 @@
     "module_max_lines": 80,
     "module_max_tokens": 1200,
     "point_nav_max_lines": 4
+  },
+  "candidate_admission": {
+    "inventory_max_utf8_bytes": 65536,
+    "inventory_max_lines": 2000,
+    "inventory_max_tokens": 20000,
+    "min_internal_cohesion": 0.5,
+    "max_external_edge_count": 0,
+    "max_overlap_shared_modules": 2,
+    "require_ssot_closure": true,
+    "require_four_host_denominator": true,
+    "reject_all_hosts_unsupported": true,
+    "require_declared_projection": true,
+    "hop_gate": "directed_projection_topology"
   },
   "rollout": "K2"
 }

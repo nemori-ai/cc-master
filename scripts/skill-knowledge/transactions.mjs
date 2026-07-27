@@ -30,7 +30,13 @@ import { validateChangeValidationSemantics } from './validation-envelope.mjs';
 
 const WORKSPACE_ROOT = '.skill-knowledge/workspaces';
 const ZERO_HASH = '0'.repeat(64);
-const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module']);
+const SOURCE_KINDS = new Set([
+  'portfolio',
+  'skill',
+  'module',
+  'composition',
+  'candidate_analysis',
+]);
 const PRODUCT_HOSTS = Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']);
 
 function txDiagnostic(code, message, location, witness, remediation, exitCode = EXIT_CODES.semantic_invariant) {
@@ -157,11 +163,14 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
   const portfolio = manifests.find(({ data }) => data.kind === 'portfolio')?.data ?? null;
   const skills = manifests.filter(({ data }) => data.kind === 'skill');
   const modules = manifests.filter(({ data }) => data.kind === 'module');
+  const compositions = manifests.filter(({ data }) => data.kind === 'composition');
+  const analyses = manifests.filter(({ data }) => data.kind === 'candidate_analysis');
   const changes = documents.filter(({ data }) => data.kind === 'change');
   const points = new Map();
   const edges = new Map();
   const modulesById = new Map();
   const skillsById = new Map();
+  const compositionsById = new Map();
   const identities = new Map();
   const register = (id, value) => {
     if (!id) return;
@@ -177,6 +186,42 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
     skillsById.set(item.data.id, item);
     register(item.data.id, { kind: 'skill', ...item });
   }
+  const productSkills = [...skills];
+  for (const item of compositions) {
+    compositionsById.set(item.data.id, item);
+    register(item.data.id, { kind: 'composition', ...item });
+    // Admitted product skill view: lifecycle-accepted compositions enter the same
+    // host-coverage / inventory / admission / runtime projection denominator as
+    // legacy skill manifests (skillsById alone is not enough).
+    if (item.data.lifecycle?.state !== 'accepted') continue;
+    if (skillsById.has(item.data.skill_id)) continue;
+    const projected = {
+      path: item.path,
+      data: {
+        schema_version: item.data.schema_version,
+        kind: 'skill',
+        id: item.data.skill_id,
+        name: item.data.name,
+        package_root: item.data.package_root,
+        intent: item.data.intent,
+        modules: item.data.consumes?.modules ?? [],
+        entry_modules: item.data.entry_modules,
+        canonical_source_inventory: item.data.canonical_source_inventory,
+        host_coverage: item.data.host_coverage,
+        lifecycle: item.data.lifecycle,
+        admission: item.data.admission,
+        _composition_id: item.data.id,
+        _analysis_ref: item.data.analysis_ref,
+        _from_composition: true,
+      },
+    };
+    skillsById.set(item.data.skill_id, projected);
+    register(item.data.skill_id, { kind: 'skill', ...projected });
+    productSkills.push(projected);
+  }
+  for (const item of analyses) {
+    register(item.data.id, { kind: 'candidate_analysis', ...item });
+  }
   for (const item of modules) {
     modulesById.set(item.data.id, item);
     register(item.data.id, { kind: 'module', ...item });
@@ -189,7 +234,25 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
       register(edge.id, { kind: 'edge', data: edge, module: item, path: item.path });
     }
   }
-  return { diagnostics, sourceAbsolute, documents, manifests, portfolio, skills, modules, changes, points, edges, modulesById, skillsById, identities, documentByPath };
+  return {
+    diagnostics,
+    sourceAbsolute,
+    documents,
+    manifests,
+    portfolio,
+    skills: productSkills,
+    modules,
+    compositions,
+    analyses,
+    changes,
+    points,
+    edges,
+    modulesById,
+    skillsById,
+    compositionsById,
+    identities,
+    documentByPath,
+  };
 }
 
 function active(node) {
@@ -230,14 +293,72 @@ function validateGraph(graph, repoRoot, workspace, scope) {
     if (entries.length > 1) diagnostics.push(txDiagnostic('SKG-ID-DUPLICATE', 'Knowledge identity is declared more than once.', entries[0].path, { id, locations: entries.map((item) => item.path) }, 'Keep exactly one declaration for each identity.'));
   }
   for (const module of graph.modules) {
-    const owner = graph.skillsById.get(module.data.owner_skill);
-    const referenced = owner?.data.modules?.filter((ref) => ref.id === module.data.id) ?? [];
-    if (!owner || referenced.length !== 1) diagnostics.push(txDiagnostic('SKG-MEMBERSHIP-INVALID', 'Module must belong to exactly one declared owner skill.', module.path, { module: module.data.id, owner_skill: module.data.owner_skill, references: referenced.length }, 'Synchronize module.owner_skill with exactly one skill.modules entry.'));
+    const hasOwnerSkill = typeof module.data.owner_skill === 'string';
+    if (hasOwnerSkill) {
+      const owner = graph.skillsById.get(module.data.owner_skill);
+      const referenced = owner?.data.modules?.filter((ref) => ref.id === module.data.id) ?? [];
+      if (!owner || referenced.length !== 1) {
+        diagnostics.push(
+          txDiagnostic(
+            'SKG-MEMBERSHIP-INVALID',
+            'Legacy module must belong to exactly one declared owner skill.',
+            module.path,
+            {
+              module: module.data.id,
+              owner_skill: module.data.owner_skill,
+              references: referenced.length,
+            },
+            'Synchronize module.owner_skill with exactly one skill.modules entry.',
+          ),
+        );
+      }
+      continue;
+    }
+    // Graph-first ownerless module: must be consumed by at least one skill/composition view.
+    const consumers = [...graph.skillsById.values()].filter((skill) =>
+      (skill.data.modules ?? []).some((ref) => ref.id === module.data.id),
+    );
+    if (consumers.length === 0) {
+      diagnostics.push(
+        txDiagnostic(
+          'SKG-MEMBERSHIP-INVALID',
+          'Ownerless module must be consumed by a composition or skill product view.',
+          module.path,
+          { module: module.data.id, consumers: 0 },
+          'Add the module to composition.consumes.modules or a transitional skill.modules list.',
+        ),
+      );
+    }
   }
   for (const skill of graph.skills) {
     for (const reference of skill.data.modules ?? []) {
       const module = graph.modulesById.get(reference.id);
-      if (!module || module.data.owner_skill !== skill.data.id) diagnostics.push(txDiagnostic('SKG-MEMBERSHIP-INVALID', 'Skill module reference does not resolve to a module owned by the skill.', skill.path, { skill: skill.data.id, module: reference.id }, 'Repair both skill.modules and module.owner_skill.'));
+      if (!module) {
+        diagnostics.push(
+          txDiagnostic(
+            'SKG-MEMBERSHIP-INVALID',
+            'Skill/composition module reference does not resolve.',
+            skill.path,
+            { skill: skill.data.id, module: reference.id },
+            'Repair modules/consumes locators.',
+          ),
+        );
+        continue;
+      }
+      if (
+        typeof module.data.owner_skill === 'string' &&
+        module.data.owner_skill !== skill.data.id
+      ) {
+        diagnostics.push(
+          txDiagnostic(
+            'SKG-MEMBERSHIP-INVALID',
+            'Skill module reference does not resolve to a module owned by the skill.',
+            skill.path,
+            { skill: skill.data.id, module: reference.id },
+            'Repair both skill.modules and module.owner_skill.',
+          ),
+        );
+      }
     }
   }
   const bindings = spanData(graph, repoRoot, workspace, scope);
@@ -308,10 +429,15 @@ function latestLedger(graph, diagnostics) {
 }
 
 function graphHash(graph, bindings, changeHead) {
+  // Product skill views include admitted composition projections; inventory must
+  // follow the same denominator so composition-only portfolios are not skipped.
+  const inventory = graph.skills.flatMap(
+    (skill) => skill.data.canonical_source_inventory ?? [],
+  );
   return canonicalGraphHash({
     manifests: graph.manifests.map((item) => item.data),
     span_hashes: Object.fromEntries([...bindings.spans].map(([id, span]) => [id, span.sha256])),
-    inventory: graph.skills.flatMap((skill) => skill.data.canonical_source_inventory ?? []),
+    inventory,
     change_head: changeHead,
   });
 }
@@ -340,6 +466,8 @@ function semanticSnapshot(graph, bindings) {
   for (const [id, entries] of graph.identities) {
     if (entries.length !== 1) continue;
     const entry = entries[0];
+    // Composition is the authored SSOT; projected skill views are derived mirrors.
+    if (entry.kind === 'skill' && entry.data?._from_composition) continue;
     values.set(`identity:${id}`, { category: 'identity', id, kind: entry.kind, value: semanticEntity(entry.kind, entry.data) });
   }
   for (const [id, entry] of graph.points) values.set(`placement:point:${id}`, { category: 'placement', id, kind: 'point', value: entry.module.data.id });

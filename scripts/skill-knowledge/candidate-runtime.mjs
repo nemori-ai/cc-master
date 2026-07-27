@@ -22,7 +22,11 @@ import {
   countEnabledRuntimeEdges,
   verifyHopContracts,
 } from './compile/surface-verifier.mjs';
-import { stripCompilerOwnedOverlay } from './compile/skill-overlay.mjs';
+import {
+  stripCompilerOwnedOverlay,
+  inspectCompilerOwnedOverlay,
+  EDGE_MARKER_RE,
+} from './compile/skill-overlay.mjs';
 import { estimateBudget } from './hash.mjs';
 import { buildAndValidateGraph } from './graph.mjs';
 import {
@@ -165,7 +169,14 @@ function materializeRuntimeRoot({ repoAuthority, workspaceAuthority, scope }) {
  * Uses candidate-v2 dual-manifest attestation: exact accepted_sap + trusted
  * expected-final rebuild. Marker/overlay-normalized bypasses are gone.
  */
-function projectHost(runtimeRoot, host, { injectPostPublishFault = null, candidateGraphSha256 = null } = {}) {
+function projectHost(
+  runtimeRoot,
+  host,
+  {
+    injectPostPublishFault = null,
+    candidateGraphSha256 = null,
+  } = {},
+) {
   try {
     const published = projectAndPublishHostSurface({
       repoRoot: runtimeRoot,
@@ -487,6 +498,11 @@ function verifyCoverageAwareHost({
   };
 }
 
+/** Attestation rebuild scratch must never enter product surface snapshots. */
+function isAttestationScratchDir(name) {
+  return typeof name === 'string' && name.startsWith('.trusted-rebuild-');
+}
+
 function walkFilesetManifest(rootAbsolute, relativePrefix = '') {
   const rows = [];
   if (!fs.existsSync(rootAbsolute)) return rows;
@@ -500,6 +516,7 @@ function walkFilesetManifest(rootAbsolute, relativePrefix = '') {
       continue;
     }
     if (dirent.isDirectory()) {
+      if (isAttestationScratchDir(dirent.name)) continue;
       rows.push({ path: rel, kind: 'dir' });
       rows.push(...walkFilesetManifest(absolute, rel));
       continue;
@@ -520,11 +537,10 @@ function walkFilesetManifest(rootAbsolute, relativePrefix = '') {
 /**
  * Snapshot the actual full/partial final host tree by reparsing files / Markdown.
  * Graph fields only represent observed anchors, nav links, and entry pins.
- * Authored graph may uniquely map an observed marker to a stable id; it must
- * never invent edges from endpoint co-presence. Disabled (non-emitted) edges
- * cannot appear in the final snapshot.
- * Observed compiler nav-surface point links must map to exactly one enabled
- * edge; 0 or >1 candidates fail closed (no snapshot on failure).
+ * The final-byte compiler overlay must be structurally valid, and observed
+ * authored-edge marker IDs must be exactly equal to the enabled authored edge
+ * closure for this host coverage. Edges are keyed by ID, so valid parallel
+ * endpoint relations remain distinct.
  *
  * @returns {{ ok: boolean, snapshot: object|null, diagnostics: object[] }}
  */
@@ -544,22 +560,57 @@ export function buildFinalSurfaceSnapshot({
 
   const authored = buildAndValidateGraph({ repoRoot: runtimeRoot });
   const authoredGraph = authored.graph ?? {};
+  const { plan: coveragePlan, diagnostics: coverageDiagnostics } =
+    resolveHostCoveragePlan(authoredGraph);
+  diagnostics.push(...coverageDiagnostics);
+  const hostCoverage = coveragePlan[host] ?? {
+    mode: 'unsupported',
+    moduleIds: [],
+  };
+  if (hostCoverage.mode !== mode) {
+    diagnostics.push(
+      diagnostic({
+        severity: 'error',
+        code: 'SKG-CHANGE-SNAPSHOT-COVERAGE-MODE',
+        message: `Final snapshot mode ${mode} disagrees with authored host coverage ${hostCoverage.mode}`,
+        location: `plugin/dist/${host}`,
+        witness: { host, snapshot_mode: mode, authored_mode: hostCoverage.mode },
+        remediation: 'Build the final snapshot from the same host coverage plan used by projection.',
+        exitCode: EXIT_CODES.projection,
+      }),
+    );
+  }
+  const expectedGraph =
+    mode === 'partial'
+      ? projectCoverageSubgraph(authoredGraph, hostCoverage.moduleIds, { host })
+      : authoredGraph;
+  const expectedEnabledEdges = (expectedGraph.edges ?? [])
+    .filter((edge) => edge.runtime?.enabled_by_default !== false)
+    .map((edge) => ({
+      id: edge.id,
+      type: edge.type,
+      from: edge.from,
+      to: edge.to,
+      enabled_by_default: true,
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const expectedEdgesById = new Map(
+    expectedEnabledEdges.map((edge) => [edge.id, edge]),
+  );
 
   const pointByAnchor = new Map();
   for (const point of authoredGraph.points ?? []) {
     pointByAnchor.set(normalizePointAnchor(point.id).html_id, point);
   }
-  const edgesByEndpoints = new Map();
-  for (const edge of authoredGraph.edges ?? []) {
-    const key = `${edge.from}\0${edge.to}`;
-    if (!edgesByEndpoints.has(key)) edgesByEndpoints.set(key, []);
-    edgesByEndpoints.get(key).push(edge);
-  }
+  const authoredEdgesById = new Map(
+    (authoredGraph.edges ?? []).map((edge) => [edge.id, edge]),
+  );
 
   const surfacePointIds = new Set();
   const surfaceModuleIds = new Set();
   const surfaceSkillIds = new Set();
-  const observedEdgeKeys = [];
+  /** @type {{ from: string, to: string, edge_id: string, href: string }[]} */
+  const observedEdgeMarkers = [];
   const entryPinTargets = [];
 
   const walkMarkdown = (absolute, relativePrefix = '') => {
@@ -569,11 +620,34 @@ export function buildFinalSurfaceSnapshot({
       const child = path.join(absolute, dirent.name);
       if (dirent.isSymbolicLink()) continue;
       if (dirent.isDirectory()) {
+        // Skip attestation rebuild scratch (.trusted-rebuild-<host>/final/skills)
+        // so each authored edge id is observed once on the product surface.
+        if (isAttestationScratchDir(dirent.name)) continue;
         walkMarkdown(child, rel);
         continue;
       }
       if (!dirent.isFile() || !dirent.name.endsWith('.md')) continue;
       const markdown = fs.readFileSync(child, 'utf8');
+      const overlay = inspectCompilerOwnedOverlay(markdown);
+      for (const issue of overlay.issues ?? []) {
+        const code = issue.kind === 'orphan_edge_marker'
+          ? 'SKG-CHANGE-SNAPSHOT-OVERLAY-ORPHAN'
+          : issue.kind === 'duplicate_edge_marker'
+            ? 'SKG-CHANGE-SNAPSHOT-OVERLAY-DUPLICATE'
+            : 'SKG-CHANGE-SNAPSHOT-OVERLAY-MALFORMED';
+        diagnostics.push(
+          diagnostic({
+            severity: 'error',
+            code,
+            message: `Invalid compiler-owned overlay in final Markdown: ${issue.message}`,
+            location: normalized(rel),
+            witness: { host, path: normalized(rel), issue },
+            remediation:
+              'Regenerate the final host surface; block malformed, duplicate, or orphan compiler markers.',
+            exitCode: EXIT_CODES.projection,
+          }),
+        );
+      }
       const anchors = inspectHtmlAnchorIds(markdown).ids ?? [];
       for (const anchor of anchors) {
         const point = pointByAnchor.get(anchor);
@@ -591,22 +665,53 @@ export function buildFinalSurfaceSnapshot({
         const fromId = match[1];
         const block = match[0];
         const fromPoint = (authoredGraph.points ?? []).find((item) => item.id === fromId);
-        for (const link of block.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
-          const target = link[1];
-          const fragment = target.includes('#') ? target.slice(target.indexOf('#') + 1) : null;
+        for (const line of block.split('\n')) {
+          const edgeMatch = [...line.matchAll(EDGE_MARKER_RE)];
+          EDGE_MARKER_RE.lastIndex = 0;
+          const linkMatch = line.match(/\[[^\]]*\]\(([^)]+)\)/);
+          if (edgeMatch.length > 0) {
+            const edgeId = edgeMatch[0][1];
+            const href = linkMatch?.[1] ?? '';
+            const fragment = href.includes('#') ? href.slice(href.indexOf('#') + 1) : null;
+            const toPoint =
+              fragment && fragment.startsWith('ccm-k-point-')
+                ? pointByAnchor.get(fragment)
+                : null;
+            if (toPoint) {
+              surfacePointIds.add(fromId);
+              surfacePointIds.add(toPoint.id);
+            }
+            observedEdgeMarkers.push({
+              from: fromId,
+              to: toPoint?.id ?? null,
+              edge_id: edgeId,
+              href,
+            });
+            continue;
+          }
+          // Point-target nav link without authored edge marker.
+          if (!linkMatch) continue;
+          const href = linkMatch[1];
+          const fragment = href.includes('#') ? href.slice(href.indexOf('#') + 1) : null;
           if (!fragment || !fragment.startsWith('ccm-k-point-')) continue;
           const toPoint = pointByAnchor.get(fragment);
           if (!toPoint) continue;
           surfacePointIds.add(fromId);
           surfacePointIds.add(toPoint.id);
-          // Authority canonical pins are emitted into nav but are not authored edges.
+          // Authority canonical pins are structural — not authored edges.
           if (
             fromPoint?.authority?.role !== 'canonical' &&
             fromPoint?.authority?.canonical === toPoint.id
           ) {
             continue;
           }
-          observedEdgeKeys.push({ from: fromId, to: toPoint.id });
+          // Authored point→point nav without edge identity marker fails closed.
+          observedEdgeMarkers.push({
+            from: fromId,
+            to: toPoint.id,
+            edge_id: null,
+            href,
+          });
         }
       }
 
@@ -662,54 +767,184 @@ export function buildFinalSurfaceSnapshot({
       };
     });
 
-  // Edges: only uniquely mapped observed nav links. Never invent from co-presence.
+  // Edges: resolve strictly by ccm:k:edge marker ID — never invent from from+to.
   const edges = [];
   const enabled_adjacency = {};
   const enabled_edge_ids = [];
   const seenEdgeIds = new Set();
-  const reportedAmbiguous = new Set();
-  for (const observed of observedEdgeKeys) {
-    if (!pointIds.has(observed.from) || !pointIds.has(observed.to)) continue;
-    const candidates = (edgesByEndpoints.get(`${observed.from}\0${observed.to}`) ?? []).filter(
-      (edge) => edge.runtime?.enabled_by_default !== false,
-    );
-    if (candidates.length !== 1) {
-      const ambKey = `${observed.from}\0${observed.to}`;
-      if (!reportedAmbiguous.has(ambKey)) {
-        reportedAmbiguous.add(ambKey);
-        const candidate_edge_ids = candidates.map((edge) => edge.id).sort();
-        diagnostics.push(
-          diagnostic({
-            severity: 'error',
-            code: 'SKG-CHANGE-SNAPSHOT-EDGE-AMBIGUOUS',
-            message: `Observed nav surface link ${observed.from} → ${observed.to} maps to ${candidates.length} enabled edge candidate(s); need exactly 1`,
-            location: `plugin/dist/${host}`,
-            witness: {
-              host,
-              from: observed.from,
-              to: observed.to,
-              candidate_edge_ids,
-            },
-            remediation:
-              'Keep enabled authored edges unique per observed nav endpoints, or remove orphan nav links; never invent or silently drop edges.',
-            exitCode: EXIT_CODES.projection,
-          }),
-        );
-      }
+  for (const observed of observedEdgeMarkers) {
+    if (!observed.edge_id) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-MISSING-MARKER',
+          message: `Authored point nav ${observed.from} → ${observed.to} is missing ccm:k:edge marker`,
+          location: `plugin/dist/${host}`,
+          witness: { host, from: observed.from, to: observed.to, href: observed.href },
+          remediation:
+            'Compiler must emit <!-- ccm:k:edge edge:… --> on each authored edge nav line; structural pins stay unmarked.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
       continue;
     }
-    const edge = candidates[0];
-    if (seenEdgeIds.has(edge.id)) continue;
+    const authoredEdge = authoredEdgesById.get(observed.edge_id);
+    if (!authoredEdge) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-UNKNOWN',
+          message: `Nav edge marker ${observed.edge_id} is not an authored graph edge`,
+          location: `plugin/dist/${host}`,
+          witness: { host, edge_id: observed.edge_id, from: observed.from, to: observed.to },
+          remediation: 'Remove unknown markers or author the edge before materializing nav.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
+    if (authoredEdge.runtime?.enabled_by_default === false) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-DISABLED',
+          message: `Nav edge marker ${authoredEdge.id} points at a disabled authored edge`,
+          location: `plugin/dist/${host}`,
+          witness: {
+            host,
+            edge_id: authoredEdge.id,
+            from: authoredEdge.from,
+            to: authoredEdge.to,
+          },
+          remediation: 'Do not emit nav for runtime.enabled_by_default=false edges.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
+    const edge = expectedEdgesById.get(observed.edge_id);
+    if (!edge) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-UNEXPECTED',
+          message: `Nav edge marker ${observed.edge_id} is outside ${host} enabled coverage`,
+          location: `plugin/dist/${host}`,
+          witness: {
+            host,
+            edge_id: observed.edge_id,
+            mode,
+            covered_modules: hostCoverage.moduleIds,
+          },
+          remediation: 'Emit authored edges only when both endpoint points survive host coverage.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
+    if (edge.from !== observed.from) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-FROM-MISMATCH',
+          message: `Edge ${edge.id} from=${edge.from} does not match nav owner ${observed.from}`,
+          location: `plugin/dist/${host}`,
+          witness: {
+            host,
+            edge_id: edge.id,
+            expected_from: edge.from,
+            nav_owner: observed.from,
+          },
+          remediation: 'Edge marker must sit in the nav block of edge.from.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
+    if (!observed.to || edge.to !== observed.to) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-TO-MISMATCH',
+          message: `Edge ${edge.id} to=${edge.to} does not match nav link anchor ${observed.to}`,
+          location: `plugin/dist/${host}`,
+          witness: {
+            host,
+            edge_id: edge.id,
+            expected_to: edge.to,
+            link_anchor: observed.to,
+            href: observed.href,
+          },
+          remediation: 'Nav link fragment must resolve to edge.to.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
+    if (!pointIds.has(edge.from) || !pointIds.has(edge.to)) continue;
+    if (seenEdgeIds.has(edge.id)) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-CHANGE-SNAPSHOT-EDGE-DUPLICATE',
+          message: `Duplicate ccm:k:edge marker for ${edge.id} on host surface`,
+          location: `plugin/dist/${host}`,
+          witness: { host, edge_id: edge.id },
+          remediation: 'Each authored edge id may appear at most once in a host surface snapshot.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+      continue;
+    }
     seenEdgeIds.add(edge.id);
     edges.push({
       id: edge.id,
+      type: edge.type,
       from: edge.from,
       to: edge.to,
-      enabled_by_default: true,
+      enabled: true,
     });
     if (!enabled_adjacency[edge.from]) enabled_adjacency[edge.from] = [];
-    enabled_adjacency[edge.from].push({ to: edge.to, edge_id: edge.id });
+    enabled_adjacency[edge.from].push({
+      id: edge.id,
+      type: edge.type,
+      from: edge.from,
+      to: edge.to,
+      enabled: true,
+    });
     enabled_edge_ids.push(edge.id);
+  }
+
+  const expectedEdgeIds = expectedEnabledEdges.map((edge) => edge.id);
+  const observedMarkerIds = [
+    ...new Set(
+      observedEdgeMarkers
+        .map((item) => item.edge_id)
+        .filter((id) => typeof id === 'string'),
+    ),
+  ].sort();
+  const missingEdgeIds = expectedEdgeIds.filter((id) => !observedMarkerIds.includes(id));
+  const unexpectedEdgeIds = observedMarkerIds.filter((id) => !expectedEdgesById.has(id));
+  if (missingEdgeIds.length > 0 || unexpectedEdgeIds.length > 0) {
+    diagnostics.push(
+      diagnostic({
+        severity: 'error',
+        code: 'SKG-CHANGE-SNAPSHOT-EDGE-SET-MISMATCH',
+        message: `Final Markdown edge markers are not exactly equal to ${host} enabled authored edges`,
+        location: `plugin/dist/${host}`,
+        witness: {
+          host,
+          mode,
+          expected_edge_ids: expectedEdgeIds,
+          observed_edge_ids: observedMarkerIds,
+          missing_edge_ids: missingEdgeIds,
+          unexpected_edge_ids: unexpectedEdgeIds,
+        },
+        remediation:
+          'Regenerate all compiler-owned nav blocks so every enabled covered edge ID appears exactly once and no other marker appears.',
+        exitCode: EXIT_CODES.projection,
+      }),
+    );
   }
 
   if (diagnostics.length > 0) {
@@ -719,7 +954,7 @@ export function buildFinalSurfaceSnapshot({
   edges.sort((a, b) => a.id.localeCompare(b.id));
   for (const from of Object.keys(enabled_adjacency)) {
     enabled_adjacency[from].sort(
-      (a, b) => a.edge_id.localeCompare(b.edge_id) || a.to.localeCompare(b.to),
+      (a, b) => a.id.localeCompare(b.id) || a.to.localeCompare(b.to),
     );
   }
   enabled_edge_ids.sort();
@@ -905,7 +1140,7 @@ export function validateCandidateRuntimeProjection({
   scope,
   candidateGraph,
   resultGraphSha256,
-  /** @type {{ host?: string, injectPostPublishFault?: Function }|null} */
+  /** @type {{ host?: string, injectPostPublishFault?: Function, mutatePayloadBeforeVerify?: Function, mutatePayloadBeforeSnapshot?: Function }|null} */
   testSeams = null,
 }) {
   const diagnostics = [];
@@ -1063,6 +1298,11 @@ export function validateCandidateRuntimeProjection({
 
       let verified;
       let payloadRootForSnapshot = path.join(runtimeRoot, 'plugin/dist', host);
+      const mutatePayloadBeforeVerify =
+        typeof testSeams?.mutatePayloadBeforeVerify === 'function' &&
+        (!testSeams.host || testSeams.host === host)
+          ? testSeams.mutatePayloadBeforeVerify
+          : null;
       if (mode === 'partial') {
         const partial = materializePartialHostTree({
           runtimeRoot,
@@ -1071,6 +1311,15 @@ export function validateCandidateRuntimeProjection({
           moduleIds: hostPlan.moduleIds,
         });
         diagnostics.push(...partial.built.diagnostics);
+        payloadRootForSnapshot = partial.partialRoot;
+        if (mutatePayloadBeforeVerify) {
+          mutatePayloadBeforeVerify({
+            host,
+            mode,
+            runtimeRoot,
+            payloadRoot: partial.partialRoot,
+          });
+        }
         verified = verifyCoverageAwareHost({
           runtimeRoot,
           host,
@@ -1080,7 +1329,6 @@ export function validateCandidateRuntimeProjection({
           payloadRootOverride: partial.partialRoot,
           projectedGraphOverride: partial.projectedGraph,
         });
-        payloadRootForSnapshot = partial.partialRoot;
         // Prove excluded modules do not appear in the partial denominator.
         for (const excludedId of verified.excluded_module_ids ?? []) {
           const slug = excludedId.replace(/^module:/, '');
@@ -1106,6 +1354,14 @@ export function validateCandidateRuntimeProjection({
           }
         }
       } else {
+        if (mutatePayloadBeforeVerify) {
+          mutatePayloadBeforeVerify({
+            host,
+            mode,
+            runtimeRoot,
+            payloadRoot: payloadRootForSnapshot,
+          });
+        }
         verified = verifyCoverageAwareHost({
           runtimeRoot,
           host,

@@ -33,7 +33,7 @@ catalog 或 model/effort 参数，也不把易腐的 provider 命令面改写成
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.target-facts](../../../knowledge/modules/pacing.target-facts.md#ccm-k-module-pacing-target-facts)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
-- [requires: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
-- [deepens_to: 模型档位事实三层](./model-tiers.md#ccm-k-point-pacing-model-tier-facts)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.target-to-global -->
+- [requires: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.target-to-signals -->
+- [deepens_to: 模型档位事实三层](./model-tiers.md#ccm-k-point-pacing-model-tier-facts) <!-- ccm:k:edge edge:pacing.target-to-model -->
 <!-- ccm:k:nav:end -->

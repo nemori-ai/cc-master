@@ -1,0 +1,291 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "candidate_analysis",
+  "id": "analysis:candidate.dev-as-ml-loop",
+  "skill_id": "skill:dev-as-ml-loop",
+  "composition_id": "composition:skill.dev-as-ml-loop",
+  "candidate_modules": [
+    "module:devloop.core",
+    "module:devloop.outer",
+    "module:devloop.ledger"
+  ],
+  "scoresheet": {
+    "D1": {
+      "score": 1,
+      "evidence": "受众是装插件后替用户执行开发任务的 runtime agent（用户面），落 plugin/src/skills/。"
+    },
+    "D2": {
+      "score": 1,
+      "evidence": "单一职责：把已切好的任务建成可测优化循环（objective/iterate/plateau→restart）；不跨切 DAG 或工程手艺内容。"
+    },
+    "D3": {
+      "probe_a": "strong",
+      "probe_b": "strong",
+      "evidence": "A.3 新路径：默认 agent 不会自发把开发建成带测量的优化循环；B.1 倾向覆写：默认会把「写完」当完成而跳过 plateau/restart 纪律。",
+      "evidence_refs": [
+        "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md"
+      ]
+    }
+  },
+  "graph_metrics": {
+    "module_count": 3,
+    "point_count": 17,
+    "internal_edge_count": 39,
+    "external_edge_count": 0
+  },
+  "verdict": "admit",
+  "witness": {
+    "reason": "D1=1 ∧ D2=1 ∧ (A∨B strong)；候选边界可物化为 composition:skill.dev-as-ml-loop",
+    "composition_id": "composition:skill.dev-as-ml-loop",
+    "candidate_modules": [
+      "module:devloop.core",
+      "module:devloop.ledger",
+      "module:devloop.outer"
+    ],
+    "candidate_points": [
+      "point:devloop.converge",
+      "point:devloop.core-thesis",
+      "point:devloop.explore-exploit",
+      "point:devloop.fit-intent",
+      "point:devloop.instrument",
+      "point:devloop.iterate",
+      "point:devloop.ledger-antipatterns",
+      "point:devloop.ledger-ccm",
+      "point:devloop.ledger-handoff",
+      "point:devloop.ledger-what",
+      "point:devloop.ledger-when",
+      "point:devloop.ml-components",
+      "point:devloop.objective",
+      "point:devloop.plateau-restart",
+      "point:devloop.regularize",
+      "point:devloop.taste-and-cycle",
+      "point:devloop.two-scale"
+    ],
+    "trigger_job_coherence": true,
+    "internal_cohesion": 2.294118,
+    "external_cut_coupling": 0,
+    "overlap_signature": {},
+    "ssot_closure": true,
+    "budgets": {
+      "hop": {
+        "observed": {
+          "protocol": "directed_projection_topology",
+          "projected_ok": true,
+          "projected_scc_count": 1,
+          "projected_directed_diameter": 3,
+          "undirected_entry_distance_max": 1,
+          "directed_diameter": 3,
+          "directed_unreachable_pair_count": 16,
+          "undirected_unreachable_count": 0
+        },
+        "policy": {
+          "point_diameter_max": 3,
+          "entry_discovery_max": 3,
+          "critical_any_point_to_primary_max": 2
+        }
+      },
+      "read": {
+        "inventory_files": 2,
+        "missing_files": [],
+        "files": [
+          {
+            "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+            "utf8_bytes": 17206,
+            "lines": 195,
+            "estimated_tokens": 5736
+          },
+          {
+            "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+            "utf8_bytes": 6820,
+            "lines": 95,
+            "estimated_tokens": 2274
+          }
+        ],
+        "utf8_bytes": 24026,
+        "estimated_lines": 290,
+        "policy_max_lines": 2000,
+        "policy_max_utf8_bytes": 65536,
+        "within_read_budget": true
+      },
+      "token": {
+        "estimated_tokens": 8009,
+        "policy_max_tokens": 20000,
+        "within_token_budget": true
+      }
+    },
+    "host_portability": {
+      "claude-code": "full",
+      "codex": "full",
+      "cursor": "full",
+      "kimi-code": "full"
+    },
+    "hop": {
+      "protocol": "directed_projection_topology",
+      "entry_roots": [
+        "point:devloop.ledger-when",
+        "point:devloop.objective",
+        "point:devloop.two-scale"
+      ],
+      "authored_directed_diameter": null,
+      "authored_directed_unreachable_pair_count": 16,
+      "authored_directed_unreachable_sample": [
+        {
+          "from": "point:devloop.converge",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.explore-exploit",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.fit-intent",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.instrument",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.iterate",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-antipatterns",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-ccm",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-handoff",
+          "to": "point:devloop.core-thesis"
+        }
+      ],
+      "projected_scc_count": 1,
+      "projected_directed_diameter": 3,
+      "projected_hosts": {
+        "claude-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "codex": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "cursor": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "kimi-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        }
+      },
+      "projected_ok": true,
+      "undirected_entry_distance_max": 1,
+      "undirected_unreachable_from_entry_primary": [],
+      "directed_diameter": 3,
+      "directed_unreachable_pair_count": 16,
+      "directed_unreachable_sample": [
+        {
+          "from": "point:devloop.converge",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.explore-exploit",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.fit-intent",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.instrument",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.iterate",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-antipatterns",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-ccm",
+          "to": "point:devloop.core-thesis"
+        },
+        {
+          "from": "point:devloop.ledger-handoff",
+          "to": "point:devloop.core-thesis"
+        }
+      ],
+      "policy": {
+        "point_diameter_max": 3,
+        "entry_discovery_max": 3,
+        "critical_any_point_to_primary_max": 2
+      }
+    },
+    "graph_metrics": {
+      "module_count": 3,
+      "point_count": 17,
+      "internal_edge_count": 39,
+      "external_edge_count": 0
+    },
+    "admission_gates": {
+      "ok": true,
+      "module_count_matches_candidate": true,
+      "point_count_positive": true,
+      "trigger_job_coherence": true,
+      "ssot_closure": true,
+      "internal_cohesion": true,
+      "external_cut": true,
+      "overlap_within_budget": true,
+      "hop": true,
+      "read_budget": true,
+      "token_budget": true,
+      "four_host_denominator": true,
+      "host_portability": true
+    }
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "golden.analysis.dev-as-ml-loop"
+      }
+    ]
+  }
+}

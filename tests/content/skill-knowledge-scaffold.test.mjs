@@ -65,6 +65,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'compile',
     'contract',
     'explain',
+    'materialize',
     'path',
     'report',
   ]);
@@ -74,6 +75,7 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'compile',
     'contract',
     'explain',
+    'materialize',
     'path',
     'report',
   ]);
@@ -117,6 +119,8 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'portfolio',
     'skill',
     'module',
+    'composition',
+    'candidate_analysis',
   ]);
   assert.deepEqual(body.hardening_contract.C6.change_head_digest_excludes, [
     'result_graph_sha256',
@@ -702,7 +706,16 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
     /当前是\s*\*\*K1\s+pilot\*\*|已落真实 inventory[：:]\s*\*\*1\*\*\s+admitted skill|3\s+modules?\s*\/\s*9\s+points?/i,
     'README must not keep the retired K1 pilot inventory claim as current truth',
   );
-  for (const command of ['change', 'check', 'contract', 'compile', 'report', 'path', 'explain']) {
+  for (const command of [
+    'change',
+    'check',
+    'contract',
+    'compile',
+    'materialize',
+    'report',
+    'path',
+    'explain',
+  ]) {
     assert.match(
       designReadme,
       new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
@@ -855,7 +868,16 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
     /K1\s+pilot\s+已落\s*3\s+modules?[\s\/,与和]+9\s+points?/i,
     'plugin/src/AGENTS.md must not keep the retired K1 pilot inventory claim',
   );
-  for (const command of ['change', 'check', 'compile', 'contract', 'explain', 'path', 'report']) {
+  for (const command of [
+    'change',
+    'check',
+    'compile',
+    'contract',
+    'explain',
+    'materialize',
+    'path',
+    'report',
+  ]) {
     assert.match(
       pluginSrcAgents,
       new RegExp(`\`${command}\`|\\b${command}\\b`, 'i'),
@@ -864,8 +886,8 @@ test('SKG-DOC-02: knowledge CONTRACT, examples README, design docs, and plugin/s
   }
   assert.match(
     pluginSrcAgents,
-    /(change|check|compile|contract|explain|path|report)[\s\S]{0,220}(已实现|implemented)/i,
-    'plugin/src/AGENTS.md must state change/check/compile/contract/explain/path/report are implemented',
+    /(change|check|compile|contract|explain|materialize|path|report)[\s\S]{0,220}(已实现|implemented)/i,
+    'plugin/src/AGENTS.md must state change/check/compile/contract/explain/materialize/path/report are implemented',
   );
   assert.doesNotMatch(
     pluginSrcAgents,

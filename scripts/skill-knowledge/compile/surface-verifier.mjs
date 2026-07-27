@@ -474,6 +474,148 @@ function bfs(adjacency, from, to) {
   return { reachable: false, hops: null, nodes: [] };
 }
 
+export function bfsDirected(adjacency, from, to) {
+  return bfs(adjacency, from, to);
+}
+
+export function projectionNodeKey(kind, id) {
+  return nodeKey(kind, id);
+}
+
+/**
+ * Expected directed projection topology (compiler structural nav + authored edges).
+ * Mirrors atlas/module/point nav arcs that materialize on host surfaces.
+ * Does NOT invent semantic fill-in edges for unreachable point pairs.
+ *
+ * @param {{
+ *   graph: object,
+ *   pointIdFilter?: Set<string>|null,
+ *   moduleIdFilter?: Set<string>|null,
+ * }} args
+ */
+export function buildExpectedProjectionTopology({
+  graph,
+  pointIdFilter = null,
+  moduleIdFilter = null,
+}) {
+  const adjacency = new Map();
+  const ensure = (id) => {
+    if (!adjacency.has(id)) adjacency.set(id, new Set());
+  };
+  const add = (from, to) => {
+    ensure(from);
+    ensure(to);
+    adjacency.get(from).add(to);
+  };
+
+  const points = (graph.points ?? []).filter(
+    (point) => !pointIdFilter || pointIdFilter.has(point.id),
+  );
+  const modules = (graph.modules ?? []).filter(
+    (module) => !moduleIdFilter || moduleIdFilter.has(module.id),
+  );
+  const pointIds = new Set(points.map((point) => point.id));
+
+  const atlas = nodeKey('atlas', 'knowledge-atlas');
+  ensure(atlas);
+
+  for (const module of modules) {
+    const modNode = nodeKey('module', module.id);
+    ensure(modNode);
+    // atlas → module routers
+    add(atlas, modNode);
+    // atlas → critical primaries (compile atlas "Critical pins")
+    if (module.access?.class === 'critical') {
+      for (const primaryId of module.access.primary_points ?? []) {
+        if (pointIds.has(primaryId)) add(atlas, nodeKey('point', primaryId));
+      }
+    }
+    const members = points.filter((point) => point.module_id === module.id);
+    for (const point of members) {
+      const pNode = nodeKey('point', point.id);
+      // module → members; point → module; point → atlas
+      add(modNode, pNode);
+      add(pNode, modNode);
+      add(pNode, atlas);
+    }
+    // module → atlas
+    add(modNode, atlas);
+  }
+
+  for (const edge of graph.edges ?? []) {
+    if (edge.runtime?.enabled_by_default === false) continue;
+    if (!pointIds.has(edge.from) || !pointIds.has(edge.to)) continue;
+    add(nodeKey('point', edge.from), nodeKey('point', edge.to));
+  }
+
+  return {
+    adjacency,
+    pointNodes: points.map((point) => nodeKey('point', point.id)).sort(compareCodePoint),
+    atlasNode: atlas,
+    moduleNodes: modules.map((module) => nodeKey('module', module.id)).sort(compareCodePoint),
+  };
+}
+
+/**
+ * H1/H2 directed point hop gates over a projection adjacency (SCC + diameter).
+ * Shared by verifyHopContracts (materialized) and candidate-analysis (forecast).
+ */
+export function evaluateDirectedPointHopGates({ adjacency, pointNodes, hopPolicy = {} }) {
+  const reach = new Map();
+  for (const from of pointNodes) {
+    const reachable = new Set();
+    for (const to of pointNodes) {
+      if (bfs(adjacency, from, to).reachable) reachable.add(to);
+    }
+    reach.set(from, reachable);
+  }
+  const remaining = new Set(pointNodes);
+  const sccs = [];
+  for (const seed of pointNodes) {
+    if (!remaining.has(seed)) continue;
+    const component = [...remaining].filter(
+      (other) => reach.get(seed)?.has(other) && reach.get(other)?.has(seed),
+    );
+    for (const member of component) remaining.delete(member);
+    sccs.push(component.sort(compareCodePoint));
+  }
+  const h1Ok = sccs.length === 1 && sccs[0].length === pointNodes.length;
+
+  let diameter = 0;
+  let diameterWitness = null;
+  let unreachablePair = null;
+  for (const from of pointNodes) {
+    for (const to of pointNodes) {
+      if (from === to) continue;
+      const pathResult = bfs(adjacency, from, to);
+      if (!pathResult.reachable) {
+        unreachablePair = { from, to };
+        diameter = Infinity;
+        break;
+      }
+      if (pathResult.hops > diameter) {
+        diameter = pathResult.hops;
+        diameterWitness = pathResult;
+      }
+    }
+    if (!Number.isFinite(diameter)) break;
+  }
+  const h2Max = hopPolicy.point_diameter_max ?? 3;
+  const h2Ok = Number.isFinite(diameter) && diameter <= h2Max;
+
+  return {
+    h1Ok,
+    h2Ok,
+    scc_count: sccs.length,
+    sccs,
+    diameter: Number.isFinite(diameter) ? diameter : null,
+    diameter_unreachable: !Number.isFinite(diameter),
+    diameterWitness,
+    unreachablePair,
+    h2Max,
+  };
+}
+
 function hostRelativeToDistPath(host, relativePath) {
   const normalized = relativePath.split(path.sep).join('/');
   if (normalized.startsWith('plugin/dist/')) return normalized;
@@ -933,33 +1075,20 @@ export function verifyHopContracts({
 
   const pointNodes = graph.points.map((point) => nodeKey('point', point.id));
 
-  // H1: exactly one point-reachable SCC (paths may traverse atlas/module).
-  const reach = new Map();
-  for (const from of pointNodes) {
-    const reachable = new Set();
-    for (const to of pointNodes) {
-      if (bfs(adjacency, from, to).reachable) reachable.add(to);
-    }
-    reach.set(from, reachable);
-  }
-  const remaining = new Set(pointNodes);
-  const sccs = [];
-  for (const seed of pointNodes) {
-    if (!remaining.has(seed)) continue;
-    const component = [...remaining].filter(
-      (other) => reach.get(seed)?.has(other) && reach.get(other)?.has(seed),
-    );
-    for (const member of component) remaining.delete(member);
-    sccs.push(component.sort(compareCodePoint));
-  }
-  const h1Ok = sccs.length === 1 && sccs[0].length === pointNodes.length;
+  const directedHop = evaluateDirectedPointHopGates({
+    adjacency,
+    pointNodes,
+    hopPolicy,
+  });
+  const h1Ok = directedHop.h1Ok;
+  const sccs = directedHop.sccs;
   if (!h1Ok) {
     diagnostics.push(
       diagnostic({
         code: 'SKG-HOP-H1',
-        message: `H1 failed: expected one point-reachable SCC, found ${sccs.length}`,
+        message: `H1 failed: expected one point-reachable SCC, found ${directedHop.scc_count}`,
         location: `plugin/dist/${host}`,
-        witness: { host, scc_count: sccs.length, sccs },
+        witness: { host, scc_count: directedHop.scc_count, sccs },
         remediation:
           'Ensure every accepted point can reach every other via atlas/module/authored nav links.',
         exitCode: 6,
@@ -967,35 +1096,19 @@ export function verifyHopContracts({
     );
   }
 
-  // H2: point→point directed diameter ≤ 3
-  let diameter = 0;
-  let diameterWitness = null;
-  let unreachablePair = null;
-  for (const from of pointNodes) {
-    for (const to of pointNodes) {
-      if (from === to) continue;
-      const pathResult = bfs(adjacency, from, to);
-      if (!pathResult.reachable) {
-        unreachablePair = { from, to };
-        diameter = Infinity;
-        break;
-      }
-      if (pathResult.hops > diameter) {
-        diameter = pathResult.hops;
-        diameterWitness = pathResult;
-      }
-    }
-    if (!Number.isFinite(diameter)) break;
-  }
-  const h2Max = hopPolicy.point_diameter_max ?? 3;
-  const h2Ok = Number.isFinite(diameter) && diameter <= h2Max;
+  // H2: point→point directed diameter ≤ point_diameter_max
+  const diameter = directedHop.diameter_unreachable ? Infinity : directedHop.diameter;
+  const diameterWitness = directedHop.diameterWitness;
+  const unreachablePair = directedHop.unreachablePair;
+  const h2Max = directedHop.h2Max;
+  const h2Ok = directedHop.h2Ok;
   if (!h2Ok) {
     diagnostics.push(
       diagnostic({
         code: 'SKG-HOP-H2',
         message: `H2 failed: point diameter ${Number.isFinite(diameter) ? diameter : 'unreachable'} > ${h2Max}`,
         location: `plugin/dist/${host}`,
-        witness: { host, diameter, max: h2Max, unreachable: unreachablePair, path: diameterWitness },
+        witness: { host, diameter: directedHop.diameter, max: h2Max, unreachable: unreachablePair, path: diameterWitness },
         remediation: 'Add atlas/module return links or shorten authored nav routes.',
         exitCode: 6,
       }),

@@ -27,8 +27,8 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model)
-- [next: ccm 是 board 写入关卡](./SKILL.md#ccm-k-point-ccm-write-gate)
+- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.x.when-to-account -->
+- [next: ccm 是 board 写入关卡](./SKILL.md#ccm-k-point-ccm-write-gate) <!-- ccm:k:edge edge:ccm.when-to-write-gate -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -49,8 +49,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path)
-- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path) <!-- ccm:k:edge edge:ccm.x.write-gate-single-path -->
+- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.write-gate-to-status -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -96,15 +96,15 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model)
-- [routes_to: artifact/verified 真完成](./references/board-model-guide.md#ccm-k-point-ccm-board-artifact-verified)
-- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics)
-- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task)
-- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task)
-- [routes_to: namespace usage](./references/command-catalog.md#ccm-k-point-ccm-cmd-usage)
-- [routes_to: namespace watchdog](./references/command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
-- [next: 三档字段操作规则](./SKILL.md#ccm-k-point-ccm-field-tiers)
-- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
+- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.entryfan.ccm.account-pool-model -->
+- [routes_to: artifact/verified 真完成](./references/board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.entryfan.ccm.board.artifact-verified -->
+- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.entryfan.ccm.board.status-semantics -->
+- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.task -->
+- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.status-ops-task-cmd -->
+- [routes_to: namespace usage](./references/command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.usage -->
+- [routes_to: namespace watchdog](./references/command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.watchdog -->
+- [next: 三档字段操作规则](./SKILL.md#ccm-k-point-ccm-field-tiers) <!-- ccm:k:edge edge:ccm.status-to-tiers -->
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.entryfan.ccm.footgun-table -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -124,8 +124,8 @@ board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path)
-- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path) <!-- ccm:k:edge edge:ccm.tiers-to-single-path -->
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.ret.pointccm.field-tiers.pri -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -144,7 +144,7 @@ board 变更**只走 `ccm`**,没有 `Write`/`Edit`/`sed` 的降级退路——�
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [contrasts_with: planning/routing 是 opt-in 合同](./SKILL.md#ccm-k-point-ccm-planning-opt-in)
+- [contrasts_with: planning/routing 是 opt-in 合同](./SKILL.md#ccm-k-point-ccm-planning-opt-in) <!-- ccm:k:edge edge:ccm.single-path-to-planning -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-planning-opt-in"></a>
 <!-- ccm:k:start point:ccm.planning-opt-in -->
@@ -158,7 +158,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.mind-model](../../knowledge/modules/ccm.mind-model.md#ccm-k-module-ccm-mind-model)
-- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.planning-to-status -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -218,9 +218,9 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.hotpath-footgun](../../knowledge/modules/ccm.hotpath-footgun.md#ccm-k-module-ccm-hotpath-footgun)
-- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task)
-- [next: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
-- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.hotpath-ops-task-cmd -->
+- [next: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.hotpath-to-footgun -->
+- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hotpath-to-status -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -258,9 +258,9 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.hotpath-footgun](../../knowledge/modules/ccm.hotpath-footgun.md#ccm-k-module-ccm-hotpath-footgun)
-- [deepens_to: Exit code 速记（指针）](./SKILL.md#ccm-k-point-ccm-exit-codes)
-- [routes_to: 深度指针路由](./SKILL.md#ccm-k-point-ccm-pointers-routing)
-- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [deepens_to: Exit code 速记（指针）](./SKILL.md#ccm-k-point-ccm-exit-codes) <!-- ccm:k:edge edge:ccm.footgun-to-exit -->
+- [routes_to: 深度指针路由](./SKILL.md#ccm-k-point-ccm-pointers-routing) <!-- ccm:k:edge edge:ccm.footgun-to-pointers -->
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.footgun-to-status -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -274,7 +274,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.hotpath-footgun](../../knowledge/modules/ccm.hotpath-footgun.md#ccm-k-module-ccm-hotpath-footgun)
-- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.ret.pointccm.exit-codes.pri -->
 <!-- ccm:k:nav:end -->
 ---
 
@@ -293,9 +293,9 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../knowledge/atlas.md)
 - [Module module:ccm.hotpath-footgun](../../knowledge/modules/ccm.hotpath-footgun.md#ccm-k-module-ccm-hotpath-footgun)
-- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics)
-- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task)
-- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
+- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.x.pointers-to-board-status -->
+- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.x.pointers-to-cmd-task -->
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.ret.pointccm.pointers-routing.pri -->
 <!-- ccm:k:nav:end -->
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:using-ccm:

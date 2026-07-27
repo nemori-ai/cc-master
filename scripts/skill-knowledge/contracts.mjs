@@ -10,6 +10,7 @@ export const IMPLEMENTED_COMMANDS = Object.freeze([
   'compile',
   'contract',
   'explain',
+  'materialize',
   'path',
   'report',
 ]);
@@ -19,6 +20,7 @@ export const DECLARED_COMMANDS = Object.freeze([
   'compile',
   'contract',
   'explain',
+  'materialize',
   'path',
   'report',
 ]);
@@ -71,7 +73,13 @@ export const HARDENING_CONTRACT = Object.freeze({
   }),
   C6: Object.freeze({
     algorithm: 'cc-master/skill-knowledge-canonical-graph-hash/v1',
-    authored_manifest_kinds: Object.freeze(['portfolio', 'skill', 'module']),
+    authored_manifest_kinds: Object.freeze([
+      'portfolio',
+      'skill',
+      'module',
+      'composition',
+      'candidate_analysis',
+    ]),
     change_head_digest_excludes: Object.freeze(['result_graph_sha256']),
     identity_set_fields: Object.freeze([
       'skills',
@@ -104,6 +112,28 @@ export const HARDENING_CONTRACT = Object.freeze({
       'runtime_hosts',
       'scope',
     ]),
+    /**
+     * Candidate-analysis admission thresholds (policy defaults).
+     * Portfolio may override via `candidate_admission`.
+     * Hop protocol: undirected distance from entry-module primary_points
+     * ≤ hop_policy.critical_any_point_to_primary_max.
+     */
+    candidate_admission: Object.freeze({
+      inventory_max_utf8_bytes: 65536,
+      inventory_max_lines: 2000,
+      inventory_max_tokens: 20000,
+      // edges/points; single-node candidates are vacuously 1.0 in the metric.
+      min_internal_cohesion: 0.5,
+      max_external_edge_count: 0,
+      // Shared SSOT compositions may share modules up to this peer budget.
+      max_overlap_shared_modules: 2,
+      require_ssot_closure: true,
+      require_four_host_denominator: true,
+      reject_all_hosts_unsupported: true,
+      // Declared full/partial host_coverage must be backed by a successful planner.
+      require_declared_projection: true,
+      hop_gate: 'directed_projection_topology',
+    }),
   }),
   C7: Object.freeze({
     algorithm: 'cc-master/skill-knowledge-markdown-span-hash/v1',

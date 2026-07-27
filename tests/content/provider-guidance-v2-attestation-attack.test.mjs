@@ -508,3 +508,199 @@ test('ATTACK-12: candidateGraphSha256 must equal recomputed graph hash (no write
     rmSync(fixture, { recursive: true, force: true });
   }
 });
+
+test('ATTACK-13: zero guidance dirs cannot vacuous-skip when registry requires three skills', async () => {
+  const { attestAllCandidateGuidanceSkills, runCli } = await import(
+    '../../scripts/skill-knowledge/candidate-attestation.mjs'
+  );
+  const { buildAndValidateGraph } = await import('../../scripts/skill-knowledge/graph.mjs');
+  const GUIDANCE = ['master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm'];
+
+  const prepareCompositionOnly = (fixture) => {
+    copyMinimalSkillKnowledgeRepo(fixture);
+    rmSync(join(fixture, 'plugin/src/knowledge/skills'), { recursive: true, force: true });
+    const portfolioPath = join(fixture, 'plugin/src/knowledge/portfolio.json');
+    const portfolio = JSON.parse(readFileSync(portfolioPath, 'utf8'));
+    portfolio.skills = portfolio.skills.filter((s) => s.id === 'skill:dev-as-ml-loop');
+    portfolio.entries = (portfolio.entries || []).filter((e) =>
+      String(e.id).includes('dev-as-ml-loop'),
+    );
+    writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
+    for (const skill of GUIDANCE) {
+      rmSync(join(fixture, 'plugin/src/skills', skill), { recursive: true, force: true });
+    }
+  };
+
+  const fixture = mkdtempSync(join(tmpdir(), 'ccm-attest-zero-'));
+  try {
+    prepareCompositionOnly(fixture);
+    const built = buildAndValidateGraph({ repoRoot: fixture });
+    assert.equal(built.ok, true, JSON.stringify(built.diagnostics?.slice(0, 5)));
+    const staging = join(fixture, '.tmp', 'attest-zero');
+    const skillsStaging = join(staging, 'skills');
+    mkdirSync(skillsStaging, { recursive: true });
+    const registryPath = join(fixture, 'plugin/src/skills/provider-guidance-runtime.json');
+
+    await assert.rejects(
+      () =>
+        attestAllCandidateGuidanceSkills({
+          repoRoot: fixture,
+          host: 'claude-code',
+          skillsStagingAbsolute: skillsStaging,
+          stagingRootAbsolute: staging,
+          registryPath,
+          candidateGraphSha256: built.graph.graph_hash,
+        }),
+      (error) =>
+        error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+        /candidate guidance skills missing/i.test(String(error.message)),
+    );
+
+    // Production CLI/env must never expose a fixture bypass for missing guidance.
+    const prev = process.env.SKG_FIXTURE_SEAM;
+    process.env.SKG_FIXTURE_SEAM = '1';
+    try {
+      await assert.rejects(
+        () =>
+          runCli([
+            '--repo-root',
+            fixture,
+            '--host',
+            'claude-code',
+            '--skills-staging',
+            skillsStaging,
+            '--staging-root',
+            staging,
+            '--registry',
+            registryPath,
+            '--graph-sha256',
+            built.graph.graph_hash,
+            '--fixture-allow-empty-guidance',
+            '1',
+          ]),
+        (error) =>
+          /unexpected --fixture-allow-empty-guidance/i.test(String(error.message)),
+      );
+
+      await assert.rejects(
+        () =>
+          runCli([
+            '--repo-root',
+            fixture,
+            '--host',
+            'claude-code',
+            '--skills-staging',
+            skillsStaging,
+            '--staging-root',
+            staging,
+            '--registry',
+            registryPath,
+            '--graph-sha256',
+            built.graph.graph_hash,
+          ]),
+        (error) =>
+          error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+          /candidate guidance skills missing/i.test(String(error.message)),
+      );
+
+      await assert.rejects(
+        () =>
+          attestAllCandidateGuidanceSkills({
+            repoRoot: fixture,
+            host: 'claude-code',
+            skillsStagingAbsolute: skillsStaging,
+            stagingRootAbsolute: staging,
+            registryPath,
+            candidateGraphSha256: built.graph.graph_hash,
+            fixtureAllowEmptyGuidance: true,
+          }),
+        (error) =>
+          error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+          /candidate guidance skills missing/i.test(String(error.message)),
+      );
+    } finally {
+      if (prev === undefined) delete process.env.SKG_FIXTURE_SEAM;
+      else process.env.SKG_FIXTURE_SEAM = prev;
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('ATTACK-14: partial guidance / missing staging / incomplete rebuild fail closed', async () => {
+  const { attestAllCandidateGuidanceSkills, rebuildTrustedExpectedFinalsForHost } = await import(
+    '../../scripts/skill-knowledge/candidate-attestation.mjs'
+  );
+  const { buildAndValidateGraph } = await import('../../scripts/skill-knowledge/graph.mjs');
+  const fixture = mkdtempSync(join(tmpdir(), 'ccm-attest-partial-'));
+  try {
+    copyMinimalSkillKnowledgeRepo(fixture);
+    rmSync(join(fixture, 'plugin/src/knowledge/skills'), { recursive: true, force: true });
+    const portfolioPath = join(fixture, 'plugin/src/knowledge/portfolio.json');
+    const portfolio = JSON.parse(readFileSync(portfolioPath, 'utf8'));
+    portfolio.skills = portfolio.skills.filter((s) => s.id === 'skill:dev-as-ml-loop');
+    portfolio.entries = (portfolio.entries || []).filter((e) =>
+      String(e.id).includes('dev-as-ml-loop'),
+    );
+    writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
+    // Leave only one of three guidance skills.
+    rmSync(join(fixture, 'plugin/src/skills/pacing-and-estimation'), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(join(fixture, 'plugin/src/skills/using-ccm'), { recursive: true, force: true });
+    const built = buildAndValidateGraph({ repoRoot: fixture });
+    assert.equal(built.ok, true, JSON.stringify(built.diagnostics?.slice(0, 5)));
+    const staging = join(fixture, '.tmp', 'attest-partial');
+    const skillsStaging = join(staging, 'skills');
+    mkdirSync(skillsStaging, { recursive: true });
+    const registryPath = join(fixture, 'plugin/src/skills/provider-guidance-runtime.json');
+
+    await assert.rejects(
+      () =>
+        attestAllCandidateGuidanceSkills({
+          repoRoot: fixture,
+          host: 'claude-code',
+          skillsStagingAbsolute: skillsStaging,
+          stagingRootAbsolute: staging,
+          registryPath,
+          candidateGraphSha256: built.graph.graph_hash,
+        }),
+      (error) =>
+        error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+        /incomplete|missing/i.test(String(error.message)),
+    );
+
+    await assert.rejects(
+      () =>
+        attestAllCandidateGuidanceSkills({
+          repoRoot: fixture,
+          host: 'claude-code',
+          skillsStagingAbsolute: join(staging, 'missing-skills'),
+          stagingRootAbsolute: staging,
+          registryPath,
+          candidateGraphSha256: built.graph.graph_hash,
+        }),
+      (error) =>
+        error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+        /missing skills staging/i.test(String(error.message)),
+    );
+
+    const registry = attestation.loadProviderGuidanceRegistry(registryPath, fixture);
+    await assert.rejects(
+      () =>
+        rebuildTrustedExpectedFinalsForHost({
+          repoRoot: fixture,
+          host: 'claude-code',
+          registry,
+          stagingRootAbsolute: staging,
+          graph: built.graph,
+        }),
+      (error) =>
+        error?.code === 'SKG-CHANGE-CANDIDATE-ATTESTATION' &&
+        /trusted rebuild guidance skills incomplete/i.test(String(error.message)),
+    );
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});

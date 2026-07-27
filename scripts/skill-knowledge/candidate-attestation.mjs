@@ -94,6 +94,17 @@ export async function rebuildTrustedExpectedFinalsForHost({
 
   const skillsSrc = path.join(repoRoot, 'plugin/src/skills');
   const skillNames = listRuntimeSkillNames(skillsSrc);
+  const presentGuidance = SKILLS.filter((skill) => skillNames.includes(skill));
+  if (presentGuidance.length !== SKILLS.length) {
+    const missing = SKILLS.filter((skill) => !presentGuidance.includes(skill));
+    throw Object.assign(
+      new Error(
+        `trusted rebuild guidance skills incomplete for ${host}: present=${presentGuidance.join(',')} missing=${missing.join(',')}`,
+      ),
+      { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+    );
+  }
+
   const sapSkills = path.join(rebuildRoot, 'sap', 'skills');
   fs.mkdirSync(sapSkills, { recursive: true });
   const projected = [];
@@ -160,13 +171,24 @@ export async function attestAllCandidateGuidanceSkills({
   registryPath,
   candidateGraphSha256,
 }) {
-  if (typeof candidateGraphSha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(candidateGraphSha256)) {
+  if (typeof candidateGraphSha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(candidateGraphSha256)) {
     throw Object.assign(
       new Error('candidate_graph_sha256 must be the real candidate graph SHA-256 (no staging fallback)'),
       { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
     );
   }
+  if (!fs.existsSync(skillsStagingAbsolute) || !fs.statSync(skillsStagingAbsolute).isDirectory()) {
+    throw Object.assign(new Error(`missing skills staging directory for ${host}`), {
+      code: 'SKG-CHANGE-CANDIDATE-ATTESTATION',
+    });
+  }
+  if (!fs.existsSync(stagingRootAbsolute) || !fs.statSync(stagingRootAbsolute).isDirectory()) {
+    throw Object.assign(new Error(`missing staging root for ${host}`), {
+      code: 'SKG-CHANGE-CANDIDATE-ATTESTATION',
+    });
+  }
 
+  // Registry + graph/hash bind BEFORE any zero-guidance decision.
   const registry = loadProviderGuidanceRegistry(registryPath, repoRoot);
   const acceptedRegistrySha256 = registryBytesSha256(registryPath);
 
@@ -197,6 +219,27 @@ export async function attestAllCandidateGuidanceSkills({
     );
   }
 
+  const skillsSrc = path.join(repoRoot, 'plugin/src/skills');
+  const skillNames = listRuntimeSkillNames(skillsSrc);
+  const presentGuidance = SKILLS.filter((skill) => skillNames.includes(skill));
+  if (presentGuidance.length === 0) {
+    throw Object.assign(
+      new Error(
+        `candidate guidance skills missing for ${host}: registry requires ${SKILLS.join(',')}`,
+      ),
+      { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+    );
+  }
+  if (presentGuidance.length !== SKILLS.length) {
+    const missing = SKILLS.filter((skill) => !presentGuidance.includes(skill));
+    throw Object.assign(
+      new Error(
+        `candidate guidance skills incomplete for ${host}: present=${presentGuidance.join(',')} missing=${missing.join(',')}`,
+      ),
+      { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+    );
+  }
+
   const rebuilt = await rebuildTrustedExpectedFinalsForHost({
     repoRoot,
     host,
@@ -205,47 +248,55 @@ export async function attestAllCandidateGuidanceSkills({
     graph: built.graph,
   });
 
-  const results = [];
-  for (const skill of SKILLS) {
-    const skillTreeAbsolute = path.join(skillsStagingAbsolute, skill);
-    if (!fs.existsSync(skillTreeAbsolute)) {
-      throw Object.assign(new Error(`missing candidate skill tree ${host}/${skill}`), {
-        code: 'SKG-CHANGE-CANDIDATE-ATTESTATION',
-      });
-    }
-    const actual = providerGuidanceRuntimeManifest(skillTreeAbsolute);
-    assertManifestsExactEqual(
-      actual,
-      rebuilt.bySkill[skill].expectedFinalManifest,
-      `${host}/${skill} trusted expected_final`,
-    );
+  try {
+    const results = [];
+    for (const skill of SKILLS) {
+      const skillTreeAbsolute = path.join(skillsStagingAbsolute, skill);
+      if (!fs.existsSync(skillTreeAbsolute)) {
+        throw Object.assign(new Error(`missing candidate skill tree ${host}/${skill}`), {
+          code: 'SKG-CHANGE-CANDIDATE-ATTESTATION',
+        });
+      }
+      const actual = providerGuidanceRuntimeManifest(skillTreeAbsolute);
+      assertManifestsExactEqual(
+        actual,
+        rebuilt.bySkill[skill].expectedFinalManifest,
+        `${host}/${skill} trusted expected_final`,
+      );
 
-    const acceptedSapManifestSha256 = manifestSha256(registry.hosts[host].skills[skill].accepted_sap);
-    const sidecar = buildCandidateAttestationSidecar({
-      host,
-      skill,
-      acceptedRegistrySha256,
-      acceptedSapManifestSha256,
-      candidateGraphSha256,
-      rawSapManifestSha256: manifestSha256(rebuilt.bySkill[skill].sapManifest),
-      expectedFinalManifestSha256: manifestSha256(rebuilt.bySkill[skill].expectedFinalManifest),
-      compilerContract: COMPILER_CONTRACT,
-    });
-    const sidecarFile = sidecarPath(skillTreeAbsolute);
-    fs.writeFileSync(sidecarFile, `${JSON.stringify(sidecar, null, 2)}\n`);
-    verifyCandidateAttestationSidecar(JSON.parse(fs.readFileSync(sidecarFile, 'utf8')), {
-      host,
-      skill,
-      acceptedRegistrySha256,
-      acceptedSapManifestSha256,
-      candidateGraphSha256,
-      rawSapManifestSha256: manifestSha256(rebuilt.bySkill[skill].sapManifest),
-      expectedFinalManifestSha256: manifestSha256(rebuilt.bySkill[skill].expectedFinalManifest),
-      compilerContract: COMPILER_CONTRACT,
-    });
-    results.push({ skill, sidecar, sidecarFile });
+      const acceptedSapManifestSha256 = manifestSha256(registry.hosts[host].skills[skill].accepted_sap);
+      const sidecar = buildCandidateAttestationSidecar({
+        host,
+        skill,
+        acceptedRegistrySha256,
+        acceptedSapManifestSha256,
+        candidateGraphSha256,
+        rawSapManifestSha256: manifestSha256(rebuilt.bySkill[skill].sapManifest),
+        expectedFinalManifestSha256: manifestSha256(rebuilt.bySkill[skill].expectedFinalManifest),
+        compilerContract: COMPILER_CONTRACT,
+      });
+      const sidecarFile = sidecarPath(skillTreeAbsolute);
+      fs.writeFileSync(sidecarFile, `${JSON.stringify(sidecar, null, 2)}\n`);
+      verifyCandidateAttestationSidecar(JSON.parse(fs.readFileSync(sidecarFile, 'utf8')), {
+        host,
+        skill,
+        acceptedRegistrySha256,
+        acceptedSapManifestSha256,
+        candidateGraphSha256,
+        rawSapManifestSha256: manifestSha256(rebuilt.bySkill[skill].sapManifest),
+        expectedFinalManifestSha256: manifestSha256(rebuilt.bySkill[skill].expectedFinalManifest),
+        compilerContract: COMPILER_CONTRACT,
+      });
+      results.push({ skill, sidecar, sidecarFile });
+    }
+    return results;
+  } finally {
+    // Never publish attestation scratch into the host surface (snapshot would
+    // double-count every skill-local edge marker under final/skills/).
+    if (rebuilt?.rebuildRoot && fs.existsSync(rebuilt.rebuildRoot)) {
+      fs.rmSync(rebuilt.rebuildRoot, { recursive: true, force: false });
+    }
   }
-  return results;
 }
 
 export function stripCandidateAttestationSidecars(skillsStagingAbsolute) {
@@ -257,10 +308,20 @@ export function stripCandidateAttestationSidecars(skillsStagingAbsolute) {
 
 /** CLI for CJS sync bridge. */
 export async function runCli(argv = process.argv.slice(2)) {
+  const acceptedFlags = new Set([
+    '--repo-root',
+    '--host',
+    '--skills-staging',
+    '--staging-root',
+    '--registry',
+    '--graph-sha256',
+    '--keep-sidecar',
+  ]);
   const values = Object.create(null);
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith('--')) throw new Error(`unexpected ${token}`);
+    if (!acceptedFlags.has(token)) throw new Error(`unexpected ${token}`);
     values[token] = argv[++i];
   }
   if (!values['--graph-sha256'] || !/^[0-9a-f]{64}$/u.test(values['--graph-sha256'])) {

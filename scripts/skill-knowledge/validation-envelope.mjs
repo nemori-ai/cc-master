@@ -47,9 +47,49 @@ function setsEqual(left, right) {
   return true;
 }
 
+const SNAPSHOT_EDGE_FIELDS = Object.freeze(['enabled', 'from', 'id', 'to', 'type']);
+
+function isStrictEnabledEdgeRow(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
+  const keys = Object.keys(row).sort();
+  if (
+    keys.length !== SNAPSHOT_EDGE_FIELDS.length ||
+    keys.some((key, index) => key !== SNAPSHOT_EDGE_FIELDS[index])
+  ) {
+    return false;
+  }
+  return (
+    typeof row.id === 'string' &&
+    row.id.length > 0 &&
+    typeof row.type === 'string' &&
+    row.type.length > 0 &&
+    typeof row.from === 'string' &&
+    row.from.length > 0 &&
+    typeof row.to === 'string' &&
+    row.to.length > 0 &&
+    row.enabled === true
+  );
+}
+
+function edgeRowsEqual(left, right) {
+  return SNAPSHOT_EDGE_FIELDS.every((field) => left?.[field] === right?.[field]);
+}
+
+function duplicateIds(rows) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const row of rows) {
+    if (typeof row?.id !== 'string') continue;
+    if (seen.has(row.id)) duplicates.add(row.id);
+    seen.add(row.id);
+  }
+  return [...duplicates].sort();
+}
+
 /**
- * Bidirectional count+set consistency for success full/partial snapshots.
- * JSON Schema only guards shape; this gate owns the semantic sets.
+ * Bidirectional count+set+tuple consistency for success full/partial snapshots.
+ * JSON Schema guards the strict row shape; this gate independently owns exact
+ * semantic equivalence across ids, edge rows, and adjacency rows.
  */
 function validateSnapshotEdgeSetConsistency(witness, diagnostics) {
   const snap = witness.final_surface_snapshot;
@@ -58,160 +98,161 @@ function validateSnapshotEdgeSetConsistency(witness, diagnostics) {
   const edgeIds = Array.isArray(snap.enabled_edge_ids) ? snap.enabled_edge_ids : null;
   const edges = Array.isArray(snap.edges) ? snap.edges : null;
   const adjacency =
-    snap.enabled_adjacency && typeof snap.enabled_adjacency === 'object'
+    snap.enabled_adjacency &&
+    typeof snap.enabled_adjacency === 'object' &&
+    !Array.isArray(snap.enabled_adjacency)
       ? snap.enabled_adjacency
       : null;
 
-  if (!edgeIds || !edges || !adjacency) {
+  const reject = (message, evidence, remediation) => {
     diagnostics.push(
       envelopeDiagnostic(
         'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-        `Host ${witness.host} snapshot edge fields must be present arrays/object for set consistency`,
-        {
-          host: witness.host,
-          enabled_edge_ids: snap.enabled_edge_ids ?? null,
-          edges: snap.edges ?? null,
-          enabled_adjacency: snap.enabled_adjacency ?? null,
-        },
-        'Emit enabled_edge_ids, edges, and enabled_adjacency together on success snapshots.',
+        `Host ${witness.host} ${message}`,
+        { host: witness.host, ...evidence },
+        remediation,
       ),
+    );
+  };
+
+  if (!edgeIds || !edges || !adjacency) {
+    reject(
+      'snapshot edge fields must be present arrays/object for set consistency',
+      {
+        enabled_edge_ids: snap.enabled_edge_ids ?? null,
+        edges: snap.edges ?? null,
+        enabled_adjacency: snap.enabled_adjacency ?? null,
+      },
+      'Emit enabled_edge_ids, edges, and enabled_adjacency together on success snapshots.',
     );
     return;
   }
 
-  const adjRows = [];
-  for (const [from, rows] of Object.entries(adjacency)) {
-    if (!Array.isArray(rows)) {
-      diagnostics.push(
-        envelopeDiagnostic(
-          'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-          `Host ${witness.host} enabled_adjacency[${from}] must be an array`,
-          { host: witness.host, from, rows },
-          'Keep adjacency values as arrays of {to, edge_id}.',
-        ),
-      );
-      return;
-    }
-    for (const row of rows) {
-      adjRows.push({
-        from,
-        to: row?.to ?? null,
-        edge_id: row?.edge_id ?? null,
-      });
-    }
-  }
-
-  const idList = edgeIds.map((id) => String(id));
-  const edgeObjIds = edges.map((edge) => edge?.id ?? null);
-  const adjIds = adjRows.map((row) => row.edge_id);
-
-  if (idList.length !== new Set(idList).size) {
-    diagnostics.push(
-      envelopeDiagnostic(
-        'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-        `Host ${witness.host} enabled_edge_ids must be unique`,
-        { host: witness.host, enabled_edge_ids: idList },
-        'Deduplicate enabled_edge_ids; each enabled edge id appears once.',
-      ),
+  const invalidIds = edgeIds.filter((id) => typeof id !== 'string' || id.length === 0);
+  if (invalidIds.length > 0) {
+    reject(
+      'enabled_edge_ids must contain only non-empty strings',
+      { invalid_enabled_edge_ids: invalidIds },
+      'Emit canonical enabled edge IDs without coercion.',
     );
   }
-  if (edgeObjIds.length !== new Set(edgeObjIds.filter(Boolean)).size) {
-    diagnostics.push(
-      envelopeDiagnostic(
-        'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-        `Host ${witness.host} snapshot.edges ids must be unique`,
-        { host: witness.host, edge_ids: edgeObjIds },
-        'Emit each edge object once; duplicate edge ids are forged.',
-      ),
+
+  const adjRows = [];
+  for (const [fromKey, rows] of Object.entries(adjacency)) {
+    if (!Array.isArray(rows)) {
+      reject(
+        `enabled_adjacency[${fromKey}] must be an array`,
+        { from: fromKey, rows },
+        'Keep adjacency values as arrays of strict {id,type,from,to,enabled:true} rows.',
+      );
+      continue;
+    }
+    for (const row of rows) adjRows.push({ fromKey, row });
+  }
+
+  for (const edge of edges) {
+    if (!isStrictEnabledEdgeRow(edge)) {
+      reject(
+        'snapshot.edges rows must be exact {id,type,from,to,enabled:true} objects',
+        { edge },
+        'Emit all five fields, reject enabled:false, and remove extra properties.',
+      );
+    }
+  }
+  for (const { fromKey, row } of adjRows) {
+    if (!isStrictEnabledEdgeRow(row)) {
+      reject(
+        'enabled_adjacency rows must be exact {id,type,from,to,enabled:true} objects',
+        { adjacency_from: fromKey, adjacency_row: row },
+        'Emit all five fields, reject enabled:false, and remove extra properties.',
+      );
+    } else if (row.from !== fromKey) {
+      reject(
+        `enabled_adjacency key ${fromKey} must equal row.from ${row.from}`,
+        { adjacency_from: fromKey, adjacency_row: row },
+        'Index every adjacency row under its own from field.',
+      );
+    }
+  }
+
+  const idList = edgeIds.filter((id) => typeof id === 'string');
+  const edgeObjIds = edges.map((edge) => edge?.id).filter((id) => typeof id === 'string');
+  const adjIds = adjRows.map(({ row }) => row?.id).filter((id) => typeof id === 'string');
+
+  if (idList.length !== new Set(idList).size) {
+    reject(
+      'enabled_edge_ids must be unique',
+      { enabled_edge_ids: idList },
+      'Deduplicate enabled_edge_ids; each enabled edge ID appears once.',
+    );
+  }
+  const duplicateEdgeIds = duplicateIds(edges);
+  if (duplicateEdgeIds.length > 0) {
+    reject(
+      'snapshot.edges IDs must be unique',
+      { duplicate_edge_ids: duplicateEdgeIds },
+      'Emit each edge row exactly once.',
+    );
+  }
+  const duplicateAdjIds = duplicateIds(adjRows.map(({ row }) => row));
+  if (duplicateAdjIds.length > 0) {
+    reject(
+      'enabled_adjacency IDs must be unique',
+      { duplicate_adjacency_ids: duplicateAdjIds },
+      'Emit each adjacency edge row exactly once.',
     );
   }
 
   const countWitness = witness.enabled_edges;
-  const countIds = idList.length;
+  const countIds = edgeIds.length;
   const countEdges = edges.length;
   const countAdj = adjRows.length;
   if (countWitness !== countIds || countIds !== countEdges || countEdges !== countAdj) {
-    diagnostics.push(
-      envelopeDiagnostic(
-        'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-        `Host ${witness.host} enabled_edges / enabled_edge_ids / edges / enabled_adjacency counts must match`,
-        {
-          host: witness.host,
-          enabled_edges: countWitness,
-          enabled_edge_ids_count: countIds,
-          edges_count: countEdges,
-          enabled_adjacency_count: countAdj,
-        },
-        'Keep the four edge projections count-equivalent on success full/partial witnesses.',
-      ),
+    reject(
+      'enabled_edges / enabled_edge_ids / edges / enabled_adjacency counts must match',
+      {
+        enabled_edges: countWitness,
+        enabled_edge_ids_count: countIds,
+        edges_count: countEdges,
+        enabled_adjacency_count: countAdj,
+      },
+      'Keep all four enabled edge projections count-equivalent.',
     );
   }
 
   const idSet = new Set(idList);
-  const edgeIdSet = new Set(edgeObjIds.filter((id) => typeof id === 'string'));
-  const adjIdSet = new Set(adjIds.filter((id) => typeof id === 'string'));
+  const edgeIdSet = new Set(edgeObjIds);
+  const adjIdSet = new Set(adjIds);
   if (!setsEqual(idSet, edgeIdSet) || !setsEqual(idSet, adjIdSet)) {
-    diagnostics.push(
-      envelopeDiagnostic(
-        'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-        `Host ${witness.host} edge id sets must be bidirectional across ids/edges/adjacency`,
-        {
-          host: witness.host,
-          enabled_edge_ids: sortedUnique(idList),
-          edges_ids: sortedUnique(edgeObjIds.filter(Boolean)),
-          adjacency_ids: sortedUnique(adjIds.filter(Boolean)),
-        },
-        'Every enabled_edge_id must appear as an edges[].id and an adjacency edge_id, and vice versa.',
-      ),
+    reject(
+      'edge ID sets must be bidirectional across ids/edges/adjacency',
+      {
+        enabled_edge_ids: sortedUnique(idList),
+        edges_ids: sortedUnique(edgeObjIds),
+        adjacency_ids: sortedUnique(adjIds),
+      },
+      'Every enabled edge ID must occur exactly once in edges and adjacency, and vice versa.',
     );
   }
 
+  const edgeById = new Map();
   for (const edge of edges) {
-    if (
-      !edge ||
-      typeof edge.id !== 'string' ||
-      typeof edge.from !== 'string' ||
-      typeof edge.to !== 'string'
-    ) {
-      diagnostics.push(
-        envelopeDiagnostic(
-          'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-          `Host ${witness.host} snapshot edge objects require id/from/to strings`,
-          { host: witness.host, edge },
-          'Emit complete {id,from,to} edge objects.',
-        ),
-      );
-      continue;
-    }
-    const rows = adjacency[edge.from] ?? [];
-    const matched = Array.isArray(rows)
-      ? rows.some((row) => row?.to === edge.to && row?.edge_id === edge.id)
-      : false;
-    if (!matched) {
-      diagnostics.push(
-        envelopeDiagnostic(
-          'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-          `Host ${witness.host} edge ${edge.id} missing matching enabled_adjacency entry`,
-          { host: witness.host, edge, adjacency_from: rows },
-          'Adjacency must include {to, edge_id} for every edges[] row under edges[].from.',
-        ),
-      );
+    if (typeof edge?.id === 'string' && !edgeById.has(edge.id)) edgeById.set(edge.id, edge);
+  }
+  const adjacencyById = new Map();
+  for (const { row } of adjRows) {
+    if (typeof row?.id === 'string' && !adjacencyById.has(row.id)) {
+      adjacencyById.set(row.id, row);
     }
   }
-
-  for (const row of adjRows) {
-    const matched = edges.some(
-      (edge) =>
-        edge?.id === row.edge_id && edge?.from === row.from && edge?.to === row.to,
-    );
-    if (!matched) {
-      diagnostics.push(
-        envelopeDiagnostic(
-          'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
-          `Host ${witness.host} adjacency entry has no matching edges[] object`,
-          { host: witness.host, adjacency_entry: row },
-          'Do not forge adjacency rows without a corresponding edges[] {id,from,to}.',
-        ),
+  for (const id of new Set([...idSet, ...edgeIdSet, ...adjIdSet])) {
+    const edge = edgeById.get(id);
+    const adjacencyRow = adjacencyById.get(id);
+    if (edge && adjacencyRow && !edgeRowsEqual(edge, adjacencyRow)) {
+      reject(
+        `edge ${id} tuple must exactly match its enabled_adjacency row`,
+        { edge, adjacency_row: adjacencyRow },
+        'Keep id/type/from/to/enabled identical across edge and adjacency projections.',
       );
     }
   }

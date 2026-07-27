@@ -59,7 +59,7 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:distill.evidence](../../../knowledge/modules/distill.evidence.md#ccm-k-module-distill-evidence)
-- [routes_to: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line)
-- [applies_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop)
-- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [routes_to: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line) <!-- ccm:k:edge edge:distill.fidelity-to-hardline -->
+- [applies_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop) <!-- ccm:k:edge edge:distill.fidelity-to-fallback -->
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.fidelity-to-tree -->
 <!-- ccm:k:nav:end -->

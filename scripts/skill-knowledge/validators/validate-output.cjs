@@ -1,8 +1,8 @@
 /**
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-cli-output.schema.json
- * Source-schema-sha256: e9f072e79f9b96e04c0d9ac09ebf91f4c7a1654937fd5a56d0527dad38267e97
- * Schema-fingerprint: 02ba5253bb96d71ccde23b106284b21942b7790a387e99cbbf2dc942e2e66580
+ * Source-schema-sha256: 0451fe148188f756d28137f4541aa90a1d97ef07fd7e94b00af0b4b3a8d77545
+ * Schema-fingerprint: d78e93d46c89453cc14a62e772c806f1fec5873f1ad49be8983468093ee685a1
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";
@@ -90,10 +90,11 @@ var require_equal = __commonJS({
 // raw/validate-output.cjs
 module.exports = validate20;
 module.exports.default = validate20;
-var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "compile", "report", "change", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "compile_mode": { "enum": ["write", "check"] }, "hosts": { "$ref": "#/$defs/stringSet" }, "host_results": { "type": "array", "items": { "$ref": "#/$defs/compileHostResult" } }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "skills"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "skills": { "type": "string", "minLength": 1 } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "improvement_claim": { "type": "string", "minLength": 1 }, "action": { "enum": ["begin", "validate", "apply"] }, "workspace": { "$ref": "#/$defs/repoPath" }, "ledger_path": { "$ref": "#/$defs/repoPath" }, "result_graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "validation": { "type": "object" }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "change" } }, "required": ["result_kind"] }, "then": { "required": ["action", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "compile" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["compile_mode", "hosts", "host_results", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "hopGate": { "type": "object", "additionalProperties": false, "required": ["ok", "witness", "remediation"], "properties": { "ok": { "type": "boolean" }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } }, "compileHostResult": { "type": "object", "additionalProperties": false, "required": ["host", "ok", "mode", "artifacts", "enabled_edges", "point_anchors", "hop_report", "budgets", "executed_checks"], "properties": { "host": { "type": "string", "minLength": 1 }, "ok": { "type": "boolean" }, "mode": { "type": "string", "minLength": 1 }, "artifacts": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "bytes"], "properties": { "path": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 0 } } } }, "enabled_edges": { "type": "integer", "minimum": 0 }, "point_anchors": { "type": "integer", "minimum": 0 }, "hop_report": { "type": "object", "additionalProperties": false, "required": ["H1", "H2", "H3", "H4"], "properties": { "H1": { "$ref": "#/$defs/hopGate" }, "H2": { "$ref": "#/$defs/hopGate" }, "H3": { "$ref": "#/$defs/hopGate" }, "H4": { "$ref": "#/$defs/hopGate" } } }, "budgets": { "type": "object" }, "executed_checks": { "$ref": "#/$defs/stringSet" } } }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
+var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "compile", "materialize", "report", "change", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "compile_mode": { "enum": ["write", "check"] }, "hosts": { "$ref": "#/$defs/stringSet" }, "host_results": { "type": "array", "items": { "$ref": "#/$defs/compileHostResult" } }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "skills"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "skills": { "type": "string", "minLength": 1 } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "improvement_claim": { "type": "string", "minLength": 1 }, "action": { "enum": ["begin", "validate", "apply"] }, "workspace": { "$ref": "#/$defs/repoPath" }, "ledger_path": { "$ref": "#/$defs/repoPath" }, "result_graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "validation": { "type": "object" }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "change" } }, "required": ["result_kind"] }, "then": { "required": ["action", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "compile" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["compile_mode", "hosts", "host_results", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "hopGate": { "type": "object", "additionalProperties": false, "required": ["ok", "witness", "remediation"], "properties": { "ok": { "type": "boolean" }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } }, "compileHostResult": { "type": "object", "additionalProperties": false, "required": ["host", "ok", "mode", "artifacts", "enabled_edges", "point_anchors", "hop_report", "budgets", "executed_checks"], "properties": { "host": { "type": "string", "minLength": 1 }, "ok": { "type": "boolean" }, "mode": { "type": "string", "minLength": 1 }, "artifacts": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "bytes"], "properties": { "path": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 0 } } } }, "enabled_edges": { "type": "integer", "minimum": 0 }, "point_anchors": { "type": "integer", "minimum": 0 }, "hop_report": { "type": "object", "additionalProperties": false, "required": ["H1", "H2", "H3", "H4"], "properties": { "H1": { "$ref": "#/$defs/hopGate" }, "H2": { "$ref": "#/$defs/hopGate" }, "H3": { "$ref": "#/$defs/hopGate" }, "H4": { "$ref": "#/$defs/hopGate" } } }, "budgets": { "type": "object" }, "executed_checks": { "$ref": "#/$defs/stringSet" } } }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields", "candidate_admission"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module", "composition", "candidate_analysis"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] }, "candidate_admission": { "type": "object", "additionalProperties": false, "required": ["inventory_max_utf8_bytes", "inventory_max_lines", "inventory_max_tokens", "min_internal_cohesion", "max_external_edge_count", "max_overlap_shared_modules", "require_ssot_closure", "require_four_host_denominator", "reject_all_hosts_unsupported", "require_declared_projection", "hop_gate"], "properties": { "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 }, "inventory_max_lines": { "type": "integer", "minimum": 1 }, "inventory_max_tokens": { "type": "integer", "minimum": 1 }, "min_internal_cohesion": { "type": "number", "minimum": 0, "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)." }, "max_external_edge_count": { "type": "integer", "minimum": 0 }, "max_overlap_shared_modules": { "type": "integer", "minimum": 0, "description": "Max modules shared with any other accepted composition peer." }, "require_ssot_closure": { "type": "boolean" }, "require_four_host_denominator": { "type": "boolean" }, "reject_all_hosts_unsupported": { "type": "boolean" }, "require_declared_projection": { "type": "boolean", "description": "Declared full/partial host_coverage must pass planSkillProjection at that level." }, "hop_gate": { "const": "directed_projection_topology", "description": "Admission uses directed projection topology (SCC=1 + diameter). Undirected is observational only." } } } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "composition": { "type": "integer", "minimum": 0 }, "candidate_analysis": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
 var schema42 = { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "owner_skill": { "type": "string", "minLength": 1 }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } };
+var schema55 = { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "composition": { "type": "integer", "minimum": 0 }, "candidate_analysis": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } };
 var schema56 = { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } };
-var schema57 = { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } };
+var schema57 = { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields", "candidate_admission"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "skill", "module", "composition", "candidate_analysis"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] }, "candidate_admission": { "type": "object", "additionalProperties": false, "required": ["inventory_max_utf8_bytes", "inventory_max_lines", "inventory_max_tokens", "min_internal_cohesion", "max_external_edge_count", "max_overlap_shared_modules", "require_ssot_closure", "require_four_host_denominator", "reject_all_hosts_unsupported", "require_declared_projection", "hop_gate"], "properties": { "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 }, "inventory_max_lines": { "type": "integer", "minimum": 1 }, "inventory_max_tokens": { "type": "integer", "minimum": 1 }, "min_internal_cohesion": { "type": "number", "minimum": 0, "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)." }, "max_external_edge_count": { "type": "integer", "minimum": 0 }, "max_overlap_shared_modules": { "type": "integer", "minimum": 0, "description": "Max modules shared with any other accepted composition peer." }, "require_ssot_closure": { "type": "boolean" }, "require_four_host_denominator": { "type": "boolean" }, "reject_all_hosts_unsupported": { "type": "boolean" }, "require_declared_projection": { "type": "boolean", "description": "Declared full/partial host_coverage must pass planSkillProjection at that level." }, "hop_gate": { "const": "directed_projection_topology", "description": "Admission uses directed projection topology (SCC=1 + diameter). Undirected is observational only." } } } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } };
 var schema58 = { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } };
 var schema63 = { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } };
 var func1 = require_ucs2length().default;
@@ -2631,7 +2632,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
     }
     if (data.result_kind !== void 0) {
       let data18 = data.result_kind;
-      if (!(data18 === "contract" || data18 === "check" || data18 === "compile" || data18 === "report" || data18 === "change" || data18 === "path" || data18 === "explain" || data18 === "diagnostic")) {
+      if (!(data18 === "contract" || data18 === "check" || data18 === "compile" || data18 === "materialize" || data18 === "report" || data18 === "change" || data18 === "path" || data18 === "explain" || data18 === "diagnostic")) {
         const err74 = { instancePath: instancePath + "/result_kind", schemaPath: "#/properties/result_kind/enum", keyword: "enum", params: { allowedValues: schema31.properties.result_kind.enum }, message: "must be equal to one of the allowed values" };
         if (vErrors === null) {
           vErrors = [err74];
@@ -3982,7 +3983,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           errors++;
         }
         for (const key5 in data72) {
-          if (!(key5 === "documents" || key5 === "portfolio" || key5 === "skill" || key5 === "module" || key5 === "change" || key5 === "errors" || key5 === "debts")) {
+          if (!func3.call(schema55.properties, key5)) {
             const err190 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/summary/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key5 }, message: "must NOT have additional properties" };
             if (vErrors === null) {
               vErrors = [err190];
@@ -4084,10 +4085,10 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
-        if (data72.change !== void 0) {
-          let data77 = data72.change;
+        if (data72.composition !== void 0) {
+          let data77 = data72.composition;
           if (!(typeof data77 == "number" && (!(data77 % 1) && !isNaN(data77)))) {
-            const err199 = { instancePath: instancePath + "/summary/change", schemaPath: "#/$defs/summary/properties/change/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            const err199 = { instancePath: instancePath + "/summary/composition", schemaPath: "#/$defs/summary/properties/composition/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err199];
             } else {
@@ -4097,7 +4098,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           if (typeof data77 == "number") {
             if (data77 < 0 || isNaN(data77)) {
-              const err200 = { instancePath: instancePath + "/summary/change", schemaPath: "#/$defs/summary/properties/change/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              const err200 = { instancePath: instancePath + "/summary/composition", schemaPath: "#/$defs/summary/properties/composition/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
               if (vErrors === null) {
                 vErrors = [err200];
               } else {
@@ -4107,10 +4108,10 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
-        if (data72.errors !== void 0) {
-          let data78 = data72.errors;
+        if (data72.candidate_analysis !== void 0) {
+          let data78 = data72.candidate_analysis;
           if (!(typeof data78 == "number" && (!(data78 % 1) && !isNaN(data78)))) {
-            const err201 = { instancePath: instancePath + "/summary/errors", schemaPath: "#/$defs/summary/properties/errors/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            const err201 = { instancePath: instancePath + "/summary/candidate_analysis", schemaPath: "#/$defs/summary/properties/candidate_analysis/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err201];
             } else {
@@ -4120,7 +4121,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           if (typeof data78 == "number") {
             if (data78 < 0 || isNaN(data78)) {
-              const err202 = { instancePath: instancePath + "/summary/errors", schemaPath: "#/$defs/summary/properties/errors/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              const err202 = { instancePath: instancePath + "/summary/candidate_analysis", schemaPath: "#/$defs/summary/properties/candidate_analysis/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
               if (vErrors === null) {
                 vErrors = [err202];
               } else {
@@ -4130,10 +4131,10 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
-        if (data72.debts !== void 0) {
-          let data79 = data72.debts;
+        if (data72.change !== void 0) {
+          let data79 = data72.change;
           if (!(typeof data79 == "number" && (!(data79 % 1) && !isNaN(data79)))) {
-            const err203 = { instancePath: instancePath + "/summary/debts", schemaPath: "#/$defs/summary/properties/debts/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            const err203 = { instancePath: instancePath + "/summary/change", schemaPath: "#/$defs/summary/properties/change/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
             if (vErrors === null) {
               vErrors = [err203];
             } else {
@@ -4143,7 +4144,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           if (typeof data79 == "number") {
             if (data79 < 0 || isNaN(data79)) {
-              const err204 = { instancePath: instancePath + "/summary/debts", schemaPath: "#/$defs/summary/properties/debts/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              const err204 = { instancePath: instancePath + "/summary/change", schemaPath: "#/$defs/summary/properties/change/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
               if (vErrors === null) {
                 vErrors = [err204];
               } else {
@@ -4153,57 +4154,67 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             }
           }
         }
+        if (data72.errors !== void 0) {
+          let data80 = data72.errors;
+          if (!(typeof data80 == "number" && (!(data80 % 1) && !isNaN(data80)))) {
+            const err205 = { instancePath: instancePath + "/summary/errors", schemaPath: "#/$defs/summary/properties/errors/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err205];
+            } else {
+              vErrors.push(err205);
+            }
+            errors++;
+          }
+          if (typeof data80 == "number") {
+            if (data80 < 0 || isNaN(data80)) {
+              const err206 = { instancePath: instancePath + "/summary/errors", schemaPath: "#/$defs/summary/properties/errors/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              if (vErrors === null) {
+                vErrors = [err206];
+              } else {
+                vErrors.push(err206);
+              }
+              errors++;
+            }
+          }
+        }
+        if (data72.debts !== void 0) {
+          let data81 = data72.debts;
+          if (!(typeof data81 == "number" && (!(data81 % 1) && !isNaN(data81)))) {
+            const err207 = { instancePath: instancePath + "/summary/debts", schemaPath: "#/$defs/summary/properties/debts/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err207];
+            } else {
+              vErrors.push(err207);
+            }
+            errors++;
+          }
+          if (typeof data81 == "number") {
+            if (data81 < 0 || isNaN(data81)) {
+              const err208 = { instancePath: instancePath + "/summary/debts", schemaPath: "#/$defs/summary/properties/debts/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              if (vErrors === null) {
+                vErrors = [err208];
+              } else {
+                vErrors.push(err208);
+              }
+              errors++;
+            }
+          }
+        }
       } else {
-        const err205 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/summary/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err209 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/summary/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err205];
+          vErrors = [err209];
         } else {
-          vErrors.push(err205);
+          vErrors.push(err209);
         }
         errors++;
       }
     }
     if (data.capabilities !== void 0) {
-      let data80 = data.capabilities;
-      if (data80 && typeof data80 == "object" && !Array.isArray(data80)) {
-        if (data80.source_json_parse === void 0) {
-          const err206 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "source_json_parse" }, message: "must have required property 'source_json_parse'" };
-          if (vErrors === null) {
-            vErrors = [err206];
-          } else {
-            vErrors.push(err206);
-          }
-          errors++;
-        }
-        if (data80.source_envelope_validation === void 0) {
-          const err207 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "source_envelope_validation" }, message: "must have required property 'source_envelope_validation'" };
-          if (vErrors === null) {
-            vErrors = [err207];
-          } else {
-            vErrors.push(err207);
-          }
-          errors++;
-        }
-        if (data80.global_id_uniqueness === void 0) {
-          const err208 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "global_id_uniqueness" }, message: "must have required property 'global_id_uniqueness'" };
-          if (vErrors === null) {
-            vErrors = [err208];
-          } else {
-            vErrors.push(err208);
-          }
-          errors++;
-        }
-        if (data80.full_json_schema_validation === void 0) {
-          const err209 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "full_json_schema_validation" }, message: "must have required property 'full_json_schema_validation'" };
-          if (vErrors === null) {
-            vErrors = [err209];
-          } else {
-            vErrors.push(err209);
-          }
-          errors++;
-        }
-        if (data80.markdown_binding === void 0) {
-          const err210 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "markdown_binding" }, message: "must have required property 'markdown_binding'" };
+      let data82 = data.capabilities;
+      if (data82 && typeof data82 == "object" && !Array.isArray(data82)) {
+        if (data82.source_json_parse === void 0) {
+          const err210 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "source_json_parse" }, message: "must have required property 'source_json_parse'" };
           if (vErrors === null) {
             vErrors = [err210];
           } else {
@@ -4211,8 +4222,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.graph_invariants === void 0) {
-          const err211 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "graph_invariants" }, message: "must have required property 'graph_invariants'" };
+        if (data82.source_envelope_validation === void 0) {
+          const err211 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "source_envelope_validation" }, message: "must have required property 'source_envelope_validation'" };
           if (vErrors === null) {
             vErrors = [err211];
           } else {
@@ -4220,8 +4231,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.runtime_projection === void 0) {
-          const err212 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "runtime_projection" }, message: "must have required property 'runtime_projection'" };
+        if (data82.global_id_uniqueness === void 0) {
+          const err212 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "global_id_uniqueness" }, message: "must have required property 'global_id_uniqueness'" };
           if (vErrors === null) {
             vErrors = [err212];
           } else {
@@ -4229,8 +4240,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.hop_analysis === void 0) {
-          const err213 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "hop_analysis" }, message: "must have required property 'hop_analysis'" };
+        if (data82.full_json_schema_validation === void 0) {
+          const err213 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "full_json_schema_validation" }, message: "must have required property 'full_json_schema_validation'" };
           if (vErrors === null) {
             vErrors = [err213];
           } else {
@@ -4238,8 +4249,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.typed_change_transactions === void 0) {
-          const err214 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "typed_change_transactions" }, message: "must have required property 'typed_change_transactions'" };
+        if (data82.markdown_binding === void 0) {
+          const err214 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "markdown_binding" }, message: "must have required property 'markdown_binding'" };
           if (vErrors === null) {
             vErrors = [err214];
           } else {
@@ -4247,8 +4258,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.entry_surface_binding === void 0) {
-          const err215 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "entry_surface_binding" }, message: "must have required property 'entry_surface_binding'" };
+        if (data82.graph_invariants === void 0) {
+          const err215 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "graph_invariants" }, message: "must have required property 'graph_invariants'" };
           if (vErrors === null) {
             vErrors = [err215];
           } else {
@@ -4256,8 +4267,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.canonical_source_inventory === void 0) {
-          const err216 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "canonical_source_inventory" }, message: "must have required property 'canonical_source_inventory'" };
+        if (data82.runtime_projection === void 0) {
+          const err216 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "runtime_projection" }, message: "must have required property 'runtime_projection'" };
           if (vErrors === null) {
             vErrors = [err216];
           } else {
@@ -4265,8 +4276,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.derived_freshness === void 0) {
-          const err217 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "derived_freshness" }, message: "must have required property 'derived_freshness'" };
+        if (data82.hop_analysis === void 0) {
+          const err217 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "hop_analysis" }, message: "must have required property 'hop_analysis'" };
           if (vErrors === null) {
             vErrors = [err217];
           } else {
@@ -4274,8 +4285,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.canonical_graph_hash === void 0) {
-          const err218 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "canonical_graph_hash" }, message: "must have required property 'canonical_graph_hash'" };
+        if (data82.typed_change_transactions === void 0) {
+          const err218 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "typed_change_transactions" }, message: "must have required property 'typed_change_transactions'" };
           if (vErrors === null) {
             vErrors = [err218];
           } else {
@@ -4283,8 +4294,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.deterministic_budget_estimator === void 0) {
-          const err219 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "deterministic_budget_estimator" }, message: "must have required property 'deterministic_budget_estimator'" };
+        if (data82.entry_surface_binding === void 0) {
+          const err219 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "entry_surface_binding" }, message: "must have required property 'entry_surface_binding'" };
           if (vErrors === null) {
             vErrors = [err219];
           } else {
@@ -4292,8 +4303,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.host_portability_probe === void 0) {
-          const err220 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "host_portability_probe" }, message: "must have required property 'host_portability_probe'" };
+        if (data82.canonical_source_inventory === void 0) {
+          const err220 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "canonical_source_inventory" }, message: "must have required property 'canonical_source_inventory'" };
           if (vErrors === null) {
             vErrors = [err220];
           } else {
@@ -4301,8 +4312,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.semantic_coverage === void 0) {
-          const err221 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "semantic_coverage" }, message: "must have required property 'semantic_coverage'" };
+        if (data82.derived_freshness === void 0) {
+          const err221 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "derived_freshness" }, message: "must have required property 'derived_freshness'" };
           if (vErrors === null) {
             vErrors = [err221];
           } else {
@@ -4310,8 +4321,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data80.behavioral_evidence_tracking === void 0) {
-          const err222 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "behavioral_evidence_tracking" }, message: "must have required property 'behavioral_evidence_tracking'" };
+        if (data82.canonical_graph_hash === void 0) {
+          const err222 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "canonical_graph_hash" }, message: "must have required property 'canonical_graph_hash'" };
           if (vErrors === null) {
             vErrors = [err222];
           } else {
@@ -4319,53 +4330,45 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        for (const key6 in data80) {
+        if (data82.deterministic_budget_estimator === void 0) {
+          const err223 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "deterministic_budget_estimator" }, message: "must have required property 'deterministic_budget_estimator'" };
+          if (vErrors === null) {
+            vErrors = [err223];
+          } else {
+            vErrors.push(err223);
+          }
+          errors++;
+        }
+        if (data82.host_portability_probe === void 0) {
+          const err224 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "host_portability_probe" }, message: "must have required property 'host_portability_probe'" };
+          if (vErrors === null) {
+            vErrors = [err224];
+          } else {
+            vErrors.push(err224);
+          }
+          errors++;
+        }
+        if (data82.semantic_coverage === void 0) {
+          const err225 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "semantic_coverage" }, message: "must have required property 'semantic_coverage'" };
+          if (vErrors === null) {
+            vErrors = [err225];
+          } else {
+            vErrors.push(err225);
+          }
+          errors++;
+        }
+        if (data82.behavioral_evidence_tracking === void 0) {
+          const err226 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/required", keyword: "required", params: { missingProperty: "behavioral_evidence_tracking" }, message: "must have required property 'behavioral_evidence_tracking'" };
+          if (vErrors === null) {
+            vErrors = [err226];
+          } else {
+            vErrors.push(err226);
+          }
+          errors++;
+        }
+        for (const key6 in data82) {
           if (!func3.call(schema56.properties, key6)) {
-            const err223 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key6 }, message: "must NOT have additional properties" };
-            if (vErrors === null) {
-              vErrors = [err223];
-            } else {
-              vErrors.push(err223);
-            }
-            errors++;
-          }
-        }
-        if (data80.source_json_parse !== void 0) {
-          if (typeof data80.source_json_parse !== "boolean") {
-            const err224 = { instancePath: instancePath + "/capabilities/source_json_parse", schemaPath: "#/$defs/capabilities/properties/source_json_parse/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
-            if (vErrors === null) {
-              vErrors = [err224];
-            } else {
-              vErrors.push(err224);
-            }
-            errors++;
-          }
-        }
-        if (data80.source_envelope_validation !== void 0) {
-          if (typeof data80.source_envelope_validation !== "boolean") {
-            const err225 = { instancePath: instancePath + "/capabilities/source_envelope_validation", schemaPath: "#/$defs/capabilities/properties/source_envelope_validation/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
-            if (vErrors === null) {
-              vErrors = [err225];
-            } else {
-              vErrors.push(err225);
-            }
-            errors++;
-          }
-        }
-        if (data80.global_id_uniqueness !== void 0) {
-          if (typeof data80.global_id_uniqueness !== "boolean") {
-            const err226 = { instancePath: instancePath + "/capabilities/global_id_uniqueness", schemaPath: "#/$defs/capabilities/properties/global_id_uniqueness/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
-            if (vErrors === null) {
-              vErrors = [err226];
-            } else {
-              vErrors.push(err226);
-            }
-            errors++;
-          }
-        }
-        if (data80.full_json_schema_validation !== void 0) {
-          if (typeof data80.full_json_schema_validation !== "boolean") {
-            const err227 = { instancePath: instancePath + "/capabilities/full_json_schema_validation", schemaPath: "#/$defs/capabilities/properties/full_json_schema_validation/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+            const err227 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key6 }, message: "must NOT have additional properties" };
             if (vErrors === null) {
               vErrors = [err227];
             } else {
@@ -4374,9 +4377,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.markdown_binding !== void 0) {
-          if (typeof data80.markdown_binding !== "boolean") {
-            const err228 = { instancePath: instancePath + "/capabilities/markdown_binding", schemaPath: "#/$defs/capabilities/properties/markdown_binding/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.source_json_parse !== void 0) {
+          if (typeof data82.source_json_parse !== "boolean") {
+            const err228 = { instancePath: instancePath + "/capabilities/source_json_parse", schemaPath: "#/$defs/capabilities/properties/source_json_parse/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err228];
             } else {
@@ -4385,9 +4388,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.graph_invariants !== void 0) {
-          if (typeof data80.graph_invariants !== "boolean") {
-            const err229 = { instancePath: instancePath + "/capabilities/graph_invariants", schemaPath: "#/$defs/capabilities/properties/graph_invariants/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.source_envelope_validation !== void 0) {
+          if (typeof data82.source_envelope_validation !== "boolean") {
+            const err229 = { instancePath: instancePath + "/capabilities/source_envelope_validation", schemaPath: "#/$defs/capabilities/properties/source_envelope_validation/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err229];
             } else {
@@ -4396,9 +4399,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.runtime_projection !== void 0) {
-          if (typeof data80.runtime_projection !== "boolean") {
-            const err230 = { instancePath: instancePath + "/capabilities/runtime_projection", schemaPath: "#/$defs/capabilities/properties/runtime_projection/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.global_id_uniqueness !== void 0) {
+          if (typeof data82.global_id_uniqueness !== "boolean") {
+            const err230 = { instancePath: instancePath + "/capabilities/global_id_uniqueness", schemaPath: "#/$defs/capabilities/properties/global_id_uniqueness/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err230];
             } else {
@@ -4407,9 +4410,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.hop_analysis !== void 0) {
-          if (typeof data80.hop_analysis !== "boolean") {
-            const err231 = { instancePath: instancePath + "/capabilities/hop_analysis", schemaPath: "#/$defs/capabilities/properties/hop_analysis/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.full_json_schema_validation !== void 0) {
+          if (typeof data82.full_json_schema_validation !== "boolean") {
+            const err231 = { instancePath: instancePath + "/capabilities/full_json_schema_validation", schemaPath: "#/$defs/capabilities/properties/full_json_schema_validation/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err231];
             } else {
@@ -4418,9 +4421,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.typed_change_transactions !== void 0) {
-          if (typeof data80.typed_change_transactions !== "boolean") {
-            const err232 = { instancePath: instancePath + "/capabilities/typed_change_transactions", schemaPath: "#/$defs/capabilities/properties/typed_change_transactions/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.markdown_binding !== void 0) {
+          if (typeof data82.markdown_binding !== "boolean") {
+            const err232 = { instancePath: instancePath + "/capabilities/markdown_binding", schemaPath: "#/$defs/capabilities/properties/markdown_binding/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err232];
             } else {
@@ -4429,9 +4432,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.entry_surface_binding !== void 0) {
-          if (typeof data80.entry_surface_binding !== "boolean") {
-            const err233 = { instancePath: instancePath + "/capabilities/entry_surface_binding", schemaPath: "#/$defs/capabilities/properties/entry_surface_binding/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.graph_invariants !== void 0) {
+          if (typeof data82.graph_invariants !== "boolean") {
+            const err233 = { instancePath: instancePath + "/capabilities/graph_invariants", schemaPath: "#/$defs/capabilities/properties/graph_invariants/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err233];
             } else {
@@ -4440,9 +4443,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.canonical_source_inventory !== void 0) {
-          if (typeof data80.canonical_source_inventory !== "boolean") {
-            const err234 = { instancePath: instancePath + "/capabilities/canonical_source_inventory", schemaPath: "#/$defs/capabilities/properties/canonical_source_inventory/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.runtime_projection !== void 0) {
+          if (typeof data82.runtime_projection !== "boolean") {
+            const err234 = { instancePath: instancePath + "/capabilities/runtime_projection", schemaPath: "#/$defs/capabilities/properties/runtime_projection/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err234];
             } else {
@@ -4451,9 +4454,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.derived_freshness !== void 0) {
-          if (typeof data80.derived_freshness !== "boolean") {
-            const err235 = { instancePath: instancePath + "/capabilities/derived_freshness", schemaPath: "#/$defs/capabilities/properties/derived_freshness/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.hop_analysis !== void 0) {
+          if (typeof data82.hop_analysis !== "boolean") {
+            const err235 = { instancePath: instancePath + "/capabilities/hop_analysis", schemaPath: "#/$defs/capabilities/properties/hop_analysis/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err235];
             } else {
@@ -4462,9 +4465,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.canonical_graph_hash !== void 0) {
-          if (typeof data80.canonical_graph_hash !== "boolean") {
-            const err236 = { instancePath: instancePath + "/capabilities/canonical_graph_hash", schemaPath: "#/$defs/capabilities/properties/canonical_graph_hash/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.typed_change_transactions !== void 0) {
+          if (typeof data82.typed_change_transactions !== "boolean") {
+            const err236 = { instancePath: instancePath + "/capabilities/typed_change_transactions", schemaPath: "#/$defs/capabilities/properties/typed_change_transactions/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err236];
             } else {
@@ -4473,9 +4476,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.deterministic_budget_estimator !== void 0) {
-          if (typeof data80.deterministic_budget_estimator !== "boolean") {
-            const err237 = { instancePath: instancePath + "/capabilities/deterministic_budget_estimator", schemaPath: "#/$defs/capabilities/properties/deterministic_budget_estimator/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.entry_surface_binding !== void 0) {
+          if (typeof data82.entry_surface_binding !== "boolean") {
+            const err237 = { instancePath: instancePath + "/capabilities/entry_surface_binding", schemaPath: "#/$defs/capabilities/properties/entry_surface_binding/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err237];
             } else {
@@ -4484,9 +4487,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.host_portability_probe !== void 0) {
-          if (typeof data80.host_portability_probe !== "boolean") {
-            const err238 = { instancePath: instancePath + "/capabilities/host_portability_probe", schemaPath: "#/$defs/capabilities/properties/host_portability_probe/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.canonical_source_inventory !== void 0) {
+          if (typeof data82.canonical_source_inventory !== "boolean") {
+            const err238 = { instancePath: instancePath + "/capabilities/canonical_source_inventory", schemaPath: "#/$defs/capabilities/properties/canonical_source_inventory/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err238];
             } else {
@@ -4495,9 +4498,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.semantic_coverage !== void 0) {
-          if (typeof data80.semantic_coverage !== "boolean") {
-            const err239 = { instancePath: instancePath + "/capabilities/semantic_coverage", schemaPath: "#/$defs/capabilities/properties/semantic_coverage/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.derived_freshness !== void 0) {
+          if (typeof data82.derived_freshness !== "boolean") {
+            const err239 = { instancePath: instancePath + "/capabilities/derived_freshness", schemaPath: "#/$defs/capabilities/properties/derived_freshness/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err239];
             } else {
@@ -4506,9 +4509,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data80.behavioral_evidence_tracking !== void 0) {
-          if (typeof data80.behavioral_evidence_tracking !== "boolean") {
-            const err240 = { instancePath: instancePath + "/capabilities/behavioral_evidence_tracking", schemaPath: "#/$defs/capabilities/properties/behavioral_evidence_tracking/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+        if (data82.canonical_graph_hash !== void 0) {
+          if (typeof data82.canonical_graph_hash !== "boolean") {
+            const err240 = { instancePath: instancePath + "/capabilities/canonical_graph_hash", schemaPath: "#/$defs/capabilities/properties/canonical_graph_hash/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
             if (vErrors === null) {
               vErrors = [err240];
             } else {
@@ -4517,57 +4520,65 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
+        if (data82.deterministic_budget_estimator !== void 0) {
+          if (typeof data82.deterministic_budget_estimator !== "boolean") {
+            const err241 = { instancePath: instancePath + "/capabilities/deterministic_budget_estimator", schemaPath: "#/$defs/capabilities/properties/deterministic_budget_estimator/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+            if (vErrors === null) {
+              vErrors = [err241];
+            } else {
+              vErrors.push(err241);
+            }
+            errors++;
+          }
+        }
+        if (data82.host_portability_probe !== void 0) {
+          if (typeof data82.host_portability_probe !== "boolean") {
+            const err242 = { instancePath: instancePath + "/capabilities/host_portability_probe", schemaPath: "#/$defs/capabilities/properties/host_portability_probe/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+            if (vErrors === null) {
+              vErrors = [err242];
+            } else {
+              vErrors.push(err242);
+            }
+            errors++;
+          }
+        }
+        if (data82.semantic_coverage !== void 0) {
+          if (typeof data82.semantic_coverage !== "boolean") {
+            const err243 = { instancePath: instancePath + "/capabilities/semantic_coverage", schemaPath: "#/$defs/capabilities/properties/semantic_coverage/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+            if (vErrors === null) {
+              vErrors = [err243];
+            } else {
+              vErrors.push(err243);
+            }
+            errors++;
+          }
+        }
+        if (data82.behavioral_evidence_tracking !== void 0) {
+          if (typeof data82.behavioral_evidence_tracking !== "boolean") {
+            const err244 = { instancePath: instancePath + "/capabilities/behavioral_evidence_tracking", schemaPath: "#/$defs/capabilities/properties/behavioral_evidence_tracking/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+            if (vErrors === null) {
+              vErrors = [err244];
+            } else {
+              vErrors.push(err244);
+            }
+            errors++;
+          }
+        }
       } else {
-        const err241 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err245 = { instancePath: instancePath + "/capabilities", schemaPath: "#/$defs/capabilities/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err241];
+          vErrors = [err245];
         } else {
-          vErrors.push(err241);
+          vErrors.push(err245);
         }
         errors++;
       }
     }
     if (data.hardening_contract !== void 0) {
-      let data98 = data.hardening_contract;
-      if (data98 && typeof data98 == "object" && !Array.isArray(data98)) {
-        if (data98.C1 === void 0) {
-          const err242 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C1" }, message: "must have required property 'C1'" };
-          if (vErrors === null) {
-            vErrors = [err242];
-          } else {
-            vErrors.push(err242);
-          }
-          errors++;
-        }
-        if (data98.C2 === void 0) {
-          const err243 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C2" }, message: "must have required property 'C2'" };
-          if (vErrors === null) {
-            vErrors = [err243];
-          } else {
-            vErrors.push(err243);
-          }
-          errors++;
-        }
-        if (data98.C3 === void 0) {
-          const err244 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C3" }, message: "must have required property 'C3'" };
-          if (vErrors === null) {
-            vErrors = [err244];
-          } else {
-            vErrors.push(err244);
-          }
-          errors++;
-        }
-        if (data98.C4 === void 0) {
-          const err245 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C4" }, message: "must have required property 'C4'" };
-          if (vErrors === null) {
-            vErrors = [err245];
-          } else {
-            vErrors.push(err245);
-          }
-          errors++;
-        }
-        if (data98.C5 === void 0) {
-          const err246 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C5" }, message: "must have required property 'C5'" };
+      let data100 = data.hardening_contract;
+      if (data100 && typeof data100 == "object" && !Array.isArray(data100)) {
+        if (data100.C1 === void 0) {
+          const err246 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C1" }, message: "must have required property 'C1'" };
           if (vErrors === null) {
             vErrors = [err246];
           } else {
@@ -4575,8 +4586,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C6 === void 0) {
-          const err247 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C6" }, message: "must have required property 'C6'" };
+        if (data100.C2 === void 0) {
+          const err247 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C2" }, message: "must have required property 'C2'" };
           if (vErrors === null) {
             vErrors = [err247];
           } else {
@@ -4584,8 +4595,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C7 === void 0) {
-          const err248 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C7" }, message: "must have required property 'C7'" };
+        if (data100.C3 === void 0) {
+          const err248 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C3" }, message: "must have required property 'C3'" };
           if (vErrors === null) {
             vErrors = [err248];
           } else {
@@ -4593,8 +4604,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C8 === void 0) {
-          const err249 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C8" }, message: "must have required property 'C8'" };
+        if (data100.C4 === void 0) {
+          const err249 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C4" }, message: "must have required property 'C4'" };
           if (vErrors === null) {
             vErrors = [err249];
           } else {
@@ -4602,8 +4613,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C9 === void 0) {
-          const err250 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C9" }, message: "must have required property 'C9'" };
+        if (data100.C5 === void 0) {
+          const err250 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C5" }, message: "must have required property 'C5'" };
           if (vErrors === null) {
             vErrors = [err250];
           } else {
@@ -4611,8 +4622,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C10 === void 0) {
-          const err251 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C10" }, message: "must have required property 'C10'" };
+        if (data100.C6 === void 0) {
+          const err251 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C6" }, message: "must have required property 'C6'" };
           if (vErrors === null) {
             vErrors = [err251];
           } else {
@@ -4620,8 +4631,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C11 === void 0) {
-          const err252 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C11" }, message: "must have required property 'C11'" };
+        if (data100.C7 === void 0) {
+          const err252 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C7" }, message: "must have required property 'C7'" };
           if (vErrors === null) {
             vErrors = [err252];
           } else {
@@ -4629,8 +4640,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C12 === void 0) {
-          const err253 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C12" }, message: "must have required property 'C12'" };
+        if (data100.C8 === void 0) {
+          const err253 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C8" }, message: "must have required property 'C8'" };
           if (vErrors === null) {
             vErrors = [err253];
           } else {
@@ -4638,8 +4649,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C13 === void 0) {
-          const err254 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C13" }, message: "must have required property 'C13'" };
+        if (data100.C9 === void 0) {
+          const err254 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C9" }, message: "must have required property 'C9'" };
           if (vErrors === null) {
             vErrors = [err254];
           } else {
@@ -4647,8 +4658,8 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        if (data98.C14 === void 0) {
-          const err255 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C14" }, message: "must have required property 'C14'" };
+        if (data100.C10 === void 0) {
+          const err255 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C10" }, message: "must have required property 'C10'" };
           if (vErrors === null) {
             vErrors = [err255];
           } else {
@@ -4656,53 +4667,45 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-        for (const key7 in data98) {
-          if (!func3.call(schema57.properties, key7)) {
-            const err256 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key7 }, message: "must NOT have additional properties" };
-            if (vErrors === null) {
-              vErrors = [err256];
-            } else {
-              vErrors.push(err256);
-            }
-            errors++;
-          }
-        }
-        if (data98.C1 !== void 0) {
-          let data99 = data98.C1;
-          if (data99 && typeof data99 == "object" && !Array.isArray(data99)) {
-            if (data99.entry_surface_fields === void 0) {
-              const err257 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/required", keyword: "required", params: { missingProperty: "entry_surface_fields" }, message: "must have required property 'entry_surface_fields'" };
-              if (vErrors === null) {
-                vErrors = [err257];
-              } else {
-                vErrors.push(err257);
-              }
-              errors++;
-            }
-            for (const key8 in data99) {
-              if (!(key8 === "entry_surface_fields")) {
-                const err258 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key8 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err258];
-                } else {
-                  vErrors.push(err258);
-                }
-                errors++;
-              }
-            }
-            if (data99.entry_surface_fields !== void 0) {
-              if (!func0(data99.entry_surface_fields, schema57.properties.C1.properties.entry_surface_fields.const)) {
-                const err259 = { instancePath: instancePath + "/hardening_contract/C1/entry_surface_fields", schemaPath: "#/$defs/hardeningContract/properties/C1/properties/entry_surface_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C1.properties.entry_surface_fields.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err259];
-                } else {
-                  vErrors.push(err259);
-                }
-                errors++;
-              }
-            }
+        if (data100.C11 === void 0) {
+          const err256 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C11" }, message: "must have required property 'C11'" };
+          if (vErrors === null) {
+            vErrors = [err256];
           } else {
-            const err260 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            vErrors.push(err256);
+          }
+          errors++;
+        }
+        if (data100.C12 === void 0) {
+          const err257 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C12" }, message: "must have required property 'C12'" };
+          if (vErrors === null) {
+            vErrors = [err257];
+          } else {
+            vErrors.push(err257);
+          }
+          errors++;
+        }
+        if (data100.C13 === void 0) {
+          const err258 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C13" }, message: "must have required property 'C13'" };
+          if (vErrors === null) {
+            vErrors = [err258];
+          } else {
+            vErrors.push(err258);
+          }
+          errors++;
+        }
+        if (data100.C14 === void 0) {
+          const err259 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/required", keyword: "required", params: { missingProperty: "C14" }, message: "must have required property 'C14'" };
+          if (vErrors === null) {
+            vErrors = [err259];
+          } else {
+            vErrors.push(err259);
+          }
+          errors++;
+        }
+        for (const key7 in data100) {
+          if (!func3.call(schema57.properties, key7)) {
+            const err260 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key7 }, message: "must NOT have additional properties" };
             if (vErrors === null) {
               vErrors = [err260];
             } else {
@@ -4711,11 +4714,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data98.C2 !== void 0) {
-          let data101 = data98.C2;
+        if (data100.C1 !== void 0) {
+          let data101 = data100.C1;
           if (data101 && typeof data101 == "object" && !Array.isArray(data101)) {
-            if (data101.coverage_states === void 0) {
-              const err261 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/required", keyword: "required", params: { missingProperty: "coverage_states" }, message: "must have required property 'coverage_states'" };
+            if (data101.entry_surface_fields === void 0) {
+              const err261 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/required", keyword: "required", params: { missingProperty: "entry_surface_fields" }, message: "must have required property 'entry_surface_fields'" };
               if (vErrors === null) {
                 vErrors = [err261];
               } else {
@@ -4723,18 +4726,20 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            if (data101.denominator === void 0) {
-              const err262 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/required", keyword: "required", params: { missingProperty: "denominator" }, message: "must have required property 'denominator'" };
-              if (vErrors === null) {
-                vErrors = [err262];
-              } else {
-                vErrors.push(err262);
+            for (const key8 in data101) {
+              if (!(key8 === "entry_surface_fields")) {
+                const err262 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key8 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err262];
+                } else {
+                  vErrors.push(err262);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key9 in data101) {
-              if (!(key9 === "coverage_states" || key9 === "denominator")) {
-                const err263 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key9 }, message: "must NOT have additional properties" };
+            if (data101.entry_surface_fields !== void 0) {
+              if (!func0(data101.entry_surface_fields, schema57.properties.C1.properties.entry_surface_fields.const)) {
+                const err263 = { instancePath: instancePath + "/hardening_contract/C1/entry_surface_fields", schemaPath: "#/$defs/hardeningContract/properties/C1/properties/entry_surface_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C1.properties.entry_surface_fields.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err263];
                 } else {
@@ -4743,53 +4748,51 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data101.coverage_states !== void 0) {
-              if (!func0(data101.coverage_states, schema57.properties.C2.properties.coverage_states.const)) {
-                const err264 = { instancePath: instancePath + "/hardening_contract/C2/coverage_states", schemaPath: "#/$defs/hardeningContract/properties/C2/properties/coverage_states/const", keyword: "const", params: { allowedValue: schema57.properties.C2.properties.coverage_states.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err264];
-                } else {
-                  vErrors.push(err264);
-                }
-                errors++;
-              }
-            }
-            if (data101.denominator !== void 0) {
-              if ("git_canonical_markdown" !== data101.denominator) {
-                const err265 = { instancePath: instancePath + "/hardening_contract/C2/denominator", schemaPath: "#/$defs/hardeningContract/properties/C2/properties/denominator/const", keyword: "const", params: { allowedValue: "git_canonical_markdown" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err265];
-                } else {
-                  vErrors.push(err265);
-                }
-                errors++;
-              }
-            }
           } else {
-            const err266 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err264 = { instancePath: instancePath + "/hardening_contract/C1", schemaPath: "#/$defs/hardeningContract/properties/C1/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err266];
+              vErrors = [err264];
             } else {
-              vErrors.push(err266);
+              vErrors.push(err264);
             }
             errors++;
           }
         }
-        if (data98.C3 !== void 0) {
-          let data104 = data98.C3;
-          if (data104 && typeof data104 == "object" && !Array.isArray(data104)) {
-            if (data104.derived_fields === void 0) {
-              const err267 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/required", keyword: "required", params: { missingProperty: "derived_fields" }, message: "must have required property 'derived_fields'" };
+        if (data100.C2 !== void 0) {
+          let data103 = data100.C2;
+          if (data103 && typeof data103 == "object" && !Array.isArray(data103)) {
+            if (data103.coverage_states === void 0) {
+              const err265 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/required", keyword: "required", params: { missingProperty: "coverage_states" }, message: "must have required property 'coverage_states'" };
               if (vErrors === null) {
-                vErrors = [err267];
+                vErrors = [err265];
               } else {
-                vErrors.push(err267);
+                vErrors.push(err265);
               }
               errors++;
             }
-            for (const key10 in data104) {
-              if (!(key10 === "derived_fields")) {
-                const err268 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key10 }, message: "must NOT have additional properties" };
+            if (data103.denominator === void 0) {
+              const err266 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/required", keyword: "required", params: { missingProperty: "denominator" }, message: "must have required property 'denominator'" };
+              if (vErrors === null) {
+                vErrors = [err266];
+              } else {
+                vErrors.push(err266);
+              }
+              errors++;
+            }
+            for (const key9 in data103) {
+              if (!(key9 === "coverage_states" || key9 === "denominator")) {
+                const err267 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key9 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err267];
+                } else {
+                  vErrors.push(err267);
+                }
+                errors++;
+              }
+            }
+            if (data103.coverage_states !== void 0) {
+              if (!func0(data103.coverage_states, schema57.properties.C2.properties.coverage_states.const)) {
+                const err268 = { instancePath: instancePath + "/hardening_contract/C2/coverage_states", schemaPath: "#/$defs/hardeningContract/properties/C2/properties/coverage_states/const", keyword: "const", params: { allowedValue: schema57.properties.C2.properties.coverage_states.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err268];
                 } else {
@@ -4798,9 +4801,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data104.derived_fields !== void 0) {
-              if (!func0(data104.derived_fields, schema57.properties.C3.properties.derived_fields.const)) {
-                const err269 = { instancePath: instancePath + "/hardening_contract/C3/derived_fields", schemaPath: "#/$defs/hardeningContract/properties/C3/properties/derived_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C3.properties.derived_fields.const }, message: "must be equal to constant" };
+            if (data103.denominator !== void 0) {
+              if ("git_canonical_markdown" !== data103.denominator) {
+                const err269 = { instancePath: instancePath + "/hardening_contract/C2/denominator", schemaPath: "#/$defs/hardeningContract/properties/C2/properties/denominator/const", keyword: "const", params: { allowedValue: "git_canonical_markdown" }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err269];
                 } else {
@@ -4810,7 +4813,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
             }
           } else {
-            const err270 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err270 = { instancePath: instancePath + "/hardening_contract/C2", schemaPath: "#/$defs/hardeningContract/properties/C2/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
               vErrors = [err270];
             } else {
@@ -4819,11 +4822,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data98.C4 !== void 0) {
-          let data106 = data98.C4;
+        if (data100.C3 !== void 0) {
+          let data106 = data100.C3;
           if (data106 && typeof data106 == "object" && !Array.isArray(data106)) {
-            if (data106.accepted_skill_requires_admission === void 0) {
-              const err271 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/required", keyword: "required", params: { missingProperty: "accepted_skill_requires_admission" }, message: "must have required property 'accepted_skill_requires_admission'" };
+            if (data106.derived_fields === void 0) {
+              const err271 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/required", keyword: "required", params: { missingProperty: "derived_fields" }, message: "must have required property 'derived_fields'" };
               if (vErrors === null) {
                 vErrors = [err271];
               } else {
@@ -4831,9 +4834,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            for (const key11 in data106) {
-              if (!(key11 === "accepted_skill_requires_admission")) {
-                const err272 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key11 }, message: "must NOT have additional properties" };
+            for (const key10 in data106) {
+              if (!(key10 === "derived_fields")) {
+                const err272 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key10 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err272];
                 } else {
@@ -4842,9 +4845,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data106.accepted_skill_requires_admission !== void 0) {
-              if (true !== data106.accepted_skill_requires_admission) {
-                const err273 = { instancePath: instancePath + "/hardening_contract/C4/accepted_skill_requires_admission", schemaPath: "#/$defs/hardeningContract/properties/C4/properties/accepted_skill_requires_admission/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
+            if (data106.derived_fields !== void 0) {
+              if (!func0(data106.derived_fields, schema57.properties.C3.properties.derived_fields.const)) {
+                const err273 = { instancePath: instancePath + "/hardening_contract/C3/derived_fields", schemaPath: "#/$defs/hardeningContract/properties/C3/properties/derived_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C3.properties.derived_fields.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err273];
                 } else {
@@ -4854,7 +4857,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
             }
           } else {
-            const err274 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err274 = { instancePath: instancePath + "/hardening_contract/C3", schemaPath: "#/$defs/hardeningContract/properties/C3/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
               vErrors = [err274];
             } else {
@@ -4863,11 +4866,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
             errors++;
           }
         }
-        if (data98.C5 !== void 0) {
-          let data108 = data98.C5;
+        if (data100.C4 !== void 0) {
+          let data108 = data100.C4;
           if (data108 && typeof data108 == "object" && !Array.isArray(data108)) {
-            if (data108.change_workflow === void 0) {
-              const err275 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/required", keyword: "required", params: { missingProperty: "change_workflow" }, message: "must have required property 'change_workflow'" };
+            if (data108.accepted_skill_requires_admission === void 0) {
+              const err275 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/required", keyword: "required", params: { missingProperty: "accepted_skill_requires_admission" }, message: "must have required property 'accepted_skill_requires_admission'" };
               if (vErrors === null) {
                 vErrors = [err275];
               } else {
@@ -4875,18 +4878,20 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            if (data108.workspace_root === void 0) {
-              const err276 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/required", keyword: "required", params: { missingProperty: "workspace_root" }, message: "must have required property 'workspace_root'" };
-              if (vErrors === null) {
-                vErrors = [err276];
-              } else {
-                vErrors.push(err276);
+            for (const key11 in data108) {
+              if (!(key11 === "accepted_skill_requires_admission")) {
+                const err276 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key11 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err276];
+                } else {
+                  vErrors.push(err276);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key12 in data108) {
-              if (!(key12 === "change_workflow" || key12 === "workspace_root")) {
-                const err277 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key12 }, message: "must NOT have additional properties" };
+            if (data108.accepted_skill_requires_admission !== void 0) {
+              if (true !== data108.accepted_skill_requires_admission) {
+                const err277 = { instancePath: instancePath + "/hardening_contract/C4/accepted_skill_requires_admission", schemaPath: "#/$defs/hardeningContract/properties/C4/properties/accepted_skill_requires_admission/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err277];
                 } else {
@@ -4895,79 +4900,85 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data108.change_workflow !== void 0) {
-              if (!func0(data108.change_workflow, schema57.properties.C5.properties.change_workflow.const)) {
-                const err278 = { instancePath: instancePath + "/hardening_contract/C5/change_workflow", schemaPath: "#/$defs/hardeningContract/properties/C5/properties/change_workflow/const", keyword: "const", params: { allowedValue: schema57.properties.C5.properties.change_workflow.const }, message: "must be equal to constant" };
+          } else {
+            const err278 = { instancePath: instancePath + "/hardening_contract/C4", schemaPath: "#/$defs/hardeningContract/properties/C4/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err278];
+            } else {
+              vErrors.push(err278);
+            }
+            errors++;
+          }
+        }
+        if (data100.C5 !== void 0) {
+          let data110 = data100.C5;
+          if (data110 && typeof data110 == "object" && !Array.isArray(data110)) {
+            if (data110.change_workflow === void 0) {
+              const err279 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/required", keyword: "required", params: { missingProperty: "change_workflow" }, message: "must have required property 'change_workflow'" };
+              if (vErrors === null) {
+                vErrors = [err279];
+              } else {
+                vErrors.push(err279);
+              }
+              errors++;
+            }
+            if (data110.workspace_root === void 0) {
+              const err280 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/required", keyword: "required", params: { missingProperty: "workspace_root" }, message: "must have required property 'workspace_root'" };
+              if (vErrors === null) {
+                vErrors = [err280];
+              } else {
+                vErrors.push(err280);
+              }
+              errors++;
+            }
+            for (const key12 in data110) {
+              if (!(key12 === "change_workflow" || key12 === "workspace_root")) {
+                const err281 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key12 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
-                  vErrors = [err278];
+                  vErrors = [err281];
                 } else {
-                  vErrors.push(err278);
+                  vErrors.push(err281);
                 }
                 errors++;
               }
             }
-            if (data108.workspace_root !== void 0) {
-              if (".skill-knowledge/workspaces/<change-id>" !== data108.workspace_root) {
-                const err279 = { instancePath: instancePath + "/hardening_contract/C5/workspace_root", schemaPath: "#/$defs/hardeningContract/properties/C5/properties/workspace_root/const", keyword: "const", params: { allowedValue: ".skill-knowledge/workspaces/<change-id>" }, message: "must be equal to constant" };
+            if (data110.change_workflow !== void 0) {
+              if (!func0(data110.change_workflow, schema57.properties.C5.properties.change_workflow.const)) {
+                const err282 = { instancePath: instancePath + "/hardening_contract/C5/change_workflow", schemaPath: "#/$defs/hardeningContract/properties/C5/properties/change_workflow/const", keyword: "const", params: { allowedValue: schema57.properties.C5.properties.change_workflow.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
-                  vErrors = [err279];
+                  vErrors = [err282];
                 } else {
-                  vErrors.push(err279);
+                  vErrors.push(err282);
+                }
+                errors++;
+              }
+            }
+            if (data110.workspace_root !== void 0) {
+              if (".skill-knowledge/workspaces/<change-id>" !== data110.workspace_root) {
+                const err283 = { instancePath: instancePath + "/hardening_contract/C5/workspace_root", schemaPath: "#/$defs/hardeningContract/properties/C5/properties/workspace_root/const", keyword: "const", params: { allowedValue: ".skill-knowledge/workspaces/<change-id>" }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err283];
+                } else {
+                  vErrors.push(err283);
                 }
                 errors++;
               }
             }
           } else {
-            const err280 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err284 = { instancePath: instancePath + "/hardening_contract/C5", schemaPath: "#/$defs/hardeningContract/properties/C5/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err280];
+              vErrors = [err284];
             } else {
-              vErrors.push(err280);
+              vErrors.push(err284);
             }
             errors++;
           }
         }
-        if (data98.C6 !== void 0) {
-          let data111 = data98.C6;
-          if (data111 && typeof data111 == "object" && !Array.isArray(data111)) {
-            if (data111.algorithm === void 0) {
-              const err281 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
-              if (vErrors === null) {
-                vErrors = [err281];
-              } else {
-                vErrors.push(err281);
-              }
-              errors++;
-            }
-            if (data111.authored_manifest_kinds === void 0) {
-              const err282 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "authored_manifest_kinds" }, message: "must have required property 'authored_manifest_kinds'" };
-              if (vErrors === null) {
-                vErrors = [err282];
-              } else {
-                vErrors.push(err282);
-              }
-              errors++;
-            }
-            if (data111.change_head_digest_excludes === void 0) {
-              const err283 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "change_head_digest_excludes" }, message: "must have required property 'change_head_digest_excludes'" };
-              if (vErrors === null) {
-                vErrors = [err283];
-              } else {
-                vErrors.push(err283);
-              }
-              errors++;
-            }
-            if (data111.identity_set_fields === void 0) {
-              const err284 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "identity_set_fields" }, message: "must have required property 'identity_set_fields'" };
-              if (vErrors === null) {
-                vErrors = [err284];
-              } else {
-                vErrors.push(err284);
-              }
-              errors++;
-            }
-            if (data111.semantic_order_fields === void 0) {
-              const err285 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "semantic_order_fields" }, message: "must have required property 'semantic_order_fields'" };
+        if (data100.C6 !== void 0) {
+          let data113 = data100.C6;
+          if (data113 && typeof data113 == "object" && !Array.isArray(data113)) {
+            if (data113.algorithm === void 0) {
+              const err285 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
               if (vErrors === null) {
                 vErrors = [err285];
               } else {
@@ -4975,64 +4986,54 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            for (const key13 in data111) {
-              if (!(key13 === "algorithm" || key13 === "authored_manifest_kinds" || key13 === "change_head_digest_excludes" || key13 === "identity_set_fields" || key13 === "semantic_order_fields")) {
-                const err286 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key13 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err286];
-                } else {
-                  vErrors.push(err286);
-                }
-                errors++;
+            if (data113.authored_manifest_kinds === void 0) {
+              const err286 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "authored_manifest_kinds" }, message: "must have required property 'authored_manifest_kinds'" };
+              if (vErrors === null) {
+                vErrors = [err286];
+              } else {
+                vErrors.push(err286);
               }
+              errors++;
             }
-            if (data111.algorithm !== void 0) {
-              if ("cc-master/skill-knowledge-canonical-graph-hash/v1" !== data111.algorithm) {
-                const err287 = { instancePath: instancePath + "/hardening_contract/C6/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-canonical-graph-hash/v1" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err287];
-                } else {
-                  vErrors.push(err287);
-                }
-                errors++;
+            if (data113.change_head_digest_excludes === void 0) {
+              const err287 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "change_head_digest_excludes" }, message: "must have required property 'change_head_digest_excludes'" };
+              if (vErrors === null) {
+                vErrors = [err287];
+              } else {
+                vErrors.push(err287);
               }
+              errors++;
             }
-            if (data111.authored_manifest_kinds !== void 0) {
-              if (!func0(data111.authored_manifest_kinds, schema57.properties.C6.properties.authored_manifest_kinds.const)) {
-                const err288 = { instancePath: instancePath + "/hardening_contract/C6/authored_manifest_kinds", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/authored_manifest_kinds/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.authored_manifest_kinds.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err288];
-                } else {
-                  vErrors.push(err288);
-                }
-                errors++;
+            if (data113.identity_set_fields === void 0) {
+              const err288 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "identity_set_fields" }, message: "must have required property 'identity_set_fields'" };
+              if (vErrors === null) {
+                vErrors = [err288];
+              } else {
+                vErrors.push(err288);
               }
+              errors++;
             }
-            if (data111.change_head_digest_excludes !== void 0) {
-              if (!func0(data111.change_head_digest_excludes, schema57.properties.C6.properties.change_head_digest_excludes.const)) {
-                const err289 = { instancePath: instancePath + "/hardening_contract/C6/change_head_digest_excludes", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/change_head_digest_excludes/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.change_head_digest_excludes.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err289];
-                } else {
-                  vErrors.push(err289);
-                }
-                errors++;
+            if (data113.semantic_order_fields === void 0) {
+              const err289 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "semantic_order_fields" }, message: "must have required property 'semantic_order_fields'" };
+              if (vErrors === null) {
+                vErrors = [err289];
+              } else {
+                vErrors.push(err289);
               }
+              errors++;
             }
-            if (data111.identity_set_fields !== void 0) {
-              if (!func0(data111.identity_set_fields, schema57.properties.C6.properties.identity_set_fields.const)) {
-                const err290 = { instancePath: instancePath + "/hardening_contract/C6/identity_set_fields", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/identity_set_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.identity_set_fields.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err290];
-                } else {
-                  vErrors.push(err290);
-                }
-                errors++;
+            if (data113.candidate_admission === void 0) {
+              const err290 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/required", keyword: "required", params: { missingProperty: "candidate_admission" }, message: "must have required property 'candidate_admission'" };
+              if (vErrors === null) {
+                vErrors = [err290];
+              } else {
+                vErrors.push(err290);
               }
+              errors++;
             }
-            if (data111.semantic_order_fields !== void 0) {
-              if (!func0(data111.semantic_order_fields, schema57.properties.C6.properties.semantic_order_fields.const)) {
-                const err291 = { instancePath: instancePath + "/hardening_contract/C6/semantic_order_fields", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/semantic_order_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.semantic_order_fields.const }, message: "must be equal to constant" };
+            for (const key13 in data113) {
+              if (!(key13 === "algorithm" || key13 === "authored_manifest_kinds" || key13 === "change_head_digest_excludes" || key13 === "identity_set_fields" || key13 === "semantic_order_fields" || key13 === "candidate_admission")) {
+                const err291 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key13 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err291];
                 } else {
@@ -5041,40 +5042,42 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-          } else {
-            const err292 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err292];
-            } else {
-              vErrors.push(err292);
-            }
-            errors++;
-          }
-        }
-        if (data98.C7 !== void 0) {
-          let data117 = data98.C7;
-          if (data117 && typeof data117 == "object" && !Array.isArray(data117)) {
-            if (data117.algorithm === void 0) {
-              const err293 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
-              if (vErrors === null) {
-                vErrors = [err293];
-              } else {
-                vErrors.push(err293);
+            if (data113.algorithm !== void 0) {
+              if ("cc-master/skill-knowledge-canonical-graph-hash/v1" !== data113.algorithm) {
+                const err292 = { instancePath: instancePath + "/hardening_contract/C6/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-canonical-graph-hash/v1" }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err292];
+                } else {
+                  vErrors.push(err292);
+                }
+                errors++;
               }
-              errors++;
             }
-            if (data117.newline_normalization === void 0) {
-              const err294 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/required", keyword: "required", params: { missingProperty: "newline_normalization" }, message: "must have required property 'newline_normalization'" };
-              if (vErrors === null) {
-                vErrors = [err294];
-              } else {
-                vErrors.push(err294);
+            if (data113.authored_manifest_kinds !== void 0) {
+              if (!func0(data113.authored_manifest_kinds, schema57.properties.C6.properties.authored_manifest_kinds.const)) {
+                const err293 = { instancePath: instancePath + "/hardening_contract/C6/authored_manifest_kinds", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/authored_manifest_kinds/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.authored_manifest_kinds.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err293];
+                } else {
+                  vErrors.push(err293);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key14 in data117) {
-              if (!(key14 === "algorithm" || key14 === "newline_normalization")) {
-                const err295 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key14 }, message: "must NOT have additional properties" };
+            if (data113.change_head_digest_excludes !== void 0) {
+              if (!func0(data113.change_head_digest_excludes, schema57.properties.C6.properties.change_head_digest_excludes.const)) {
+                const err294 = { instancePath: instancePath + "/hardening_contract/C6/change_head_digest_excludes", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/change_head_digest_excludes/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.change_head_digest_excludes.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err294];
+                } else {
+                  vErrors.push(err294);
+                }
+                errors++;
+              }
+            }
+            if (data113.identity_set_fields !== void 0) {
+              if (!func0(data113.identity_set_fields, schema57.properties.C6.properties.identity_set_fields.const)) {
+                const err295 = { instancePath: instancePath + "/hardening_contract/C6/identity_set_fields", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/identity_set_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.identity_set_fields.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err295];
                 } else {
@@ -5083,9 +5086,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data117.algorithm !== void 0) {
-              if ("cc-master/skill-knowledge-markdown-span-hash/v1" !== data117.algorithm) {
-                const err296 = { instancePath: instancePath + "/hardening_contract/C7/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C7/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-markdown-span-hash/v1" }, message: "must be equal to constant" };
+            if (data113.semantic_order_fields !== void 0) {
+              if (!func0(data113.semantic_order_fields, schema57.properties.C6.properties.semantic_order_fields.const)) {
+                const err296 = { instancePath: instancePath + "/hardening_contract/C6/semantic_order_fields", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/semantic_order_fields/const", keyword: "const", params: { allowedValue: schema57.properties.C6.properties.semantic_order_fields.const }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err296];
                 } else {
@@ -5094,382 +5097,377 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data117.newline_normalization !== void 0) {
-              if ("crlf-to-lf" !== data117.newline_normalization) {
-                const err297 = { instancePath: instancePath + "/hardening_contract/C7/newline_normalization", schemaPath: "#/$defs/hardeningContract/properties/C7/properties/newline_normalization/const", keyword: "const", params: { allowedValue: "crlf-to-lf" }, message: "must be equal to constant" };
+            if (data113.candidate_admission !== void 0) {
+              let data119 = data113.candidate_admission;
+              if (data119 && typeof data119 == "object" && !Array.isArray(data119)) {
+                if (data119.inventory_max_utf8_bytes === void 0) {
+                  const err297 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "inventory_max_utf8_bytes" }, message: "must have required property 'inventory_max_utf8_bytes'" };
+                  if (vErrors === null) {
+                    vErrors = [err297];
+                  } else {
+                    vErrors.push(err297);
+                  }
+                  errors++;
+                }
+                if (data119.inventory_max_lines === void 0) {
+                  const err298 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "inventory_max_lines" }, message: "must have required property 'inventory_max_lines'" };
+                  if (vErrors === null) {
+                    vErrors = [err298];
+                  } else {
+                    vErrors.push(err298);
+                  }
+                  errors++;
+                }
+                if (data119.inventory_max_tokens === void 0) {
+                  const err299 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "inventory_max_tokens" }, message: "must have required property 'inventory_max_tokens'" };
+                  if (vErrors === null) {
+                    vErrors = [err299];
+                  } else {
+                    vErrors.push(err299);
+                  }
+                  errors++;
+                }
+                if (data119.min_internal_cohesion === void 0) {
+                  const err300 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "min_internal_cohesion" }, message: "must have required property 'min_internal_cohesion'" };
+                  if (vErrors === null) {
+                    vErrors = [err300];
+                  } else {
+                    vErrors.push(err300);
+                  }
+                  errors++;
+                }
+                if (data119.max_external_edge_count === void 0) {
+                  const err301 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "max_external_edge_count" }, message: "must have required property 'max_external_edge_count'" };
+                  if (vErrors === null) {
+                    vErrors = [err301];
+                  } else {
+                    vErrors.push(err301);
+                  }
+                  errors++;
+                }
+                if (data119.max_overlap_shared_modules === void 0) {
+                  const err302 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "max_overlap_shared_modules" }, message: "must have required property 'max_overlap_shared_modules'" };
+                  if (vErrors === null) {
+                    vErrors = [err302];
+                  } else {
+                    vErrors.push(err302);
+                  }
+                  errors++;
+                }
+                if (data119.require_ssot_closure === void 0) {
+                  const err303 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "require_ssot_closure" }, message: "must have required property 'require_ssot_closure'" };
+                  if (vErrors === null) {
+                    vErrors = [err303];
+                  } else {
+                    vErrors.push(err303);
+                  }
+                  errors++;
+                }
+                if (data119.require_four_host_denominator === void 0) {
+                  const err304 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "require_four_host_denominator" }, message: "must have required property 'require_four_host_denominator'" };
+                  if (vErrors === null) {
+                    vErrors = [err304];
+                  } else {
+                    vErrors.push(err304);
+                  }
+                  errors++;
+                }
+                if (data119.reject_all_hosts_unsupported === void 0) {
+                  const err305 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "reject_all_hosts_unsupported" }, message: "must have required property 'reject_all_hosts_unsupported'" };
+                  if (vErrors === null) {
+                    vErrors = [err305];
+                  } else {
+                    vErrors.push(err305);
+                  }
+                  errors++;
+                }
+                if (data119.require_declared_projection === void 0) {
+                  const err306 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "require_declared_projection" }, message: "must have required property 'require_declared_projection'" };
+                  if (vErrors === null) {
+                    vErrors = [err306];
+                  } else {
+                    vErrors.push(err306);
+                  }
+                  errors++;
+                }
+                if (data119.hop_gate === void 0) {
+                  const err307 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/required", keyword: "required", params: { missingProperty: "hop_gate" }, message: "must have required property 'hop_gate'" };
+                  if (vErrors === null) {
+                    vErrors = [err307];
+                  } else {
+                    vErrors.push(err307);
+                  }
+                  errors++;
+                }
+                for (const key14 in data119) {
+                  if (!func3.call(schema57.properties.C6.properties.candidate_admission.properties, key14)) {
+                    const err308 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key14 }, message: "must NOT have additional properties" };
+                    if (vErrors === null) {
+                      vErrors = [err308];
+                    } else {
+                      vErrors.push(err308);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.inventory_max_utf8_bytes !== void 0) {
+                  let data120 = data119.inventory_max_utf8_bytes;
+                  if (!(typeof data120 == "number" && (!(data120 % 1) && !isNaN(data120)))) {
+                    const err309 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_utf8_bytes", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_utf8_bytes/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err309];
+                    } else {
+                      vErrors.push(err309);
+                    }
+                    errors++;
+                  }
+                  if (typeof data120 == "number") {
+                    if (data120 < 1 || isNaN(data120)) {
+                      const err310 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_utf8_bytes", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_utf8_bytes/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+                      if (vErrors === null) {
+                        vErrors = [err310];
+                      } else {
+                        vErrors.push(err310);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data119.inventory_max_lines !== void 0) {
+                  let data121 = data119.inventory_max_lines;
+                  if (!(typeof data121 == "number" && (!(data121 % 1) && !isNaN(data121)))) {
+                    const err311 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_lines", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_lines/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err311];
+                    } else {
+                      vErrors.push(err311);
+                    }
+                    errors++;
+                  }
+                  if (typeof data121 == "number") {
+                    if (data121 < 1 || isNaN(data121)) {
+                      const err312 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_lines", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_lines/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+                      if (vErrors === null) {
+                        vErrors = [err312];
+                      } else {
+                        vErrors.push(err312);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data119.inventory_max_tokens !== void 0) {
+                  let data122 = data119.inventory_max_tokens;
+                  if (!(typeof data122 == "number" && (!(data122 % 1) && !isNaN(data122)))) {
+                    const err313 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_tokens", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_tokens/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err313];
+                    } else {
+                      vErrors.push(err313);
+                    }
+                    errors++;
+                  }
+                  if (typeof data122 == "number") {
+                    if (data122 < 1 || isNaN(data122)) {
+                      const err314 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/inventory_max_tokens", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/inventory_max_tokens/minimum", keyword: "minimum", params: { comparison: ">=", limit: 1 }, message: "must be >= 1" };
+                      if (vErrors === null) {
+                        vErrors = [err314];
+                      } else {
+                        vErrors.push(err314);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data119.min_internal_cohesion !== void 0) {
+                  let data123 = data119.min_internal_cohesion;
+                  if (typeof data123 == "number") {
+                    if (data123 < 0 || isNaN(data123)) {
+                      const err315 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/min_internal_cohesion", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/min_internal_cohesion/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+                      if (vErrors === null) {
+                        vErrors = [err315];
+                      } else {
+                        vErrors.push(err315);
+                      }
+                      errors++;
+                    }
+                  } else {
+                    const err316 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/min_internal_cohesion", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/min_internal_cohesion/type", keyword: "type", params: { type: "number" }, message: "must be number" };
+                    if (vErrors === null) {
+                      vErrors = [err316];
+                    } else {
+                      vErrors.push(err316);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.max_external_edge_count !== void 0) {
+                  let data124 = data119.max_external_edge_count;
+                  if (!(typeof data124 == "number" && (!(data124 % 1) && !isNaN(data124)))) {
+                    const err317 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/max_external_edge_count", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/max_external_edge_count/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err317];
+                    } else {
+                      vErrors.push(err317);
+                    }
+                    errors++;
+                  }
+                  if (typeof data124 == "number") {
+                    if (data124 < 0 || isNaN(data124)) {
+                      const err318 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/max_external_edge_count", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/max_external_edge_count/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+                      if (vErrors === null) {
+                        vErrors = [err318];
+                      } else {
+                        vErrors.push(err318);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data119.max_overlap_shared_modules !== void 0) {
+                  let data125 = data119.max_overlap_shared_modules;
+                  if (!(typeof data125 == "number" && (!(data125 % 1) && !isNaN(data125)))) {
+                    const err319 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/max_overlap_shared_modules", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/max_overlap_shared_modules/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err319];
+                    } else {
+                      vErrors.push(err319);
+                    }
+                    errors++;
+                  }
+                  if (typeof data125 == "number") {
+                    if (data125 < 0 || isNaN(data125)) {
+                      const err320 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/max_overlap_shared_modules", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/max_overlap_shared_modules/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+                      if (vErrors === null) {
+                        vErrors = [err320];
+                      } else {
+                        vErrors.push(err320);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data119.require_ssot_closure !== void 0) {
+                  if (typeof data119.require_ssot_closure !== "boolean") {
+                    const err321 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/require_ssot_closure", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/require_ssot_closure/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+                    if (vErrors === null) {
+                      vErrors = [err321];
+                    } else {
+                      vErrors.push(err321);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.require_four_host_denominator !== void 0) {
+                  if (typeof data119.require_four_host_denominator !== "boolean") {
+                    const err322 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/require_four_host_denominator", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/require_four_host_denominator/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+                    if (vErrors === null) {
+                      vErrors = [err322];
+                    } else {
+                      vErrors.push(err322);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.reject_all_hosts_unsupported !== void 0) {
+                  if (typeof data119.reject_all_hosts_unsupported !== "boolean") {
+                    const err323 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/reject_all_hosts_unsupported", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/reject_all_hosts_unsupported/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+                    if (vErrors === null) {
+                      vErrors = [err323];
+                    } else {
+                      vErrors.push(err323);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.require_declared_projection !== void 0) {
+                  if (typeof data119.require_declared_projection !== "boolean") {
+                    const err324 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/require_declared_projection", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/require_declared_projection/type", keyword: "type", params: { type: "boolean" }, message: "must be boolean" };
+                    if (vErrors === null) {
+                      vErrors = [err324];
+                    } else {
+                      vErrors.push(err324);
+                    }
+                    errors++;
+                  }
+                }
+                if (data119.hop_gate !== void 0) {
+                  if ("directed_projection_topology" !== data119.hop_gate) {
+                    const err325 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission/hop_gate", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/properties/hop_gate/const", keyword: "const", params: { allowedValue: "directed_projection_topology" }, message: "must be equal to constant" };
+                    if (vErrors === null) {
+                      vErrors = [err325];
+                    } else {
+                      vErrors.push(err325);
+                    }
+                    errors++;
+                  }
+                }
+              } else {
+                const err326 = { instancePath: instancePath + "/hardening_contract/C6/candidate_admission", schemaPath: "#/$defs/hardeningContract/properties/C6/properties/candidate_admission/type", keyword: "type", params: { type: "object" }, message: "must be object" };
                 if (vErrors === null) {
-                  vErrors = [err297];
+                  vErrors = [err326];
                 } else {
-                  vErrors.push(err297);
+                  vErrors.push(err326);
                 }
                 errors++;
               }
             }
           } else {
-            const err298 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err327 = { instancePath: instancePath + "/hardening_contract/C6", schemaPath: "#/$defs/hardeningContract/properties/C6/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err298];
+              vErrors = [err327];
             } else {
-              vErrors.push(err298);
+              vErrors.push(err327);
             }
             errors++;
           }
         }
-        if (data98.C8 !== void 0) {
-          let data120 = data98.C8;
-          if (data120 && typeof data120 == "object" && !Array.isArray(data120)) {
-            if (data120.algorithm === void 0) {
-              const err299 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
+        if (data100.C7 !== void 0) {
+          let data131 = data100.C7;
+          if (data131 && typeof data131 == "object" && !Array.isArray(data131)) {
+            if (data131.algorithm === void 0) {
+              const err328 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
               if (vErrors === null) {
-                vErrors = [err299];
+                vErrors = [err328];
               } else {
-                vErrors.push(err299);
+                vErrors.push(err328);
               }
               errors++;
             }
-            if (data120.formula === void 0) {
-              const err300 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/required", keyword: "required", params: { missingProperty: "formula" }, message: "must have required property 'formula'" };
+            if (data131.newline_normalization === void 0) {
+              const err329 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/required", keyword: "required", params: { missingProperty: "newline_normalization" }, message: "must have required property 'newline_normalization'" };
               if (vErrors === null) {
-                vErrors = [err300];
+                vErrors = [err329];
               } else {
-                vErrors.push(err300);
+                vErrors.push(err329);
               }
               errors++;
             }
-            for (const key15 in data120) {
-              if (!(key15 === "algorithm" || key15 === "formula")) {
-                const err301 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key15 }, message: "must NOT have additional properties" };
+            for (const key15 in data131) {
+              if (!(key15 === "algorithm" || key15 === "newline_normalization")) {
+                const err330 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key15 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
-                  vErrors = [err301];
+                  vErrors = [err330];
                 } else {
-                  vErrors.push(err301);
+                  vErrors.push(err330);
                 }
                 errors++;
               }
             }
-            if (data120.algorithm !== void 0) {
-              if ("cc-master/skill-knowledge-budget-estimator/v1" !== data120.algorithm) {
-                const err302 = { instancePath: instancePath + "/hardening_contract/C8/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C8/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-budget-estimator/v1" }, message: "must be equal to constant" };
+            if (data131.algorithm !== void 0) {
+              if ("cc-master/skill-knowledge-markdown-span-hash/v1" !== data131.algorithm) {
+                const err331 = { instancePath: instancePath + "/hardening_contract/C7/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C7/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-markdown-span-hash/v1" }, message: "must be equal to constant" };
                 if (vErrors === null) {
-                  vErrors = [err302];
+                  vErrors = [err331];
                 } else {
-                  vErrors.push(err302);
+                  vErrors.push(err331);
                 }
                 errors++;
               }
             }
-            if (data120.formula !== void 0) {
-              if ("ceil(utf8_bytes/3)" !== data120.formula) {
-                const err303 = { instancePath: instancePath + "/hardening_contract/C8/formula", schemaPath: "#/$defs/hardeningContract/properties/C8/properties/formula/const", keyword: "const", params: { allowedValue: "ceil(utf8_bytes/3)" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err303];
-                } else {
-                  vErrors.push(err303);
-                }
-                errors++;
-              }
-            }
-          } else {
-            const err304 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err304];
-            } else {
-              vErrors.push(err304);
-            }
-            errors++;
-          }
-        }
-        if (data98.C9 !== void 0) {
-          let data123 = data98.C9;
-          if (data123 && typeof data123 == "object" && !Array.isArray(data123)) {
-            if (data123.hosts === void 0) {
-              const err305 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "hosts" }, message: "must have required property 'hosts'" };
-              if (vErrors === null) {
-                vErrors = [err305];
-              } else {
-                vErrors.push(err305);
-              }
-              errors++;
-            }
-            if (data123.worker_allowlist === void 0) {
-              const err306 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "worker_allowlist" }, message: "must have required property 'worker_allowlist'" };
-              if (vErrors === null) {
-                vErrors = [err306];
-              } else {
-                vErrors.push(err306);
-              }
-              errors++;
-            }
-            if (data123.payload_modes === void 0) {
-              const err307 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "payload_modes" }, message: "must have required property 'payload_modes'" };
-              if (vErrors === null) {
-                vErrors = [err307];
-              } else {
-                vErrors.push(err307);
-              }
-              errors++;
-            }
-            if (data123.anchor_form === void 0) {
-              const err308 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "anchor_form" }, message: "must have required property 'anchor_form'" };
-              if (vErrors === null) {
-                vErrors = [err308];
-              } else {
-                vErrors.push(err308);
-              }
-              errors++;
-            }
-            if (data123.path_policy === void 0) {
-              const err309 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "path_policy" }, message: "must have required property 'path_policy'" };
-              if (vErrors === null) {
-                vErrors = [err309];
-              } else {
-                vErrors.push(err309);
-              }
-              errors++;
-            }
-            for (const key16 in data123) {
-              if (!(key16 === "hosts" || key16 === "worker_allowlist" || key16 === "payload_modes" || key16 === "anchor_form" || key16 === "path_policy")) {
-                const err310 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key16 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err310];
-                } else {
-                  vErrors.push(err310);
-                }
-                errors++;
-              }
-            }
-            if (data123.hosts !== void 0) {
-              if (!func0(data123.hosts, schema57.properties.C9.properties.hosts.const)) {
-                const err311 = { instancePath: instancePath + "/hardening_contract/C9/hosts", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/hosts/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.hosts.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err311];
-                } else {
-                  vErrors.push(err311);
-                }
-                errors++;
-              }
-            }
-            if (data123.worker_allowlist !== void 0) {
-              if (!func0(data123.worker_allowlist, schema57.properties.C9.properties.worker_allowlist.const)) {
-                const err312 = { instancePath: instancePath + "/hardening_contract/C9/worker_allowlist", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/worker_allowlist/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.worker_allowlist.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err312];
-                } else {
-                  vErrors.push(err312);
-                }
-                errors++;
-              }
-            }
-            if (data123.payload_modes !== void 0) {
-              if (!func0(data123.payload_modes, schema57.properties.C9.properties.payload_modes.const)) {
-                const err313 = { instancePath: instancePath + "/hardening_contract/C9/payload_modes", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/payload_modes/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.payload_modes.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err313];
-                } else {
-                  vErrors.push(err313);
-                }
-                errors++;
-              }
-            }
-            if (data123.anchor_form !== void 0) {
-              if ("explicit-html-id" !== data123.anchor_form) {
-                const err314 = { instancePath: instancePath + "/hardening_contract/C9/anchor_form", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/anchor_form/const", keyword: "const", params: { allowedValue: "explicit-html-id" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err314];
-                } else {
-                  vErrors.push(err314);
-                }
-                errors++;
-              }
-            }
-            if (data123.path_policy !== void 0) {
-              if ("relative-final-host-path" !== data123.path_policy) {
-                const err315 = { instancePath: instancePath + "/hardening_contract/C9/path_policy", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/path_policy/const", keyword: "const", params: { allowedValue: "relative-final-host-path" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err315];
-                } else {
-                  vErrors.push(err315);
-                }
-                errors++;
-              }
-            }
-          } else {
-            const err316 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err316];
-            } else {
-              vErrors.push(err316);
-            }
-            errors++;
-          }
-        }
-        if (data98.C10 !== void 0) {
-          let data129 = data98.C10;
-          if (data129 && typeof data129 == "object" && !Array.isArray(data129)) {
-            if (data129.changed_scope_base_option === void 0) {
-              const err317 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "changed_scope_base_option" }, message: "must have required property 'changed_scope_base_option'" };
-              if (vErrors === null) {
-                vErrors = [err317];
-              } else {
-                vErrors.push(err317);
-              }
-              errors++;
-            }
-            if (data129.immutable_chain === void 0) {
-              const err318 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "immutable_chain" }, message: "must have required property 'immutable_chain'" };
-              if (vErrors === null) {
-                vErrors = [err318];
-              } else {
-                vErrors.push(err318);
-              }
-              errors++;
-            }
-            for (const key17 in data129) {
-              if (!(key17 === "changed_scope_base_option" || key17 === "immutable_chain")) {
-                const err319 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key17 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err319];
-                } else {
-                  vErrors.push(err319);
-                }
-                errors++;
-              }
-            }
-            if (data129.changed_scope_base_option !== void 0) {
-              if ("--base" !== data129.changed_scope_base_option) {
-                const err320 = { instancePath: instancePath + "/hardening_contract/C10/changed_scope_base_option", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/changed_scope_base_option/const", keyword: "const", params: { allowedValue: "--base" }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err320];
-                } else {
-                  vErrors.push(err320);
-                }
-                errors++;
-              }
-            }
-            if (data129.immutable_chain !== void 0) {
-              if (true !== data129.immutable_chain) {
-                const err321 = { instancePath: instancePath + "/hardening_contract/C10/immutable_chain", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/immutable_chain/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err321];
-                } else {
-                  vErrors.push(err321);
-                }
-                errors++;
-              }
-            }
-          } else {
-            const err322 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err322];
-            } else {
-              vErrors.push(err322);
-            }
-            errors++;
-          }
-        }
-        if (data98.C11 !== void 0) {
-          let data132 = data98.C11;
-          if (data132 && typeof data132 == "object" && !Array.isArray(data132)) {
-            if (data132.k2_allows_partial === void 0) {
-              const err323 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/required", keyword: "required", params: { missingProperty: "k2_allows_partial" }, message: "must have required property 'k2_allows_partial'" };
-              if (vErrors === null) {
-                vErrors = [err323];
-              } else {
-                vErrors.push(err323);
-              }
-              errors++;
-            }
-            for (const key18 in data132) {
-              if (!(key18 === "k2_allows_partial")) {
-                const err324 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key18 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err324];
-                } else {
-                  vErrors.push(err324);
-                }
-                errors++;
-              }
-            }
-            if (data132.k2_allows_partial !== void 0) {
-              if (false !== data132.k2_allows_partial) {
-                const err325 = { instancePath: instancePath + "/hardening_contract/C11/k2_allows_partial", schemaPath: "#/$defs/hardeningContract/properties/C11/properties/k2_allows_partial/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err325];
-                } else {
-                  vErrors.push(err325);
-                }
-                errors++;
-              }
-            }
-          } else {
-            const err326 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err326];
-            } else {
-              vErrors.push(err326);
-            }
-            errors++;
-          }
-        }
-        if (data98.C12 !== void 0) {
-          let data134 = data98.C12;
-          if (data134 && typeof data134 == "object" && !Array.isArray(data134)) {
-            if (data134.report_tracks === void 0) {
-              const err327 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/required", keyword: "required", params: { missingProperty: "report_tracks" }, message: "must have required property 'report_tracks'" };
-              if (vErrors === null) {
-                vErrors = [err327];
-              } else {
-                vErrors.push(err327);
-              }
-              errors++;
-            }
-            for (const key19 in data134) {
-              if (!(key19 === "report_tracks")) {
-                const err328 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key19 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err328];
-                } else {
-                  vErrors.push(err328);
-                }
-                errors++;
-              }
-            }
-            if (data134.report_tracks !== void 0) {
-              if (!func0(data134.report_tracks, schema57.properties.C12.properties.report_tracks.const)) {
-                const err329 = { instancePath: instancePath + "/hardening_contract/C12/report_tracks", schemaPath: "#/$defs/hardeningContract/properties/C12/properties/report_tracks/const", keyword: "const", params: { allowedValue: schema57.properties.C12.properties.report_tracks.const }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err329];
-                } else {
-                  vErrors.push(err329);
-                }
-                errors++;
-              }
-            }
-          } else {
-            const err330 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err330];
-            } else {
-              vErrors.push(err330);
-            }
-            errors++;
-          }
-        }
-        if (data98.C13 !== void 0) {
-          let data136 = data98.C13;
-          if (data136 && typeof data136 == "object" && !Array.isArray(data136)) {
-            if (data136.research_supersession_required === void 0) {
-              const err331 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/required", keyword: "required", params: { missingProperty: "research_supersession_required" }, message: "must have required property 'research_supersession_required'" };
-              if (vErrors === null) {
-                vErrors = [err331];
-              } else {
-                vErrors.push(err331);
-              }
-              errors++;
-            }
-            for (const key20 in data136) {
-              if (!(key20 === "research_supersession_required")) {
-                const err332 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key20 }, message: "must NOT have additional properties" };
+            if (data131.newline_normalization !== void 0) {
+              if ("crlf-to-lf" !== data131.newline_normalization) {
+                const err332 = { instancePath: instancePath + "/hardening_contract/C7/newline_normalization", schemaPath: "#/$defs/hardeningContract/properties/C7/properties/newline_normalization/const", keyword: "const", params: { allowedValue: "crlf-to-lf" }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err332];
                 } else {
@@ -5478,32 +5476,30 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data136.research_supersession_required !== void 0) {
-              if (true !== data136.research_supersession_required) {
-                const err333 = { instancePath: instancePath + "/hardening_contract/C13/research_supersession_required", schemaPath: "#/$defs/hardeningContract/properties/C13/properties/research_supersession_required/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err333];
-                } else {
-                  vErrors.push(err333);
-                }
-                errors++;
-              }
-            }
           } else {
-            const err334 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err333 = { instancePath: instancePath + "/hardening_contract/C7", schemaPath: "#/$defs/hardeningContract/properties/C7/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err334];
+              vErrors = [err333];
             } else {
-              vErrors.push(err334);
+              vErrors.push(err333);
             }
             errors++;
           }
         }
-        if (data98.C14 !== void 0) {
-          let data138 = data98.C14;
-          if (data138 && typeof data138 == "object" && !Array.isArray(data138)) {
-            if (data138.runtime_skill_count === void 0) {
-              const err335 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "runtime_skill_count" }, message: "must have required property 'runtime_skill_count'" };
+        if (data100.C8 !== void 0) {
+          let data134 = data100.C8;
+          if (data134 && typeof data134 == "object" && !Array.isArray(data134)) {
+            if (data134.algorithm === void 0) {
+              const err334 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/required", keyword: "required", params: { missingProperty: "algorithm" }, message: "must have required property 'algorithm'" };
+              if (vErrors === null) {
+                vErrors = [err334];
+              } else {
+                vErrors.push(err334);
+              }
+              errors++;
+            }
+            if (data134.formula === void 0) {
+              const err335 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/required", keyword: "required", params: { missingProperty: "formula" }, message: "must have required property 'formula'" };
               if (vErrors === null) {
                 vErrors = [err335];
               } else {
@@ -5511,18 +5507,20 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
               }
               errors++;
             }
-            if (data138.governance_meta_skill_is_runtime === void 0) {
-              const err336 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "governance_meta_skill_is_runtime" }, message: "must have required property 'governance_meta_skill_is_runtime'" };
-              if (vErrors === null) {
-                vErrors = [err336];
-              } else {
-                vErrors.push(err336);
+            for (const key16 in data134) {
+              if (!(key16 === "algorithm" || key16 === "formula")) {
+                const err336 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key16 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err336];
+                } else {
+                  vErrors.push(err336);
+                }
+                errors++;
               }
-              errors++;
             }
-            for (const key21 in data138) {
-              if (!(key21 === "runtime_skill_count" || key21 === "governance_meta_skill_is_runtime")) {
-                const err337 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key21 }, message: "must NOT have additional properties" };
+            if (data134.algorithm !== void 0) {
+              if ("cc-master/skill-knowledge-budget-estimator/v1" !== data134.algorithm) {
+                const err337 = { instancePath: instancePath + "/hardening_contract/C8/algorithm", schemaPath: "#/$defs/hardeningContract/properties/C8/properties/algorithm/const", keyword: "const", params: { allowedValue: "cc-master/skill-knowledge-budget-estimator/v1" }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err337];
                 } else {
@@ -5531,9 +5529,9 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data138.runtime_skill_count !== void 0) {
-              if (8 !== data138.runtime_skill_count) {
-                const err338 = { instancePath: instancePath + "/hardening_contract/C14/runtime_skill_count", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/runtime_skill_count/const", keyword: "const", params: { allowedValue: 8 }, message: "must be equal to constant" };
+            if (data134.formula !== void 0) {
+              if ("ceil(utf8_bytes/3)" !== data134.formula) {
+                const err338 = { instancePath: instancePath + "/hardening_contract/C8/formula", schemaPath: "#/$defs/hardeningContract/properties/C8/properties/formula/const", keyword: "const", params: { allowedValue: "ceil(utf8_bytes/3)" }, message: "must be equal to constant" };
                 if (vErrors === null) {
                   vErrors = [err338];
                 } else {
@@ -5542,79 +5540,67 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data138.governance_meta_skill_is_runtime !== void 0) {
-              if (false !== data138.governance_meta_skill_is_runtime) {
-                const err339 = { instancePath: instancePath + "/hardening_contract/C14/governance_meta_skill_is_runtime", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/governance_meta_skill_is_runtime/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
-                if (vErrors === null) {
-                  vErrors = [err339];
-                } else {
-                  vErrors.push(err339);
-                }
-                errors++;
+          } else {
+            const err339 = { instancePath: instancePath + "/hardening_contract/C8", schemaPath: "#/$defs/hardeningContract/properties/C8/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err339];
+            } else {
+              vErrors.push(err339);
+            }
+            errors++;
+          }
+        }
+        if (data100.C9 !== void 0) {
+          let data137 = data100.C9;
+          if (data137 && typeof data137 == "object" && !Array.isArray(data137)) {
+            if (data137.hosts === void 0) {
+              const err340 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "hosts" }, message: "must have required property 'hosts'" };
+              if (vErrors === null) {
+                vErrors = [err340];
+              } else {
+                vErrors.push(err340);
               }
+              errors++;
             }
-          } else {
-            const err340 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-            if (vErrors === null) {
-              vErrors = [err340];
-            } else {
-              vErrors.push(err340);
+            if (data137.worker_allowlist === void 0) {
+              const err341 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "worker_allowlist" }, message: "must have required property 'worker_allowlist'" };
+              if (vErrors === null) {
+                vErrors = [err341];
+              } else {
+                vErrors.push(err341);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-      } else {
-        const err341 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-        if (vErrors === null) {
-          vErrors = [err341];
-        } else {
-          vErrors.push(err341);
-        }
-        errors++;
-      }
-    }
-    if (data.structural_status !== void 0) {
-      let data141 = data.structural_status;
-      if (data141 && typeof data141 == "object" && !Array.isArray(data141)) {
-        if (data141.state === void 0) {
-          const err342 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/required", keyword: "required", params: { missingProperty: "state" }, message: "must have required property 'state'" };
-          if (vErrors === null) {
-            vErrors = [err342];
-          } else {
-            vErrors.push(err342);
-          }
-          errors++;
-        }
-        for (const key22 in data141) {
-          if (!(key22 === "state" || key22 === "counts" || key22 === "graph_hash")) {
-            const err343 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key22 }, message: "must NOT have additional properties" };
-            if (vErrors === null) {
-              vErrors = [err343];
-            } else {
-              vErrors.push(err343);
+            if (data137.payload_modes === void 0) {
+              const err342 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "payload_modes" }, message: "must have required property 'payload_modes'" };
+              if (vErrors === null) {
+                vErrors = [err342];
+              } else {
+                vErrors.push(err342);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-        if (data141.state !== void 0) {
-          let data142 = data141.state;
-          if (!(data142 === "pass" || data142 === "fail" || data142 === "debt" || data142 === "not_run")) {
-            const err344 = { instancePath: instancePath + "/structural_status/state", schemaPath: "#/$defs/structuralStatus/properties/state/enum", keyword: "enum", params: { allowedValues: schema58.properties.state.enum }, message: "must be equal to one of the allowed values" };
-            if (vErrors === null) {
-              vErrors = [err344];
-            } else {
-              vErrors.push(err344);
+            if (data137.anchor_form === void 0) {
+              const err343 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "anchor_form" }, message: "must have required property 'anchor_form'" };
+              if (vErrors === null) {
+                vErrors = [err343];
+              } else {
+                vErrors.push(err343);
+              }
+              errors++;
             }
-            errors++;
-          }
-        }
-        if (data141.counts !== void 0) {
-          let data143 = data141.counts;
-          if (data143 && typeof data143 == "object" && !Array.isArray(data143)) {
-            for (const key23 in data143) {
-              let data144 = data143[key23];
-              if (!(typeof data144 == "number" && (!(data144 % 1) && !isNaN(data144)))) {
-                const err345 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (data137.path_policy === void 0) {
+              const err344 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/required", keyword: "required", params: { missingProperty: "path_policy" }, message: "must have required property 'path_policy'" };
+              if (vErrors === null) {
+                vErrors = [err344];
+              } else {
+                vErrors.push(err344);
+              }
+              errors++;
+            }
+            for (const key17 in data137) {
+              if (!(key17 === "hosts" || key17 === "worker_allowlist" || key17 === "payload_modes" || key17 === "anchor_form" || key17 === "path_policy")) {
+                const err345 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key17 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
                   vErrors = [err345];
                 } else {
@@ -5622,56 +5608,441 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 }
                 errors++;
               }
-              if (typeof data144 == "number") {
-                if (data144 < 0 || isNaN(data144)) {
-                  const err346 = { instancePath: instancePath + "/structural_status/counts/" + key23.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+            }
+            if (data137.hosts !== void 0) {
+              if (!func0(data137.hosts, schema57.properties.C9.properties.hosts.const)) {
+                const err346 = { instancePath: instancePath + "/hardening_contract/C9/hosts", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/hosts/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.hosts.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err346];
+                } else {
+                  vErrors.push(err346);
+                }
+                errors++;
+              }
+            }
+            if (data137.worker_allowlist !== void 0) {
+              if (!func0(data137.worker_allowlist, schema57.properties.C9.properties.worker_allowlist.const)) {
+                const err347 = { instancePath: instancePath + "/hardening_contract/C9/worker_allowlist", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/worker_allowlist/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.worker_allowlist.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err347];
+                } else {
+                  vErrors.push(err347);
+                }
+                errors++;
+              }
+            }
+            if (data137.payload_modes !== void 0) {
+              if (!func0(data137.payload_modes, schema57.properties.C9.properties.payload_modes.const)) {
+                const err348 = { instancePath: instancePath + "/hardening_contract/C9/payload_modes", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/payload_modes/const", keyword: "const", params: { allowedValue: schema57.properties.C9.properties.payload_modes.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err348];
+                } else {
+                  vErrors.push(err348);
+                }
+                errors++;
+              }
+            }
+            if (data137.anchor_form !== void 0) {
+              if ("explicit-html-id" !== data137.anchor_form) {
+                const err349 = { instancePath: instancePath + "/hardening_contract/C9/anchor_form", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/anchor_form/const", keyword: "const", params: { allowedValue: "explicit-html-id" }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err349];
+                } else {
+                  vErrors.push(err349);
+                }
+                errors++;
+              }
+            }
+            if (data137.path_policy !== void 0) {
+              if ("relative-final-host-path" !== data137.path_policy) {
+                const err350 = { instancePath: instancePath + "/hardening_contract/C9/path_policy", schemaPath: "#/$defs/hardeningContract/properties/C9/properties/path_policy/const", keyword: "const", params: { allowedValue: "relative-final-host-path" }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err350];
+                } else {
+                  vErrors.push(err350);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err351 = { instancePath: instancePath + "/hardening_contract/C9", schemaPath: "#/$defs/hardeningContract/properties/C9/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err351];
+            } else {
+              vErrors.push(err351);
+            }
+            errors++;
+          }
+        }
+        if (data100.C10 !== void 0) {
+          let data143 = data100.C10;
+          if (data143 && typeof data143 == "object" && !Array.isArray(data143)) {
+            if (data143.changed_scope_base_option === void 0) {
+              const err352 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "changed_scope_base_option" }, message: "must have required property 'changed_scope_base_option'" };
+              if (vErrors === null) {
+                vErrors = [err352];
+              } else {
+                vErrors.push(err352);
+              }
+              errors++;
+            }
+            if (data143.immutable_chain === void 0) {
+              const err353 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/required", keyword: "required", params: { missingProperty: "immutable_chain" }, message: "must have required property 'immutable_chain'" };
+              if (vErrors === null) {
+                vErrors = [err353];
+              } else {
+                vErrors.push(err353);
+              }
+              errors++;
+            }
+            for (const key18 in data143) {
+              if (!(key18 === "changed_scope_base_option" || key18 === "immutable_chain")) {
+                const err354 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key18 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err354];
+                } else {
+                  vErrors.push(err354);
+                }
+                errors++;
+              }
+            }
+            if (data143.changed_scope_base_option !== void 0) {
+              if ("--base" !== data143.changed_scope_base_option) {
+                const err355 = { instancePath: instancePath + "/hardening_contract/C10/changed_scope_base_option", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/changed_scope_base_option/const", keyword: "const", params: { allowedValue: "--base" }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err355];
+                } else {
+                  vErrors.push(err355);
+                }
+                errors++;
+              }
+            }
+            if (data143.immutable_chain !== void 0) {
+              if (true !== data143.immutable_chain) {
+                const err356 = { instancePath: instancePath + "/hardening_contract/C10/immutable_chain", schemaPath: "#/$defs/hardeningContract/properties/C10/properties/immutable_chain/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err356];
+                } else {
+                  vErrors.push(err356);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err357 = { instancePath: instancePath + "/hardening_contract/C10", schemaPath: "#/$defs/hardeningContract/properties/C10/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err357];
+            } else {
+              vErrors.push(err357);
+            }
+            errors++;
+          }
+        }
+        if (data100.C11 !== void 0) {
+          let data146 = data100.C11;
+          if (data146 && typeof data146 == "object" && !Array.isArray(data146)) {
+            if (data146.k2_allows_partial === void 0) {
+              const err358 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/required", keyword: "required", params: { missingProperty: "k2_allows_partial" }, message: "must have required property 'k2_allows_partial'" };
+              if (vErrors === null) {
+                vErrors = [err358];
+              } else {
+                vErrors.push(err358);
+              }
+              errors++;
+            }
+            for (const key19 in data146) {
+              if (!(key19 === "k2_allows_partial")) {
+                const err359 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key19 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err359];
+                } else {
+                  vErrors.push(err359);
+                }
+                errors++;
+              }
+            }
+            if (data146.k2_allows_partial !== void 0) {
+              if (false !== data146.k2_allows_partial) {
+                const err360 = { instancePath: instancePath + "/hardening_contract/C11/k2_allows_partial", schemaPath: "#/$defs/hardeningContract/properties/C11/properties/k2_allows_partial/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err360];
+                } else {
+                  vErrors.push(err360);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err361 = { instancePath: instancePath + "/hardening_contract/C11", schemaPath: "#/$defs/hardeningContract/properties/C11/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err361];
+            } else {
+              vErrors.push(err361);
+            }
+            errors++;
+          }
+        }
+        if (data100.C12 !== void 0) {
+          let data148 = data100.C12;
+          if (data148 && typeof data148 == "object" && !Array.isArray(data148)) {
+            if (data148.report_tracks === void 0) {
+              const err362 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/required", keyword: "required", params: { missingProperty: "report_tracks" }, message: "must have required property 'report_tracks'" };
+              if (vErrors === null) {
+                vErrors = [err362];
+              } else {
+                vErrors.push(err362);
+              }
+              errors++;
+            }
+            for (const key20 in data148) {
+              if (!(key20 === "report_tracks")) {
+                const err363 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key20 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err363];
+                } else {
+                  vErrors.push(err363);
+                }
+                errors++;
+              }
+            }
+            if (data148.report_tracks !== void 0) {
+              if (!func0(data148.report_tracks, schema57.properties.C12.properties.report_tracks.const)) {
+                const err364 = { instancePath: instancePath + "/hardening_contract/C12/report_tracks", schemaPath: "#/$defs/hardeningContract/properties/C12/properties/report_tracks/const", keyword: "const", params: { allowedValue: schema57.properties.C12.properties.report_tracks.const }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err364];
+                } else {
+                  vErrors.push(err364);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err365 = { instancePath: instancePath + "/hardening_contract/C12", schemaPath: "#/$defs/hardeningContract/properties/C12/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err365];
+            } else {
+              vErrors.push(err365);
+            }
+            errors++;
+          }
+        }
+        if (data100.C13 !== void 0) {
+          let data150 = data100.C13;
+          if (data150 && typeof data150 == "object" && !Array.isArray(data150)) {
+            if (data150.research_supersession_required === void 0) {
+              const err366 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/required", keyword: "required", params: { missingProperty: "research_supersession_required" }, message: "must have required property 'research_supersession_required'" };
+              if (vErrors === null) {
+                vErrors = [err366];
+              } else {
+                vErrors.push(err366);
+              }
+              errors++;
+            }
+            for (const key21 in data150) {
+              if (!(key21 === "research_supersession_required")) {
+                const err367 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key21 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err367];
+                } else {
+                  vErrors.push(err367);
+                }
+                errors++;
+              }
+            }
+            if (data150.research_supersession_required !== void 0) {
+              if (true !== data150.research_supersession_required) {
+                const err368 = { instancePath: instancePath + "/hardening_contract/C13/research_supersession_required", schemaPath: "#/$defs/hardeningContract/properties/C13/properties/research_supersession_required/const", keyword: "const", params: { allowedValue: true }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err368];
+                } else {
+                  vErrors.push(err368);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err369 = { instancePath: instancePath + "/hardening_contract/C13", schemaPath: "#/$defs/hardeningContract/properties/C13/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err369];
+            } else {
+              vErrors.push(err369);
+            }
+            errors++;
+          }
+        }
+        if (data100.C14 !== void 0) {
+          let data152 = data100.C14;
+          if (data152 && typeof data152 == "object" && !Array.isArray(data152)) {
+            if (data152.runtime_skill_count === void 0) {
+              const err370 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "runtime_skill_count" }, message: "must have required property 'runtime_skill_count'" };
+              if (vErrors === null) {
+                vErrors = [err370];
+              } else {
+                vErrors.push(err370);
+              }
+              errors++;
+            }
+            if (data152.governance_meta_skill_is_runtime === void 0) {
+              const err371 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/required", keyword: "required", params: { missingProperty: "governance_meta_skill_is_runtime" }, message: "must have required property 'governance_meta_skill_is_runtime'" };
+              if (vErrors === null) {
+                vErrors = [err371];
+              } else {
+                vErrors.push(err371);
+              }
+              errors++;
+            }
+            for (const key22 in data152) {
+              if (!(key22 === "runtime_skill_count" || key22 === "governance_meta_skill_is_runtime")) {
+                const err372 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key22 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err372];
+                } else {
+                  vErrors.push(err372);
+                }
+                errors++;
+              }
+            }
+            if (data152.runtime_skill_count !== void 0) {
+              if (8 !== data152.runtime_skill_count) {
+                const err373 = { instancePath: instancePath + "/hardening_contract/C14/runtime_skill_count", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/runtime_skill_count/const", keyword: "const", params: { allowedValue: 8 }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err373];
+                } else {
+                  vErrors.push(err373);
+                }
+                errors++;
+              }
+            }
+            if (data152.governance_meta_skill_is_runtime !== void 0) {
+              if (false !== data152.governance_meta_skill_is_runtime) {
+                const err374 = { instancePath: instancePath + "/hardening_contract/C14/governance_meta_skill_is_runtime", schemaPath: "#/$defs/hardeningContract/properties/C14/properties/governance_meta_skill_is_runtime/const", keyword: "const", params: { allowedValue: false }, message: "must be equal to constant" };
+                if (vErrors === null) {
+                  vErrors = [err374];
+                } else {
+                  vErrors.push(err374);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err375 = { instancePath: instancePath + "/hardening_contract/C14", schemaPath: "#/$defs/hardeningContract/properties/C14/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err375];
+            } else {
+              vErrors.push(err375);
+            }
+            errors++;
+          }
+        }
+      } else {
+        const err376 = { instancePath: instancePath + "/hardening_contract", schemaPath: "#/$defs/hardeningContract/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        if (vErrors === null) {
+          vErrors = [err376];
+        } else {
+          vErrors.push(err376);
+        }
+        errors++;
+      }
+    }
+    if (data.structural_status !== void 0) {
+      let data155 = data.structural_status;
+      if (data155 && typeof data155 == "object" && !Array.isArray(data155)) {
+        if (data155.state === void 0) {
+          const err377 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/required", keyword: "required", params: { missingProperty: "state" }, message: "must have required property 'state'" };
+          if (vErrors === null) {
+            vErrors = [err377];
+          } else {
+            vErrors.push(err377);
+          }
+          errors++;
+        }
+        for (const key23 in data155) {
+          if (!(key23 === "state" || key23 === "counts" || key23 === "graph_hash")) {
+            const err378 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key23 }, message: "must NOT have additional properties" };
+            if (vErrors === null) {
+              vErrors = [err378];
+            } else {
+              vErrors.push(err378);
+            }
+            errors++;
+          }
+        }
+        if (data155.state !== void 0) {
+          let data156 = data155.state;
+          if (!(data156 === "pass" || data156 === "fail" || data156 === "debt" || data156 === "not_run")) {
+            const err379 = { instancePath: instancePath + "/structural_status/state", schemaPath: "#/$defs/structuralStatus/properties/state/enum", keyword: "enum", params: { allowedValues: schema58.properties.state.enum }, message: "must be equal to one of the allowed values" };
+            if (vErrors === null) {
+              vErrors = [err379];
+            } else {
+              vErrors.push(err379);
+            }
+            errors++;
+          }
+        }
+        if (data155.counts !== void 0) {
+          let data157 = data155.counts;
+          if (data157 && typeof data157 == "object" && !Array.isArray(data157)) {
+            for (const key24 in data157) {
+              let data158 = data157[key24];
+              if (!(typeof data158 == "number" && (!(data158 % 1) && !isNaN(data158)))) {
+                const err380 = { instancePath: instancePath + "/structural_status/counts/" + key24.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                if (vErrors === null) {
+                  vErrors = [err380];
+                } else {
+                  vErrors.push(err380);
+                }
+                errors++;
+              }
+              if (typeof data158 == "number") {
+                if (data158 < 0 || isNaN(data158)) {
+                  const err381 = { instancePath: instancePath + "/structural_status/counts/" + key24.replace(/~/g, "~0").replace(/\//g, "~1"), schemaPath: "#/$defs/structuralStatus/properties/counts/additionalProperties/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
                   if (vErrors === null) {
-                    vErrors = [err346];
+                    vErrors = [err381];
                   } else {
-                    vErrors.push(err346);
+                    vErrors.push(err381);
                   }
                   errors++;
                 }
               }
             }
           } else {
-            const err347 = { instancePath: instancePath + "/structural_status/counts", schemaPath: "#/$defs/structuralStatus/properties/counts/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err382 = { instancePath: instancePath + "/structural_status/counts", schemaPath: "#/$defs/structuralStatus/properties/counts/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err347];
+              vErrors = [err382];
             } else {
-              vErrors.push(err347);
+              vErrors.push(err382);
             }
             errors++;
           }
         }
-        if (data141.graph_hash !== void 0) {
-          let data145 = data141.graph_hash;
-          if (typeof data145 === "string") {
-            if (!pattern4.test(data145)) {
-              const err348 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
+        if (data155.graph_hash !== void 0) {
+          let data159 = data155.graph_hash;
+          if (typeof data159 === "string") {
+            if (!pattern4.test(data159)) {
+              const err383 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
               if (vErrors === null) {
-                vErrors = [err348];
+                vErrors = [err383];
               } else {
-                vErrors.push(err348);
+                vErrors.push(err383);
               }
               errors++;
             }
           } else {
-            const err349 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+            const err384 = { instancePath: instancePath + "/structural_status/graph_hash", schemaPath: "#/$defs/structuralStatus/properties/graph_hash/type", keyword: "type", params: { type: "string" }, message: "must be string" };
             if (vErrors === null) {
-              vErrors = [err349];
+              vErrors = [err384];
             } else {
-              vErrors.push(err349);
+              vErrors.push(err384);
             }
             errors++;
           }
         }
       } else {
-        const err350 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        const err385 = { instancePath: instancePath + "/structural_status", schemaPath: "#/$defs/structuralStatus/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err350];
+          vErrors = [err385];
         } else {
-          vErrors.push(err350);
+          vErrors.push(err385);
         }
         errors++;
       }
@@ -5683,358 +6054,358 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
       }
     }
     if (data.improvement_claim !== void 0) {
-      let data147 = data.improvement_claim;
-      if (typeof data147 === "string") {
-        if (func1(data147) < 1) {
-          const err351 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+      let data161 = data.improvement_claim;
+      if (typeof data161 === "string") {
+        if (func1(data161) < 1) {
+          const err386 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
-            vErrors = [err351];
+            vErrors = [err386];
           } else {
-            vErrors.push(err351);
+            vErrors.push(err386);
           }
           errors++;
         }
       } else {
-        const err352 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err387 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err352];
+          vErrors = [err387];
         } else {
-          vErrors.push(err352);
+          vErrors.push(err387);
         }
         errors++;
       }
     }
     if (data.action !== void 0) {
-      let data148 = data.action;
-      if (!(data148 === "begin" || data148 === "validate" || data148 === "apply")) {
-        const err353 = { instancePath: instancePath + "/action", schemaPath: "#/properties/action/enum", keyword: "enum", params: { allowedValues: schema31.properties.action.enum }, message: "must be equal to one of the allowed values" };
+      let data162 = data.action;
+      if (!(data162 === "begin" || data162 === "validate" || data162 === "apply")) {
+        const err388 = { instancePath: instancePath + "/action", schemaPath: "#/properties/action/enum", keyword: "enum", params: { allowedValues: schema31.properties.action.enum }, message: "must be equal to one of the allowed values" };
         if (vErrors === null) {
-          vErrors = [err353];
+          vErrors = [err388];
         } else {
-          vErrors.push(err353);
+          vErrors.push(err388);
         }
         errors++;
       }
     }
     if (data.workspace !== void 0) {
-      let data149 = data.workspace;
-      if (typeof data149 === "string") {
-        if (func1(data149) < 1) {
-          const err354 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+      let data163 = data.workspace;
+      if (typeof data163 === "string") {
+        if (func1(data163) < 1) {
+          const err389 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
-            vErrors = [err354];
+            vErrors = [err389];
           } else {
-            vErrors.push(err354);
+            vErrors.push(err389);
           }
           errors++;
         }
-        if (!pattern5.test(data149)) {
-          const err355 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
+        if (!pattern5.test(data163)) {
+          const err390 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
           if (vErrors === null) {
-            vErrors = [err355];
+            vErrors = [err390];
           } else {
-            vErrors.push(err355);
+            vErrors.push(err390);
           }
           errors++;
         }
       } else {
-        const err356 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err391 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err356];
+          vErrors = [err391];
         } else {
-          vErrors.push(err356);
+          vErrors.push(err391);
         }
         errors++;
       }
     }
     if (data.ledger_path !== void 0) {
-      let data150 = data.ledger_path;
-      if (typeof data150 === "string") {
-        if (func1(data150) < 1) {
-          const err357 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+      let data164 = data.ledger_path;
+      if (typeof data164 === "string") {
+        if (func1(data164) < 1) {
+          const err392 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
-            vErrors = [err357];
+            vErrors = [err392];
           } else {
-            vErrors.push(err357);
+            vErrors.push(err392);
           }
           errors++;
         }
-        if (!pattern5.test(data150)) {
-          const err358 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
+        if (!pattern5.test(data164)) {
+          const err393 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
           if (vErrors === null) {
-            vErrors = [err358];
+            vErrors = [err393];
           } else {
-            vErrors.push(err358);
+            vErrors.push(err393);
           }
           errors++;
         }
       } else {
-        const err359 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err394 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err359];
+          vErrors = [err394];
         } else {
-          vErrors.push(err359);
+          vErrors.push(err394);
         }
         errors++;
       }
     }
     if (data.result_graph_sha256 !== void 0) {
-      let data151 = data.result_graph_sha256;
-      if (typeof data151 === "string") {
-        if (!pattern4.test(data151)) {
-          const err360 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
+      let data165 = data.result_graph_sha256;
+      if (typeof data165 === "string") {
+        if (!pattern4.test(data165)) {
+          const err395 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
           if (vErrors === null) {
-            vErrors = [err360];
+            vErrors = [err395];
           } else {
-            vErrors.push(err360);
+            vErrors.push(err395);
           }
           errors++;
         }
       } else {
-        const err361 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err396 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err361];
+          vErrors = [err396];
         } else {
-          vErrors.push(err361);
+          vErrors.push(err396);
         }
         errors++;
       }
     }
     if (data.validation !== void 0) {
-      let data152 = data.validation;
-      if (!(data152 && typeof data152 == "object" && !Array.isArray(data152))) {
-        const err362 = { instancePath: instancePath + "/validation", schemaPath: "#/properties/validation/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+      let data166 = data.validation;
+      if (!(data166 && typeof data166 == "object" && !Array.isArray(data166))) {
+        const err397 = { instancePath: instancePath + "/validation", schemaPath: "#/properties/validation/type", keyword: "type", params: { type: "object" }, message: "must be object" };
         if (vErrors === null) {
-          vErrors = [err362];
+          vErrors = [err397];
         } else {
-          vErrors.push(err362);
+          vErrors.push(err397);
         }
         errors++;
       }
     }
     if (data.diagnostics !== void 0) {
-      let data153 = data.diagnostics;
-      if (Array.isArray(data153)) {
-        const len10 = data153.length;
+      let data167 = data.diagnostics;
+      if (Array.isArray(data167)) {
+        const len10 = data167.length;
         for (let i16 = 0; i16 < len10; i16++) {
-          let data154 = data153[i16];
-          if (data154 && typeof data154 == "object" && !Array.isArray(data154)) {
-            if (data154.severity === void 0) {
-              const err363 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
+          let data168 = data167[i16];
+          if (data168 && typeof data168 == "object" && !Array.isArray(data168)) {
+            if (data168.severity === void 0) {
+              const err398 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
               if (vErrors === null) {
-                vErrors = [err363];
+                vErrors = [err398];
               } else {
-                vErrors.push(err363);
+                vErrors.push(err398);
               }
               errors++;
             }
-            if (data154.code === void 0) {
-              const err364 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
+            if (data168.code === void 0) {
+              const err399 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
               if (vErrors === null) {
-                vErrors = [err364];
+                vErrors = [err399];
               } else {
-                vErrors.push(err364);
+                vErrors.push(err399);
               }
               errors++;
             }
-            if (data154.message === void 0) {
-              const err365 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
+            if (data168.message === void 0) {
+              const err400 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
               if (vErrors === null) {
-                vErrors = [err365];
+                vErrors = [err400];
               } else {
-                vErrors.push(err365);
+                vErrors.push(err400);
               }
               errors++;
             }
-            if (data154.location === void 0) {
-              const err366 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
+            if (data168.location === void 0) {
+              const err401 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
               if (vErrors === null) {
-                vErrors = [err366];
+                vErrors = [err401];
               } else {
-                vErrors.push(err366);
+                vErrors.push(err401);
               }
               errors++;
             }
-            if (data154.witness === void 0) {
-              const err367 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
+            if (data168.witness === void 0) {
+              const err402 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
               if (vErrors === null) {
-                vErrors = [err367];
+                vErrors = [err402];
               } else {
-                vErrors.push(err367);
+                vErrors.push(err402);
               }
               errors++;
             }
-            if (data154.remediation === void 0) {
-              const err368 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
+            if (data168.remediation === void 0) {
+              const err403 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
               if (vErrors === null) {
-                vErrors = [err368];
+                vErrors = [err403];
               } else {
-                vErrors.push(err368);
+                vErrors.push(err403);
               }
               errors++;
             }
-            for (const key24 in data154) {
-              if (!(key24 === "severity" || key24 === "code" || key24 === "message" || key24 === "location" || key24 === "witness" || key24 === "remediation")) {
-                const err369 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key24 }, message: "must NOT have additional properties" };
+            for (const key25 in data168) {
+              if (!(key25 === "severity" || key25 === "code" || key25 === "message" || key25 === "location" || key25 === "witness" || key25 === "remediation")) {
+                const err404 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key25 }, message: "must NOT have additional properties" };
                 if (vErrors === null) {
-                  vErrors = [err369];
+                  vErrors = [err404];
                 } else {
-                  vErrors.push(err369);
+                  vErrors.push(err404);
                 }
                 errors++;
               }
             }
-            if (data154.severity !== void 0) {
-              let data155 = data154.severity;
-              if (!(data155 === "error" || data155 === "warning" || data155 === "debt" || data155 === "info")) {
-                const err370 = { instancePath: instancePath + "/diagnostics/" + i16 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema63.properties.severity.enum }, message: "must be equal to one of the allowed values" };
+            if (data168.severity !== void 0) {
+              let data169 = data168.severity;
+              if (!(data169 === "error" || data169 === "warning" || data169 === "debt" || data169 === "info")) {
+                const err405 = { instancePath: instancePath + "/diagnostics/" + i16 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema63.properties.severity.enum }, message: "must be equal to one of the allowed values" };
                 if (vErrors === null) {
-                  vErrors = [err370];
+                  vErrors = [err405];
                 } else {
-                  vErrors.push(err370);
+                  vErrors.push(err405);
                 }
                 errors++;
               }
             }
-            if (data154.code !== void 0) {
-              let data156 = data154.code;
-              if (typeof data156 === "string") {
-                if (!pattern17.test(data156)) {
-                  const err371 = { instancePath: instancePath + "/diagnostics/" + i16 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
+            if (data168.code !== void 0) {
+              let data170 = data168.code;
+              if (typeof data170 === "string") {
+                if (!pattern17.test(data170)) {
+                  const err406 = { instancePath: instancePath + "/diagnostics/" + i16 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
                   if (vErrors === null) {
-                    vErrors = [err371];
+                    vErrors = [err406];
                   } else {
-                    vErrors.push(err371);
+                    vErrors.push(err406);
                   }
                   errors++;
                 }
               } else {
-                const err372 = { instancePath: instancePath + "/diagnostics/" + i16 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                const err407 = { instancePath: instancePath + "/diagnostics/" + i16 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
                 if (vErrors === null) {
-                  vErrors = [err372];
+                  vErrors = [err407];
                 } else {
-                  vErrors.push(err372);
+                  vErrors.push(err407);
                 }
                 errors++;
               }
             }
-            if (data154.message !== void 0) {
-              let data157 = data154.message;
-              if (typeof data157 === "string") {
-                if (func1(data157) < 1) {
-                  const err373 = { instancePath: instancePath + "/diagnostics/" + i16 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+            if (data168.message !== void 0) {
+              let data171 = data168.message;
+              if (typeof data171 === "string") {
+                if (func1(data171) < 1) {
+                  const err408 = { instancePath: instancePath + "/diagnostics/" + i16 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
                   if (vErrors === null) {
-                    vErrors = [err373];
+                    vErrors = [err408];
                   } else {
-                    vErrors.push(err373);
+                    vErrors.push(err408);
                   }
                   errors++;
                 }
               } else {
-                const err374 = { instancePath: instancePath + "/diagnostics/" + i16 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                const err409 = { instancePath: instancePath + "/diagnostics/" + i16 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
                 if (vErrors === null) {
-                  vErrors = [err374];
+                  vErrors = [err409];
                 } else {
-                  vErrors.push(err374);
+                  vErrors.push(err409);
                 }
                 errors++;
               }
             }
-            if (data154.location !== void 0) {
-              let data158 = data154.location;
-              if (typeof data158 === "string") {
-                if (func1(data158) < 1) {
-                  const err375 = { instancePath: instancePath + "/diagnostics/" + i16 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+            if (data168.location !== void 0) {
+              let data172 = data168.location;
+              if (typeof data172 === "string") {
+                if (func1(data172) < 1) {
+                  const err410 = { instancePath: instancePath + "/diagnostics/" + i16 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
                   if (vErrors === null) {
-                    vErrors = [err375];
+                    vErrors = [err410];
                   } else {
-                    vErrors.push(err375);
+                    vErrors.push(err410);
                   }
                   errors++;
                 }
               } else {
-                const err376 = { instancePath: instancePath + "/diagnostics/" + i16 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                const err411 = { instancePath: instancePath + "/diagnostics/" + i16 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
                 if (vErrors === null) {
-                  vErrors = [err376];
+                  vErrors = [err411];
                 } else {
-                  vErrors.push(err376);
+                  vErrors.push(err411);
                 }
                 errors++;
               }
             }
-            if (data154.witness !== void 0) {
-              let data159 = data154.witness;
-              if (!(data159 && typeof data159 == "object" && !Array.isArray(data159))) {
-                const err377 = { instancePath: instancePath + "/diagnostics/" + i16 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (data168.witness !== void 0) {
+              let data173 = data168.witness;
+              if (!(data173 && typeof data173 == "object" && !Array.isArray(data173))) {
+                const err412 = { instancePath: instancePath + "/diagnostics/" + i16 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
                 if (vErrors === null) {
-                  vErrors = [err377];
+                  vErrors = [err412];
                 } else {
-                  vErrors.push(err377);
+                  vErrors.push(err412);
                 }
                 errors++;
               }
             }
-            if (data154.remediation !== void 0) {
-              let data160 = data154.remediation;
-              if (typeof data160 === "string") {
-                if (func1(data160) < 1) {
-                  const err378 = { instancePath: instancePath + "/diagnostics/" + i16 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+            if (data168.remediation !== void 0) {
+              let data174 = data168.remediation;
+              if (typeof data174 === "string") {
+                if (func1(data174) < 1) {
+                  const err413 = { instancePath: instancePath + "/diagnostics/" + i16 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
                   if (vErrors === null) {
-                    vErrors = [err378];
+                    vErrors = [err413];
                   } else {
-                    vErrors.push(err378);
+                    vErrors.push(err413);
                   }
                   errors++;
                 }
               } else {
-                const err379 = { instancePath: instancePath + "/diagnostics/" + i16 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                const err414 = { instancePath: instancePath + "/diagnostics/" + i16 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
                 if (vErrors === null) {
-                  vErrors = [err379];
+                  vErrors = [err414];
                 } else {
-                  vErrors.push(err379);
+                  vErrors.push(err414);
                 }
                 errors++;
               }
             }
           } else {
-            const err380 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err415 = { instancePath: instancePath + "/diagnostics/" + i16, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
             if (vErrors === null) {
-              vErrors = [err380];
+              vErrors = [err415];
             } else {
-              vErrors.push(err380);
+              vErrors.push(err415);
             }
             errors++;
           }
         }
       } else {
-        const err381 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
+        const err416 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
         if (vErrors === null) {
-          vErrors = [err381];
+          vErrors = [err416];
         } else {
-          vErrors.push(err381);
+          vErrors.push(err416);
         }
         errors++;
       }
     }
     if (props0 !== true) {
-      for (const key25 in data) {
-        if (!props0 || !props0[key25]) {
-          const err382 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key25 }, message: "must NOT have unevaluated properties" };
+      for (const key26 in data) {
+        if (!props0 || !props0[key26]) {
+          const err417 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key26 }, message: "must NOT have unevaluated properties" };
           if (vErrors === null) {
-            vErrors = [err382];
+            vErrors = [err417];
           } else {
-            vErrors.push(err382);
+            vErrors.push(err417);
           }
           errors++;
         }
       }
     }
   } else {
-    const err383 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+    const err418 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
     if (vErrors === null) {
-      vErrors = [err383];
+      vErrors = [err418];
     } else {
-      vErrors.push(err383);
+      vErrors.push(err418);
     }
     errors++;
   }

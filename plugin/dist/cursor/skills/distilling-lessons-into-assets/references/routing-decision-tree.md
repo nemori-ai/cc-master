@@ -47,10 +47,10 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
-- [next: 允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest)
-- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [fallback_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop)
-- [requires: 四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
+- [next: 允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest) <!-- ccm:k:edge edge:distill.tree-to-dual -->
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.tree-to-evidence -->
+- [fallback_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop) <!-- ccm:k:edge edge:distill.tree-to-fallback -->
+- [requires: 四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy) <!-- ccm:k:edge edge:distill.tree-to-taxonomy -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-dual-dest"></a>
 <!-- ccm:k:start point:distill.dual-dest -->
@@ -66,8 +66,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
-- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.dual-to-evidence -->
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.dual-to-tree -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-distill-fallback-no-drop"></a>
 <!-- ccm:k:start point:distill.fallback-no-drop -->
@@ -92,6 +92,6 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:distill.routing](../../../knowledge/modules/distill.routing.md#ccm-k-module-distill-routing)
-- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
-- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
+- [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.fallback-to-evidence -->
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.fallback-to-tree -->
 <!-- ccm:k:nav:end -->

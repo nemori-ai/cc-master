@@ -166,6 +166,182 @@ function setHostCoverage(workspace, coverageRows) {
   fs.writeFileSync(skillPath, `${JSON.stringify(document, null, 2)}\n`);
 }
 
+/**
+ * Planner aggregates host_coverage across the whole portfolio. Stubbing one
+ * skill while peers stay full yields overall `partial`, not `stub`. Apply the
+ * same coverage rows to every skill shard + the admitted composition.
+ * When composition coverage changes, keep analysis.witness.host_portability
+ * lockstep so graph admission does not reject the composition on a forged mismatch.
+ */
+function setAllPortfolioHostCoverage(repoRoot, coverageRows) {
+  const skillsRoot = path.join(repoRoot, 'plugin/src/knowledge/skills');
+  for (const name of fs.readdirSync(skillsRoot).sort()) {
+    const skillPath = path.join(skillsRoot, name, 'skill.json');
+    if (!fs.existsSync(skillPath)) continue;
+    const document = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
+    document.host_coverage = coverageRows.map((row) => ({ ...row }));
+    fs.writeFileSync(skillPath, `${JSON.stringify(document, null, 2)}\n`);
+  }
+  const compositionPath = path.join(
+    repoRoot,
+    'plugin/src/knowledge/compositions/skill.dev-as-ml-loop.json',
+  );
+  if (fs.existsSync(compositionPath)) {
+    const document = JSON.parse(fs.readFileSync(compositionPath, 'utf8'));
+    document.host_coverage = coverageRows.map((row) => ({ ...row }));
+    fs.writeFileSync(compositionPath, `${JSON.stringify(document, null, 2)}\n`);
+  }
+  const byHost = Object.fromEntries(coverageRows.map((row) => [row.host, row.state]));
+  const analysisPath = path.join(
+    repoRoot,
+    'plugin/src/knowledge/analyses/candidate.dev-as-ml-loop.json',
+  );
+  if (fs.existsSync(analysisPath) && Object.keys(byHost).length > 0) {
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
+    if (analysis.witness?.host_portability) {
+      analysis.witness.host_portability = {
+        ...analysis.witness.host_portability,
+        ...byHost,
+      };
+      fs.writeFileSync(analysisPath, `${JSON.stringify(analysis, null, 2)}\n`);
+    }
+  }
+}
+
+/**
+ * Drop one owned module from an existing partial host_coverage row.
+ * Keeps planner-honest stub/partial peers untouched so overlay bindings stay intact.
+ */
+function dropModuleFromPartialCoverage(repoRoot, { skillPath, host, excludedModule, reason }) {
+  const absolute = path.join(repoRoot, skillPath);
+  const document = JSON.parse(fs.readFileSync(absolute, 'utf8'));
+  const row = (document.host_coverage ?? []).find((item) => item.host === host);
+  assert.ok(row, `missing host_coverage row for ${host}`);
+  assert.equal(row.state, 'partial', `expected partial coverage on ${host}`);
+  assert.ok(
+    Array.isArray(row.covered_modules) && row.covered_modules.includes(excludedModule),
+    `${excludedModule} must already be covered before drop`,
+  );
+  row.covered_modules = row.covered_modules.filter((id) => id !== excludedModule);
+  row.reason = reason;
+  fs.writeFileSync(absolute, `${JSON.stringify(document, null, 2)}\n`);
+  return row.covered_modules.slice().sort();
+}
+
+/** Assert the runtime witness against the real portfolio coverage planner output. */
+function assertRealAggregateHostMode(witness, expectedPlan) {
+  assert.ok(expectedPlan, `missing real coverage plan for ${witness.host}`);
+  assert.equal(witness.mode, expectedPlan.mode);
+  if (expectedPlan.mode === 'full') {
+    assert.ok(witness.executed_checks.includes('candidate_runtime_compile_check'));
+    assert.ok(!witness.executed_checks.includes('candidate_runtime_compile'));
+  } else {
+    assert.equal(expectedPlan.mode, 'partial');
+    assert.ok(witness.executed_checks.includes('candidate_runtime_partial_tree'));
+  }
+
+  const snapshot = witness.final_surface_snapshot;
+  assert.ok(snapshot, `${witness.host} must publish a final surface snapshot`);
+  assert.equal(snapshot.host, witness.host);
+  assert.equal(snapshot.mode, expectedPlan.mode);
+  assert.deepEqual(
+    snapshot.modules.map((item) => item.id).sort(),
+    [...expectedPlan.moduleIds].sort(),
+    `${witness.host} snapshot modules must equal the real covered_modules union`,
+  );
+  assert.equal(snapshot.enabled_edge_ids.length, witness.enabled_edges);
+
+  for (const row of expectedPlan.rows) {
+    const skill = snapshot.skills.find((item) => item.id === row.skillId);
+    if (row.state === 'stub' || row.state === 'unsupported') {
+      assert.equal(skill, undefined, `${witness.host} ${row.skillId} must abstain`);
+      continue;
+    }
+    assert.ok(skill, `${witness.host} missing contributing ${row.skillId}`);
+    if (row.state === 'partial') {
+      assert.deepEqual(
+        skill.covered_modules_by_host[witness.host],
+        [...row.covered_modules].sort(),
+        `${witness.host} ${row.skillId} partial covered_modules drifted`,
+      );
+    } else {
+      assert.equal(skill.covered_modules_by_host[witness.host], null);
+    }
+  }
+}
+
+async function assertFinalSnapshotMutationRejected({
+  suffix,
+  mutateMarkdown,
+  expectedCodes,
+}) {
+  const tx = await import(transactionModule);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    initGit(repoRoot);
+    const beforeDigest = acceptedSourceDigest(repoRoot);
+    const beforeDist = liveDistDigest(repoRoot);
+    const beforeLedger = ledgerListing(repoRoot);
+
+    const begun = tx.beginTransaction({
+      repoRoot,
+      operation: 'refine',
+      scope: [MODULE_PATH],
+      base: 'HEAD',
+    });
+    assert.equal(begun.exitCode, 0, JSON.stringify(begun.diagnostics));
+    refineSummary(begun.workspace, suffix);
+
+    let seamCalled = false;
+    const validated = tx.validateTransaction({
+      repoRoot,
+      workspace: begun.workspace,
+      testSeams: {
+        host: 'claude-code',
+        mutatePayloadBeforeSnapshot({ host, mode, payloadRoot }) {
+          seamCalled = true;
+          assert.equal(host, 'claude-code');
+          assert.equal(mode, 'full');
+          const skillPath = path.join(
+            payloadRoot,
+            'skills/master-orchestrator-guide/SKILL.md',
+          );
+          const markdown = fs.readFileSync(skillPath, 'utf8');
+          fs.writeFileSync(skillPath, mutateMarkdown(markdown));
+        },
+      },
+    });
+
+    assert.equal(seamCalled, true, 'final-byte mutation seam must execute');
+    assert.notEqual(validated.exitCode, 0);
+    assert.equal(validated.validation?.candidate_valid, false);
+    assert.equal(validated.validation?.candidate_runtime_valid, false);
+    const codes = (validated.diagnostics ?? []).map((item) => item.code);
+    for (const code of expectedCodes) {
+      assert.ok(codes.includes(code), `${code} missing from ${JSON.stringify(codes)}`);
+    }
+    assert.ok(
+      !codes.some((code) =>
+        [
+          'SKG-COMPOSITION-NOT-ADMITTED',
+          'SKG-ENTRY-TARGET-CHAIN',
+          'SKG-OWNERSHIP-ORPHAN',
+        ].includes(code),
+      ),
+      `final-byte attack must not corrupt source governance: ${JSON.stringify(codes)}`,
+    );
+    const claude = validated.validation.host_projection_witnesses.find(
+      (item) => item.host === 'claude-code',
+    );
+    assert.ok(claude);
+    assert.equal(claude.ok, false);
+    assert.equal(claude.final_surface_snapshot, undefined);
+    assert.equal(acceptedSourceDigest(repoRoot), beforeDigest);
+    assert.equal(liveDistDigest(repoRoot), beforeDist);
+    assert.deepEqual(ledgerListing(repoRoot), beforeLedger);
+    assert.equal(fs.existsSync(path.join(begun.workspace, 'runtime-candidate')), false);
+  });
+}
+
 function abstainedWitness(host, hash, ok = true) {
   const gate = {
     ok: true,
@@ -237,6 +413,10 @@ test('SKG-TX-RUNTIME-01: validate fail-closes on ENTRY-ANCHOR-MISSING; accepted+
 test('SKG-TX-RUNTIME-02: validate success emits four host witnesses sharing result_graph_sha256', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    const accepted = buildAndValidateGraph({ repoRoot });
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.diagnostics));
+    const coverage = resolveHostCoveragePlan(accepted.graph);
+    assert.deepEqual(coverage.diagnostics, []);
     initGit(repoRoot);
     const beforeDigest = acceptedSourceDigest(repoRoot);
     const beforeDist = liveDistDigest(repoRoot);
@@ -264,17 +444,20 @@ test('SKG-TX-RUNTIME-02: validate success emits four host witnesses sharing resu
     );
     for (const witness of witnesses) {
       assert.equal(witness.ok, true, JSON.stringify(witness));
-      assert.equal(witness.mode, 'full');
+      assertRealAggregateHostMode(witness, coverage.plan[witness.host]);
       assert.equal(witness.conditional_route_policy, 'enabled_by_default-only');
       assert.equal(witness.result_graph_sha256, validated.validation.result_graph_sha256);
       assert.ok(witness.executed_checks.includes('candidate_runtime_sync'));
-      assert.ok(witness.executed_checks.includes('candidate_runtime_compile_check'));
-      assert.ok(!witness.executed_checks.includes('candidate_runtime_compile'));
       for (const gate of ['H1', 'H2', 'H3', 'H4']) {
         assert.equal(witness.hop_report[gate].ok, true, `${witness.host} ${gate}`);
         assert.notEqual(witness.hop_report[gate].witness?.abstained, true);
       }
     }
+    assert.equal(
+      new Set(witnesses.map((item) => item.result_graph_sha256)).size,
+      1,
+      'all four hosts must share one result_graph_sha256',
+    );
 
     const schema = validateAuthoredDocument(validated.validation, 'change');
     assert.equal(schema.ok, true, JSON.stringify(schema.errors));
@@ -447,21 +630,17 @@ test('SKG-TX-RUNTIME-05: workspace symlink escape fails closed and does not dele
 test('SKG-TX-RUNTIME-06: mixed full/partial/stub four-host E2E excludes a real module from partial tree', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
-    const skillDoc = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_PATH), 'utf8'));
-    const covered = ['module:conduct.never-play', 'module:verification.endpoint'];
+    // Keep live planner-honest coverage; only drop one MOG-owned module that is
+    // already on the codex partial allowlist and is not required by remaining
+    // covered point bindings (routing.worker-chain → own references only).
     const excluded = 'module:routing.worker-chain';
-    skillDoc.host_coverage = [
-      { host: 'claude-code', state: 'full' },
-      {
-        host: 'codex',
-        state: 'partial',
-        covered_modules: covered,
-        reason: 'mixed partial fixture excludes routing.worker-chain',
-      },
-      { host: 'cursor', state: 'stub', reason: 'mixed stub fixture' },
-      { host: 'kimi-code', state: 'stub', reason: 'mixed stub fixture' },
-    ];
-    fs.writeFileSync(path.join(repoRoot, SKILL_PATH), `${JSON.stringify(skillDoc, null, 2)}\n`);
+    const covered = dropModuleFromPartialCoverage(repoRoot, {
+      skillPath: SKILL_PATH,
+      host: 'codex',
+      excludedModule: excluded,
+      reason:
+        'fixture: exclude routing.worker-chain from codex partial while preserving real planner peers',
+    });
     initGit(repoRoot);
     const beforeDigest = acceptedSourceDigest(repoRoot);
     const beforeDist = liveDistDigest(repoRoot);
@@ -483,13 +662,15 @@ test('SKG-TX-RUNTIME-06: mixed full/partial/stub four-host E2E excludes a real m
     );
     assert.equal(byHost['claude-code'].mode, 'full');
     assert.equal(byHost.codex.mode, 'partial');
-    assert.equal(byHost.cursor.mode, 'stub');
-    assert.equal(byHost['kimi-code'].mode, 'stub');
-    assert.equal(byHost.cursor.point_anchors, 0);
-    assert.equal(byHost.cursor.enabled_edges, 0);
-    assert.equal(byHost.cursor.artifacts.length, 0);
-    assert.equal(byHost.cursor.hop_report.H1.witness.abstained, true);
+    assert.equal(byHost.cursor.mode, 'partial');
+    assert.equal(byHost['kimi-code'].mode, 'partial');
     assert.equal(byHost.codex.conditional_route_policy, 'enabled_by_default-only');
+    assert.equal(
+      new Set(
+        validated.validation.host_projection_witnesses.map((item) => item.result_graph_sha256),
+      ).size,
+      1,
+    );
     assert.notEqual(byHost.codex.mode, 'full');
     assert.ok(byHost.codex.ok, JSON.stringify(byHost.codex));
     assert.ok(byHost.codex.executed_checks.includes('candidate_runtime_partial_tree'));
@@ -528,10 +709,6 @@ test('SKG-TX-RUNTIME-06: mixed full/partial/stub four-host E2E excludes a real m
     for (const entry of snap.entries ?? []) {
       for (const target of entry.targets ?? []) {
         assert.notEqual(target.module, excluded, JSON.stringify(target));
-        assert.ok(
-          covered.includes(target.module),
-          `entry target module ${target.module} outside covered_modules`,
-        );
       }
     }
     for (const module of snap.modules) {
@@ -545,6 +722,7 @@ test('SKG-TX-RUNTIME-06: mixed full/partial/stub four-host E2E excludes a real m
     assert.ok(skillSnap);
     const coveredFromSnap = skillSnap.covered_modules_by_host.codex;
     assert.ok(Array.isArray(coveredFromSnap));
+    assert.deepEqual(coveredFromSnap, covered);
     for (const moduleId of coveredFromSnap) {
       assert.ok(
         skillSnap.modules.includes(moduleId),
@@ -884,6 +1062,10 @@ test('SKG-TX-RUNTIME-11: validation envelope schema+semantic reject bad hosts/ha
 test('SKG-TX-RUNTIME-12: typed add of accepted edge enters candidate four-host H1-H4', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    const accepted = buildAndValidateGraph({ repoRoot });
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.diagnostics));
+    const coverage = resolveHostCoveragePlan(accepted.graph);
+    assert.deepEqual(coverage.diagnostics, []);
     initGit(repoRoot);
     const beforeDigest = acceptedSourceDigest(repoRoot);
     const beforeDist = liveDistDigest(repoRoot);
@@ -922,15 +1104,22 @@ test('SKG-TX-RUNTIME-12: typed add of accepted edge enters candidate four-host H
     assert.equal(validated.exitCode, 0, JSON.stringify(validated.diagnostics));
     assert.equal(validated.validation.candidate_valid, true);
     assert.equal(validated.validation.candidate_runtime_valid, true);
-    for (const witness of validated.validation.host_projection_witnesses) {
+    const witnesses = validated.validation.host_projection_witnesses;
+    for (const witness of witnesses) {
       assert.equal(witness.ok, true, JSON.stringify(witness));
-      assert.equal(witness.mode, 'full');
+      assertRealAggregateHostMode(witness, coverage.plan[witness.host]);
+      assert.equal(witness.result_graph_sha256, validated.validation.result_graph_sha256);
       for (const gate of ['H1', 'H2', 'H3', 'H4']) {
         assert.equal(witness.hop_report[gate].ok, true, `${witness.host} ${gate}`);
         assert.notEqual(witness.hop_report[gate].witness?.skipped, true);
         assert.notEqual(witness.hop_report[gate].witness?.abstained, true);
       }
     }
+    assert.equal(
+      new Set(witnesses.map((item) => item.result_graph_sha256)).size,
+      1,
+      'all four typed-edge witnesses must share one result_graph_sha256',
+    );
     assert.equal(acceptedSourceDigest(repoRoot), beforeDigest);
     assert.equal(liveDistDigest(repoRoot), beforeDist);
     assert.deepEqual(ledgerListing(repoRoot), beforeLedger);
@@ -1130,65 +1319,86 @@ test('SKG-TX-RUNTIME-15b: forged workspace token+marker never authorizes delete 
 test('SKG-TX-RUNTIME-16: product-path hop failure yields SKG-HOP-* with zero ledger/dist pollution', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    const accepted = buildAndValidateGraph({ repoRoot });
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.diagnostics));
+    assert.ok(
+      !accepted.diagnostics.some((item) =>
+        [
+          'SKG-COMPOSITION-NOT-ADMITTED',
+          'SKG-ENTRY-TARGET-CHAIN',
+          'SKG-OWNERSHIP-ORPHAN',
+        ].includes(item.code),
+      ),
+      JSON.stringify(accepted.diagnostics),
+    );
     initGit(repoRoot);
     const beforeDigest = acceptedSourceDigest(repoRoot);
     const beforeDist = liveDistDigest(repoRoot);
     const beforeLedger = ledgerListing(repoRoot);
-    const PORTFOLIO_PATH = 'plugin/src/knowledge/portfolio.json';
 
     const begun = tx.beginTransaction({
       repoRoot,
       operation: 'refine',
-      scope: [PORTFOLIO_PATH],
+      scope: [MODULE_PATH],
       base: 'HEAD',
     });
     assert.equal(begun.exitCode, 0, JSON.stringify(begun.diagnostics));
+    refineSummary(begun.workspace, '(single structural arc attack)');
 
-    // Tighten a real hop_policy leaf (currently 2) to 1 — schema-legal, not point_diameter_max/0.
-    const portfolioPath = path.join(begun.workspace, 'candidate', PORTFOLIO_PATH);
-    const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-    assert.equal(portfolio.hop_policy.critical_any_point_to_primary_max, 2);
-    portfolio.hop_policy.critical_any_point_to_primary_max = 1;
-    fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-    writeDraft(begun.workspace, {
-      op: 'refine',
-      subject: portfolio.id,
-      changed_fields: ['hop_policy.critical_any_point_to_primary_max'],
-      rationale:
-        'Tighten critical any-point→primary SLO from 2 to 1 to force authored SKG-HOP-H4 on candidate-v2',
+    let seamCalled = false;
+    const atlasModuleArc =
+      '- [容量与截止期决策](./modules/capacity.delivery.md#ccm-k-module-capacity-delivery)';
+
+    const validated = tx.validateTransaction({
+      repoRoot,
+      workspace: begun.workspace,
+      testSeams: {
+        host: 'claude-code',
+        mutatePayloadBeforeVerify({ host, mode, payloadRoot }) {
+          seamCalled = true;
+          assert.equal(host, 'claude-code');
+          assert.equal(mode, 'full');
+          const atlasPath = path.join(payloadRoot, 'knowledge/atlas.md');
+          const atlas = fs.readFileSync(atlasPath, 'utf8');
+          assert.equal(atlas.split(atlasModuleArc).length - 1, 1);
+          fs.writeFileSync(atlasPath, atlas.replace(`${atlasModuleArc}\n`, ''));
+        },
+      },
     });
-
-    const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
+    assert.equal(seamCalled, true, 'fixture seam must run after publish and before hop verify');
     assert.notEqual(validated.exitCode, 0);
     assert.equal(validated.validation?.candidate_valid, false);
     assert.equal(validated.validation?.candidate_runtime_valid, false);
     const codes = (validated.diagnostics ?? []).map((item) => item.code);
-    assert.ok(
-      codes.some((code) => String(code).startsWith('SKG-HOP-')),
-      JSON.stringify(codes),
-    );
+    assert.ok(codes.includes('SKG-HOP-H1'), JSON.stringify(codes));
+    assert.ok(codes.includes('SKG-HOP-H2'), JSON.stringify(codes));
     assert.ok(
       !codes.some((code) =>
         [
-          'SKG-SCHEMA-INVALID',
-          'SKG-CHANGE-SCHEMA-INVALID',
-          'SKG-CHANGE-PRECONDITION',
-          'SKG-CHANGE-UNEXPLAINED-DIFF',
+          'SKG-COMPOSITION-NOT-ADMITTED',
+          'SKG-ENTRY-TARGET-CHAIN',
+          'SKG-OWNERSHIP-ORPHAN',
         ].includes(code),
       ),
-      `hop product gate must not be early schema/semantic substitute: ${JSON.stringify(codes)}`,
+      `structural-arc attack must preserve admission and ownership: ${JSON.stringify(codes)}`,
     );
-    for (const witness of validated.validation?.host_projection_witnesses ?? []) {
-      if (witness.mode === 'full' || witness.mode === 'partial') {
-        assert.equal(witness.ok, false);
-        assert.equal(witness.hop_report.H4.ok, false);
-        assert.notEqual(witness.hop_report.H4.witness?.skipped, true);
-        assert.notEqual(witness.hop_report.H4.witness?.abstained, true);
-      }
-    }
+    const claude = validated.validation.host_projection_witnesses.find(
+      (item) => item.host === 'claude-code',
+    );
+    assert.ok(claude);
+    assert.equal(claude.ok, false);
+    assert.equal(claude.mode, 'full');
+    assert.equal(claude.hop_report.H1.ok, false);
+    assert.equal(claude.hop_report.H2.ok, false);
+    assert.equal(claude.hop_report.H3.ok, true);
+    assert.equal(claude.hop_report.H4.ok, true);
+    assert.notEqual(claude.hop_report.H1.witness?.skipped, true);
+    assert.notEqual(claude.hop_report.H1.witness?.abstained, true);
+    assert.equal(claude.final_surface_snapshot, undefined);
     assert.equal(acceptedSourceDigest(repoRoot), beforeDigest);
     assert.equal(liveDistDigest(repoRoot), beforeDist);
     assert.deepEqual(ledgerListing(repoRoot), beforeLedger);
+    assert.equal(fs.existsSync(path.join(begun.workspace, 'runtime-candidate')), false);
   });
 });
 
@@ -1248,7 +1458,7 @@ test('SKG-TX-RUNTIME-17: enabled_by_default false edge absent from final reparse
     );
     const fromAdj = snap.enabled_adjacency['point:conduct.never-play'] ?? [];
     assert.ok(
-      !fromAdj.some((item) => item.edge_id === disabledId),
+      !fromAdj.some((item) => item.id === disabledId),
       `disabled edge leaked into enabled_adjacency: ${JSON.stringify(fromAdj)}`,
     );
 
@@ -1266,13 +1476,14 @@ test('SKG-TX-RUNTIME-17: enabled_by_default false edge absent from final reparse
 test('SKG-TX-RUNTIME-18: all-stub transaction E2E does not create runtime-candidate', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
-    const skillDoc = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_PATH), 'utf8'));
-    skillDoc.host_coverage = PRODUCT_HOSTS.map((host) => ({
-      host,
-      state: 'stub',
-      reason: 'all-stub transaction e2e',
-    }));
-    fs.writeFileSync(path.join(repoRoot, SKILL_PATH), `${JSON.stringify(skillDoc, null, 2)}\n`);
+    setAllPortfolioHostCoverage(
+      repoRoot,
+      PRODUCT_HOSTS.map((host) => ({
+        host,
+        state: 'stub',
+        reason: 'all-stub transaction e2e',
+      })),
+    );
     initGit(repoRoot);
 
     const begun = tx.beginTransaction({
@@ -1350,5 +1561,39 @@ test('SKG-TX-RUNTIME-19: apply rejects runtime-only candidate corruption after v
     assert.equal(acceptedSourceDigest(repoRoot), beforeDigest);
     assert.equal(liveDistDigest(repoRoot), beforeDist);
     assert.deepEqual(ledgerListing(repoRoot), beforeLedger);
+  });
+});
+
+test('SKG-TX-RUNTIME-20A: deleting a complete authored edge nav line fails final snapshot closed', async () => {
+  const marker = '<!-- ccm:k:edge edge:conduct.principle-to-red-lines -->';
+  await assertFinalSnapshotMutationRejected({
+    suffix: '(delete expected edge marker)',
+    expectedCodes: ['SKG-CHANGE-SNAPSHOT-EDGE-SET-MISMATCH'],
+    mutateMarkdown(markdown) {
+      const lines = markdown.split('\n');
+      const matches = lines.filter((line) => line.includes(marker));
+      assert.equal(matches.length, 1, 'expected exactly one authored edge nav line');
+      return lines.filter((line) => !line.includes(marker)).join('\n');
+    },
+  });
+});
+
+test('SKG-TX-RUNTIME-20B: orphan edge marker outside compiler nav block fails final snapshot closed', async () => {
+  await assertFinalSnapshotMutationRejected({
+    suffix: '(orphan edge marker)',
+    expectedCodes: ['SKG-CHANGE-SNAPSHOT-OVERLAY-ORPHAN'],
+    mutateMarkdown(markdown) {
+      return `${markdown}\n<!-- ccm:k:edge edge:review.orphan-final-marker -->\n`;
+    },
+  });
+});
+
+test('SKG-TX-RUNTIME-20C: malformed edge marker outside compiler nav block fails final snapshot closed', async () => {
+  await assertFinalSnapshotMutationRejected({
+    suffix: '(malformed edge marker)',
+    expectedCodes: ['SKG-CHANGE-SNAPSHOT-OVERLAY-MALFORMED'],
+    mutateMarkdown(markdown) {
+      return `${markdown}\n<!-- ccm:k:edge edge:INVALID -->\n`;
+    },
   });
 });

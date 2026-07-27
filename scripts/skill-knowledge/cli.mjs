@@ -17,6 +17,7 @@ import {
   validateTransaction,
 } from './transactions.mjs';
 import { assertReportFormat, runExplain, runPath, runReport } from './query.mjs';
+import { runMaterialize } from './graph-first.mjs';
 
 const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
 
@@ -24,6 +25,7 @@ Commands:
   contract [--json]
   check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
   compile [--source <dir>] [--host <host>] [--check] [--json]
+  materialize --composition <id> [--check] [--json]
   change begin --op <${'add|wording|refine|move|split|merge|transfer_owner|deprecate|retire'}> --scope <path...> --base <git-ref> [--json]
   change validate <workspace> [--json]
   change apply <workspace> [--json]
@@ -219,6 +221,17 @@ function renderHuman(body) {
     }
     return lines.join('\n');
   }
+  if (body.result_kind === 'materialize') {
+    const lines = [
+      `skill-knowledge materialize: ${body.ok ? 'OK' : 'FAILED'}`,
+      `composition: ${body.composition ?? ''}`,
+      `hosts: ${(body.hosts ?? []).join(', ')}`,
+    ];
+    for (const item of body.diagnostics ?? []) {
+      lines.push(`${item.severity.toUpperCase()} ${item.code}: ${item.message}`);
+    }
+    return lines.join('\n');
+  }
   return body.diagnostics
     .map((item) => `${item.severity.toUpperCase()} ${item.code}: ${item.message}`)
     .join('\n');
@@ -331,6 +344,45 @@ export function main(argv = process.argv.slice(2)) {
       check: options.check,
     });
     emit(result.body, options.json || json);
+    return result.exitCode;
+  }
+
+  if (command === 'materialize') {
+    let composition = undefined;
+    let checkOnly = false;
+    let materializeJson = json;
+    const args = argv.slice(argv.indexOf(command) + 1);
+    try {
+      for (let index = 0; index < args.length; index += 1) {
+        const token = args[index];
+        if (token === '--json') materializeJson = true;
+        else if (token === '--check') checkOnly = true;
+        else if (token === '--composition') {
+          index += 1;
+          if (!args[index]) throw new Error('--composition requires an id');
+          composition = args[index];
+        } else if (token === '--analysis-override') {
+          throw new Error(
+            '--analysis-override is forbidden; verdicts are derived from authored analysis + graph metrics',
+          );
+        } else {
+          throw new Error(`unknown materialize argument: ${token}`);
+        }
+      }
+    } catch (error) {
+      emit(usageFailure(command, error.message), materializeJson);
+      return EXIT_CODES.usage;
+    }
+    if (!composition) {
+      emit(usageFailure(command, '--composition is required'), materializeJson);
+      return EXIT_CODES.usage;
+    }
+    const result = runMaterialize({
+      repoRoot,
+      compositionId: composition,
+      checkOnly,
+    });
+    emit(result.body, materializeJson);
     return result.exitCode;
   }
 

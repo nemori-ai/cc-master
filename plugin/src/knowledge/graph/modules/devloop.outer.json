@@ -2,7 +2,6 @@
   "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
   "kind": "module",
   "id": "module:devloop.outer",
-  "owner_skill": "skill:dev-as-ml-loop",
   "title": "外层编排与组件分工",
   "intent": "让 orchestrator 把外层 loop 建成可调度的优化系统，而不是 work order。",
   "recognition_cues": [

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc-master.dev/schemas/skill-knowledge-source-v1alpha1.json",
   "title": "cc-master skill knowledge authored source",
-  "description": "Normative source contract for portfolio, skill, and module shards.",
+  "description": "Normative source contract for portfolio, skill, module, composition, and candidate_analysis shards (graph-first).",
   "oneOf": [
     {
       "$ref": "#/$defs/portfolio"
@@ -12,6 +12,12 @@
     },
     {
       "$ref": "#/$defs/module"
+    },
+    {
+      "$ref": "#/$defs/composition"
+    },
+    {
+      "$ref": "#/$defs/candidateAnalysis"
     }
   ],
   "$defs": {
@@ -45,6 +51,14 @@
     "subjectId": {
       "type": "string",
       "pattern": "^subject:[a-z0-9][a-z0-9.-]*$"
+    },
+    "compositionId": {
+      "type": "string",
+      "pattern": "^composition:skill\\.[a-z0-9][a-z0-9.-]*$"
+    },
+    "analysisId": {
+      "type": "string",
+      "pattern": "^analysis:candidate\\.[a-z0-9][a-z0-9.-]*$"
     },
     "sha256": {
       "type": "string",
@@ -516,6 +530,57 @@
         }
       }
     },
+    "candidateAdmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inventory_max_utf8_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inventory_max_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inventory_max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_internal_cohesion": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)."
+        },
+        "max_external_edge_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_overlap_shared_modules": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Max modules shared with any other accepted composition peer."
+        },
+        "require_ssot_closure": {
+          "type": "boolean"
+        },
+        "require_four_host_denominator": {
+          "type": "boolean"
+        },
+        "reject_all_hosts_unsupported": {
+          "type": "boolean"
+        },
+        "require_declared_projection": {
+          "type": "boolean",
+          "description": "Declared full/partial host_coverage must pass planSkillProjection at that level."
+        },
+        "hop_gate": {
+          "enum": [
+            "directed_projection_topology"
+          ],
+          "description": "Admission uses expected directed projection topology (SCC=1 + diameter ≤ point_diameter_max). Undirected metrics are observational only."
+        }
+      }
+    },
     "portfolioSkillRef": {
       "type": "object",
       "additionalProperties": false,
@@ -611,6 +676,9 @@
         },
         "router_budget": {
           "$ref": "#/$defs/routerBudget"
+        },
+        "candidate_admission": {
+          "$ref": "#/$defs/candidateAdmission"
         },
         "rollout": {
           "enum": [
@@ -1152,6 +1220,388 @@
         }
       }
     },
+    "compositionConsumes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "modules"
+      ],
+      "properties": {
+        "modules": {
+          "description": "Single consumption SSOT: module locators with id + manifest. No parallel modules[] on composition.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/moduleRef"
+          }
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "id",
+        "skill_id",
+        "name",
+        "package_root",
+        "intent",
+        "consumes",
+        "entry_modules",
+        "canonical_source_inventory",
+        "host_coverage",
+        "analysis_ref",
+        "lifecycle",
+        "admission"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "kind": {
+          "const": "composition"
+        },
+        "id": {
+          "$ref": "#/$defs/compositionId"
+        },
+        "skill_id": {
+          "$ref": "#/$defs/skillId"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "package_root": {
+          "type": "string",
+          "pattern": "^plugin/src/skills/[a-z0-9-]+$"
+        },
+        "intent": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "consumes": {
+          "$ref": "#/$defs/compositionConsumes"
+        },
+        "entry_modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/moduleId"
+          },
+          "uniqueItems": true
+        },
+        "canonical_source_inventory": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceInventoryEntry"
+          }
+        },
+        "host_coverage": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/hostCoverage"
+          }
+        },
+        "analysis_ref": {
+          "$ref": "#/$defs/analysisId"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        }
+      }
+    },
+    "candidateScoresheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "D1",
+        "D2",
+        "D3"
+      ],
+      "properties": {
+        "D1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "score",
+            "evidence"
+          ],
+          "properties": {
+            "score": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "evidence": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        },
+        "D2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "score",
+            "evidence"
+          ],
+          "properties": {
+            "score": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "evidence": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        },
+        "D3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "probe_a",
+            "probe_b",
+            "evidence",
+            "evidence_refs"
+          ],
+          "properties": {
+            "probe_a": {
+              "enum": [
+                "weak",
+                "strong"
+              ]
+            },
+            "probe_b": {
+              "enum": [
+                "weak",
+                "strong"
+              ]
+            },
+            "evidence": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "candidateAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "kind",
+        "id",
+        "skill_id",
+        "composition_id",
+        "candidate_modules",
+        "scoresheet",
+        "graph_metrics",
+        "verdict",
+        "witness",
+        "lifecycle",
+        "admission"
+      ],
+      "properties": {
+        "schema_version": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "kind": {
+          "const": "candidate_analysis"
+        },
+        "id": {
+          "$ref": "#/$defs/analysisId"
+        },
+        "skill_id": {
+          "$ref": "#/$defs/skillId"
+        },
+        "composition_id": {
+          "$ref": "#/$defs/compositionId"
+        },
+        "candidate_modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/moduleId"
+          },
+          "uniqueItems": true
+        },
+        "scoresheet": {
+          "$ref": "#/$defs/candidateScoresheet"
+        },
+        "graph_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "module_count",
+            "point_count",
+            "internal_edge_count",
+            "external_edge_count"
+          ],
+          "properties": {
+            "module_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "point_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "internal_edge_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "external_edge_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "verdict": {
+          "enum": [
+            "admit",
+            "reject",
+            "reference",
+            "decompose"
+          ]
+        },
+        "witness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "composition_id",
+            "candidate_modules",
+            "candidate_points",
+            "trigger_job_coherence",
+            "internal_cohesion",
+            "external_cut_coupling",
+            "overlap_signature",
+            "ssot_closure",
+            "budgets",
+            "host_portability",
+            "hop",
+            "graph_metrics",
+            "admission_gates"
+          ],
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "composition_id": {
+              "$ref": "#/$defs/compositionId"
+            },
+            "candidate_modules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/moduleId"
+              }
+            },
+            "candidate_points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/pointId"
+              }
+            },
+            "trigger_job_coherence": {
+              "type": "boolean"
+            },
+            "internal_cohesion": {
+              "type": "number"
+            },
+            "external_cut_coupling": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "overlap_signature": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/moduleId"
+                }
+              }
+            },
+            "ssot_closure": {
+              "type": "boolean"
+            },
+            "budgets": {
+              "type": "object"
+            },
+            "host_portability": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "hop": {
+              "type": "object"
+            },
+            "graph_metrics": {
+              "type": "object"
+            },
+            "admission_gates": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ok",
+                "module_count_matches_candidate",
+                "point_count_positive",
+                "trigger_job_coherence",
+                "ssot_closure",
+                "internal_cohesion",
+                "external_cut",
+                "overlap_within_budget",
+                "hop",
+                "read_budget",
+                "token_budget",
+                "four_host_denominator",
+                "host_portability"
+              ],
+              "properties": {
+                "ok": { "type": "boolean" },
+                "module_count_matches_candidate": { "type": "boolean" },
+                "point_count_positive": { "type": "boolean" },
+                "trigger_job_coherence": { "type": "boolean" },
+                "ssot_closure": { "type": "boolean" },
+                "internal_cohesion": { "type": "boolean" },
+                "external_cut": { "type": "boolean" },
+                "overlap_within_budget": { "type": "boolean" },
+                "hop": { "type": "boolean" },
+                "read_budget": { "type": "boolean" },
+                "token_budget": { "type": "boolean" },
+                "four_host_denominator": { "type": "boolean" },
+                "host_portability": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
+        }
+      }
+    },
     "module": {
       "type": "object",
       "additionalProperties": false,
@@ -1159,7 +1609,6 @@
         "schema_version",
         "kind",
         "id",
-        "owner_skill",
         "title",
         "intent",
         "recognition_cues",
@@ -1181,6 +1630,7 @@
           "$ref": "#/$defs/moduleId"
         },
         "owner_skill": {
+          "description": "Legacy skill-first field. Forbidden on graph-first global modules; transitional only for unmigrated skills.",
           "$ref": "#/$defs/skillId"
         },
         "title": {

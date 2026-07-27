@@ -24,10 +24,10 @@
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.estimation](../../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
-- [requires: baseline 是 EVM 前置](./estimation.md#ccm-k-point-pacing-baseline-precondition)
-- [deepens_to: 交付 DDL 风险消费](./estimation.md#ccm-k-point-pacing-deadline-risk)
-- [requires: 估算诚实字段](./estimation.md#ccm-k-point-pacing-honest-fields)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [requires: baseline 是 EVM 前置](./estimation.md#ccm-k-point-pacing-baseline-precondition) <!-- ccm:k:edge edge:pacing.verbs-to-baseline -->
+- [deepens_to: 交付 DDL 风险消费](./estimation.md#ccm-k-point-pacing-deadline-risk) <!-- ccm:k:edge edge:pacing.verbs-to-ddl -->
+- [requires: 估算诚实字段](./estimation.md#ccm-k-point-pacing-honest-fields) <!-- ccm:k:edge edge:pacing.verbs-to-honest -->
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.verbs-to-global -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-pacing-deadline-risk"></a>
 <!-- ccm:k:start point:pacing.deadline-risk -->
@@ -47,8 +47,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.estimation](../../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
-- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.ddl-to-verbs -->
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.ddl -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-pacing-baseline-precondition"></a>
 <!-- ccm:k:start point:pacing.baseline-precondition -->
@@ -66,8 +66,8 @@ EVM 只在此前已经建立 plan baseline 时可计算。baseline 是 board 内
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.estimation](../../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
-- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.baseline-to-verbs -->
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.baseline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-pacing-honest-fields"></a>
 <!-- ccm:k:start point:pacing.honest-fields -->
@@ -88,8 +88,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.estimation](../../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
-- [applies_to: usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.honest -->
+- [applies_to: usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension) <!-- ccm:k:edge edge:pacing.honest-to-tension -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-pacing-usage-estimate-tension"></a>
 <!-- ccm:k:start point:pacing.usage-estimate-tension -->
@@ -104,6 +104,6 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:pacing.estimation](../../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
-- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs)
-- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [routes_to: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.tension-to-verbs -->
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.tension -->
 <!-- ccm:k:nav:end -->

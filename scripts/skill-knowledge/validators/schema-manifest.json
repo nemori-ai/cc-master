@@ -1,14 +1,14 @@
 {
   "algorithm": "cc-master/skill-knowledge-schema-fingerprint/v1",
   "schemas": {
-    "knowledge-source.schema.json": "bfa2d184cbe63503c776cf5e92de1b8ec3337822a9f83ecef58d406cdda9515f",
-    "knowledge-change.schema.json": "5cc39f3b8010c8c53eb0050102c718790cf82aca130da18410e9af98bb87dd43",
-    "knowledge-cli-output.schema.json": "e9f072e79f9b96e04c0d9ac09ebf91f4c7a1654937fd5a56d0527dad38267e97"
+    "knowledge-source.schema.json": "bcc4f34436630d3a18feb7a17e7bf2ff9b15f899f5d4d482447855b33c18afbc",
+    "knowledge-change.schema.json": "c4e64c4b43a52c7feae5bac4a181819a5b3dabfc312fc09766be548fb10b47a5",
+    "knowledge-cli-output.schema.json": "0451fe148188f756d28137f4541aa90a1d97ef07fd7e94b00af0b4b3a8d77545"
   },
-  "fingerprint": "02ba5253bb96d71ccde23b106284b21942b7790a387e99cbbf2dc942e2e66580",
+  "fingerprint": "d78e93d46c89453cc14a62e772c806f1fec5873f1ad49be8983468093ee685a1",
   "bundles": {
-    "validate-source.cjs": "31209acc3f64ef2eddcc43d1e8522d510a671ee17bfe3678b33a22444b82494d",
-    "validate-change.cjs": "b78e818ed5042b25e80a5dd5c437a6a1e17d836611cf61325a793dfb3ec184ba",
-    "validate-output.cjs": "5dd78da9538498284d5fbb4d79692235e4a9b71d3bb062649dcaabcc64f7cf24"
+    "validate-source.cjs": "6872d76c26ee699936e46e495902147430af83a5ccca0488aaf0870e973ff8fd",
+    "validate-change.cjs": "5cae9c6c05e75c24710fdc22e5e534d5a6a8d5af2e12d5754271d434baf49fb3",
+    "validate-output.cjs": "c167ec86fcc8213521c4b05968821208d50859ab33072cfa305dfb6985ef9c62"
   }
 }

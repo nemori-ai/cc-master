@@ -448,11 +448,11 @@ test('CODEX-A-product: disabled authored edge absent from snapshot edges and adj
     assert.ok(!snap.edges.some((item) => item.id === disabledId));
     assert.ok(!snap.enabled_edge_ids.includes(disabledId));
     const adj = snap.enabled_adjacency['point:conduct.never-play'] ?? [];
-    assert.ok(!adj.some((item) => item.edge_id === disabledId));
+    assert.ok(!adj.some((item) => item.id === disabledId));
   });
 });
 
-test('CODEX-A-product: multi-match enabled edges for one nav link fail closed without snapshot', async () => {
+test('CODEX-A-product: parallel typed edges keep distinct edge-id markers in snapshot', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
     initGit(repoRoot);
@@ -472,7 +472,7 @@ test('CODEX-A-product: multi-match enabled edges for one nav link fail closed wi
       type: 'deepens_to',
       from: 'point:conduct.never-play',
       to: 'point:conduct.red-lines',
-      when: ['duplicate enabled endpoints for snapshot ambiguity'],
+      when: ['second typed relation on same endpoints'],
       path_role: 'support',
       order: 99,
       runtime: { enabled_by_default: true },
@@ -481,29 +481,41 @@ test('CODEX-A-product: multi-match enabled edges for one nav link fail closed wi
     writeDraft(begun.workspace, {
       op: 'add',
       entities: [dupId],
-      rationale: 'multi-match enabled edges must fail closed on snapshot',
+      rationale: 'parallel typed edges must retain both ids via ccm:k:edge markers',
     });
     const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
-    assert.notEqual(validated.exitCode, 0);
-    const amb = (validated.diagnostics ?? []).filter(
-      (item) => item.code === 'SKG-CHANGE-SNAPSHOT-EDGE-AMBIGUOUS',
+    assert.equal(
+      validated.exitCode,
+      0,
+      JSON.stringify((validated.diagnostics ?? []).filter((d) => d.severity === 'error').slice(0, 8)),
     );
-    assert.ok(amb.length > 0, JSON.stringify((validated.diagnostics ?? []).map((d) => d.code)));
-    assert.equal(amb[0].witness.from, 'point:conduct.never-play');
-    assert.equal(amb[0].witness.to, 'point:conduct.red-lines');
-    assert.ok(amb[0].witness.candidate_edge_ids.includes(dupId));
-    assert.ok(amb[0].witness.candidate_edge_ids.includes('edge:conduct.principle-to-red-lines'));
-    assert.ok(amb[0].witness.host);
+    assert.equal(
+      (validated.diagnostics ?? []).filter((d) => d.code === 'SKG-CHANGE-SNAPSHOT-EDGE-AMBIGUOUS')
+        .length,
+      0,
+    );
+    let sawBoth = false;
     for (const witness of validated.validation?.host_projection_witnesses ?? []) {
-      if (witness.mode === 'full' || witness.mode === 'partial') {
-        assert.equal(witness.ok, false);
-        assert.equal(witness.final_surface_snapshot, undefined);
+      if (witness.mode !== 'full' && witness.mode !== 'partial') continue;
+      assert.equal(witness.ok, true, JSON.stringify(witness.diagnostics?.slice?.(0, 3) ?? witness));
+      const snap = witness.final_surface_snapshot;
+      assert.ok(snap, 'expected final_surface_snapshot');
+      const ids = new Set((snap.edges ?? []).map((edge) => edge.id));
+      if (ids.has(dupId) && ids.has('edge:conduct.principle-to-red-lines')) {
+        sawBoth = true;
+        for (const edge of snap.edges) {
+          assert.ok(edge.type);
+          assert.equal(edge.enabled, true);
+          assert.ok(edge.from);
+          assert.ok(edge.to);
+        }
       }
     }
+    assert.equal(sawBoth, true, 'expected both parallel edge ids in at least one host snapshot');
   });
 });
 
-test('CODEX-A-product: 0-match orphan nav link fail closed without snapshot', async () => {
+test('CODEX-A-product: orphan nav link without edge marker fail closed without snapshot', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
     initGit(repoRoot);
@@ -518,7 +530,7 @@ test('CODEX-A-product: 0-match orphan nav link fail closed without snapshot', as
       repoRoot,
       workspace: begun.workspace,
       testSeams: {
-        host: 'claude-code',
+        // Inject on every projected host so each full/partial witness fail-closes.
         mutatePayloadBeforeSnapshot({ payloadRoot }) {
           const skillMd = path.join(
             payloadRoot,
@@ -531,10 +543,8 @@ test('CODEX-A-product: 0-match orphan nav link fail closed without snapshot', as
           const end = text.indexOf('<!-- ccm:k:nav:end -->', idx);
           assert.ok(end > idx);
           const injected =
-            '\n- [orphan 0-match](./SKILL.md#ccm-k-point-conduct-deserting-podium)';
-          const next =
-            text.slice(0, end) + injected + text.slice(end);
-          // Body link outside nav must remain ignored; plant one to prove boundary.
+            '\n- [orphan missing-marker](./SKILL.md#ccm-k-point-conduct-deserting-podium)';
+          const next = text.slice(0, end) + injected + text.slice(end);
           const withBody =
             next +
             '\n\n[body link ignored](./SKILL.md#ccm-k-point-conduct-deserting-podium)\n';
@@ -543,22 +553,18 @@ test('CODEX-A-product: 0-match orphan nav link fail closed without snapshot', as
       },
     });
     assert.notEqual(validated.exitCode, 0);
-    const amb = (validated.diagnostics ?? []).filter(
-      (item) => item.code === 'SKG-CHANGE-SNAPSHOT-EDGE-AMBIGUOUS',
+    const missing = (validated.diagnostics ?? []).filter(
+      (item) => item.code === 'SKG-CHANGE-SNAPSHOT-EDGE-MISSING-MARKER',
     );
-    assert.ok(amb.length > 0, JSON.stringify((validated.diagnostics ?? []).map((d) => d.code)));
-    const orphan = amb.find(
-      (item) =>
-        item.witness?.from === 'point:conduct.never-play' &&
-        item.witness?.to === 'point:conduct.deserting-podium',
-    );
-    assert.ok(orphan, JSON.stringify(amb.map((item) => item.witness)));
-    assert.deepEqual(orphan.witness.candidate_edge_ids, []);
-    const claude = validated.validation?.host_projection_witnesses?.find(
-      (item) => item.host === 'claude-code',
-    );
-    assert.equal(claude?.ok, false);
-    assert.equal(claude?.final_surface_snapshot, undefined);
+    assert.ok(missing.length > 0, JSON.stringify((validated.diagnostics ?? []).map((d) => d.code)));
+    assert.equal(missing[0].witness.from, 'point:conduct.never-play');
+    assert.equal(missing[0].witness.to, 'point:conduct.deserting-podium');
+    for (const witness of validated.validation?.host_projection_witnesses ?? []) {
+      if (witness.mode === 'full' || witness.mode === 'partial') {
+        assert.equal(witness.ok, false);
+        assert.equal(witness.final_surface_snapshot, undefined);
+      }
+    }
   });
 });
 
@@ -571,9 +577,10 @@ test('CODEX-E: envelope rejects snapshot edge-set mismatches', () => {
   };
   const edge = {
     id: 'edge:conduct.principle-to-red-lines',
+    type: 'routes_to',
     from: 'point:conduct.never-play',
     to: 'point:conduct.red-lines',
-    enabled_by_default: true,
+    enabled: true,
   };
   const goodSnap = {
     host: 'claude-code',
@@ -588,7 +595,7 @@ test('CODEX-E: envelope rejects snapshot edge-set mismatches', () => {
     entries: [],
     enabled_edge_ids: [edge.id],
     enabled_adjacency: {
-      [edge.from]: [{ to: edge.to, edge_id: edge.id }],
+      [edge.from]: [{ ...edge }],
     },
   };
   const baseFull = {
@@ -669,6 +676,25 @@ test('CODEX-E: envelope rejects snapshot edge-set mismatches', () => {
     ),
   );
 
+  const disabled = structuredClone(doc);
+  disabled.host_projection_witnesses[0].final_surface_snapshot.edges[0].enabled = false;
+  assert.ok(
+    validateChangeValidationSemantics(disabled, { runtimeValid: true }).some(
+      (item) => item.code === 'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
+    ),
+    'enabled:false edge rows must never remain schema/semantic green',
+  );
+
+  const adjacencyTypeMismatch = structuredClone(doc);
+  adjacencyTypeMismatch.host_projection_witnesses[0].final_surface_snapshot
+    .enabled_adjacency[edge.from][0].type = 'summarizes';
+  assert.ok(
+    validateChangeValidationSemantics(adjacencyTypeMismatch, { runtimeValid: true }).some(
+      (item) => item.code === 'SKG-CHANGE-VALIDATION-SNAPSHOT-EDGE-SET',
+    ),
+    'adjacency type must exactly match the edge row',
+  );
+
   const forged = structuredClone(doc);
   forged.host_projection_witnesses[0].final_surface_snapshot.enabled_edge_ids = [
     edge.id,
@@ -679,9 +705,10 @@ test('CODEX-E: envelope rejects snapshot edge-set mismatches', () => {
     edge,
     {
       id: 'edge:forged-extra',
+      type: 'routes_to',
       from: 'point:conduct.never-play',
       to: 'point:conduct.deserting-podium',
-      enabled_by_default: true,
+      enabled: true,
     },
   ];
   // adjacency still only the real edge → forge / incomplete correspondence
@@ -700,8 +727,8 @@ test('CODEX-E: envelope rejects snapshot edge-set mismatches', () => {
   dupIds.host_projection_witnesses[0].final_surface_snapshot.edges = [edge, { ...edge }];
   dupIds.host_projection_witnesses[0].final_surface_snapshot.enabled_adjacency = {
     [edge.from]: [
-      { to: edge.to, edge_id: edge.id },
-      { to: edge.to, edge_id: edge.id },
+      { ...edge },
+      { ...edge },
     ],
   };
   assert.ok(
@@ -785,6 +812,13 @@ test('CODEX-B: standalone change validator enforces mode+ok snapshot branches', 
   const red = validateAuthoredDocument(okFullMissingSnap, 'change');
   assert.equal(red.ok, false, 'ok full without snapshot must fail schema');
 
+  const edge = {
+    id: 'edge:conduct.principle-to-red-lines',
+    type: 'routes_to',
+    from: 'point:conduct.never-play',
+    to: 'point:conduct.red-lines',
+    enabled: true,
+  };
   const snap = {
     host: 'claude-code',
     mode: 'full',
@@ -794,14 +828,52 @@ test('CODEX-B: standalone change validator enforces mode+ok snapshot branches', 
     skills: [],
     modules: [],
     points: [],
-    edges: [],
+    edges: [edge],
     entries: [],
-    enabled_edge_ids: [],
-    enabled_adjacency: {},
+    enabled_edge_ids: [edge.id],
+    enabled_adjacency: {
+      [edge.from]: [{ ...edge }],
+    },
   };
   okFullMissingSnap.host_projection_witnesses[0].final_surface_snapshot = snap;
   const green = validateAuthoredDocument(okFullMissingSnap, 'change');
   assert.equal(green.ok, true, JSON.stringify(green.errors?.slice(0, 8)));
+
+  const disabledEdge = structuredClone(okFullMissingSnap);
+  disabledEdge.host_projection_witnesses[0].final_surface_snapshot.edges[0].enabled = false;
+  assert.equal(
+    validateAuthoredDocument(disabledEdge, 'change').ok,
+    false,
+    'snapshot edge rows must be schema-constant enabled:true',
+  );
+
+  const disabledAdjacency = structuredClone(okFullMissingSnap);
+  disabledAdjacency.host_projection_witnesses[0].final_surface_snapshot
+    .enabled_adjacency[edge.from][0].enabled = false;
+  assert.equal(
+    validateAuthoredDocument(disabledAdjacency, 'change').ok,
+    false,
+    'snapshot adjacency rows must be schema-constant enabled:true',
+  );
+
+  const looseAdjacency = structuredClone(okFullMissingSnap);
+  looseAdjacency.host_projection_witnesses[0].final_surface_snapshot
+    .enabled_adjacency[edge.from][0].edge_id = edge.id;
+  assert.equal(
+    validateAuthoredDocument(looseAdjacency, 'change').ok,
+    false,
+    'snapshot adjacency rows must reject additional properties',
+  );
+
+  const duplicateEnabledId = structuredClone(okFullMissingSnap);
+  duplicateEnabledId.host_projection_witnesses[0].final_surface_snapshot.enabled_edge_ids.push(
+    edge.id,
+  );
+  assert.equal(
+    validateAuthoredDocument(duplicateEnabledId, 'change').ok,
+    false,
+    'enabled_edge_ids must be schema-unique',
+  );
 
   const failedWithSnap = structuredClone(okFullMissingSnap);
   failedWithSnap.host_projection_witnesses[0].ok = false;

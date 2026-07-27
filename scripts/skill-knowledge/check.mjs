@@ -17,12 +17,14 @@ import {
   validatorsAvailable,
 } from './schema.mjs';
 
-const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module']);
+  const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module', 'composition', 'candidate_analysis']);
 const STAGES = new Set(['K0', 'K1', 'K2', 'K3']);
 const ID_PATTERNS = Object.freeze({
   portfolio: /^portfolio:[a-z0-9][a-z0-9.-]*$/,
   skill: /^skill:[a-z0-9][a-z0-9.-]*$/,
   module: /^module:[a-z0-9][a-z0-9.-]*$/,
+  composition: /^composition:skill\.[a-z0-9][a-z0-9.-]*$/,
+  candidate_analysis: /^analysis:candidate\.[a-z0-9][a-z0-9.-]*$/,
   change: /^change:[0-9]{8}\.[a-z0-9][a-z0-9.-]*$/,
 });
 
@@ -180,7 +182,7 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
     );
   }
 
-  const counts = { portfolio: 0, skill: 0, module: 0, change: 0 };
+  const counts = { portfolio: 0, skill: 0, module: 0, composition: 0, candidate_analysis: 0, change: 0 };
   const identities = new Map();
   let documents = 0;
   const files =
@@ -322,9 +324,12 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
 
   const exitCode = selectExitCode(diagnostics);
   const publicDiagnostics = diagnostics.map(outputDiagnostic);
+  // summary.skill = skill product views (legacy skill shards + admitted compositions).
+  // composition / candidate_analysis remain separate authored-kind counters.
   const summary = {
     documents,
     ...counts,
+    skill: counts.skill + counts.composition,
     errors: publicDiagnostics.filter((item) => item.severity === 'error').length,
     debts: publicDiagnostics.filter((item) => item.severity === 'debt').length,
   };

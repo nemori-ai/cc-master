@@ -49,7 +49,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
-- [routes_to: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [routes_to: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:verification.procedure-to-principle -->
 <!-- ccm:k:nav:end -->
 ### resume 第 0 步：先 `cd` 进 `board.git.worktree`，确认 cwd == 它，再接手
 

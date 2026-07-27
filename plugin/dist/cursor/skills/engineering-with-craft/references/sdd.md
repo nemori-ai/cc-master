@@ -38,15 +38,15 @@ Spec 就是那个**先于实现达成的外部标准**：消费者与实现者�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine)
-- [deepens_to: SDD 适用性判断](./sdd.md#ccm-k-point-sdd-admission)
-- [deepens_to: Spec、实现与测试对齐](./sdd.md#ccm-k-point-sdd-alignment)
-- [deepens_to: 先改 spec 的变更顺序](./sdd.md#ccm-k-point-sdd-change-order)
-- [deepens_to: Spec 漂移红线](./sdd.md#ccm-k-point-sdd-drift-red-line)
-- [deepens_to: 实现前 Spec 硬闸](./sdd.md#ccm-k-point-sdd-implementation-gate)
-- [deepens_to: SDD 当代实践锚](./sdd.md#ccm-k-point-sdd-practice-anchors)
-- [deepens_to: Spec 的职责边界](./sdd.md#ccm-k-point-sdd-spec-boundary)
-- [deepens_to: SDD 与 DDD/OOP/TDD 接力](./sdd.md#ccm-k-point-sdd-theory-handoff)
+- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.spec-first.to-shared-spine -->
+- [deepens_to: SDD 适用性判断](./sdd.md#ccm-k-point-sdd-admission) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-admission -->
+- [deepens_to: Spec、实现与测试对齐](./sdd.md#ccm-k-point-sdd-alignment) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-alignment -->
+- [deepens_to: 先改 spec 的变更顺序](./sdd.md#ccm-k-point-sdd-change-order) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-change-order -->
+- [deepens_to: Spec 漂移红线](./sdd.md#ccm-k-point-sdd-drift-red-line) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-drift-red-line -->
+- [deepens_to: 实现前 Spec 硬闸](./sdd.md#ccm-k-point-sdd-implementation-gate) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-implementation-gate -->
+- [deepens_to: SDD 当代实践锚](./sdd.md#ccm-k-point-sdd-practice-anchors) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-practice-anchors -->
+- [deepens_to: Spec 的职责边界](./sdd.md#ccm-k-point-sdd-spec-boundary) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-spec-boundary -->
+- [deepens_to: SDD 与 DDD/OOP/TDD 接力](./sdd.md#ccm-k-point-sdd-theory-handoff) <!-- ccm:k:edge edge:craft.spec-first.core-belief-to-theory-handoff -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-spec-boundary"></a>
 <!-- ccm:k:start point:sdd.spec-boundary -->
@@ -76,7 +76,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.spec-boundary-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-alignment"></a>
 <!-- ccm:k:start point:sdd.alignment -->
@@ -101,7 +101,7 @@ spec（合约 SSOT）
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.alignment-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-change-order"></a>
 <!-- ccm:k:start point:sdd.change-order -->
@@ -124,7 +124,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.change-order-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-admission"></a>
 <!-- ccm:k:start point:sdd.admission -->
@@ -159,7 +159,7 @@ SDD 不是对一切代码适用的万能方法——spec-first 带来的收益�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.admission-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-implementation-gate"></a>
 <!-- ccm:k:start point:sdd.implementation-gate -->
@@ -187,7 +187,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.implementation-gate-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-theory-handoff"></a>
 <!-- ccm:k:start point:sdd.theory-handoff -->
@@ -225,7 +225,7 @@ design ──────────── build ──────────
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.theory-handoff-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-drift-red-line"></a>
 <!-- ccm:k:start point:sdd.drift-red-line -->
@@ -263,7 +263,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.drift-red-line-to-core-belief -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-sdd-practice-anchors"></a>
 <!-- ccm:k:start point:sdd.practice-anchors -->
@@ -285,5 +285,5 @@ SDD 的精神在业界有多种形态的具体落地——本节列锚点供参�
 Knowledge navigation:
 - [Knowledge atlas](../../../knowledge/atlas.md)
 - [Module module:craft.spec-first](../../../knowledge/modules/craft.spec-first.md#ccm-k-module-craft-spec-first)
-- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief)
+- [routes_to: Spec 先于实现](./sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.spec-first.practice-anchors-to-core-belief -->
 <!-- ccm:k:nav:end -->

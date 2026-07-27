@@ -34,6 +34,13 @@ import {
 } from './paths.mjs';
 
 export const NAV_END = '<!-- ccm:k:nav:end -->';
+
+/** Trailing compiler-owned authored-edge identity marker on nav link lines. */
+export const EDGE_MARKER_RE =
+  /<!--\s*ccm:k:edge\s+(edge:[a-z0-9][a-z0-9.-]*)\s*-->/g;
+const EDGE_MARKER_ANY_RE = /<!--\s*ccm:k:edge(?:\s+[^>]*)?\s*-->/g;
+const EDGE_MARKER_MALFORMED_RE =
+  /<!--\s*ccm:k:edge(?!\s+edge:[a-z0-9][a-z0-9.-]*\s*-->)/g;
 export const ENTRY_PIN_START = '<!-- ccm:k:entry-pin:start -->';
 export const ENTRY_PIN_END = '<!-- ccm:k:entry-pin:end -->';
 export const PRODUCT_HOST_SET = new Set(PRODUCT_HOSTS);
@@ -78,6 +85,11 @@ function linkLine(label, fromFile, toFile, fragment) {
   const relative = posixRelative(fromFile, toFile);
   const safe = sanitizeMarkdownLinkLabel(label);
   return `- [${safe}](${relative}${fragment})`;
+}
+
+/** Authored graph edge nav line with stable edge-id marker (never used for structural pins). */
+function authoredEdgeLinkLine(label, fromFile, toFile, fragment, edgeId) {
+  return `${linkLine(label, fromFile, toFile, fragment)} <!-- ccm:k:edge ${edgeId} -->`;
 }
 
 function pointDistPath(host, point) {
@@ -231,6 +243,67 @@ export function inspectCompilerOwnedOverlay(text) {
     });
   }
 
+  // Authored edge identity markers: only inside nav blocks, unique, well-formed,
+  // and only trailing a markdown link line (never on structural atlas/module/canonical pins).
+  const edgeIdsSeen = new Set();
+  for (const match of navBlocks) {
+    const block = match[0];
+    const ownerPoint = match[1] ?? null;
+    if (EDGE_MARKER_MALFORMED_RE.test(block)) {
+      issues.push({
+        kind: 'malformed_edge_marker',
+        message: `malformed ccm:k:edge marker in nav for ${ownerPoint ?? '(anonymous)'}`,
+        witness: { point: ownerPoint },
+      });
+    }
+    // Reset lastIndex after /g test.
+    EDGE_MARKER_MALFORMED_RE.lastIndex = 0;
+
+    const blockLines = block.split('\n');
+    for (const line of blockLines) {
+      const markers = [...line.matchAll(EDGE_MARKER_RE)];
+      EDGE_MARKER_RE.lastIndex = 0;
+      if (markers.length === 0) continue;
+      if (markers.length > 1) {
+        issues.push({
+          kind: 'malformed_edge_marker',
+          message: 'nav line carries multiple ccm:k:edge markers',
+          witness: { point: ownerPoint, line },
+        });
+        continue;
+      }
+      const edgeId = markers[0][1];
+      if (edgeIdsSeen.has(edgeId)) {
+        issues.push({
+          kind: 'duplicate_edge_marker',
+          message: `duplicate ccm:k:edge marker ${edgeId}`,
+          witness: { edge: edgeId, point: ownerPoint },
+        });
+      }
+      edgeIdsSeen.add(edgeId);
+      const stripped = line.replace(EDGE_MARKER_RE, '').trimEnd();
+      EDGE_MARKER_RE.lastIndex = 0;
+      if (!/^\s*-\s+\[[^\]]*\]\([^)]+\)\s*$/.test(stripped)) {
+        issues.push({
+          kind: 'edge_marker_bad_position',
+          message: `ccm:k:edge ${edgeId} is not trailing a markdown nav link line`,
+          witness: { edge: edgeId, point: ownerPoint, line },
+        });
+      }
+      // Structural atlas / module router links must not pretend to be authored edges.
+      const hrefMatch = stripped.match(/\(([^)]+)\)\s*$/);
+      const href = hrefMatch?.[1] ?? '';
+      const fragment = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
+      if (fragment && !fragment.startsWith('ccm-k-point-')) {
+        issues.push({
+          kind: 'edge_marker_on_structural_pin',
+          message: `ccm:k:edge ${edgeId} must not mark structural atlas/module pins`,
+          witness: { edge: edgeId, point: ownerPoint, href },
+        });
+      }
+    }
+  }
+
   let remainder = source.replace(NAV_BLOCK_RE, '').replace(ENTRY_PIN_BLOCK_RE, '');
   if (/ccm:k:nav:/.test(remainder) || /ccm:k:entry-pin:/.test(remainder)) {
     issues.push({
@@ -238,6 +311,20 @@ export function inspectCompilerOwnedOverlay(text) {
       message: 'leftover ccm:k nav/entry-pin tokens after stripping well-formed blocks',
     });
   }
+  if (EDGE_MARKER_MALFORMED_RE.test(remainder)) {
+    issues.push({
+      kind: 'malformed_edge_marker',
+      message: 'malformed ccm:k:edge marker found outside a compiler-owned nav block',
+    });
+  }
+  EDGE_MARKER_MALFORMED_RE.lastIndex = 0;
+  if (EDGE_MARKER_ANY_RE.test(remainder)) {
+    issues.push({
+      kind: 'orphan_edge_marker',
+      message: 'ccm:k:edge marker found outside a compiler-owned nav block',
+    });
+  }
+  EDGE_MARKER_ANY_RE.lastIndex = 0;
 
   return {
     ok: issues.length === 0,
@@ -246,6 +333,7 @@ export function inspectCompilerOwnedOverlay(text) {
     entry_pin_blocks: entryBlocks.length,
     skill_anchors: skillAnchorCount,
     point_anchors: pointAnchorCount,
+    edge_markers: edgeIdsSeen.size,
     has_overlay:
       navBlocks.length > 0 ||
       entryBlocks.length > 0 ||
@@ -328,12 +416,15 @@ export function buildPointNavBlock({ point, host, graph, fromFile }) {
     if (!targetPoint) continue;
     const target = pointDistPath(host, targetPoint);
     const targetAnchor = normalizePointAnchor(targetPoint.id);
+    const edgeId = edge.edge_id ?? edge.id;
+    if (!edgeId) continue;
     navLines.push(
-      linkLine(
+      authoredEdgeLinkLine(
         `${edge.type}: ${targetPoint.title || targetPoint.id}`,
         fromFile,
         target,
         targetAnchor.fragment,
+        edgeId,
       ),
     );
   }

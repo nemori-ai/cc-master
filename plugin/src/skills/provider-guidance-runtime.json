@@ -29,7 +29,7 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "44bc5f2589a458184886cf135db01fc54cd76ce4d1c34e96235854654e5f031c",
+              "SKILL.md": "1182a8eefa72ee16ada0472af00e1f2bcc800128b46409d62635852b53122482",
               "references/async-hitl.md": "cb17a10063d01b2240b26884398e9f729e439682f22743d53b4535e0ee4869a2",
               "references/board.md": "482e77acec9cf9b7313122ed00303d77824a6539b1e070092dc06d898ca8d98d",
               "references/cost-decisions.md": "2aadd757e3e63c080457041c00cfd8a79a3e0fd5a72daae968ca374bc15175f5",
@@ -41,8 +41,8 @@
               "references/model-allocation.md": "5ed2b4deb316ee56126eaa2fc2fac225f3939ebd05f609783954264d725e28e0",
               "references/multi-layer-planning.md": "75552224feed49c9b3c9227ff678a2a5423e567b5db63da9e809b2eeb32605a9",
               "references/outside-in.md": "5b5cee2e37cc42f82b2d090c5a05104b6918b59c6c600024237c8337ba4bfe05",
-              "references/resume-verify.md": "d2fba25164e12c1873414c09e29c15dfab09c6aa4534384e3107a0dbe40f8fd9",
-              "references/worker-routing.md": "1f11613783351839da69431baaf8133a850fec51ed18ae5ef690484059fe6381",
+              "references/resume-verify.md": "b359083f7e1613d13296b98f94da9deed045810f3d1b42a1f9c4c4c505935923",
+              "references/worker-routing.md": "18ac592fa90d0aa87bc55461975d2be43c62a46c9f20ca6fbbe76b571e4f5675",
               "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
             }
           }
@@ -64,12 +64,12 @@
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
               "SKILL.md": "f0f03069f3966407611594e8482d33cb57ab8131cdd177396d3ffc3e9934e32f",
-              "references/cross-harness-target-facts.md": "2da3c982c2ecda8625010461e3962003beaf547c4e94d151f4f749cedef8a7cb",
-              "references/estimation.md": "b7bae446fd7847238a82c9ea642febc2ad8ca90e7df5d271d78a65717274a121",
-              "references/model-tiers.md": "59ef4f3d6317bad27ab67be829a91d9bf7f1cd82d2f77b81969c5bf490723d54",
-              "references/pacing-levers.md": "639a011233a92baf32245bfa2d0b9c2e86901a400f484cbcc60d560ba1f88994",
-              "references/pool-aware-advice.md": "c526f0e3dbb737675d3061f6343cf72ac558617a9cd0a8a2b7b874adc5e58a22",
-              "references/usage-signals.md": "0bad47a7660b6713b76ecab498f0495a236b21ca883582406c740f74f9c7ef61"
+              "references/cross-harness-target-facts.md": "892651616f3d049422a9631833019c03206f7c5e1a787aa3c5e6dfd497e71779",
+              "references/estimation.md": "9b94b44a86e770af9099bfa3f41817f0b3967ed19f1e68248d9062d2a8046392",
+              "references/model-tiers.md": "c41282e2c2c4beae1f51950032c7f2f60834fd3ed66f7be6dc09f121b3ce2e20",
+              "references/pacing-levers.md": "3ecfeaf64e85cf2efd5a72c51d589b1507177349febbacb3deef652e22fa3c6f",
+              "references/pool-aware-advice.md": "0931c8728a29397e79691688af9a570220a4a9e3c2e7c59d99777dfa02a1da5d",
+              "references/usage-signals.md": "2364d68cfff8a500550181234663539e27672a330bc40355fc44796384b426e2"
             }
           }
         },
@@ -86,10 +86,10 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "345f4e0ee033d261cb8a66927393704012df9fc23751ec334658cc32e848fdc5",
-              "references/account-pool.md": "dd21f5f6eabfec601c348e6e060346156b28b0b30aac72e25cfa3055be61a2ac",
-              "references/board-model-guide.md": "c741e630f6b17844880ef6b46b0bcf5229bb1317168a028fc68dea2dbab5edb0",
-              "references/command-catalog.md": "d982dd77fd463391e77def65be82abeab7e02d72c6968586bd3c6eb7e6f65090"
+              "SKILL.md": "362501beac252ef12f312909457cf86a26d1aeec298a57b0dcce47653241766b",
+              "references/account-pool.md": "bb1eec70adce497c54006e57462ab5e821c97e9d27a80f4b46f3a55450538d82",
+              "references/board-model-guide.md": "687f0ebbf7b0a071ab97c47ed7c6c59f4e0c29c64018589f69809834f9f5b8b0",
+              "references/command-catalog.md": "215045406a6b82850a802e14de26b88193c0153d7061dcc318a2f377c7ba31c7"
             }
           }
         }
@@ -118,7 +118,7 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "2a8ce97cec422d37edbe732365d07998231735d36f0695eda0cb328c90fe54d8",
+              "SKILL.md": "6dd8bf3ae79fa123124b3444d3fcba4116fa6a92f79612bf34e365488f8de3ad",
               "references/async-hitl.md": "e7f6dd6a3d8b9e180be097f41b776c24fe4023a22940cf8f58137d188d1ea36a",
               "references/board.md": "7e161c2d5802ced2a293c21361ab584a6cdc7bafa809adf60095beb9e8382220",
               "references/deadline-discipline.md": "65b72ccdd59fa984607611086cfc7672ef4039ad9fc31f88e0619c162bde4a70",
@@ -128,8 +128,8 @@
               "references/model-allocation.md": "5ed2b4deb316ee56126eaa2fc2fac225f3939ebd05f609783954264d725e28e0",
               "references/multi-layer-planning.md": "75552224feed49c9b3c9227ff678a2a5423e567b5db63da9e809b2eeb32605a9",
               "references/outside-in.md": "5b5cee2e37cc42f82b2d090c5a05104b6918b59c6c600024237c8337ba4bfe05",
-              "references/resume-verify.md": "2cef4d76fa9810a2eb3e01518b82a67b04a796319235af8e2c0af987335999f3",
-              "references/worker-routing.md": "fd2b99f6d34199432489cad4d59999b06b9a6711e6c4b7b94b1697c49dbef81b"
+              "references/resume-verify.md": "d3d9ef005d77a0ae3839fb4e39208601395c57ee9aa97585fe1b70d11be883c3",
+              "references/worker-routing.md": "a77971579733ac0ccaf9330ee1c90e0ebaae63644d5df01458a3a12d410b8554"
             }
           }
         },
@@ -150,12 +150,12 @@
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
               "SKILL.md": "f26911ca4d27b398298a72b38650b98f12261178d0f122e469493afc57f5a35d",
-              "references/cross-harness-target-facts.md": "bc2c1b77d57664f9ed85d9dc815082bf3288ef3327a6d31552c657b2ed4a62c4",
-              "references/estimation.md": "b7bae446fd7847238a82c9ea642febc2ad8ca90e7df5d271d78a65717274a121",
-              "references/model-tiers.md": "59ef4f3d6317bad27ab67be829a91d9bf7f1cd82d2f77b81969c5bf490723d54",
-              "references/pacing-levers.md": "639a011233a92baf32245bfa2d0b9c2e86901a400f484cbcc60d560ba1f88994",
-              "references/pool-aware-advice.md": "c526f0e3dbb737675d3061f6343cf72ac558617a9cd0a8a2b7b874adc5e58a22",
-              "references/usage-signals.md": "0bad47a7660b6713b76ecab498f0495a236b21ca883582406c740f74f9c7ef61"
+              "references/cross-harness-target-facts.md": "ded7d6cc1e69bc15f3569df5fdec569fd083ef70e95d0832f3ede27d1f629911",
+              "references/estimation.md": "9b94b44a86e770af9099bfa3f41817f0b3967ed19f1e68248d9062d2a8046392",
+              "references/model-tiers.md": "c41282e2c2c4beae1f51950032c7f2f60834fd3ed66f7be6dc09f121b3ce2e20",
+              "references/pacing-levers.md": "3ecfeaf64e85cf2efd5a72c51d589b1507177349febbacb3deef652e22fa3c6f",
+              "references/pool-aware-advice.md": "0931c8728a29397e79691688af9a570220a4a9e3c2e7c59d99777dfa02a1da5d",
+              "references/usage-signals.md": "2364d68cfff8a500550181234663539e27672a330bc40355fc44796384b426e2"
             }
           }
         },
@@ -171,9 +171,9 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "b3906d427c95249e3971a904eef5372044775401ec843ed4918c4e8a17d02950",
-              "references/board-model-guide.md": "fe233358b5f9a4d50acb5b7f1780eb7b1b42ed129f6cbc325d3b788610a029f6",
-              "references/command-catalog.md": "535250464e8eb036c4703f86343e82b1efce7cd62e9baf3d6b7dbdf66dfa002d"
+              "SKILL.md": "cd8b47296727c7374e241029f5e90045aeb1e94acde14d4e5f4ce0e1668f2183",
+              "references/board-model-guide.md": "d75cc16ecfd012ec87c04ccf84eb34506301821b127f8fa7cf28c415880d503e",
+              "references/command-catalog.md": "7fe9d198efe91ac716728ae2de281bc270fd0f88b4a70fa1e06b5f39551b7ec3"
             }
           }
         }
@@ -202,7 +202,7 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "acf144edb29179ed1483780b4ee408ea03007768c1aae11e7b625ac16e8c073d",
+              "SKILL.md": "29d254cea422b6783568b39a5cb07f2279f68dd710e5c08d2dab33d588841835",
               "references/async-hitl.md": "88a5165252041bb3cb9ece2f8802e6bc216222e3dfaf0e7c1d897d525384f194",
               "references/board.md": "aa1cc79f7339cb846acbe85276faf9941f323fca1bd6f71fddcb2f8752546a16",
               "references/deadline-discipline.md": "65b72ccdd59fa984607611086cfc7672ef4039ad9fc31f88e0619c162bde4a70",
@@ -212,8 +212,8 @@
               "references/model-allocation.md": "5ed2b4deb316ee56126eaa2fc2fac225f3939ebd05f609783954264d725e28e0",
               "references/multi-layer-planning.md": "75552224feed49c9b3c9227ff678a2a5423e567b5db63da9e809b2eeb32605a9",
               "references/outside-in.md": "5b5cee2e37cc42f82b2d090c5a05104b6918b59c6c600024237c8337ba4bfe05",
-              "references/resume-verify.md": "3cde8355d9eede3580696a611910a5afed7e24e48834674cc8b6050c42e29a17",
-              "references/worker-routing.md": "9b7b5e4054d1969e196f6aa1d5770dbbd916dc080d5df25a0a486d308b2c2888"
+              "references/resume-verify.md": "be053d88caadce21f9ab73de7dbab8341590e6328c09d240514b94a9a29b3d6c",
+              "references/worker-routing.md": "143b088e923c3996e2d7792f0e1fbd3147e7f3aaab37a74d45bdd189b791bddf"
             }
           }
         },
@@ -234,12 +234,12 @@
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
               "SKILL.md": "68dab96f9f9534ce694c7e8a393356148383dcaac6c8393a819527165cbf4ff1",
-              "references/cross-harness-target-facts.md": "bc2c1b77d57664f9ed85d9dc815082bf3288ef3327a6d31552c657b2ed4a62c4",
-              "references/estimation.md": "b7bae446fd7847238a82c9ea642febc2ad8ca90e7df5d271d78a65717274a121",
-              "references/model-tiers.md": "59ef4f3d6317bad27ab67be829a91d9bf7f1cd82d2f77b81969c5bf490723d54",
-              "references/pacing-levers.md": "639a011233a92baf32245bfa2d0b9c2e86901a400f484cbcc60d560ba1f88994",
-              "references/pool-aware-advice.md": "c526f0e3dbb737675d3061f6343cf72ac558617a9cd0a8a2b7b874adc5e58a22",
-              "references/usage-signals.md": "0bad47a7660b6713b76ecab498f0495a236b21ca883582406c740f74f9c7ef61"
+              "references/cross-harness-target-facts.md": "ded7d6cc1e69bc15f3569df5fdec569fd083ef70e95d0832f3ede27d1f629911",
+              "references/estimation.md": "9b94b44a86e770af9099bfa3f41817f0b3967ed19f1e68248d9062d2a8046392",
+              "references/model-tiers.md": "c41282e2c2c4beae1f51950032c7f2f60834fd3ed66f7be6dc09f121b3ce2e20",
+              "references/pacing-levers.md": "3ecfeaf64e85cf2efd5a72c51d589b1507177349febbacb3deef652e22fa3c6f",
+              "references/pool-aware-advice.md": "0931c8728a29397e79691688af9a570220a4a9e3c2e7c59d99777dfa02a1da5d",
+              "references/usage-signals.md": "2364d68cfff8a500550181234663539e27672a330bc40355fc44796384b426e2"
             }
           }
         },
@@ -255,9 +255,9 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "c458dd43331260ae82e116969fb1dbaeb7e470360074c0a0520b2ad9469095db",
-              "references/board-model-guide.md": "db0a582d9e592f6904380ee2ad1e82ce71f9450f59e938242c819cb760d001cf",
-              "references/command-catalog.md": "2d2b3e23866f2cbce46280ec8bf2feeb26c2826bcf3bda1a41d48afd2bd1fde1"
+              "SKILL.md": "0dcfba107636517b468e0e85f6fef191000465a333c570fb486060aa95b1d41d",
+              "references/board-model-guide.md": "efcf8cb2cdf9ed49ca9b0b2866cc9758fc381fb542af90b4280372f75564d976",
+              "references/command-catalog.md": "677ac25dc1fa8ec20d10bf69c8c672e9d0b785d9adf4e46846d2868a6a3ce111"
             }
           }
         }
@@ -287,7 +287,7 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "dcdd7aa9e571c42dc96eed0c80df48e029404e250f00390ee6c1a1197ef9f2b5",
+              "SKILL.md": "7f5848135abd762336b2d4a08e9115129d4ac33fa45de12cae6ef4657a6e1f51",
               "references/async-hitl.md": "ead3be8372178c0553fbad190947338f0f4719f0acfce8d1b24778835539a953",
               "references/board.md": "a397b93ffc10710369ea33b39d6942391f090b35535f8a02233c60121449bc3a",
               "references/deadline-discipline.md": "65b72ccdd59fa984607611086cfc7672ef4039ad9fc31f88e0619c162bde4a70",
@@ -298,8 +298,8 @@
               "references/model-allocation.md": "5ed2b4deb316ee56126eaa2fc2fac225f3939ebd05f609783954264d725e28e0",
               "references/multi-layer-planning.md": "75552224feed49c9b3c9227ff678a2a5423e567b5db63da9e809b2eeb32605a9",
               "references/outside-in.md": "5b5cee2e37cc42f82b2d090c5a05104b6918b59c6c600024237c8337ba4bfe05",
-              "references/resume-verify.md": "1771189fb0f3035f9e43383aaa48d914f543d85001e5229cd8f68758dcdf5272",
-              "references/worker-routing.md": "25ef8a15e0251e173ae409700f25a3d79b5c14e2fe900aed6b697dab2dff7d5a"
+              "references/resume-verify.md": "3157824d50498a03ab6faf08dc73baf1825bd6855b8e9e5ca09d6b7349cf4bd5",
+              "references/worker-routing.md": "3d38a2e8a1f447468d40384a3fa20d629b5e18f791480d829a7243beba0300d7"
             }
           }
         },
@@ -320,12 +320,12 @@
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
               "SKILL.md": "b5d460b24db44ff06e3a156d6fe45b7de4066e0b07d1e7b488e37ba9ce6314a6",
-              "references/cross-harness-target-facts.md": "bc2c1b77d57664f9ed85d9dc815082bf3288ef3327a6d31552c657b2ed4a62c4",
-              "references/estimation.md": "b7bae446fd7847238a82c9ea642febc2ad8ca90e7df5d271d78a65717274a121",
-              "references/model-tiers.md": "59ef4f3d6317bad27ab67be829a91d9bf7f1cd82d2f77b81969c5bf490723d54",
-              "references/pacing-levers.md": "639a011233a92baf32245bfa2d0b9c2e86901a400f484cbcc60d560ba1f88994",
-              "references/pool-aware-advice.md": "c526f0e3dbb737675d3061f6343cf72ac558617a9cd0a8a2b7b874adc5e58a22",
-              "references/usage-signals.md": "0bad47a7660b6713b76ecab498f0495a236b21ca883582406c740f74f9c7ef61"
+              "references/cross-harness-target-facts.md": "ded7d6cc1e69bc15f3569df5fdec569fd083ef70e95d0832f3ede27d1f629911",
+              "references/estimation.md": "9b94b44a86e770af9099bfa3f41817f0b3967ed19f1e68248d9062d2a8046392",
+              "references/model-tiers.md": "c41282e2c2c4beae1f51950032c7f2f60834fd3ed66f7be6dc09f121b3ce2e20",
+              "references/pacing-levers.md": "3ecfeaf64e85cf2efd5a72c51d589b1507177349febbacb3deef652e22fa3c6f",
+              "references/pool-aware-advice.md": "0931c8728a29397e79691688af9a570220a4a9e3c2e7c59d99777dfa02a1da5d",
+              "references/usage-signals.md": "2364d68cfff8a500550181234663539e27672a330bc40355fc44796384b426e2"
             }
           }
         },
@@ -341,9 +341,9 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "9a565cfb2a48085482c7bcc73aee28980e7955f276571f57fd5b70ce08f068aa",
-              "references/board-model-guide.md": "b760d2736e71cf390db93d1829fe18a69bd64c98c8603641f2444d4eec46523a",
-              "references/command-catalog.md": "5093caf028d625d4869e8dab00a85cc69af2f135fe0a01791eee872b80aa0a8d"
+              "SKILL.md": "7ef8aa947e8d517f99688e8dda947377d294a03d9b37529f2740c5570cf22da6",
+              "references/board-model-guide.md": "0b4ade20c6ba46ca5b768c7f671abca6e96cf1f0681fc925c27d0c7a68677ff5",
+              "references/command-catalog.md": "8951d3b0b8af365e2aec5a5c2aabc6c834c1ba143f94a8d7abbe1154e36b0029"
             }
           }
         }

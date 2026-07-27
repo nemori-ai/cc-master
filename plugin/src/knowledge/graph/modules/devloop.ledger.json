@@ -2,7 +2,6 @@
   "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
   "kind": "module",
   "id": "module:devloop.ledger",
-  "owner_skill": "skill:dev-as-ml-loop",
   "title": "optimization ledger",
   "intent": "把外层优化状态持续写进 board，使 compact/换人后续接同一 loss。",
   "recognition_cues": [

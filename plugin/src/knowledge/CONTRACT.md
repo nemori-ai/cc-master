@@ -1,9 +1,9 @@
 # Skill knowledge source root
 
-> Status: **K2 — eight runtime skills / full portfolio inventory + four-host compile**
+> Status: **K2 — eight runtime skills / full portfolio inventory + K3-00 graph-first walking skeleton (`dev-as-ml-loop`)**
 >
 > This directory is an authored maintainer source root, not runtime prose. Inventory claims
-> must match `portfolio.json` + per-skill shards; do not cite the old three-module pilot as live truth.
+> must match `portfolio.json` + per-skill shards / compositions; do not cite the old three-module pilot as live truth.
 
 Source layout:
 
@@ -11,21 +11,24 @@ Source layout:
 plugin/src/knowledge/
 ├── CONTRACT.md
 ├── portfolio.json
-└── skills/
+├── graph/modules/          # global modules (graph-first; not nested under skill)
+├── compositions/           # admitted skill product views (K3-00 pilot)
+├── analyses/               # candidate analysis + scoresheet/witness
+└── skills/                 # transitional skill shards (7 remaining until K3-01A)
     ├── master-orchestrator-guide/
     ├── authoring-workflows/
     ├── engineering-with-craft/
     ├── using-ccm/
-    ├── dev-as-ml-loop/
     ├── slicing-goals-into-dags/
     ├── pacing-and-estimation/
     └── distilling-lessons-into-assets/
 ```
 
-K2 admits **all eight** runtime skills under `portfolio.skills`, with module/point shards bound to
-real canonical Markdown markers. JSON holds identity / authority / routing / inventory metadata
-only — exact HOW remains in Markdown spans (no second SSOT). Host honesty stays in each skill's
-`host_coverage` (including workflow stubs and using-ccm / master-orchestrator partial hosts).
+K2 admits **all eight** runtime skills under `portfolio.skills` (seven transitional shards + one
+`composition` for `dev-as-ml-loop`), with module/point shards bound to real canonical Markdown
+markers. JSON holds identity / authority / routing / inventory metadata only — exact HOW remains
+in Markdown spans (no second SSOT). Host honesty stays in each skill's `host_coverage` (including
+workflow stubs and using-ccm / master-orchestrator partial hosts).
 
 Executable entry points:
 
@@ -33,6 +36,7 @@ Executable entry points:
 node scripts/skill-knowledge.mjs check --stage K2 --json
 node scripts/skill-knowledge.mjs compile --json
 node scripts/skill-knowledge.mjs compile --check --json
+node scripts/skill-knowledge.mjs materialize --composition composition:skill.dev-as-ml-loop --json
 node scripts/skill-knowledge.mjs change begin --op <op> --scope <path...> --base <git-ref> --json
 node scripts/skill-knowledge.mjs change validate <workspace> --json
 node scripts/skill-knowledge.mjs change apply <workspace> --json
@@ -40,6 +44,15 @@ node scripts/skill-knowledge.mjs report --json
 node scripts/skill-knowledge.mjs path --from <id> --to <id> --host claude-code --json
 node scripts/skill-knowledge.mjs explain <id-or-code> --json
 ```
+
+K3-00 walking skeleton: `dev-as-ml-loop` is graph-first — global modules under
+`graph/modules/`, admitted via `analyses/` + `compositions/` (`consumes.modules` locator SSOT),
+materialized with `materialize` only when lifecycle=accepted and derived verdict=admit.
+`--analysis-override` is forbidden. Other skills remain transitional skill-first until K3-01A.
+`plugin/src/knowledge` is repo-only authored/meta; `plugin/dist/<host>/knowledge` is generated
+atlas/router only. Candidate analysis persists derived `graph_metrics` + metric witness (must
+match recompute); admission gates use portfolio `candidate_admission` + hop_policy (not echoed
+host_coverage declarations). Package hardening is deferred to K3-01P.
 
 Implemented capabilities (see `contract --json`): schema validation, markdown binding, canonical
 source inventory attestation, derived authority freshness, graph invariants, entry-surface
