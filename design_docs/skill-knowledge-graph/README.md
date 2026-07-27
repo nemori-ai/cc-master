@@ -11,6 +11,7 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 | 理解完整拓扑、SSOT、三跳、事务、工具链与 CI 合同 | [specification.md](specification.md) |
 | 维护者执行 health / typed change / witness（无独立 meta-skill） | [specification.md](specification.md) §12–13 + [cli-contract.md](cli-contract.md) + `node scripts/skill-knowledge.mjs` |
 | 查询当前可执行能力、稳定 JSON envelope、diagnostic 与 exit code | [cli-contract.md](cli-contract.md) |
+| 设计/实现 source→dist→release 的冻结、验证、原子发布与恢复 | [trusted-projection-transaction.md](trusted-projection-transaction.md) |
 | 编写或验证 authored graph source | [schemas/knowledge-source.schema.json](schemas/knowledge-source.schema.json) |
 | 编写或验证语义变更事务 | [schemas/knowledge-change.schema.json](schemas/knowledge-change.schema.json) |
 | 看一套最小但完整的 source 示例 | [examples/](examples/) |
@@ -21,7 +22,10 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 ## SSOT 边界
 
 - [specification.md](specification.md) 是当前治理模型与不变式的 evergreen SSOT。
-- `schemas/` 是 source/change document 的机器合同 SSOT；若 prose 与 schema 冲突，先视为
+- [trusted-projection-transaction.md](trusted-projection-transaction.md) 是 source→dist→release
+  事务状态机、artifact lineage、P1–P8 与 failure semantics 的 SSOT。
+- `schemas/` 是 source/change document 与 trusted projection transaction artifact 的机器合同
+  SSOT；若 prose 与 schema 冲突，先视为
   contract drift，必须在同一变更中消歧，不能任选一边。
 - canonical Markdown span 是知识正文 SSOT；JSON 不复制完整 HOW。
 - module JSON 是模块 intent、boundary、membership、access 与路由元数据的 SSOT。
