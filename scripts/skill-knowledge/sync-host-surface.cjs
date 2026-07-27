@@ -5,8 +5,10 @@
  * (manifest/commands/adapters/skills+overlay+entry pins/hooks/rules) →
  * candidate-root compile → runtime attestation → publishHostTree.
  *
- * The Claude/full-host path delegates ownership to Trusted Projection
- * Transaction; compatibility paths retain the legacy publishHostTree flow.
+ * Every supported host delegates ownership to Trusted Projection Transaction.
+ * There is deliberately no compatibility publisher: a host that cannot enter
+ * the shared lock/journal/verifier/publisher must fail closed before touching
+ * live dist.
  *
  * `stamp` is an explicit internal parameter (tests inject deterministic values).
  * Optional `injectLateFault` is a dev-test-only seam after staging is fully built
@@ -42,7 +44,6 @@ const {
   readYamlString,
   requireDir,
 } = require('../project-skill.cjs');
-const { publishHostTree } = require('./publish-host-tree.cjs');
 const {
   runTrustedProjectionTransaction,
 } = require('./trusted-projection/transaction.cjs');
@@ -724,154 +725,24 @@ function projectAndPublishHostSurface({
   const distParent = integrity.distParentAbsolute;
   const liveAbsolute = integrity.liveAbsolute;
 
-  if (host === 'claude-code') {
-    return runTrustedProjectionTransaction({
-      repoRoot: root,
-      host,
-      distParent: path.resolve(distParent),
-      live: path.resolve(liveAbsolute),
-      buildCandidate({ frozenRepoRoot, candidateRoot }) {
-        buildHostCandidate({
-          repoRoot: frozenRepoRoot,
-          host,
-          candidateRoot,
-          attestationMode: mode,
-          candidateGraphSha256,
-        });
-      },
-      injectLateFault,
-      injectPostPublishFault,
-      warn,
-    });
-  }
-
-  const stagingAbsolute = path.join(distParent, `${host}.write-${stamp}`);
-  const backupAbsolute = path.join(distParent, `${host}.bak-${stamp}`);
-
-  if (lstatOrNull(stagingAbsolute) || lstatOrNull(backupAbsolute)) {
-    throw new Error(`host staging/backup collision under ${distParent}`);
-  }
-
-  fs.mkdirSync(stagingAbsolute);
-  const stagingStat = lstatOrNull(stagingAbsolute);
-  if (!stagingStat || stagingStat.isSymbolicLink() || !stagingStat.isDirectory()) {
-    throw new Error(`invalid host staging directory ${stagingAbsolute}`);
-  }
-
-  try {
-    projectNonSkillSurfaces({ repoRoot: root, host, stagingAbsolute });
-    projectSkillsIntoStaging({
-      repoRoot: root,
-      host,
-      stagingAbsolute,
-      attestationMode: mode,
-    });
-    compileIntoCandidate({
-      repoRoot: root,
-      host,
-      candidateRoot: stagingAbsolute,
-    });
-
-    // Post-compile attestation re-check on final skill trees inside candidate.
-    const skillsStaging = path.join(stagingAbsolute, 'skills');
-    if (fs.existsSync(skillsStaging)) {
-      if (mode === 'candidate-v2') {
-        const registryPath = path.join(root, 'plugin/src/skills/provider-guidance-runtime.json');
-        if (
-          typeof candidateGraphSha256 !== 'string' ||
-          !/^[0-9a-f]{64}$/u.test(candidateGraphSha256)
-        ) {
-          throw Object.assign(
-            new Error(
-              `candidate-v2 requires explicit candidateGraphSha256 (real graph hash); refused staging-path fallback for ${host}`,
-            ),
-            { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
-          );
-        }
-        runCandidateGuidanceAttestationBridge({
-          repoRoot: root,
-          host,
-          skillsStaging,
-          stagingRoot: stagingAbsolute,
-          registryPath,
-          graphSha256: candidateGraphSha256,
-        });
-      }
-      for (const skill of fs.readdirSync(skillsStaging).sort()) {
-        const projectionTarget = path.join(skillsStaging, skill);
-        if (!fs.statSync(projectionTarget).isDirectory()) continue;
-        const plan = planSkillProjection({ repoRoot: root, host, skill });
-        if (plan.mode === 'planned') continue;
-        if (mode === 'accepted' && plan.providerGuidanceContract) {
-          const registry = loadProviderGuidanceRegistry(
-            plan.providerGuidanceRegistryPath,
-            root,
-          );
-          assertProviderGuidanceRuntimeTree(
-            registry,
-            plan.providerGuidanceContract.host,
-            plan.providerGuidanceContract.skill,
-            projectionTarget,
-          );
-        }
-        // Do not re-assert pacing here: entry pins may already be on SKILL.md, and
-        // the pacing registry fingerprints overlay-only trees (asserted pre-pin above).
-      }
-    }
-
-    if (typeof injectLateFault === 'function') {
-      injectLateFault({
-        distParentAbsolute: path.resolve(distParent),
-        liveAbsolute: path.resolve(liveAbsolute),
-        stagingAbsolute: path.resolve(stagingAbsolute),
-        backupAbsolute: path.resolve(backupAbsolute),
-        stamp,
-      });
-    }
-
-    const published = publishHostTree({
-      distParentAbsolute: path.resolve(distParent),
-      liveAbsolute: path.resolve(liveAbsolute),
-      stagingAbsolute: path.resolve(stagingAbsolute),
-      host,
-      stamp,
-      warn,
-    });
-
-    if (typeof injectPostPublishFault === 'function') {
-      injectPostPublishFault({
-        distParentAbsolute: path.resolve(distParent),
-        liveAbsolute: path.resolve(liveAbsolute),
-        stagingAbsolute: path.resolve(stagingAbsolute),
-        backupAbsolute: path.resolve(backupAbsolute),
-        stamp,
-        published,
-      });
-      const fault = new Error(
-        `injected post-publish fault for ${host} after successful publish (residual live dist present)`,
-      );
-      fault.code = 'SKG-SYNC-POST-PUBLISH-FAULT';
-      fault.sync_envelope = {
-        schema: 'cc-master/skill-knowledge-sync/v1alpha1',
-        ok: false,
+  return runTrustedProjectionTransaction({
+    repoRoot: root,
+    host,
+    distParent: path.resolve(distParent),
+    live: path.resolve(liveAbsolute),
+    buildCandidate({ frozenRepoRoot, candidateRoot }) {
+      buildHostCandidate({
+        repoRoot: frozenRepoRoot,
         host,
-        phase: 'post_publish',
-        residual_live_dist: true,
-      };
-      throw fault;
-    }
-
-    return published;
-  } catch (error) {
-    if (lstatOrNull(stagingAbsolute)) {
-      try {
-        rmNoFollow(stagingAbsolute, path.resolve(distParent));
-      } catch {
-        // leave staging for operator inspection
-      }
-    }
-    throw error;
-  }
+        candidateRoot,
+        attestationMode: mode,
+        candidateGraphSha256,
+      });
+    },
+    injectLateFault,
+    injectPostPublishFault,
+    warn,
+  });
 }
 
 module.exports = {

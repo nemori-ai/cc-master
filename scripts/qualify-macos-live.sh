@@ -403,10 +403,18 @@ run_required launchd_uninstall env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOM
 run_required launchd_deactivation_truth validate_launchd_uninstall_log
 
 mkdir -p "${EVIDENCE_DIR}/plugins"
+TRUSTED_PLUGIN_MANIFEST="${CCM_TRUSTED_RELEASE_MANIFEST:-}"
+[ -n "${TRUSTED_PLUGIN_MANIFEST}" ] || {
+  printf '%s\n' 'CCM_TRUSTED_RELEASE_MANIFEST is required; live dist packaging is forbidden' \
+    >"${EVIDENCE_DIR}/plugin_package.log"
+  record plugin_package FAIL 2
+  FAILURES=$((FAILURES + 1))
+}
 run_required plugin_package env CCM_PLUGIN_OUT_DIR="${EVIDENCE_DIR}/plugins" \
-  bash scripts/package-plugin.sh --all-hosts v0.0.0-macos-qualification
+  bash scripts/package-plugin.sh --manifest "${TRUSTED_PLUGIN_MANIFEST}" \
+    --out-dir "${EVIDENCE_DIR}/plugins"
 run_required plugin_checksums bash -c 'cd "$1" && shasum -a 256 -c SHA256SUMS' _ \
-  "${EVIDENCE_DIR}/plugins"
+  "$(dirname "$(find "${EVIDENCE_DIR}/plugins" -name SHA256SUMS -type f -print -quit)")"
 run_required plugin_extract_modes_manifests validate_plugin_archives
 run_required plugin_projection_clean bash scripts/check-plugin-dist-sync.sh
 

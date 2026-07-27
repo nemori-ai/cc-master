@@ -10,6 +10,36 @@ const {
   publishSealedHostTree,
   runTrustedProjectionTransaction,
 } = require('../../scripts/skill-knowledge/trusted-projection/transaction.cjs');
+const {
+  freezeTrustedHostPolicy,
+} = require('../../scripts/skill-knowledge/trusted-projection/host-plans.mjs');
+
+function fixturePolicy() {
+  const rules = [{
+    operator: 'trusted.copy',
+    from: 'payload.txt',
+    to: 'payload.txt',
+  }];
+  return freezeTrustedHostPolicy({
+    id: 'policy.transaction-runtime-fixture',
+    declaration: {
+      schema: 'cc-master/trusted-projection-host-policy/v1alpha1',
+      directory_mode: 0o755,
+      scope: {
+        required_source_paths: ['payload.txt'],
+        skills_safe_prefixes: ['payload.txt'],
+        cross_surface_prefixes: [],
+        cross_surface_action: 'fail',
+      },
+      hosts: Object.fromEntries(
+        ['claude-code', 'codex', 'cursor', 'kimi-code'].map((host) => [
+          host,
+          { host_rules: rules, skills_rules: rules },
+        ]),
+      ),
+    },
+  });
+}
 
 function fixture(body) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tpt-runtime-'));
@@ -31,6 +61,7 @@ function runProjection(options) {
   return runTrustedProjectionTransaction({
     ...options,
     host: 'claude-code',
+    projectionPolicy: fixturePolicy(),
     buildCandidate({ frozenRepoRoot, candidateRoot }) {
       const source = path.join(frozenRepoRoot, 'plugin/src/payload.txt');
       fs.copyFileSync(source, path.join(candidateRoot, 'payload.txt'));

@@ -3,6 +3,14 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const {
+  computeTrustedArtifactId,
+  freezeProjectionPlan,
+  freezeSourceSnapshot,
+} = require('./host-plans.mjs');
+const {
+  scanTree: scanReleaseArtifactTree,
+} = require('../../trusted-release-bundle.mjs');
 
 const SEALED_RECORDS = new WeakSet();
 const MODE_MASK = 0o7777;
@@ -240,6 +248,41 @@ function assertSnapshotEqual(expected, actual, code, message) {
   }
 }
 
+function assertCandidateMatchesProjectionPlan(plan, candidate) {
+  const expected = plan?.expected_entries;
+  if (!Array.isArray(expected)) {
+    throw new TrustedProjectionError(
+      'TPT-PLAN-UNTRUSTED-POLICY',
+      'trusted projection requires a frozen typed ProjectionPlan',
+    );
+  }
+  const comparable = (entry) => ({
+    path: entry.path,
+    kind: entry.kind,
+    sha256: entry.kind === 'file' ? entry.sha256 : null,
+    size: entry.size,
+    executable: entry.executable,
+    posix_mode: entry.posix_mode,
+  });
+  const expectedComparable = expected
+    .filter(({ path: relative }) => relative !== '.')
+    .map(comparable);
+  const actualComparable = candidate.entries.map(comparable);
+  if (stableJson(expectedComparable) !== stableJson(actualComparable)) {
+    throw new TrustedProjectionError(
+      'TPT-PLAN-DRIFT',
+      'candidate does not exactly match the pre-compile trusted ProjectionPlan',
+      {
+        witness: {
+          projection_plan_id: plan.projection_plan_id,
+          expected_paths: expected.map(({ path: relative }) => relative),
+          actual_paths: candidate.entries.map(({ path: relative }) => relative),
+        },
+      },
+    );
+  }
+}
+
 function copyTreeFromSnapshot(sourceRoot, destinationRoot, expected) {
   fs.mkdirSync(destinationRoot, { recursive: true });
   for (const entry of expected.entries) {
@@ -419,26 +462,18 @@ function freezeSupportTree(repoRoot, frozenRepoRoot, relative) {
 
 function createSealedRecord({
   transactionId,
+  sourceObservation,
   sourceSnapshot,
-  planSnapshot,
+  projectionPlan,
   candidateSnapshot,
   candidateRoot,
   originalSourceRoot,
 }) {
   const record = Object.freeze({
     transaction_id: transactionId,
+    source_observation: sourceObservation,
     source_snapshot: sourceSnapshot,
-    projection_plan: Object.freeze({
-      schema: 'cc-master/trusted-projection/internal-plan/v1',
-      expected_snapshot: planSnapshot,
-      projection_plan_id: `tpt:plan:${sha256(
-        stableJson({
-          transaction_id: transactionId,
-          source_content_id: sourceSnapshot.artifact_content_id,
-          expected_content_id: planSnapshot.artifact_content_id,
-        }),
-      )}`,
-    }),
+    projection_plan: projectionPlan,
     verified_snapshot: candidateSnapshot,
     verified_snapshot_attestation: Object.freeze({
       schema: 'cc-master/trusted-projection/internal-attestation/v1',
@@ -446,7 +481,7 @@ function createSealedRecord({
       authorized_content_id: candidateSnapshot.artifact_content_id,
       sealed_content_id: candidateSnapshot.artifact_content_id,
       source_content_id: sourceSnapshot.artifact_content_id,
-      projection_plan_content_id: planSnapshot.artifact_content_id,
+      projection_plan_id: projectionPlan.projection_plan_id,
     }),
     candidate_root: candidateRoot,
     original_source_root: originalSourceRoot,
@@ -473,7 +508,7 @@ function publishSealedHostTree({
   const transactionId = sealed.transaction_id;
   const currentSource = scanTree(sealed.original_source_root, 'source-commit-prepare');
   assertSnapshotEqual(
-    sealed.source_snapshot,
+    sealed.source_observation,
     currentSource,
     'TPT-SOURCE-DRIFT',
     'source changed after freeze and before commit prepare',
@@ -485,11 +520,9 @@ function publishSealedHostTree({
     'TPT-UNVERIFIED-COMMIT',
     'sealed candidate changed before commit',
   );
-  assertSnapshotEqual(
-    sealed.projection_plan.expected_snapshot,
+  assertCandidateMatchesProjectionPlan(
+    sealed.projection_plan,
     currentCandidate,
-    'TPT-PLAN-DRIFT',
-    'candidate does not exactly match the independently frozen projection plan',
   );
 
   const liveBefore = lstatOrNull(live) ? scanTree(live, 'live-before') : null;
@@ -547,6 +580,44 @@ function publishSealedHostTree({
         );
       }
     }
+    const committedSnapshot = scanReleaseArtifactTree(
+      live,
+      `host-${path.basename(live)}`,
+    );
+    const attestation = {
+      schema: 'cc-master/trusted-projection/verified-snapshot-attestation/v1alpha1',
+      transaction_id: transactionId,
+      verified_snapshot_attestation_id: '',
+      candidate_snapshot_id: committedSnapshot.artifact_snapshot_id,
+      authorized_content_id: committedSnapshot.artifact_content_id,
+      sealed_content_id: committedSnapshot.artifact_content_id,
+      checks: [{
+        invariant: 'P4',
+        code: 'TPT-VERIFIED',
+        ok: true,
+        witness_sha256: committedSnapshot.tree_sha256,
+      }],
+    };
+    attestation.verified_snapshot_attestation_id = computeTrustedArtifactId(
+      'verified-snapshot-attestation',
+      'verify',
+      attestation,
+      'verified_snapshot_attestation_id',
+    );
+    const receipt = {
+      transaction_id: transactionId,
+      publish_receipt_id: '',
+      verified_snapshot_attestation_id: attestation.verified_snapshot_attestation_id,
+      outcome: 'committed',
+      live_after_snapshot_id: committedSnapshot.artifact_snapshot_id,
+      committed_content_id: committedSnapshot.artifact_content_id,
+    };
+    receipt.publish_receipt_id = computeTrustedArtifactId(
+      'publish-receipt',
+      'publish',
+      receipt,
+      'publish_receipt_id',
+    );
     return {
       ok: true,
       committed: true,
@@ -554,6 +625,11 @@ function publishSealedHostTree({
       recoveryRef: backupRetained ? backup : null,
       transaction_id: transactionId,
       committedContentId: liveAfter.artifact_content_id,
+      snapshot_root: path.resolve(live),
+      snapshot: committedSnapshot,
+      projection_plan: sealed.projection_plan,
+      verified_snapshot_attestation: Object.freeze(attestation),
+      publish_receipt: Object.freeze(receipt),
     };
   } catch (error) {
     const liveNow = lstatOrNull(live);
@@ -589,6 +665,9 @@ function runTrustedProjectionTransaction({
   host,
   distParent,
   live,
+  projectionPolicy,
+  requestedSurface = 'host',
+  verifiedBase = null,
   buildCandidate,
   injectLateFault,
   injectPostPublishFault,
@@ -596,13 +675,35 @@ function runTrustedProjectionTransaction({
   warn = console.warn,
 }) {
   const sourceRoot = path.join(repoRoot, 'plugin/src');
-  const sourceSnapshot = scanTree(sourceRoot, 'plugin-src');
+  const sourceObservation = scanTree(sourceRoot, 'plugin-src');
   const transactionId = `tpt:tx:${sha256(
     stableJson({
       host,
-      source_content_id: sourceSnapshot.artifact_content_id,
+      source_content_id: sourceObservation.artifact_content_id,
     }),
   )}`;
+  if (!projectionPolicy) {
+    throw new TrustedProjectionError(
+      'TPT-HOST-POLICY-UNSUPPORTED',
+      `trusted source/strategy projection policy is not available for ${host}; legacy candidate-derived planning is forbidden`,
+      {
+        transaction_id: transactionId,
+        remediation:
+          'Provide a freezeTrustedHostPolicy result with pre-compile expected entries; do not derive expected bytes from a candidate tree.',
+      },
+    );
+  }
+  const sourceSnapshot = freezeSourceSnapshot({
+    transactionId,
+    entries: sourceObservation.entries,
+  });
+  const projectionPlan = freezeProjectionPlan({
+    sourceSnapshot,
+    host,
+    scope: requestedSurface,
+    policy: projectionPolicy,
+    verifiedBase,
+  });
   const { lockRoot, backup } = acquireHostLock({
     distParent,
     live,
@@ -616,7 +717,7 @@ function runTrustedProjectionTransaction({
     copyTreeFromSnapshot(
       sourceRoot,
       path.join(frozenRepoRoot, 'plugin/src'),
-      sourceSnapshot,
+      sourceObservation,
     );
     for (const relative of [
       'scripts',
@@ -626,15 +727,6 @@ function runTrustedProjectionTransaction({
       freezeSupportTree(repoRoot, frozenRepoRoot, relative);
     }
     fs.mkdirSync(path.join(frozenRepoRoot, 'plugin/dist'), { recursive: true });
-
-    const planRoot = path.join(
-      frozenRepoRoot,
-      'plugin/dist',
-      `${host}.write-trusted-plan`,
-    );
-    fs.mkdirSync(planRoot);
-    buildCandidate({ frozenRepoRoot, candidateRoot: planRoot, purpose: 'plan' });
-    const planSnapshot = scanTree(planRoot, 'trusted-plan');
 
     const candidateRoot = path.join(
       frozenRepoRoot,
@@ -648,23 +740,19 @@ function runTrustedProjectionTransaction({
       purpose: 'candidate',
     });
     const candidateSnapshot = scanTree(candidateRoot, 'candidate');
-    assertSnapshotEqual(
-      planSnapshot,
-      candidateSnapshot,
-      'TPT-PLAN-DRIFT',
-      'candidate differs from the independently frozen trusted projection plan',
-    );
+    assertCandidateMatchesProjectionPlan(projectionPlan, candidateSnapshot);
     const sourceAtVerify = scanTree(sourceRoot, 'source-verify');
     assertSnapshotEqual(
-      sourceSnapshot,
+      sourceObservation,
       sourceAtVerify,
       'TPT-SOURCE-DRIFT',
       'source changed after freeze and before verification',
     );
     const sealed = createSealedRecord({
       transactionId,
+      sourceObservation,
       sourceSnapshot,
-      planSnapshot,
+      projectionPlan,
       candidateSnapshot,
       candidateRoot,
       originalSourceRoot: sourceRoot,

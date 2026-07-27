@@ -1,14 +1,9 @@
 /**
- * Skills-surface orchestration for sync-plugin-dist.
- *
- * Owns: staging create → SAP project → final overlay → skills-scoped entry pins
- * → attestation assert → publishSkillsTree. Outer catch cleans ONLY this
- * orchestration's staging. Backup create / restore / post-commit cleanup belong
- * solely to publishSkillsTree.
- *
- * `stamp` is an explicit internal parameter (tests inject deterministic values).
- * Optional `beforePublish` is a dev-test-only seam planted between initial
- * collision check and publish — production sync never passes it.
+ * Skills is a request scope, not an independently publishable live subtree.
+ * Until a durable verified-full-base receipt is available, every skills request
+ * expands to the full-host trusted transaction. This preserves the shared host
+ * lock, re-verifies the complete host snapshot, and prevents knowledge/strategy
+ * changes from being smuggled through a narrower legacy publisher.
  */
 'use strict';
 
@@ -119,114 +114,19 @@ function projectAndPublishSkillsSurface({
   beforePublish,
   warn = (message) => console.warn(`sync-plugin-dist: ${message}`),
 }) {
-  const root = path.resolve(repoRoot);
-  const stamp = assertSafeStamp(stampInput);
-  // Integrity before any mkdir: refuse live host symlink / symlink ancestors.
-  assertHostDistPathIntegrity(root, host);
-  const src = path.join(root, 'plugin/src');
-  const hostDist = path.join(root, 'plugin/dist', host);
-  const skillsSrc = path.join(src, 'skills');
-  const liveAbsolute = path.join(hostDist, 'skills');
-  const stagingAbsolute = path.join(hostDist, `skills.write-${stamp}`);
-  const backupAbsolute = path.join(hostDist, `skills.bak-${stamp}`);
-
-  requireDir(skillsSrc);
-  fs.mkdirSync(hostDist, { recursive: true });
-
-  // Initial collision check (before staging create).
-  if (lstatOrNull(stagingAbsolute) || lstatOrNull(backupAbsolute)) {
-    throw new Error(`skills staging/backup collision under ${hostDist}`);
+  assertSafeStamp(stampInput);
+  if (typeof beforePublish === 'function') {
+    throw new Error(
+      'skills-only legacy beforePublish seam is unsupported; the request expands to full-host trusted publish',
+    );
   }
-  fs.mkdirSync(stagingAbsolute);
-  const stagingStat = lstatOrNull(stagingAbsolute);
-  if (!stagingStat || stagingStat.isSymbolicLink() || !stagingStat.isDirectory()) {
-    throw new Error(`invalid skills staging directory ${stagingAbsolute}`);
-  }
-
-  try {
-    const deferredGuidance = [];
-    for (const skill of fs.readdirSync(skillsSrc).sort()) {
-      if (skill.startsWith('_')) continue;
-      if (!fs.statSync(path.join(skillsSrc, skill)).isDirectory()) continue;
-      const plan = planSkillProjection({ repoRoot: root, host, skill });
-      if (plan.mode === 'planned') {
-        // Phase B: cursor (and future hosts) may declare planned until overlays exist.
-        continue;
-      }
-      const projectionTarget = path.join(stagingAbsolute, skill);
-      applySkillProjection(plan, projectionTarget);
-      applyFinalSkillOverlay({
-        repoRoot: root,
-        host,
-        skill,
-        skillTree: projectionTarget,
-        stagingRoot: stagingAbsolute,
-      });
-      if (plan.providerGuidanceContract) {
-        deferredGuidance.push({ plan, projectionTarget });
-      }
-      if (plan.readOnlyContract) {
-        assertPacingRenderedArtifact(
-          plan.pacingRegistry,
-          plan.readOnlyContract.host,
-          plan.pacingRenderedBody,
-        );
-        assertPacingRuntimeTree(plan.pacingRegistry, plan.readOnlyContract.host, projectionTarget);
-      }
-    }
-
-    // Skills-scoped host entry pins (Codex skill_entry). Command entries stay full-host-only.
-    applySkillsScopedEntryPinsBridge({
-      repoRoot: root,
-      host,
-      stagingRoot: stagingAbsolute,
-      skillsTree: stagingAbsolute,
-    });
-
-    for (const { plan, projectionTarget } of deferredGuidance) {
-      const registry = loadProviderGuidanceRegistry(
-        plan.providerGuidanceRegistryPath,
-        root,
-      );
-      assertProviderGuidanceRuntimeTree(
-        registry,
-        plan.providerGuidanceContract.host,
-        plan.providerGuidanceContract.skill,
-        projectionTarget,
-      );
-    }
-
-    // Dev-test-only seam: runs after initial check + staging fill, before publish.
-    // Production sync must not pass beforePublish.
-    if (typeof beforePublish === 'function') {
-      beforePublish({
-        hostDistAbsolute: path.resolve(hostDist),
-        liveAbsolute: path.resolve(liveAbsolute),
-        stagingAbsolute: path.resolve(stagingAbsolute),
-        backupAbsolute: path.resolve(backupAbsolute),
-        stamp,
-      });
-    }
-
-    return publishSkillsTree({
-      hostDistAbsolute: path.resolve(hostDist),
-      liveAbsolute: path.resolve(liveAbsolute),
-      stagingAbsolute: path.resolve(stagingAbsolute),
-      stamp,
-      warn,
-    });
-  } catch (error) {
-    // Outer catch owns ONLY staging it created. Never remove unknown/collision backups —
-    // publishSkillsTree uniquely owns backup create/restore/post-commit cleanup.
-    if (lstatOrNull(stagingAbsolute)) {
-      try {
-        rmNoFollow(stagingAbsolute, path.resolve(hostDist));
-      } catch {
-        // leave staging for operator inspection
-      }
-    }
-    throw error;
-  }
+  const { projectAndPublishHostSurface } = require('./sync-host-surface.cjs');
+  return projectAndPublishHostSurface({
+    repoRoot,
+    host,
+    stamp: stampInput,
+    warn: (message) => warn(`skills scope expanded to verified full-host snapshot: ${message}`),
+  });
 }
 
 module.exports = {

@@ -196,10 +196,31 @@ test('manifest-only shell adapter emits exactly the sealed upload set', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'trusted-release-shell-'));
   try {
     const manifest = fixtureManifest(root);
+    const archiveSnapshot = (snapshotRoot, archiveName) => {
+      const archive = path.join(root, archiveName);
+      const zipped = spawnSync('zip', ['-q', '-X', '-r', archive, '.'], {
+        cwd: snapshotRoot,
+        encoding: 'utf8',
+      });
+      assert.equal(zipped.status, 0, zipped.stderr);
+      return {
+        kind: 'zip',
+        path: path.relative(root, archive),
+        sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
+      };
+    };
     for (const host of manifest.hosts) {
-      host.snapshot_root = path.relative(root, host.snapshot_root);
+      host.snapshot_locator = archiveSnapshot(
+        host.snapshot_root,
+        `snapshot-${host.host}.zip`,
+      );
+      delete host.snapshot_root;
     }
-    manifest.docs.snapshot_root = path.relative(root, manifest.docs.snapshot_root);
+    manifest.docs.snapshot_locator = archiveSnapshot(
+      manifest.docs.snapshot_root,
+      'snapshot-docs.zip',
+    );
+    delete manifest.docs.snapshot_root;
     const manifestPath = path.join(root, 'release-input.json');
     fs.writeFileSync(manifestPath, JSON.stringify(manifest));
     const result = spawnSync(

@@ -636,6 +636,37 @@ function usage() {
   );
 }
 
+function materializeSnapshotLocator(locator, manifestRoot, destination, label) {
+  if (
+    !locator
+    || locator.kind !== 'zip'
+    || typeof locator.path !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(locator.sha256 ?? '')
+    || Object.keys(locator).sort().join(',') !== 'kind,path,sha256'
+  ) {
+    fail(
+      'TPT-ATTESTATION-STALE',
+      `${label} requires an immutable mode-preserving zip snapshot locator`,
+    );
+  }
+  const archive = path.resolve(manifestRoot, locator.path);
+  const bytes = fs.readFileSync(archive);
+  if (sha256(bytes) !== locator.sha256) {
+    fail('TPT-SOURCE-DRIFT', `${label} snapshot archive digest changed`);
+  }
+  fs.mkdirSync(destination, { recursive: true });
+  const extracted = spawnSync('unzip', ['-q', archive, '-d', destination], {
+    encoding: 'utf8',
+  });
+  if (extracted.status !== 0) {
+    fail(
+      'TPT-ARTIFACT-UNSAFE',
+      `${label} snapshot archive extraction failed: ${extracted.stderr || extracted.stdout}`,
+    );
+  }
+  return destination;
+}
+
 function main(argv) {
   if (argv[0] !== 'build') {
     usage();
@@ -658,16 +689,38 @@ function main(argv) {
   const absoluteManifest = path.resolve(manifestPath);
   const manifest = JSON.parse(fs.readFileSync(absoluteManifest, 'utf8'));
   const manifestRoot = path.dirname(absoluteManifest);
-  manifest.docs.snapshot_root = path.resolve(manifestRoot, manifest.docs.snapshot_root);
-  for (const host of manifest.hosts) {
-    host.snapshot_root = path.resolve(manifestRoot, host.snapshot_root);
+  fs.mkdirSync(path.resolve(outDir), { recursive: true });
+  const materialized = fs.mkdtempSync(path.join(path.resolve(outDir), '.release-input-'));
+  try {
+    if (Object.hasOwn(manifest.docs ?? {}, 'snapshot_root')) {
+      fail('TPT-ATTESTATION-STALE', 'raw docs snapshot_root transport is forbidden');
+    }
+    manifest.docs.snapshot_root = materializeSnapshotLocator(
+      manifest.docs.snapshot_locator,
+      manifestRoot,
+      path.join(materialized, 'docs'),
+      'docs',
+    );
+    for (const host of manifest.hosts) {
+      if (Object.hasOwn(host, 'snapshot_root')) {
+        fail('TPT-ATTESTATION-STALE', `raw ${host.host} snapshot_root transport is forbidden`);
+      }
+      host.snapshot_root = materializeSnapshotLocator(
+        host.snapshot_locator,
+        manifestRoot,
+        path.join(materialized, host.host),
+        host.host,
+      );
+    }
+    const result = buildReleaseBundle(manifest, outDir);
+    for (const { filename } of result.hosts) {
+      process.stdout.write(`${path.join(result.release_dir, filename)}\n`);
+    }
+    process.stdout.write(`${path.join(result.release_dir, 'SHA256SUMS')}\n`);
+    process.stdout.write(`${path.join(result.release_dir, 'release-attestation.json')}\n`);
+  } finally {
+    fs.rmSync(materialized, { recursive: true, force: true });
   }
-  const result = buildReleaseBundle(manifest, outDir);
-  for (const { filename } of result.hosts) {
-    process.stdout.write(`${path.join(result.release_dir, filename)}\n`);
-  }
-  process.stdout.write(`${path.join(result.release_dir, 'SHA256SUMS')}\n`);
-  process.stdout.write(`${path.join(result.release_dir, 'release-attestation.json')}\n`);
   return 0;
 }
 

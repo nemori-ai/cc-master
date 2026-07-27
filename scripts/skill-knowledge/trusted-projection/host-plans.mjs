@@ -117,6 +117,10 @@ function artifactId(domain, prefix, artifact, ownId) {
   )}`;
 }
 
+export function computeTrustedArtifactId(domain, prefix, artifact, ownId) {
+  return artifactId(domain, prefix, artifact, ownId);
+}
+
 function assertPortablePath(value, { allowRoot = true } = {}) {
   if (
     typeof value !== 'string' ||
@@ -315,6 +319,50 @@ function assertSourceSnapshot(snapshot) {
   if (snapshot.source_snapshot_id !== expectedId) {
     fail('TPT-SOURCE-SNAPSHOT-INVALID', 'source snapshot artifact id does not match');
   }
+}
+
+export function freezeSourceSnapshot({
+  transactionId,
+  rootId = 'plugin-src',
+  entries,
+  gitTree = null,
+  directoryMode = 0o755,
+}) {
+  if (!TRANSACTION_ID.test(transactionId ?? '') || !LOGICAL_ID.test(rootId ?? '')) {
+    fail('TPT-SOURCE-SNAPSHOT-INVALID', 'source snapshot identity is malformed');
+  }
+  if (!Array.isArray(entries)) {
+    fail('TPT-SOURCE-SNAPSHOT-INVALID', 'source snapshot entries are required');
+  }
+  const files = entries
+    .filter((entry) => entry?.kind === 'file')
+    .map((entry) => [
+      entry.path,
+      entry.sha256,
+      entry.size,
+      entry.posix_mode,
+    ]);
+  const normalized = buildEntries(files, directoryMode);
+  const identity = treeIdentity(normalized);
+  const snapshot = {
+    schema: 'cc-master/trusted-projection/source-snapshot/v1alpha1',
+    transaction_id: transactionId,
+    source_snapshot_id: '',
+    source_content_id: identity.contentId,
+    source_root_id: rootId,
+    git_tree: gitTree,
+    mode_model: 'posix-12bit',
+    entries: normalized,
+    tree_sha256: identity.treeSha256,
+  };
+  snapshot.source_snapshot_id = artifactId(
+    'source-snapshot',
+    'source',
+    snapshot,
+    'source_snapshot_id',
+  );
+  assertSourceSnapshot(snapshot);
+  return deepFreeze(snapshot);
 }
 
 function validatePolicyShape(policy) {
