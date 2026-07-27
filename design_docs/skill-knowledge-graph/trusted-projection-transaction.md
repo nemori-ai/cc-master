@@ -1,6 +1,6 @@
 # Trusted Projection Transaction
 
-> Status: **v1alpha1 normative contract; production integration pending**
+> Status: **v1alpha1 normative contract; host publisher and release bundler landed, final integration reconciliation pending**
 >
 > Scope: `plugin/src` → `plugin/dist/<host>` → release bundle 的冻结、投影、验证、发布与恢复。
 >
@@ -26,6 +26,12 @@
 
 compiler 是 repo-private proof engine。publisher 是纯提交器。release bundler 只消费已经提交且可追溯的
 artifact。三者不能互相代替。
+
+compiler 启动前必须同时冻结 source snapshot 与由 trusted policy 独立产生的 projection plan。
+sealed verified snapshot 是 publisher 唯一可接受的字节权威。release package 只消费 committed
+receipt、对应 attestation 与冻结 bundle plan；它永不 sync dist、重新 compile source 或现场扩大
+文件集合。`plugin/src/knowledge/` 及任何顶层 `knowledge/` 输出都是 repo-only，不能进入
+host/package/release closed set。
 
 ### 1.2 事务 aggregate
 

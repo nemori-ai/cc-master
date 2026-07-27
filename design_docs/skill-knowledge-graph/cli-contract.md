@@ -34,7 +34,7 @@ node scripts/skill-knowledge.mjs <command> [options]
 |---|---|---|
 | `contract [--json]` | implemented | 返回能力、plane、operation、invariant 与 exit-code registry |
 | `check [--source <dir>] [--stage K0\|K1\|K2\|K3] [--host <host>] [--base <git-ref>] [--json]` | implemented-k1-pilot | K0 只执行 scaffold；K1+ 对 pilot source 跑 schema + binding + inventory + graph invariants。`--host/--base` 仍 exit 10 |
-| `compile [--host <host>] [--check] [--json]` | implemented-k1-pilot | 四 host runtime projection + final surface verifier；`result_kind=compile`；`--check` 对已提交 dist 做 byte drift 门 |
+| `compile [--host <host>] [--check] [--json]` | implemented-k1-pilot | 四 host accepted-skill projection + final surface verifier；repo-only `knowledge/` 不进入 host 输出；`result_kind=compile`；`--check` 对已提交 dist 做 byte drift 门 |
 | `materialize --composition <id> [--check] [--json]` | implemented-k3-00 | graph-first skill-as-artifact：只物化 lifecycle=accepted 且 **derived** verdict=admit 的 composition；禁止 `--analysis-override`；`result_kind=materialize`；复用四 host compile 投影 |
 | `report [--format json\|markdown] [--host <host>] [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=report`；分轨 `structural_status` / `behavioral_evidence_status`；含 graph hash、counts、witness、remediation。`--host` 仍 exit 10 |
 | `path --from <id> --to <id> --host <host> [--source <dir>] [--json]` | implemented-k1-pilot | `result_kind=path`；在 **authored navigation plane**（`runtime.enabled_by_default`）上 BFS；对不存在 / 歧义 / 不可达 fail closed，带 shortest-path witness |
@@ -42,6 +42,8 @@ node scripts/skill-knowledge.mjs <command> [options]
 | `change begin\|validate\|apply` | implemented-k1 | ignored candidate workspace 中的 typed change transaction；`begin → validate → apply` fail-closed 事务链 |
 
 `check --host|--base` / `report --host` 仍为 declared-unavailable。K1 pilot 的 authored `path`/`hop_analysis` **不替代** final-host H1–H4（那由 `compile` + `runtime_projection=true` 证明）。
+`runtime_projection` 表示 accepted composition 对普通 host skill surface 的投影，不表示
+`plugin/src/knowledge` 或顶层 `knowledge/` 是 runtime/package surface。
 
 ## 2. JSON envelope
 

@@ -1,5 +1,12 @@
 # 对 cc-master 的影响：从文件 portfolio 升级为可验证的知识 contract
 
+> **演进标记（superseded implementation shape，2026-07-27）：** 本文保留最初
+> co-located/per-skill/runtime-atlas 提案的研究演进。正式实现已经 graph-first：全局
+> point/module/typed edge 是原始事实，accepted composition 是派生 skill artifact；
+> binding/path 只作 evidence，module 可被多 composition 消费而保持单一 SSOT。
+> `plugin/src/knowledge/` 是 repo-only，不进入 dist/package/release；publish/package 只接受
+> Trusted Projection Transaction seal 的 verified snapshot，package 不 sync/recompile。
+
 ## 1. 当前基线
 
 `[仓内实测·2026-07-23 checkout]` 对 `plugin/src/skills/**/canonical/**/*.md` 的只读扫描得到：
@@ -56,8 +63,8 @@ verification.endpoint-procedure
 
 ```text
 stable Markdown span markers
-  + plugin/src/skills/<skill>/.design/knowledge.yaml
-  + generated graph/source maps/runtime routers
+  + plugin/src/knowledge/{graph/modules,compositions,analyses}
+  + generated source maps + accepted skill projections
 ```
 
 不选择：
@@ -68,25 +75,24 @@ stable Markdown span markers
 - graph DB 作为 runtime 前置；
 - 只生成 dev-only JSON、不生成 agent 可见导航。
 
-### 为什么 `.design/knowledge.yaml`
+### 为什么使用全局 `plugin/src/knowledge/`
 
-- 与 skill 维护上下文 co-located；
-- `.design` 已是 maintainer-only、分发时剔除的约定；
-- 不污染 agent-facing prose；
-- projection pipeline 可以在 canonical 阶段读取，再生成 host-specific runtime surfaces。
+- point/module/typed edge 不被某个 skill 目录拥有；
+- composition 可以复用同一 module SSOT；
+- binding/path 保持 evidence 角色，不反推 membership；
+- 整个 root 是 maintainer-only，并被 trusted host/release plan 排除。
 
 具体路径仍需在实现设计中验证 `project-skill.cjs`、SAP strategy 和 package 规则；
 本报告不授权修改 projection。
 
 ## 4. Runtime topology
 
-建议逻辑结构：
+原研究建议的独立 atlas/router 结构已 supersede。当前逻辑结构是：
 
 ```text
-current point/module
-  → generated global module atlas
-  → generated target module router
-  → target point span
+global graph facts
+  → admitted composition
+  → ordinary host skill Markdown
 ```
 
 ### 关键限制
@@ -140,7 +146,7 @@ skill-knowledge bootstrap --skill <name>
 |---|---|
 | schema、parser、graph algorithms、source map | dev tooling，不是 skill |
 | 编辑单个 skill body 时维护 marker/node/lineage | `cc-master-skillsmith` |
-| 跨 skill owner、overlap、merge/transfer | `curating-skill-portfolios` |
+| composition 边界、shared module consumers、overlap | `curating-skill-portfolios` |
 | query → point 路由行为 eval | `grounding-skill-evals` |
 | 新功能前真实痛点与设计准入 | `requirement-elicitation` |
 
@@ -158,6 +164,9 @@ skill-knowledge bootstrap --skill <name>
 > 独立执行工作流。因此规范准入 dev-only `governing-skill-knowledge`，但只在 K1 工具能力真实可用后
 > 创建。原“暂不新增”保留为能力不存在时的正确判断，不静默改写。
 
+> **再次演进（superseded，2026-07-24）：** Round-1 最终裁决是
+> `governing-skill-knowledge` **REJECTED / DELETE**；正式规范 + CLI 已覆盖该维护者旅程。
+
 ## 7. 与八个分发 skills 的边界
 
 knowledge graph 是 **这些 skills 的维护/导航机制**，不是第九个运行时知识领域。
@@ -165,8 +174,8 @@ knowledge graph 是 **这些 skills 的维护/导航机制**，不是第九个�
 - 不在 `master-orchestrator-guide` 复述 graph governance；
 - 不把所有跨 skill atlas 注入 SKILL A；
 - 不改变 A/B/D/E/F/G/H/I 的职责边界；
-- runtime atlas 只承载“何时去哪里”，不复制目标 skill 的 HOW；
-- point owner 必须服从红线 3 的 skill portfolio 边界。
+- repo-only graph metadata 不复制目标 skill 的 HOW，也不进入 runtime package；
+- canonical authority 与 composition consumers 必须服从红线 3 的 skill portfolio 边界。
 
 ## 8. 红线与架构约束
 

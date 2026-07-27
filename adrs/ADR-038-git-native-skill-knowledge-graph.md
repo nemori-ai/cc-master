@@ -2,8 +2,8 @@
 
 > Status: **Accepted**
 > Date: 2026-07-23
-> Scope: `plugin/src/skills` 的知识身份与 Markdown binding；未来 `plugin/src/knowledge/`、
-> `plugin/dist/<host>/knowledge/`、knowledge compiler/editor、测试与 CI。
+> Scope: `plugin/src/skills` 的知识身份与 Markdown binding；repo-only
+> `plugin/src/knowledge/`、knowledge compiler/editor、可信投影事务、测试与 CI。
 > Source: 2026-07-23 skill/plugin 全面健康诊断与三跳知识可达性设计；用户批准正式化完整方案。
 
 ---
@@ -52,6 +52,13 @@ cc-master 的分发知识目前以 Markdown 文件组织。文件级 progressive
 > 以 `dev-as-ml-loop` 贯通 schema→analysis→admit→materialize→四 host；其余 skill 全量迁移与
 > package 硬化（K3-01P）属后续任务。
 
+> **Amendment (2026-07-27, K3-03P)**：全量迁移后，point、module 与 typed edge 是
+> `plugin/src/knowledge/` 中的全局 authored facts；accepted composition 才是可投影的 skill
+> 产品。module 可以被多个 composition 消费，但正文与 module/point 身份仍只有一个 SSOT。
+> `binding.path`、marker、anchor 与 source map 都是 evidence/projection，不是 owner，也不能从
+> skill 目录反推 membership。`plugin/src/knowledge/` 是 repo-only maintainer surface，禁止进入
+> host dist、package 或 release artifact；不存在平行的 knowledge runtime SSOT。
+
 ### 2.2 图是 multipane typed contract
 
 Structural、authority、navigation、trigger、constraint、lineage 与 projection plane 分开。
@@ -93,8 +100,13 @@ compiler/editor 使用 Node 22 ESM、strict JSON、in-memory adjacency maps 和�
 pinned Ajv 只在开发时生成提交进仓的 standalone validator；clean clone routine check 不现场安装
 schema dependency。
 
-编译器生成 per-host Markdown atlas、module routers、point anchors/nav blocks，并在 final dist 上
-重新解析 link/anchor 计算 hops。生成物随现有 `plugin/dist` 同 commit 纪律提交。
+编译器只能消费冻结的 source snapshot 与独立冻结的 trusted projection plan，并把 accepted
+composition 投影进既有 host-native skill surface；repo-only graph、analysis、contract 与
+`knowledge/` 目录不进入 host dist。final verifier 在 sealed candidate 上重解析实际
+link/anchor 与 skill surface；只有这份 verified snapshot 可以发布。
+
+package/release 只消费 committed publish receipt、对应 attestation 与冻结 bundle plan。package
+阶段不得重新扫描 source、sync dist、重新 compile 或扩大文件集合。
 
 ### 2.6 不使用数据库作为 v1 canonical store
 
@@ -105,7 +117,7 @@ of truth。
 ### 2.7 渐进启用，不预支合规声明
 
 按 K0 observe → K1 pilot → K2 covered → K3 enforced 晋级。只有 K3 的 per-host 全图检查通过后，
-才可声称 cc-master runtime knowledge graph 达到三跳合同。
+才可声称 accepted runtime skill projection 达到三跳合同。
 
 ## 3. Consequences
 
@@ -127,7 +139,8 @@ of truth。
 
 ### 3.3 Neutral
 
-- 分发 skill 数量仍为八；`knowledge/` 是 shared runtime support surface，不是第九个 skill。
+- 分发 skill 数量仍为八；`plugin/src/knowledge/` 是 repo-only 治理输入，不是第九个 skill，
+  也不是 runtime/package/release surface。
 - task/execution graph schema 不受影响。
 - LLM behavior eval 继续带外运行，不进入无模型 deterministic hard CI。
 

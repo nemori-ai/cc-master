@@ -4,7 +4,7 @@
 >
 > Version: **v1alpha1**
 >
-> Last updated: **2026-07-24**
+> Last updated: **2026-07-27**
 >
 > Scope: `plugin/src/skills` 的知识身份、Markdown binding、跨 skill 导航、语义变更、
 > host projection、健康诊断与研发治理。
@@ -25,7 +25,8 @@ cc-master 要把八个分发 skill 从“若干 Markdown 文件”治理成一�
 3. **权威唯一**：一个 semantic subject 恰有一个 active canonical point；summary/example
    直接回指 canonical，不形成转述链。
 4. **运行时全通**：对每个被声明为 full/partial covered 的 host，其 active accepted point
-   navigation graph 有向强连通，point→point 有向直径不超过 3。
+   skill navigation graph 有向强连通，point→point 有向直径不超过 3；repo-only graph source
+   本身不作为 runtime surface。
 5. **关键内容更近**：critical module 的 primary point 满足更严格的 scoped hop SLO。
 6. **变更可审计**：结构变化由类型化 operation 解释，并在 candidate graph 上整体校验后才落地。
 7. **projection 不漂移**：authored graph、canonical Markdown 与 final host Markdown 的 binding、
@@ -403,7 +404,7 @@ canonicalize 到对应 canonical point。
 目标 authored layout：
 
 ```text
-plugin/src/knowledge/          # repo-only authored/meta source（不分发进用户 runtime package 硬化；K3-01P）
+plugin/src/knowledge/          # repo-only authored/meta source；禁止进入 dist/package/release
 ├── portfolio.json
 ├── graph/modules/             # global modules（graph-first；非 skill 嵌套）
 ├── compositions/              # skill-as-artifact product views（consumes.modules 为唯一消费 SSOT）
@@ -411,8 +412,10 @@ plugin/src/knowledge/          # repo-only authored/meta source（不分发进�
 └── changes/
 ```
 
-`plugin/dist/<host>/knowledge/` 只是 **generated runtime atlas/router**（compile/materialize 产物），
-不是第二 authored SSOT。package 硬化剔除/收口属后续 **K3-01P**，不在 K3-00 walking skeleton 范围。
+point、module、typed edge 是该 root 下的原始全局事实；accepted composition 是其派生 skill
+产品。compile/materialize 只能把 accepted composition 的产品效果投影进既有 host skill
+surface；不得创建 `plugin/dist/<host>/knowledge/` 或把 analyses/contracts/graph shards 带入
+package。由此不存在 authored graph 与 knowledge runtime 两套 SSOT。
 
 机器合同：
 
@@ -618,7 +621,7 @@ budget estimator v1 先做与 span hash 相同的 CRLF→LF 规范化，再报�
 
 统一入口 `node scripts/skill-knowledge.mjs`。K0 已实现 `contract` 与 `check` 的 walking
 skeleton；K1 pilot 额外实现 `report` / `path` / `explain`（authored navigation plane）、
-`compile`（四 host runtime projection；`runtime_projection=true`）与 typed `change`
+`compile`（四 host skill projection；`runtime_projection=true`）与 typed `change`
 transactions（`typed_change_transactions=true`）。其机器 envelope、diagnostic 与 exit code 以
 [cli-contract.md](cli-contract.md) 为准。仍只冻结 vocabulary、当前必须 exit 10、不得假成功的是
 `check --host/--base` 与 `report --host`：
@@ -641,25 +644,28 @@ binding、semantic invariant、projection、hop、drift 与 usage error。
 K1 尚未实现的 option（`check --host/--base`、`report --host`、`report --format markdown`）
 仍随所属命令 exit 10；参数出现在合同中不等于 capability 可用。
 
-### 10.4 Runtime projection
+### 10.4 Trusted product projection
 
-每个 host 最终生成：
+每个 host 最终只接收普通 host-native plugin surface：
 
 ```text
 plugin/dist/<host>/
-├── knowledge/
-│   ├── atlas.md
-│   └── modules/<module-id>.md
 └── skills/<skill>/**/*.md
     └── generated point anchors + tiny navigation blocks
 ```
 
 规则：
 
-- `knowledge/` 是 shared runtime support surface，不是第九个分发 skill。
+- `plugin/src/knowledge/` 与任何顶层 `knowledge/` 输出都是 repo-only，必须从 dist/package/release
+  closed set 中排除。
+- point/module/typed edge 是 authored graph facts；只有 lifecycle=accepted 且 derived
+  verdict=admit 的 composition 能成为 skill artifact。
 - source Markdown 不手写 generated block。
-- projection 先清旧 block，再从 graph hash 生成。
+- Trusted Projection Transaction 在 compiler 前冻结 source snapshot 与独立 trusted plan；
+  compiler 只能在该闭集内生成 candidate。
 - final-dist verifier 重新 parse 所有 anchor/link，不能只信模板。
+- verifier seal 的 snapshot 是 publish/package 唯一字节权威；publisher 不重新发现文件，
+  package 不 sync、不重新 compile。
 - relative link 以 final host path 计算，不依赖 `${CLAUDE_PLUGIN_ROOT}` 在 Markdown 中展开。
 - `partial` host 只计算真实投影子图；`stub/unsupported` 不声称 coverage。
 
@@ -673,7 +679,8 @@ plugin/dist/<host>/
 4. **Golden fixtures**：单 module、跨文件 module、critical pin、summary fan-in、partial host。
 5. **Mutation/metamorphic**：删 marker、断 anchor、造 authority chain、改 owner 不改 routes、
    把 critical 全开、插入虚边骗 hop。
-6. **Projection integration**：canonical → host dist → reparse → source map/hop。
+6. **Projection integration**：frozen source + trusted plan → candidate → verify/seal → publish；
+   final host skill surface reparse → source map/hop。
 7. **Behavior eval**：结构绿后，用 Track A/B 量 agent 是否更精准触达；不进无 LLM 的 hard CI。
 
 ### 11.2 Drift matrix
@@ -685,6 +692,8 @@ plugin/dist/<host>/
 | source graph ↔ generated router/nav | deterministic compile + graph hash |
 | canonical path ↔ host adapter path | per-host source map + final link parse |
 | source ↔ committed dist | 现有 `check-plugin-dist-sync.sh` |
+| frozen source/plan ↔ sealed candidate ↔ published dist | Trusted Projection Transaction attestation + publish receipt |
+| committed dist ↔ release package | frozen bundle plan + release attestation；package 禁止 sync/recompile |
 | base/result semantic diff ↔ change set | change replay + hash/diff explanation |
 | access class ↔ actual hop | per-host shortest path assertions |
 | host coverage claim ↔ surface | projection verifier |
@@ -699,11 +708,13 @@ canonical coverage 的 denominator 由 Git tree 枚举 `plugin/src/skills/<runti
 固定接线：
 
 - `run-tests.sh`：当前已自动发现 K0 content contract test；K1+ 再加入 marker、domain/graph tests；
-- `scripts/sync-plugin-dist.sh`：现有 SAP/PHIP 投影后执行 knowledge graph post-pass；
+- `scripts/sync-plugin-dist.sh`：在 Trusted Projection Transaction 内冻结 source + trusted plan，
+  再投影、compile、verify/seal 并发布 host candidate；
 - `scripts/check-plugin-dist-sync.sh`：继续作为 source/dist 同 commit 漂移门；
 - GitHub Actions 已新增 `plugin-contracts` job，执行 K0 contract test + source check；
 - 现有 required `build-and-check` 已保持名字稳定，作为 ccm + plugin jobs 的 aggregator；
-- release gate 只发布已保存且 final-dist verifier 通过的生成物。
+- release gate 只消费 committed publish receipt、对应 verified snapshot attestation 与冻结
+  bundle plan；package 不从 live source/dist 重新 sync 或 compile。
 
 不要把 LLM eval 变成 deterministic CI 的依赖；它属于改行为时的带外证据。
 
@@ -738,7 +749,7 @@ canonical coverage 的 denominator 由 Git tree 枚举 `plugin/src/skills/<runti
 | 关切 | Owner |
 |---|---|
 | 一个 skill body 该怎么写 | `cc-master-skillsmith` |
-| 要不要建 skill、module owner/portfolio 边界争议 | `curating-skill-portfolios` |
+| 要不要建 skill、composition 边界 / shared module consumers / portfolio 争议 | `curating-skill-portfolios` |
 | J、Track A/B 与行为改进是否成立 | `grounding-skill-evals` |
 | graph health / typed change / witness 怎么执行 | 本目录正式规范 + `scripts/skill-knowledge.mjs` |
 
@@ -753,13 +764,16 @@ root `AGENTS.md` 必须反映真实磁盘：runtime portfolio **8**；dev/meta *
 一次正常知识变更：
 
 1. 识别任务：wording、refine、move、split、merge、transfer、deprecate 或 retire。
-2. `explain/path/report` 读取当前 owner、authority、inbound routes、host coverage、shortest witnesses。
+2. `explain/path/report` 读取当前 canonical authority、composition consumers、inbound routes、
+   host coverage、shortest witnesses。
 3. 用 typed command 构建 change set 与 candidate。
 4. 修改 canonical Markdown span；不手写 generated nav。
 5. candidate 全图校验；失败时按 witness 修复，不 suppress。
-6. compile 所有 affected hosts，final-dist reparse。
-7. 跑 source tests、dist sync check；行为变化再跑 Track A/B。
-8. PR review 同时看 Markdown diff、JSON semantic diff、change set、health delta、dist diff。
+6. 冻结 source snapshot 与 trusted host plan，再 compile 所有 affected hosts；只 seal
+   final-dist reparse 全绿的 candidate。
+7. 以 sealed verified snapshot 发布，跑 source tests、dist sync check；行为变化再跑 Track A/B。
+8. PR review 同时看 Markdown diff、JSON semantic diff、change set、health delta、dist diff
+   与 transaction witness。release package 只消费 receipt/attestation，不重跑 sync/compile。
 9. 合并后 change set immutable；错误用新 change 修正。
 
 ## 14. 渐进启用
@@ -783,7 +797,9 @@ root `AGENTS.md` 必须反映真实磁盘：runtime portfolio **8**；dev/meta *
 - per-host point→point directed diameter `≤3`；
 - access class + pin budget；
 - typed change transactions；
-- Node in-memory compiler 与 generated runtime Markdown；
+- Node in-memory compiler、accepted composition 与普通 host skill surface；
+- Trusted Projection Transaction 冻结 source + plan、sealed snapshot 单一发布权威，以及
+  package 不 sync/recompile；
 - 维护者旅程走正式规范 + CLI（独立 governance meta-skill 已 DELETE）；
 - K0→K3 hardening。
 

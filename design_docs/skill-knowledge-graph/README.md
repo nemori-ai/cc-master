@@ -1,7 +1,7 @@
 # Skill Knowledge Graph
 
 本目录是 cc-master **skill knowledge graph 治理系统的正式、持续维护入口**。它把分发
-skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块、知识点、权威关系、运行时导航、
+skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块、知识点、权威关系、产品导航、
 变更谱系与 host projection 建立 Git-native 的可计算合同。
 
 ## 阅读路由
@@ -30,17 +30,28 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 - canonical Markdown span 是知识正文 SSOT；JSON 不复制完整 HOW。
 - module JSON 是模块 intent、boundary、membership、access 与路由元数据的 SSOT。
 - change set 是语义身份演化的审计记录，不替代 Git diff，也不替代当前 materialized source。
-- `plugin/dist/<host>/knowledge/` 与注入的导航块是未来编译产物，不是 authored SSOT。
+- `plugin/src/knowledge/` 整体是 repo-only maintainer source，不进入 host dist、package 或
+  release artifact。accepted composition 才是可投影的 skill 产品；最终 host 中不存在平行的
+  `knowledge/` runtime SSOT。
+- source 与 trusted projection plan 必须在 compiler 前冻结；sealed verified snapshot 是
+  publish/package 的唯一字节权威。package 只消费 receipt/attestation/frozen bundle plan，
+  不 sync、不重新 compile。
 
 ## 当前成熟度
 
 当前是 **K3 — eight runtime skills fully migrated to graph-first compositions**：
 
 - `plugin/src/knowledge/` 已落真实 inventory：**8** 个 accepted composition + **8** 个可复算 candidate analysis，共消费全局 **46 modules / 249 points / 404 authored typed edges**；不存在 legacy skill shard / `owner_skill` fallback；
-- `check` / `contract` / `compile` / `materialize` / `change` / `report` / `path` / `explain` 已实现（K2 查询面 + 四 host runtime projection + typed change + K3-00 materialize）；
+- `check` / `contract` / `compile` / `materialize` / `change` / `report` / `path` / `explain` 已实现（K2 查询面 + 四 host skill projection + typed change + K3 materialize）；
 - standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仍覆盖 authored navigation plane；final-host H1–H4 由 `compile` 证明）；
 - 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI `check --host` integration；
-- `runtime_projection=true`：`compile` 写入 `plugin/dist/<host>/knowledge/` 与 skill nav/anchors，final verifier 只计真实可点击边；host honesty 保留 stub/partial coverage（workflow stubs；using-ccm / master-orchestrator partial hosts）；
+- `runtime_projection=true`：`compile` 只把 accepted composition 的产品效果写入普通 host skill
+  surface；final verifier 只计真实可点击边。trusted host plan 与 release bundler 都拒绝
+  repo-only `knowledge/` 路径；host honesty 保留 stub/partial coverage（workflow stubs；
+  using-ccm / master-orchestrator partial hosts）；
+- Trusted Projection Transaction 已冻结 source + trusted plan 后再运行 compiler，并以 sealed
+  verified snapshot 授权 publish；release package 只消费 committed receipt/attestation 与
+  frozen bundle plan，禁止现场 sync/recompile；
 - typed change transactions 已交付：`change begin → validate → apply` 冻结 scope/base/hash，验证闭合集合并以 rollback-safe publication 写入 immutable ledger（`typed_change_transactions=true`）；
 - 带外行为评测脚手架已交付（`behavioral_evidence_tracking=true`）：冻结 train/holdout、
   no-router baseline / router candidate、Codex/Cursor runner、grounding/navigation grader 与

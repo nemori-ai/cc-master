@@ -6,6 +6,13 @@
 > [cc-master 映射](04_cc_master_implications.md)和
 > [研究议程](05_research_agenda.md)。
 
+> **演进标记（superseded as product architecture，2026-07-27）：** 下文保留
+> 2026-07-23 的 research-time `per-skill manifest + runtime atlas/router` 提案。正式产品已经
+> 转为 graph-first：point/module/typed edge 是 `plugin/src/knowledge/` 的全局原始事实；
+> accepted composition 是派生 skill artifact；binding/path 只作 evidence。module 可被多个
+> composition 消费而仍只有一个 SSOT。该 repo-only graph 不进入 dist/package/release；可信投影
+> 先冻结 source + trusted plan，sealed verified snapshot 才能发布/打包，package 不 sync/recompile。
+
 ## 一句话结论
 
 推荐把 cc-master skills 建模为：
@@ -40,6 +47,10 @@
 > `begin → validate → apply`、graph witness 与 projection 能力真实可用后创建 dev-only
 > `governing-skill-knowledge`，专责执行图诊断与 typed transaction。它不进入 runtime plugin，也不接管
 > skillsmith / curating / eval 的职责。保留原文是为了保留决策演进证据，不把后来的条件倒写回研究时点。
+
+> **再次演进（superseded，2026-07-24）：** 正式 Counterfactual Probe 最终判定
+> `governing-skill-knowledge` 为 weak×weak，结论是 **REJECTED / DELETE**。维护者旅程由正式规范 +
+> CLI 承担，不新增独立 meta-skill。
 
 ## 推荐架构
 

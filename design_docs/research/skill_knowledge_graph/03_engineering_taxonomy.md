@@ -1,12 +1,16 @@
 # 工程分类：不要把知识图、路由图、authority 和 source map 混成一张图
 
+> **演进标记（2026-07-27）：** 本文分类已按正式 graph-first 裁决校正：point、module 与 typed
+> edge 是全局原始事实；skill/composition 是 accepted derived artifact。binding/path 只是
+> evidence，不是 owner；module 可以有多个 composition consumers，但正文和身份仍只有一个 SSOT。
+
 ## 1. 最小领域对象
 
 | 对象 | 定义 | 是否是正文 |
 |---|---|---|
 | `entry` | command、顶层 skill、用户意图等进入点 | 否 |
-| `skill` | 可触发的 runtime package | 容器，不是 point |
-| `module` | 一组共同服务一个导航意图的 points | 可绑定连续 Markdown span |
+| `skill` / composition | 经 admit 的可触发 runtime artifact | 派生产品，不拥有 module/point |
+| `module` | 一组共同服务一个导航意图的全局 points | 可绑定多个 Markdown span |
 | `point` | 最小可拥有、引用、定位、验证的知识单元 | 必须绑定 primary span |
 | `artifact` | Markdown 文件、manifest、generated source map | 否 |
 | `projection` | canonical point 在某 host 最终产物的位置 | 否 |
@@ -16,7 +20,7 @@
 一个 point 应：
 
 - 能用一句话说明它回答的判断；
-- 有唯一 owner；
+- 有唯一 canonical authority；
 - 可以单独被路由到；
 - 能判断一次改动是措辞、refine、split 还是 merge；
 - 不因每段都要 ID 而机械碎片化。
@@ -80,10 +84,11 @@ returns_to_atlas
 回答“什么用户意图/command/entry 会激活哪一组知识”：
 
 ```text
-intent → entry → skill → module
+intent → entry → accepted composition → module/point
 ```
 
-它与 frontmatter description 的 skill-level routing 对齐，但下钻到 module/point。
+它与 frontmatter description 的 artifact-level routing 对齐，但 module/point membership
+只来自全局 graph，不从 skill 目录推导。
 
 ### 2.4 Projection graph
 
@@ -176,7 +181,8 @@ v1 建议：
 id
 kind
 module
-owner_skill
+binding
+authority
 summary             # routing metadata，不代替正文
 applies_when
 avoid_when

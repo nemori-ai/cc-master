@@ -44,6 +44,17 @@ pnpm -C ccm install && pnpm -C ccm build   # 出 dist
 
 `plugin/src` is the semantic source. `plugin/dist/<harness>` is committed generated
 output and must be kept in the same commit as the source change that caused it.
+`plugin/src/knowledge` is repo-only governance data: raw points/modules/typed edges
+and accepted composition metadata. It must not appear in host dist, package, or
+release artifacts.
+
+Full host projection runs as a Trusted Projection Transaction. It freezes the
+source snapshot and an independently generated trusted plan before the compiler
+runs. Only the sealed snapshot that passed final-host verification may be
+published. Release packaging consumes that committed publish receipt, its
+attestation, and a frozen bundle plan; packaging never syncs dist, recompiles
+source, or expands the planned file set.
+
 Install the repo-local pre-push hook once per clone:
 
 ```bash

@@ -5,9 +5,9 @@
 
 **调研窗口**：2025-07-23 ～ 2026-07-23<br>
 **完成日期**：2026-07-23<br>
-**当前状态**：研究完成；设计已在
-[`design_docs/skill-knowledge-graph/`](../../skill-knowledge-graph/README.md) 正式接受为 K0 合同；
-编译器、编辑器、projection 与 CI 实现仍待后续切片。
+**当前状态**：研究完成；后续 graph-first 全量迁移与可信投影事务已经落地。正式现状以
+[`design_docs/skill-knowledge-graph/`](../../skill-knowledge-graph/README.md) 为准；本专栏保留
+2026-07-23 研究时点的假设，旧 skill-first / runtime-knowledge 形态由各文显式演进标记 supersede。
 
 ## 这组报告回答什么
 
@@ -54,8 +54,8 @@ control/evidence graph：任务怎样调度、执行、恢复和验收。
 本专栏研究的是 **skill knowledge graph**：
 
 ```text
-skill knowledge graph                 task/execution graph
-知识点、owner、路由、lineage           task、deps、attempt、artifact、state
+skill knowledge graph                      task/execution graph
+知识点、canonical authority、路由、lineage  task、deps、attempt、artifact、state
 回答“agent 该读什么、按什么顺序读”      回答“系统该执行什么、何时执行”
 ```
 
