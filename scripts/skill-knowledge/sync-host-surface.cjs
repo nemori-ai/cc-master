@@ -5,14 +5,15 @@
  * (manifest/commands/adapters/skills+overlay+entry pins/hooks/rules) →
  * candidate-root compile → runtime attestation → publishHostTree.
  *
- * Outer catch cleans ONLY this orchestration's staging.
- * Backup create / restore / post-commit cleanup belong solely to publishHostTree.
+ * The Claude/full-host path delegates ownership to Trusted Projection
+ * Transaction; compatibility paths retain the legacy publishHostTree flow.
  *
  * `stamp` is an explicit internal parameter (tests inject deterministic values).
  * Optional `injectLateFault` is a dev-test-only seam after staging is fully built
  * (including compile) and before publish — production sync never passes it.
- * Optional `injectPostPublishFault` runs after a successful publishHostTree and
- * must throw so callers can observe residual live dist with a non-zero sync.
+ * Optional `injectPostPublishFault` is a test seam. On the trusted path it is a
+ * post-commit cleanup warning and cannot turn an established commit into
+ * ordinary nonzero failure.
  * `attestationMode: 'candidate-v2'` enables dual-manifest candidate attestation
  * (exact accepted_sap + trusted expected-final rebuild). Marker/overlay-normalized
  * bypasses are intentionally absent.
@@ -42,6 +43,9 @@ const {
   requireDir,
 } = require('../project-skill.cjs');
 const { publishHostTree } = require('./publish-host-tree.cjs');
+const {
+  runTrustedProjectionTransaction,
+} = require('./trusted-projection/transaction.cjs');
 
 function lstatOrNull(target) {
   try {
@@ -629,6 +633,77 @@ function projectNonSkillSurfaces({ repoRoot, host, stagingAbsolute }) {
   }
 }
 
+function buildHostCandidate({
+  repoRoot,
+  host,
+  candidateRoot,
+  attestationMode,
+  candidateGraphSha256,
+}) {
+  projectNonSkillSurfaces({
+    repoRoot,
+    host,
+    stagingAbsolute: candidateRoot,
+  });
+  projectSkillsIntoStaging({
+    repoRoot,
+    host,
+    stagingAbsolute: candidateRoot,
+    attestationMode,
+  });
+  compileIntoCandidate({
+    repoRoot,
+    host,
+    candidateRoot,
+  });
+
+  const skillsStaging = path.join(candidateRoot, 'skills');
+  if (!fs.existsSync(skillsStaging)) return;
+  if (attestationMode === 'candidate-v2') {
+    const registryPath = path.join(
+      repoRoot,
+      'plugin/src/skills/provider-guidance-runtime.json',
+    );
+    if (
+      typeof candidateGraphSha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/u.test(candidateGraphSha256)
+    ) {
+      throw Object.assign(
+        new Error(
+          `candidate-v2 requires explicit candidateGraphSha256 (real graph hash); refused staging-path fallback for ${host}`,
+        ),
+        { code: 'SKG-CHANGE-CANDIDATE-ATTESTATION' },
+      );
+    }
+    runCandidateGuidanceAttestationBridge({
+      repoRoot,
+      host,
+      skillsStaging,
+      stagingRoot: candidateRoot,
+      registryPath,
+      graphSha256: candidateGraphSha256,
+    });
+  }
+  for (const skill of fs.readdirSync(skillsStaging).sort()) {
+    const projectionTarget = path.join(skillsStaging, skill);
+    if (!fs.statSync(projectionTarget).isDirectory()) continue;
+    const plan = planSkillProjection({ repoRoot, host, skill });
+    if (plan.mode === 'planned') continue;
+    if (attestationMode === 'accepted' && plan.providerGuidanceContract) {
+      const registry = loadProviderGuidanceRegistry(
+        plan.providerGuidanceRegistryPath,
+        repoRoot,
+      );
+      assertProviderGuidanceRuntimeTree(
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
+  }
+}
+
 /**
  * Project + compile + attest + atomically publish one full host dist tree.
  */
@@ -648,6 +723,28 @@ function projectAndPublishHostSurface({
   const integrity = assertHostDistPathIntegrity(root, host);
   const distParent = integrity.distParentAbsolute;
   const liveAbsolute = integrity.liveAbsolute;
+
+  if (host === 'claude-code') {
+    return runTrustedProjectionTransaction({
+      repoRoot: root,
+      host,
+      distParent: path.resolve(distParent),
+      live: path.resolve(liveAbsolute),
+      buildCandidate({ frozenRepoRoot, candidateRoot }) {
+        buildHostCandidate({
+          repoRoot: frozenRepoRoot,
+          host,
+          candidateRoot,
+          attestationMode: mode,
+          candidateGraphSha256,
+        });
+      },
+      injectLateFault,
+      injectPostPublishFault,
+      warn,
+    });
+  }
+
   const stagingAbsolute = path.join(distParent, `${host}.write-${stamp}`);
   const backupAbsolute = path.join(distParent, `${host}.bak-${stamp}`);
 
