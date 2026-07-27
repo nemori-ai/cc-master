@@ -62,14 +62,6 @@
       "edge_rewrites": [],
       "rationale": "两个知识点表达同一 canonical subject。"
     },
-    "transfer_owner": {
-      "op": "transfer_owner",
-      "subject": "module:example.transferred",
-      "from_skill": "skill:example-source",
-      "to_skill": "skill:example-destination",
-      "edge_rewrites": [],
-      "rationale": "模块职责边界已迁移到新的 runtime skill。"
-    },
     "deprecate": {
       "op": "deprecate",
       "subjects": [

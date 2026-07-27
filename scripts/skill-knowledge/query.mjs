@@ -422,10 +422,10 @@ export function runExplain({ repoRoot, source = DEFAULT_SOURCE_ROOT, target }) {
     entity = {
       id,
       kind: 'module',
-      owner_skill: module.owner_skill,
       recognition_cues: [...(module.recognition_cues ?? [])],
       access: module.access,
       witness: {
+        consumers: [...(module.consumers ?? [])].sort(compareCodePoint),
         points: module.points.map((item) => item.id).sort(compareCodePoint),
         edges: module.edges.map((item) => item.id).sort(compareCodePoint),
       },
@@ -443,7 +443,6 @@ export function runExplain({ repoRoot, source = DEFAULT_SOURCE_ROOT, target }) {
     entity = {
       id,
       kind: 'point',
-      owner_skill: point.owner_skill,
       module: point.module_id,
       authority: point.authority,
       binding: point.binding,
@@ -451,6 +450,10 @@ export function runExplain({ repoRoot, source = DEFAULT_SOURCE_ROOT, target }) {
       inbound,
       outbound,
       witness: {
+        consumers: [
+          ...(built.graph.modules.find((module) => module.id === point.module_id)
+            ?.consumers ?? []),
+        ].sort(compareCodePoint),
         span_sha256: built.graph.span_hashes[id] ?? null,
       },
     };

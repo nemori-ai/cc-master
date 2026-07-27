@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { validateAuthoredDocument } from '../../scripts/skill-knowledge/schema.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cliPath = path.join(repoRoot, 'scripts', 'skill-knowledge.mjs');
@@ -22,7 +23,6 @@ const operationTypes = [
   'move',
   'split',
   'merge',
-  'transfer_owner',
   'deprecate',
   'retire',
 ];
@@ -117,7 +117,6 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
   assert.deepEqual(body.hardening_contract.C5.change_workflow, ['begin', 'validate', 'apply']);
   assert.deepEqual(body.hardening_contract.C6.authored_manifest_kinds, [
     'portfolio',
-    'skill',
     'module',
     'composition',
     'candidate_analysis',
@@ -392,9 +391,8 @@ test('SKG-CONTRACT-03: source schema freezes C1-C4 and the four-host denominator
   assert.equal(schema.$defs.entry.properties.surfaces.minItems, 4);
   assert.equal(schema.$defs.entry.properties.surfaces.maxItems, 4);
   assert.equal(schema.$defs.entry.properties.surfaces.allOf.length, 4);
-  assert.equal(schema.$defs.skill.properties.host_coverage.minItems, 4);
-  assert.equal(schema.$defs.skill.properties.host_coverage.maxItems, 4);
-  assert.equal(schema.$defs.skill.properties.host_coverage.allOf.length, 4);
+  assert.equal(schema.$defs.composition.properties.host_coverage.minItems, 4);
+  assert.equal(schema.$defs.composition.properties.host_coverage.maxItems, 4);
   assert.deepEqual(schema.$defs.entrySurface.required, [
     'host',
     'source_file',
@@ -413,8 +411,12 @@ test('SKG-CONTRACT-03: source schema freezes C1-C4 and the four-host denominator
     schema.$defs.sourceInventoryEntry.required.includes('reviewed_unbound_sha256'),
     true,
   );
-  assert.equal(schema.$defs.skill.required.includes('canonical_source_inventory'), true);
-  assert.equal(schema.$defs.skill.required.includes('admission'), true);
+  assert.equal(
+    schema.$defs.composition.required.includes('canonical_source_inventory'),
+    true,
+  );
+  assert.equal(schema.$defs.composition.required.includes('analysis_ref'), true);
+  assert.equal(schema.$defs.composition.required.includes('admission'), true);
   assert.deepEqual(schema.$defs.derivedAuthority.required, [
     'role',
     'subject',
@@ -486,7 +488,7 @@ test('SKG-CONTRACT-04: change schema freezes C5/C10 workspace and immutable chai
   assert.deepEqual(witnessModeBranches[2].if.properties.mode.enum, ['full', 'partial']);
   assert.equal(witnessModeBranches[2].if.properties.ok.const, false);
   assert.equal(witnessModeBranches[2].then.properties.final_surface_snapshot, false);
-  assert.equal(schema.$defs.operation.oneOf.length, 9);
+  assert.equal(schema.$defs.operation.oneOf.length, 8);
   const outputSchema = JSON.parse(
     fs.readFileSync(
       path.join(
@@ -575,30 +577,49 @@ test('SKG-EXAMPLES-02: change workspace, validation, and ledger identity remain 
   );
 });
 
-test('SKG-EXAMPLES-03: K1 pilot has one admitted skill, three modules, and four unique hosts', () => {
+test('SKG-EXAMPLES-03: graph-only example has an admitted composition, analysis, and four unique hosts', () => {
   const portfolio = JSON.parse(
     fs.readFileSync(path.join(examplesRoot, 'portfolio.json'), 'utf8'),
   );
-  const skill = JSON.parse(
+  const composition = JSON.parse(
     fs.readFileSync(
-      path.join(examplesRoot, 'master-orchestrator-guide.skill.json'),
+      path.join(examplesRoot, 'master-orchestrator-guide.composition.json'),
+      'utf8',
+    ),
+  );
+  const analysis = JSON.parse(
+    fs.readFileSync(
+      path.join(examplesRoot, 'master-orchestrator-guide.analysis.json'),
       'utf8',
     ),
   );
   const hosts = portfolio.entries.flatMap((entry) =>
     entry.surfaces.map((surface) => surface.host));
+  const moduleExamples = [
+    'verification.endpoint.module.json',
+    'conduct.never-play.module.json',
+    'routing.worker-chain.module.json',
+  ].map((name) => JSON.parse(fs.readFileSync(path.join(examplesRoot, name), 'utf8')));
 
-  assert.equal(portfolio.rollout, 'K1');
+  assert.equal(portfolio.rollout, 'K3');
+  for (const document of [portfolio, composition, analysis, ...moduleExamples]) {
+    const result = validateAuthoredDocument(document, 'source');
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+  }
   assert.equal(portfolio.skills.length, 1);
-  assert.equal(skill.modules.length, 3);
+  assert.equal(composition.kind, 'composition');
+  assert.equal(composition.consumes.modules.length, 14);
+  assert.equal(composition.analysis_ref, analysis.id);
+  assert.equal(analysis.composition_id, composition.id);
+  assert.equal(analysis.verdict, 'admit');
   assert.equal(new Set(portfolio.runtime_hosts).size, 4);
   assert.deepEqual(portfolio.runtime_hosts, ['claude-code', 'codex', 'cursor', 'kimi-code']);
   assert.deepEqual(hosts, portfolio.runtime_hosts);
   assert.equal(new Set(hosts).size, 4);
-  assert.equal(skill.lifecycle.state, 'accepted');
-  assert.ok(skill.admission.evidence.length > 0);
-  assert.ok(skill.admission.verifiers.length > 0);
-  assert.ok(skill.canonical_source_inventory.length >= 14);
+  assert.equal(composition.lifecycle.state, 'accepted');
+  assert.ok(composition.admission.evidence.length > 0);
+  assert.ok(composition.admission.verifiers.length > 0);
+  assert.ok(composition.canonical_source_inventory.length >= 14);
 });
 
 test('SKG-EXAMPLES-04: report golden keeps structural and behavioral evidence separate', () => {

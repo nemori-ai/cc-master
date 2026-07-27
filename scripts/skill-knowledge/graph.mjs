@@ -15,7 +15,6 @@ import {
   analyzeAgainstGraph,
   compositionToSkillView,
   consumeModuleIds,
-  consumeModuleRefs,
 } from './candidate-analysis.mjs';
 
 const NAV_EDGE_TYPES = new Set([
@@ -105,7 +104,6 @@ export function buildAndValidateGraph({
   for (const document of loaded.documents) {
     if (!document.schema_ok) continue;
     if (document.kind === 'portfolio') portfolios.push(document);
-    else if (document.kind === 'skill') skills.push(document);
     else if (document.kind === 'module') modules.push(document);
     else if (document.kind === 'composition') compositions.push(document);
     else if (document.kind === 'candidate_analysis') analyses.push(document);
@@ -120,7 +118,7 @@ export function buildAndValidateGraph({
     // Analyzer bootstrap: do not project compositions into skill views.
   }
 
-  if (portfolios.length === 0 && skills.length === 0 && modules.length === 0) {
+  if (portfolios.length === 0 && modules.length === 0) {
     if (diagnostics.every((item) => item.severity !== 'error')) {
       pushError(diagnostics, {
         code: 'SKG-COVERAGE-EMPTY',
@@ -177,9 +175,6 @@ export function buildAndValidateGraph({
     return value;
   };
 
-  for (const skillDoc of skills) {
-    skillById.set(skillDoc.id, skillDoc.data);
-  }
   for (const moduleDoc of modules) {
     moduleById.set(moduleDoc.id, moduleDoc.data);
   }
@@ -259,23 +254,21 @@ export function buildAndValidateGraph({
     }
   }
 
-  // Structural refs: portfolio→skill|composition; consumers→global modules.
-  const moduleOwners = new Map();
+  // Structural refs: portfolio→accepted composition; compositions→global modules.
   const moduleConsumers = new Map();
-  const skillOwners = new Map();
+  const portfolioSkillRefs = new Set();
   if (portfolio) {
     for (const ref of portfolio.skills ?? []) {
       const doc = documentByPath.get(ref.manifest);
-      const isSkill = doc && doc.kind === 'skill' && doc.id === ref.id && doc.schema_ok;
       const isComposition =
         doc &&
         doc.kind === 'composition' &&
         doc.data?.skill_id === ref.id &&
         doc.schema_ok;
-      if (!isSkill && !isComposition) {
+      if (!isComposition) {
         pushError(diagnostics, {
           code: 'SKG-OWNERSHIP-REF',
-          message: `Portfolio skill manifest ref does not resolve to exact loaded skill or composition: ${ref.id}`,
+          message: `Portfolio skill manifest ref does not resolve to the exact composition: ${ref.id}`,
           location: portfolios[0].path,
           witness: {
             ref,
@@ -285,7 +278,7 @@ export function buildAndValidateGraph({
             schema_ok: doc?.schema_ok ?? false,
           },
           remediation:
-            'Point portfolio.skills[].manifest at the skill shard or admitted composition for that skill_id.',
+            'Point portfolio.skills[].manifest at composition:skill.<name> for that skill_id.',
           exitCode: 4,
         });
         continue;
@@ -303,24 +296,18 @@ export function buildAndValidateGraph({
           exitCode: 4,
         });
       }
-      const owners = skillOwners.get(ref.id) ?? [];
-      owners.push(portfolios[0].id);
-      skillOwners.set(ref.id, owners);
+      portfolioSkillRefs.add(ref.id);
     }
   }
 
   for (const skillDoc of skills) {
     const skill = skillDoc.data;
-    const moduleRefs = skill._composition_id
-      ? consumeModuleRefs(skillDoc.data._raw_composition ?? skill)
-      : skill.modules ?? [];
-    // Composition skill views already carry modules from consumes via compositionToSkillView.
     for (const ref of skill.modules ?? []) {
       const doc = documentByPath.get(ref.manifest);
       if (!doc || doc.kind !== 'module' || doc.id !== ref.id || !doc.schema_ok) {
         pushError(diagnostics, {
           code: 'SKG-OWNERSHIP-REF',
-          message: `Skill/composition module manifest ref does not resolve to exact loaded module: ${ref.id}`,
+          message: `Composition module manifest ref does not resolve to exact loaded module: ${ref.id}`,
           location: skillDoc.path,
           witness: {
             skill: skill.id,
@@ -331,14 +318,11 @@ export function buildAndValidateGraph({
             schema_ok: doc?.schema_ok ?? false,
           },
           remediation:
-            'Point consumes.modules[].manifest (composition) or modules[].manifest (legacy skill) at a global module shard.',
+            'Point composition.consumes.modules[].manifest at a global graph/modules shard.',
           exitCode: 4,
         });
         continue;
       }
-      const owners = moduleOwners.get(ref.id) ?? [];
-      owners.push(skill.id);
-      moduleOwners.set(ref.id, owners);
       const consumers = moduleConsumers.get(ref.id) ?? [];
       consumers.push({
         skill: skill.id,
@@ -347,75 +331,26 @@ export function buildAndValidateGraph({
       });
       moduleConsumers.set(ref.id, consumers);
     }
-    void moduleRefs;
-  }
-
-  for (const [moduleId, owners] of [...moduleOwners.entries()].sort(([left], [right]) =>
-    compareCodePoint(left, right),
-  )) {
-    const uniqueOwners = [...new Set(owners)].sort(compareCodePoint);
-    const moduleDoc = moduleById.get(moduleId);
-    const legacyOwned = Boolean(moduleDoc?.owner_skill);
-    // Graph-first modules may be consumed by multiple compositions (shared SSOT).
-    // Legacy skill-first modules still require exactly one owner_skill consumer.
-    if (legacyOwned && uniqueOwners.length > 1) {
-      pushError(diagnostics, {
-        code: 'SKG-OWNERSHIP-MULTIPLY',
-        message: `Legacy owner_skill module is claimed by multiple skills: ${moduleId}`,
-        location: moduleDoc ? `module:${moduleId}` : loaded.source_root,
-        witness: { module: moduleId, owners: uniqueOwners },
-        remediation:
-          'Migrate the module to graph-first (drop owner_skill) or keep exactly one legacy owner.',
-        exitCode: 4,
-      });
-    }
   }
 
   for (const moduleDoc of modules) {
-    const owners = [...new Set(moduleOwners.get(moduleDoc.id) ?? [])].sort(compareCodePoint);
     const consumers = moduleConsumers.get(moduleDoc.id) ?? [];
-    const hasOwnerSkill = typeof moduleDoc.data.owner_skill === 'string';
-    if (owners.length === 0 && consumers.length === 0) {
+    if (!skipCompositionAdmission && consumers.length === 0) {
       pushError(diagnostics, {
         code: 'SKG-OWNERSHIP-ORPHAN',
-        message: `Module shard is not consumed by any skill/composition: ${moduleDoc.id}`,
+        message: `Global module is not consumed by any admitted composition: ${moduleDoc.id}`,
         location: moduleDoc.path,
         witness: { module: moduleDoc.id, path: moduleDoc.path },
         remediation:
-          'Add the module to an admitted composition.consumes/modules list (graph-first) or a transitional skill.modules list.',
+          'Add the module to an accepted composition.consumes.modules list with derived admit.',
         exitCode: 4,
       });
-    } else if (hasOwnerSkill && owners.length === 1 && moduleDoc.data.owner_skill !== owners[0]) {
-      pushError(diagnostics, {
-        code: 'SKG-OWNERSHIP-REF',
-        message: `Module owner_skill does not match its owning skill ref: ${moduleDoc.id}`,
-        location: moduleDoc.path,
-        witness: {
-          module: moduleDoc.id,
-          owner_skill: moduleDoc.data.owner_skill,
-          owning_skill_ref: owners[0],
-        },
-        remediation: 'Align module.owner_skill with the unique skill.modules[] owner, or drop owner_skill for graph-first.',
-        exitCode: 4,
-      });
-    } else if (hasOwnerSkill === false && owners.length === 0) {
-      // Consumed only via composition path already covered above.
     }
   }
 
   // Structural membership + point/edge index.
   for (const moduleDoc of modules) {
     const module = moduleDoc.data;
-    if (module.owner_skill && !skillById.has(module.owner_skill)) {
-      pushError(diagnostics, {
-        code: 'SKG-OWNERSHIP-REF',
-        message: `Module owner skill is missing: ${module.owner_skill}`,
-        location: moduleDoc.path,
-        witness: { module: module.id, owner_skill: module.owner_skill },
-        remediation: 'Point owner_skill at an authored skill shard, or omit it for graph-first modules.',
-        exitCode: 4,
-      });
-    }
     for (const point of module.points ?? []) {
       if (pointById.has(point.id)) {
         pushError(diagnostics, {
@@ -431,11 +366,7 @@ export function buildAndValidateGraph({
         });
         continue;
       }
-      pointById.set(point.id, {
-        ...point,
-        module_id: module.id,
-        ...(module.owner_skill ? { owner_skill: module.owner_skill } : {}),
-      });
+      pointById.set(point.id, { ...point, module_id: module.id });
       const role = point.authority?.role;
       const subject = point.authority?.subject;
       if (role === 'canonical' && subject) {
@@ -474,13 +405,13 @@ export function buildAndValidateGraph({
 
   for (const skillDoc of skills) {
     const skill = skillDoc.data;
-    if (!skillOwners.has(skill.id)) {
+    if (!portfolioSkillRefs.has(skill.id)) {
       pushError(diagnostics, {
         code: 'SKG-OWNERSHIP-ORPHAN',
-        message: `Skill shard is not owned by the portfolio: ${skill.id}`,
+        message: `Admitted composition product is not referenced by the portfolio: ${skill.id}`,
         location: skillDoc.path,
         witness: { skill: skill.id, path: skillDoc.path },
-        remediation: 'Add the skill to portfolio.skills or remove the orphan shard.',
+        remediation: 'Reference the accepted composition from portfolio.skills or keep it draft.',
         exitCode: 4,
       });
     }
@@ -567,9 +498,7 @@ export function buildAndValidateGraph({
             if (skillId && moduleId) {
               const module = moduleById.get(moduleId);
               if (!module) return true;
-              // Legacy skill-first: owner_skill must match when present.
-              if (module.owner_skill && module.owner_skill !== skillId) return true;
-              // Graph-first / transitional: skill|composition must explicitly consume the module.
+              // Membership exists only through the admitted composition.
               const consumed = (skillById.get(skillId)?.modules ?? []).some(
                 (ref) => ref.id === moduleId,
               );
@@ -582,7 +511,6 @@ export function buildAndValidateGraph({
             if (skillId && pointId) {
               const point = pointById.get(pointId);
               if (!point) return true;
-              if (point.owner_skill && point.owner_skill !== skillId) return true;
               const consumed = (skillById.get(skillId)?.modules ?? []).some(
                 (ref) => ref.id === point.module_id,
               );
@@ -597,7 +525,7 @@ export function buildAndValidateGraph({
               location: portfolios[0].path,
               witness: { entry: entry.id, host: surface.host, target },
               remediation:
-                'Keep entry targets on skill→consumed-module→point (graph-first composition) or transitional skill→module→point; path names never invent membership.',
+                'Keep entry targets on composition skill view→consumed module→point; paths never invent membership.',
               exitCode: 4,
             });
           }
@@ -989,8 +917,6 @@ export function buildAndValidateGraph({
 
   const manifests = [
     ...(portfolio ? [portfolio] : []),
-    // Legacy skill shards only — compositions are hashed as raw governance docs.
-    ...skills.filter((item) => !item._from_composition).map((item) => item.data),
     ...modules.map((item) => item.data),
     ...compositions.map((item) => item.data),
     ...analyses.map((item) => item.data),
@@ -1024,7 +950,7 @@ export function buildAndValidateGraph({
     compositions: compositions
       .map((item) => item.data)
       .sort((left, right) => compareCodePoint(left.id, right.id)),
-    analyses: analyses
+    candidate_analyses: analyses
       .map((item) => item.data)
       .sort((left, right) => compareCodePoint(left.id, right.id)),
     points: [...pointById.entries()]
@@ -1046,7 +972,7 @@ export function buildAndValidateGraph({
     graph_hash: graphHash,
     counts: {
       portfolio: portfolios.length,
-      // Product views: legacy skill shards + composition-projected skills.
+      // Product views exist only as accepted composition projections.
       skill: skills.length,
       composition: compositions.length,
       candidate_analysis: analyses.length,

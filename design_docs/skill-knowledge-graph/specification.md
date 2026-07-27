@@ -98,8 +98,8 @@ module membership。**
 | final host 路径、anchor、实际可点击 link | generated projection + final-dist verifier |
 
 JSON 中的 `summary`、`intent`、`recognition_cues` 只作路由元数据，不能复制完整正文。
-过渡期仍允许未迁移 skill 携带遗留 `owner_skill`；K3-00 walking skeleton（`dev-as-ml-loop`）
-已改为 composition 消费全局 module，不得再把 skill 目录当成 membership SSOT。
+全量迁移后 authored skill product 只来自 accepted composition；全局 module 禁止
+`owner_skill`，也不得把 skill 目录当成 membership SSOT。
 
 ### 2.4 K1 contract-hardening registry
 
@@ -114,7 +114,7 @@ K1 的编译器、编辑器和 host verifier 不得自行补设计。以下 `C1`
 | `C3` | summary/example authority 直接指向 canonical point，并声明 `review_policy` 与 `reviewed_canonical_sha256`；canonical span hash 改变使 review-on-change 记录失效 |
 | `C4` | lifecycle 为 `accepted` 的 SkillNode 与 accepted module/point/edge/entry 一样必须有 admission evidence 与 verifier，不留 `K-I08` 例外 |
 | `C5` | typed change 只表达语义操作和审计，不承载任意 Markdown bytes；`begin → candidate edit → validate → apply` 在 ignored workspace 中执行，任何 optimistic-lock、scope hash 或 patch dry-run 失败都不得部分写入 |
-| `C6` | canonical graph hash 只纳入 accepted portfolio/skill/module/**composition**/**candidate_analysis** manifests、canonical span hashes、source inventory 与 accepted change-head digest；digest 排除当前 record 的 `result_graph_sha256` 防自引用，按 §10.2 稳定序列化；`candidate_admission` 阈值（`min_internal_cohesion` / `max_overlap_shared_modules` / `require_declared_projection` / `hop_gate=directed_projection_topology`）以真实 metrics + projection topology + `planSkillProjection` 为 gate；witness 闭集 exact equality；authored edge 经 `ccm:k:edge` marker 身份化 |
+| `C6` | canonical graph hash 只纳入 accepted portfolio/module/**composition**/**candidate_analysis** manifests、canonical span hashes、source inventory 与 accepted change-head digest；digest 排除当前 record 的 `result_graph_sha256` 防自引用，按 §10.2 稳定序列化；`candidate_admission` 阈值（`min_internal_cohesion` / `max_overlap_shared_modules` / `require_declared_projection` / `hop_gate=directed_projection_topology`）以真实 metrics + projection topology + `planSkillProjection` 为 gate；witness 闭集 exact equality；authored edge 经 `ccm:k:edge` marker 身份化 |
 | `C7` | Markdown span hash 在 UTF-8、CRLF→LF 后计算 start/end marker 之间的精确 bytes；marker 与 span 外 generated block 不纳入，nested crossing/overlap/unclosed/duplicate fail closed |
 | `C8` | budget 只报告 `estimated_tokens`、lines、UTF-8 bytes；v1 估算器是确定性的 `ceil(utf8_bytes / 3)`，不声称等于任一模型 tokenizer |
 | `C9` | K1 的 host portability probe 固定覆盖 `claude-code / codex / cursor / kimi-code`，分别验证 explicit anchor、relative link、path rewrite 与 canonical/partial/stub payload；冻结 `worker_allowlist=[codex,cursor]`（与四产品 host 分界）、`anchor_form=explicit-html-id`、`path_policy=relative-final-host-path`；heading auto-slug 与 live click-through 标为 unverifiable 且 fail closed |
@@ -141,7 +141,7 @@ portfolio ─lists→ composition(skill artifact) ─consumes→ module ─conta
 - module **不**语义嵌套在 skill 下；skill/composition 只声明 `consumes`。
 - 同一 module 可被多个 admitted composition 消费（共享 SSOT）；反向 consumers 只能派生。
 - containment / consumption 不计 runtime hop。
-- 过渡期：未迁移 skill 仍可带遗留 `owner_skill`；新全局 module 禁止依赖目录名冒充归属。
+- authored `owner_skill` 与 legacy skill manifest 均不在 source schema；module placement 只来自全局 shard。
 
 > 历史 skill-first 叙事（`portfolio → skill → module → point` 且「module 被唯一 skill 拥有」）
 > 已被本段 supersede；实现与测试必须以 composition 消费为准。
@@ -408,11 +408,7 @@ plugin/src/knowledge/          # repo-only authored/meta source（不分发进�
 ├── graph/modules/             # global modules（graph-first；非 skill 嵌套）
 ├── compositions/              # skill-as-artifact product views（consumes.modules 为唯一消费 SSOT）
 ├── analyses/                  # candidate_analysis（Counterfactual evidence + derived verdict）
-├── changes/
-└── skills/                    # 过渡期 skill-first shards（未迁移 skill）
-    └── <skill>/
-        ├── skill.json
-        └── modules/
+└── changes/
 ```
 
 `plugin/dist/<host>/knowledge/` 只是 **generated runtime atlas/router**（compile/materialize 产物），
@@ -420,7 +416,7 @@ plugin/src/knowledge/          # repo-only authored/meta source（不分发进�
 
 机器合同：
 
-- [knowledge-source.schema.json](schemas/knowledge-source.schema.json)：portfolio、skill、module、composition、candidate_analysis。
+- [knowledge-source.schema.json](schemas/knowledge-source.schema.json)：portfolio、module、composition、candidate_analysis。
 - [knowledge-change.schema.json](schemas/knowledge-change.schema.json)：语义变更事务。
 - [knowledge-cli-output.schema.json](schemas/knowledge-cli-output.schema.json)：CLI envelope（含 `materialize`）。
 
@@ -445,12 +441,11 @@ plugin/src/knowledge/          # repo-only authored/meta source（不分发进�
 | `move` | 保持 point ID，改变 binding path/marker 或 module membership |
 | `split` | 一个 active identity 退役，产生 2+ 个新 identity |
 | `merge` | 2+ 个 active identity 退役，产生一个新 identity |
-| `transfer_owner` | module 在 skill 间转移；同时修复 membership/entry/routes |
 | `deprecate` | 仍可读但不再作为默认 target，必须指定 replacement 或 rationale |
 | `retire` | 从 active/runtime graph 移除，保留 lineage tombstone |
 
 直接手改 JSON/marker 可以保留为紧急 escape hatch，但 CI 从 base/result graph diff 反推结构变化；存在
-未被 change set 完整解释的 identity、owner、authority、lifecycle、binding 或 edge diff即拒绝。
+未被 change set 完整解释的 identity、composition consumer、authority、lifecycle、binding 或 edge diff即拒绝。
 
 ### 8.2 Change set
 
@@ -593,7 +588,7 @@ finalize。任何一步失败都不落半张图。Git 保留跨进程与 reviewe
 
 canonical graph hash v1 使用以下规范：
 
-1. 收集 accepted portfolio/skill/module/**composition**/**candidate_analysis** manifests、每个 active canonical point 的 span SHA-256、
+1. 收集 accepted portfolio/module/**composition**/**candidate_analysis** manifests、每个 active canonical point 的 span SHA-256、
    完整 canonical source inventory，以及 accepted change-head digest。change manifest 不作为普通 authored
    manifest 再次整份纳入。graph-first 下 composition 与 candidate_analysis 是治理事实，任一字段变化必须改变
    `graph_hash`（见 K3-00 mutation tests）。
@@ -634,7 +629,7 @@ compile [--host <host>] [--check]
 report [--format json|markdown] [--host <host>]
 path --from <id> --to <id> --host <host>
 explain <id>
-change begin --op <add|wording|refine|move|split|merge|transfer_owner|deprecate|retire> --scope ... --base <git-ref>
+change begin --op <add|wording|refine|move|split|merge|deprecate|retire> --scope ... --base <git-ref>
 change validate <workspace>
 change apply <workspace>
 ```

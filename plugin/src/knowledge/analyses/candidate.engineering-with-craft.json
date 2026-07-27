@@ -1,0 +1,278 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "candidate_analysis",
+  "id": "analysis:candidate.engineering-with-craft",
+  "skill_id": "skill:engineering-with-craft",
+  "composition_id": "composition:skill.engineering-with-craft",
+  "candidate_modules": [
+    "module:craft.domain-modeling",
+    "module:craft.foundation",
+    "module:craft.object-design",
+    "module:craft.spec-first",
+    "module:craft.test-first"
+  ],
+  "scoresheet": {
+    "D1": {
+      "score": 1,
+      "audience_plane": "runtime-user",
+      "evidence": "受众是设计、开发和测试真实代码的 runtime agent；内容不是仓库治理元规则。"
+    },
+    "D2": {
+      "score": 1,
+      "bounded_context": "在一个执行循环内统一应用 DDD、OOP、SDD 与 TDD 工程手艺",
+      "evidence": "单一 bounded context：在一个执行循环内统一应用 DDD、OOP、SDD 与 TDD 工程手艺；不吸收相邻 runtime skill 的认知职责。"
+    },
+    "D3": {
+      "probe_a": "weak",
+      "probe_b": "strong",
+      "evidence": "Probe A 弱：DDD/OOP/SDD/TDD 的单项知识可从公共资料获得；Probe B 强：本资产强制 test-first、constraint parity、契约 SSOT 与 no-silent-failure，覆写 agent 常见的实现先行和测试降级倾向。",
+      "evidence_refs": [
+        "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+      ]
+    }
+  },
+  "graph_metrics": {
+    "module_count": 5,
+    "point_count": 40,
+    "internal_edge_count": 78,
+    "external_edge_count": 0
+  },
+  "verdict": "admit",
+  "witness": {
+    "reason": "D1=1 ∧ D2=1 ∧ (Probe A ∨ Probe B strong)，且实时图指标、预算与四 host portability 闸全部通过。",
+    "composition_id": "composition:skill.engineering-with-craft",
+    "candidate_modules": [
+      "module:craft.domain-modeling",
+      "module:craft.foundation",
+      "module:craft.object-design",
+      "module:craft.spec-first",
+      "module:craft.test-first"
+    ],
+    "candidate_points": [
+      "point:craft.composition-over-wrapper",
+      "point:craft.contract-ssot",
+      "point:craft.evidence-over-claim",
+      "point:craft.invariant-anchor",
+      "point:craft.layered-thinking",
+      "point:craft.red-lines",
+      "point:craft.shared-spine",
+      "point:craft.stage-handoff",
+      "point:ddd.admission-question",
+      "point:ddd.aggregate-ownership",
+      "point:ddd.application-derivation",
+      "point:ddd.design-focus",
+      "point:ddd.failure-radar",
+      "point:ddd.red-lines",
+      "point:ddd.strategic-boundaries",
+      "point:oop.abstraction-cost",
+      "point:oop.composition-over-inheritance",
+      "point:oop.encapsulation-vocabulary",
+      "point:oop.failure-radar",
+      "point:oop.four-pillars",
+      "point:oop.red-lines",
+      "point:oop.shared-root-links",
+      "point:oop.solid-judgment",
+      "point:sdd.admission",
+      "point:sdd.alignment",
+      "point:sdd.change-order",
+      "point:sdd.core-belief",
+      "point:sdd.drift-red-line",
+      "point:sdd.implementation-gate",
+      "point:sdd.practice-anchors",
+      "point:sdd.spec-boundary",
+      "point:sdd.theory-handoff",
+      "point:tdd.completion-gate",
+      "point:tdd.constraint-parity",
+      "point:tdd.design-feedback",
+      "point:tdd.iron-law",
+      "point:tdd.loop-boundary",
+      "point:tdd.rationalizations",
+      "point:tdd.red-evidence",
+      "point:tdd.red-green-loop"
+    ],
+    "trigger_job_coherence": true,
+    "internal_cohesion": 1.95,
+    "external_cut_coupling": 0,
+    "overlap_signature": {},
+    "ssot_closure": true,
+    "budgets": {
+      "hop": {
+        "observed": {
+          "protocol": "directed_projection_topology",
+          "projected_ok": true,
+          "projected_scc_count": 1,
+          "projected_directed_diameter": 3,
+          "undirected_entry_distance_max": 1,
+          "directed_diameter": 3,
+          "directed_unreachable_pair_count": 0,
+          "undirected_unreachable_count": 0
+        },
+        "policy": {
+          "point_diameter_max": 3,
+          "entry_discovery_max": 3,
+          "critical_any_point_to_primary_max": 2
+        }
+      },
+      "read": {
+        "inventory_files": 5,
+        "missing_files": [],
+        "files": [
+          {
+            "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+            "utf8_bytes": 10903,
+            "lines": 128,
+            "estimated_tokens": 3635
+          },
+          {
+            "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+            "utf8_bytes": 17934,
+            "lines": 246,
+            "estimated_tokens": 5978
+          },
+          {
+            "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+            "utf8_bytes": 15153,
+            "lines": 219,
+            "estimated_tokens": 5051
+          },
+          {
+            "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+            "utf8_bytes": 14436,
+            "lines": 218,
+            "estimated_tokens": 4812
+          },
+          {
+            "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+            "utf8_bytes": 13616,
+            "lines": 209,
+            "estimated_tokens": 4539
+          }
+        ],
+        "utf8_bytes": 72042,
+        "estimated_lines": 1020,
+        "policy_max_lines": 8192,
+        "policy_max_utf8_bytes": 524288,
+        "within_read_budget": true
+      },
+      "token": {
+        "estimated_tokens": 24014,
+        "policy_max_tokens": 131072,
+        "within_token_budget": true
+      }
+    },
+    "host_portability": {
+      "claude-code": "full",
+      "codex": "full",
+      "cursor": "full",
+      "kimi-code": "full"
+    },
+    "hop": {
+      "protocol": "directed_projection_topology",
+      "entry_roots": [
+        "point:craft.shared-spine",
+        "point:ddd.admission-question",
+        "point:oop.four-pillars",
+        "point:sdd.core-belief",
+        "point:tdd.iron-law"
+      ],
+      "authored_directed_diameter": 5,
+      "authored_directed_unreachable_pair_count": 0,
+      "authored_directed_unreachable_sample": [],
+      "projected_scc_count": 1,
+      "projected_directed_diameter": 3,
+      "projected_hosts": {
+        "claude-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "codex": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "cursor": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "kimi-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        }
+      },
+      "projected_ok": true,
+      "undirected_entry_distance_max": 1,
+      "undirected_unreachable_from_entry_primary": [],
+      "directed_diameter": 3,
+      "directed_unreachable_pair_count": 0,
+      "directed_unreachable_sample": [],
+      "policy": {
+        "point_diameter_max": 3,
+        "entry_discovery_max": 3,
+        "critical_any_point_to_primary_max": 2
+      }
+    },
+    "graph_metrics": {
+      "module_count": 5,
+      "point_count": 40,
+      "internal_edge_count": 78,
+      "external_edge_count": 0
+    },
+    "admission_gates": {
+      "ok": true,
+      "module_count_matches_candidate": true,
+      "point_count_positive": true,
+      "trigger_job_coherence": true,
+      "ssot_closure": true,
+      "internal_cohesion": true,
+      "external_cut": true,
+      "overlap_within_budget": true,
+      "hop": true,
+      "read_budget": true,
+      "token_budget": true,
+      "four_host_denominator": true,
+      "host_portability": true
+    }
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md"
+      },
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "golden.analysis.engineering-with-craft"
+      }
+    ]
+  }
+}

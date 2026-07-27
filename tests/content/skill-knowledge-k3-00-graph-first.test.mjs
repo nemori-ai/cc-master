@@ -33,7 +33,7 @@ function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, relative), 'utf8'));
 }
 
-test('SKG-K3-00-01: schema admits composition + candidate_analysis; module.owner_skill optional', async () => {
+test('SKG-K3-00-01: schema admits composition + candidate_analysis; global module has no owner', async () => {
   const { validateAuthoredDocument, validatorsAvailable } = await import(
     '../../scripts/skill-knowledge/schema.mjs'
   );

@@ -17,6 +17,8 @@ import pacingAttestation from '../../scripts/pacing-read-only-attestation.cjs';
 import { stripEntryPinOverlay } from '../../scripts/skill-knowledge/compile/skill-overlay.mjs';
 import { hashUnboundRegions } from '../../scripts/skill-knowledge/inventory.mjs';
 import { extractMarkers } from '../../scripts/skill-knowledge/markers.mjs';
+import { buildAndValidateGraph } from '../../scripts/skill-knowledge/graph.mjs';
+import { createCandidateAnalysisDocument } from '../../scripts/skill-knowledge/candidate-analysis.mjs';
 import { copyMinimalSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -67,7 +69,7 @@ const makeProjectionFixture = () => {
 const refreshPacingInventoryUnboundHash = (repoRoot, repoRelativePath) => {
   const skillJsonPath = join(
     repoRoot,
-    'plugin/src/knowledge/skills/pacing-and-estimation/skill.json',
+    'plugin/src/knowledge/compositions/skill.pacing-and-estimation.json',
   );
   const skill = JSON.parse(readFileSync(skillJsonPath, 'utf8'));
   const entry = skill.canonical_source_inventory?.find((item) => item.path === repoRelativePath);
@@ -80,6 +82,32 @@ const refreshPacingInventoryUnboundHash = (repoRoot, repoRelativePath) => {
     markers.spans.filter((span) => (entry.point_ids ?? []).includes(span.point_id)),
   );
   writeFileSync(skillJsonPath, `${JSON.stringify(skill, null, 2)}\n`);
+
+  // Canonical prose changes also change the candidate's recomputable closure
+  // budgets. Keep the temp analysis authentic with the production analyzer so
+  // the hostile payload reaches the independent pacing/provider attestor.
+  const analysisPath = join(
+    repoRoot,
+    'plugin/src/knowledge/analyses/candidate.pacing-and-estimation.json',
+  );
+  const analysis = JSON.parse(readFileSync(analysisPath, 'utf8'));
+  const provisional = buildAndValidateGraph({
+    repoRoot,
+    sourceRoot: 'plugin/src/knowledge',
+    skipCompositionAdmission: true,
+  });
+  assert.ok(provisional.graph, 'analysis refresh requires a provisional graph');
+  const refreshed = createCandidateAnalysisDocument({
+    repoRoot,
+    graph: provisional.graph,
+    composition: skill,
+    scoresheet: analysis.scoresheet,
+    reason: analysis.witness?.reason,
+    lifecycle: analysis.lifecycle,
+    admission: analysis.admission,
+  });
+  assert.equal(refreshed.verdict, 'admit', 'fixture mutation must preserve candidate admission');
+  writeFileSync(analysisPath, `${JSON.stringify(refreshed, null, 2)}\n`);
 };
 
 const project = (root, host) =>

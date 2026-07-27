@@ -39,6 +39,20 @@ function kindHintForDocument(document) {
   return 'source';
 }
 
+function expectedRelativePath(document) {
+  if (document?.kind === 'portfolio') return 'portfolio.json';
+  if (document?.kind === 'module' && typeof document.id === 'string') {
+    return `graph/modules/${document.id.replace(/^module:/, '')}.json`;
+  }
+  if (document?.kind === 'composition' && typeof document.skill_id === 'string') {
+    return `compositions/skill.${document.skill_id.replace(/^skill:/, '')}.json`;
+  }
+  if (document?.kind === 'candidate_analysis' && typeof document.skill_id === 'string') {
+    return `analyses/candidate.${document.skill_id.replace(/^skill:/, '')}.json`;
+  }
+  return null;
+}
+
 /**
  * Load authored knowledge JSON into an IR-friendly structure with deterministic diagnostics.
  */
@@ -98,6 +112,33 @@ export function loadKnowledgeSource({ repoRoot, sourceRoot }) {
     }
 
     const hint = kindHintForDocument(document);
+    const relativeLocation = path.relative(absolute, file).split(path.sep).join('/');
+    const expected = expectedRelativePath(document);
+    const isChange =
+      document?.kind === 'change' ||
+      document?.kind === 'change_workspace' ||
+      document?.kind === 'change_validation';
+    const layoutOk =
+      expected === relativeLocation ||
+      (isChange && relativeLocation.startsWith('changes/'));
+    if (!layoutOk) {
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-SOURCE-LAYOUT',
+          message: `Authored document is outside the graph-only source layout: ${location}`,
+          location,
+          witness: {
+            kind: document?.kind ?? null,
+            actual: relativeLocation,
+            expected,
+          },
+          remediation:
+            'Keep portfolio.json, graph/modules/*.json, compositions/*.json, analyses/*.json, and changes/** as the only authored source locations.',
+          exitCode: 3,
+        }),
+      );
+    }
     const schemaResult = validatorsAvailable()
       ? validateAuthoredDocument(document, hint)
       : { ok: false, errors: [] };

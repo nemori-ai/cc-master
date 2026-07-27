@@ -26,7 +26,7 @@ Commands:
   check [--source <dir>] [--stage K0|K1|K2|K3] [--host <host>] [--base <git-ref>] [--json]
   compile [--source <dir>] [--host <host>] [--check] [--json]
   materialize --composition <id> [--check] [--json]
-  change begin --op <${'add|wording|refine|move|split|merge|transfer_owner|deprecate|retire'}> --scope <path...> --base <git-ref> [--json]
+  change begin --op <${'add|wording|refine|move|split|merge|deprecate|retire'}> --scope <path...> --base <git-ref> [--json]
   change validate <workspace> [--json]
   change apply <workspace> [--json]
   report [--source <dir>] [--format json|markdown] [--host <host>] [--json]

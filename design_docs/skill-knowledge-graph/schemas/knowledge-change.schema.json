@@ -126,7 +126,6 @@
         "move",
         "split",
         "merge",
-        "transfer_owner",
         "deprecate",
         "retire"
       ]
@@ -1267,41 +1266,6 @@
         }
       }
     },
-    "transferOwnerOperation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "op",
-        "subject",
-        "from_skill",
-        "to_skill",
-        "edge_rewrites",
-        "rationale"
-      ],
-      "properties": {
-        "op": {
-          "const": "transfer_owner"
-        },
-        "subject": {
-          "$ref": "#/$defs/moduleId"
-        },
-        "from_skill": {
-          "$ref": "#/$defs/skillId"
-        },
-        "to_skill": {
-          "$ref": "#/$defs/skillId"
-        },
-        "edge_rewrites": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/edgeRewrite"
-          }
-        },
-        "rationale": {
-          "$ref": "#/$defs/nonEmptyString"
-        }
-      }
-    },
     "deprecateOperation": {
       "type": "object",
       "additionalProperties": false,
@@ -1381,9 +1345,6 @@
         },
         {
           "$ref": "#/$defs/mergeOperation"
-        },
-        {
-          "$ref": "#/$defs/transferOwnerOperation"
         },
         {
           "$ref": "#/$defs/deprecateOperation"

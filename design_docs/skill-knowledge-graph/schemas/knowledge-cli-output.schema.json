@@ -126,7 +126,9 @@
         "root",
         "portfolio",
         "changes",
-        "skills"
+        "modules",
+        "compositions",
+        "analyses"
       ],
       "properties": {
         "root": {
@@ -138,9 +140,14 @@
         "changes": {
           "$ref": "#/$defs/repoPath"
         },
-        "skills": {
-          "type": "string",
-          "minLength": 1
+        "modules": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "compositions": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "analyses": {
+          "$ref": "#/$defs/repoPath"
         }
       }
     },
@@ -703,7 +710,6 @@
             "authored_manifest_kinds": {
               "const": [
                 "portfolio",
-                "skill",
                 "module",
                 "composition",
                 "candidate_analysis"
@@ -1175,10 +1181,6 @@
             "entry",
             "diagnostic"
           ]
-        },
-        "owner_skill": {
-          "type": "string",
-          "minLength": 1
         },
         "module": {
           "type": "string",

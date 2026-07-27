@@ -15,7 +15,7 @@ const repoRoot = path.resolve(import.meta.dirname, '../..');
 const targets = [
   {
     name: 'engineering-with-craft',
-    root: 'plugin/src/knowledge/skills/engineering-with-craft',
+    composition: 'plugin/src/knowledge/compositions/skill.engineering-with-craft.json',
     canonical: 'plugin/src/skills/engineering-with-craft/canonical',
     expectedEntry: 'entry:engineering-craft',
     expectedSkillPrimary: 'point:craft.shared-spine',
@@ -29,7 +29,7 @@ const targets = [
   },
   {
     name: 'authoring-workflows',
-    root: 'plugin/src/knowledge/skills/authoring-workflows',
+    composition: 'plugin/src/knowledge/compositions/skill.authoring-workflows.json',
     canonical: 'plugin/src/skills/authoring-workflows/canonical',
     expectedEntry: 'entry:workflow-authoring',
     expectedSkillPrimary: 'point:workflow.shape-tree',
@@ -88,25 +88,26 @@ function shortestDistance(adjacency, from, to) {
 
 for (const target of targets) {
   test(`${target.name}: schema, denominator, markers, authority and local authored paths close`, () => {
-    const skillPath = `${target.root}/skill.json`;
-    const skill = readJson(skillPath);
-    assertSchema(skill, skillPath);
+    const composition = readJson(target.composition);
+    assertSchema(composition, target.composition);
 
     const denominator = gitMarkdownDenominator(target.canonical);
-    const inventoryPaths = skill.canonical_source_inventory.map((entry) => entry.path).sort();
+    const inventoryPaths = composition.canonical_source_inventory
+      .map((entry) => entry.path)
+      .sort();
     assert.deepEqual(inventoryPaths, denominator, 'inventory must equal the Git Markdown denominator');
     assert.equal(
-      skill.canonical_source_inventory.some((entry) => entry.coverage === 'partial'),
+      composition.canonical_source_inventory.some((entry) => entry.coverage === 'partial'),
       false,
       'K2 shard must not contain partial coverage',
     );
 
     const points = new Map();
     const edges = new Map();
-    const modules = skill.modules.map((reference) => {
+    const modules = composition.consumes.modules.map((reference) => {
       const module = readJson(reference.manifest);
       assertSchema(module, reference.manifest);
-      assert.equal(module.owner_skill, skill.id);
+      assert.equal(Object.hasOwn(module, 'owner_skill'), false);
       for (const point of module.points) {
         assert.equal(points.has(point.id), false, `duplicate point ${point.id}`);
         points.set(point.id, { point, module });
@@ -119,13 +120,13 @@ for (const target of targets) {
     });
 
     assert.deepEqual(
-      skill.entry_modules.slice().sort(),
+      composition.entry_modules.slice().sort(),
       modules.map((module) => module.id).sort(),
       'every local module must be an entry module pending shared portfolio integration',
     );
 
     const inventoryPointIds = new Set(
-      skill.canonical_source_inventory.flatMap((entry) => entry.point_ids),
+      composition.canonical_source_inventory.flatMap((entry) => entry.point_ids),
     );
     assert.deepEqual(
       [...inventoryPointIds].sort(),
@@ -133,7 +134,7 @@ for (const target of targets) {
       'inventory point membership must equal module point membership',
     );
 
-    for (const entry of skill.canonical_source_inventory) {
+    for (const entry of composition.canonical_source_inventory) {
       const text = fs.readFileSync(path.join(repoRoot, entry.path), 'utf8');
       const parsed = extractMarkers(text, entry.path);
       assert.equal(parsed.ok, true, JSON.stringify(parsed.diagnostics));
@@ -216,7 +217,7 @@ for (const target of targets) {
     }
 
     assert.deepEqual(
-      Object.fromEntries(skill.host_coverage.map((item) => [item.host, item.state])),
+      Object.fromEntries(composition.host_coverage.map((item) => [item.host, item.state])),
       target.expectedCoverage,
     );
   });

@@ -128,7 +128,7 @@ JSON 结果必须包含：
   "C3": {"derived_fields": ["canonical", "review_policy", "reviewed_canonical_sha256"]},
   "C4": {"accepted_skill_requires_admission": true},
   "C5": {"change_workflow": ["begin", "validate", "apply"], "workspace_root": ".skill-knowledge/workspaces/<change-id>"},
-  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "skill", "module", "composition", "candidate_analysis"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"], "candidate_admission": {"inventory_max_utf8_bytes": 65536, "inventory_max_lines": 2000, "inventory_max_tokens": 20000, "min_internal_cohesion": 0.5, "max_external_edge_count": 0, "max_overlap_shared_modules": 2, "require_ssot_closure": true, "require_four_host_denominator": true, "reject_all_hosts_unsupported": true, "require_declared_projection": true, "hop_gate": "directed_projection_topology"}},
+  "C6": {"algorithm": "cc-master/skill-knowledge-canonical-graph-hash/v1", "authored_manifest_kinds": ["portfolio", "module", "composition", "candidate_analysis"], "change_head_digest_excludes": ["result_graph_sha256"], "identity_set_fields": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"], "semantic_order_fields": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"], "candidate_admission": {"inventory_max_utf8_bytes": 524288, "inventory_max_lines": 8192, "inventory_max_tokens": 131072, "min_internal_cohesion": 0.1, "max_external_edge_count": 0, "max_overlap_shared_modules": 2, "require_ssot_closure": true, "require_four_host_denominator": true, "reject_all_hosts_unsupported": true, "require_declared_projection": true, "hop_gate": "directed_projection_topology"}},
   "C7": {"algorithm": "cc-master/skill-knowledge-markdown-span-hash/v1", "newline_normalization": "crlf-to-lf"},
   "C8": {"algorithm": "cc-master/skill-knowledge-budget-estimator/v1", "formula": "ceil(utf8_bytes/3)"},
   "C9": {
@@ -149,7 +149,8 @@ JSON 结果必须包含：
 数组顺序是 contract 输出顺序；消费者不得按 object key 的序号推断语义。
 
 `C6.candidate_admission` 阈值依据真实 candidate metrics（非 form-only）：
-- `min_internal_cohesion`：`internal_edges / points`（点数 `< 2` 时 vacuously `1.0`）；当前 pilot `dev-as-ml-loop` 观测约 `2.29`，默认门槛 `0.5`。
+- inventory read/token cap 是完整 composition canonical inventory 的 closure budget，不表示一次 activation 会 eager-read 全部文件；它们是与当前 candidate 最大值无关的固定二进制 safety envelope：512 KiB 限制单 composition 被读取/哈希的 raw bytes，8192 lines 独立限制碎片化的 review/navigation surface，131072 estimated tokens 限制稠密语义体积。三闸同时成立，不能靠编码或排版绕过其余维度。
+- `min_internal_cohesion`：`internal_edges / points`（点数 `< 2` 时 vacuously `1.0`）；门槛 `0.1` 要求至少每十个 point 有一条 authored typed relation，同时容纳按需读取的稀疏 orchestration/reference 模块。
 - `max_overlap_shared_modules`：与任一其他 accepted composition 共享的 module 数上界（默认 `2`）；gate 名 `overlap_within_budget`。
 - `require_declared_projection`：declared `full`/`partial` 必须由只读 `planSkillProjection` 支撑（`mode:copy` + 缺失 slot replacement → analysis reject）。
 - `hop_gate=directed_projection_topology`：admission 依据 expected directed projection topology（atlas/module 结构弧 + authored edges）要求 SCC=1 且 directed diameter ≤ `hop_policy.point_diameter_max`；undirected 仅观测。最终权威仍是每 host materialized Markdown 的 `verifyHopContracts`。
@@ -343,7 +344,7 @@ committed change schema 与 semantic envelope gate；gate 后若改写 envelope�
 
 `change apply <workspace>` 必须重跑完整 validate（含四 host candidate runtime gate）后全有或全无写入；成功写入后才 finalized immutable
 change record。任一 scope stale/dirty/写失败或 runtime gate 失败都拒绝部分写入和 ledger finalize。closed operation set 保持：
-`add / wording / refine / move / split / merge / transfer_owner / deprecate / retire`。
+`add / wording / refine / move / split / merge / deprecate / retire`。
 
 `report` envelope 的 `result_kind` 为 `report`，并同时含：
 

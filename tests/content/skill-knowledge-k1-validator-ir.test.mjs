@@ -43,7 +43,7 @@ test('SKG-K1-SCHEMA-01: standalone Draft 2020-12 validators accept C1-C5 valid f
 
   const cases = [
     ['valid/c1-entry-surfaces.portfolio.json', 'source', true],
-    ['valid/c2-inventory.skill.json', 'source', true],
+    ['valid/c2-inventory.composition.json', 'source', true],
     ['valid/c3-c4-module.json', 'source', true],
     ['valid/c5-c6-change.json', 'change', true],
     ['invalid/c1-missing-surfaces.portfolio.json', 'source', false],
@@ -183,7 +183,7 @@ test('SKG-K1-HASH-03: C6 canonical graph hash excludes result_graph_sha256 self-
 
   const change = readJson('valid/c6-change-with-result-hash.json');
   const portfolio = readJson('valid/c1-entry-surfaces.portfolio.json');
-  const skill = readJson('valid/c2-inventory.skill.json');
+  const skill = readJson('valid/c2-inventory.composition.json');
   const moduleDoc = readJson('valid/c3-c4-module.json');
 
   const baseInput = {
@@ -595,7 +595,7 @@ test('SKG-K1-HASH-05: identity-set permutation is hash-stable; semantic order is
   }
 
   const portfolio = readJson('valid/c1-entry-surfaces.portfolio.json');
-  const skill = readJson('valid/c2-inventory.skill.json');
+  const skill = readJson('valid/c2-inventory.composition.json');
   const moduleDoc = readJson('valid/c3-c4-module.json');
 
   assert.ok((moduleDoc.points?.length ?? 0) >= 2);
@@ -618,7 +618,9 @@ test('SKG-K1-HASH-05: identity-set permutation is hash-stable; semantic order is
   permuted.manifests[2].points = [...permuted.manifests[2].points].reverse();
   permuted.manifests[2].edges = [...permuted.manifests[2].edges].reverse();
   permuted.manifests[0].skills = [...(permuted.manifests[0].skills ?? [])].reverse();
-  permuted.manifests[1].modules = [...(permuted.manifests[1].modules ?? [])].reverse();
+  permuted.manifests[1].consumes.modules = [
+    ...(permuted.manifests[1].consumes.modules ?? []),
+  ].reverse();
   permuted.inventory = [...permuted.inventory].reverse();
   permuted.manifests[1].canonical_source_inventory = [
     ...permuted.manifests[1].canonical_source_inventory,

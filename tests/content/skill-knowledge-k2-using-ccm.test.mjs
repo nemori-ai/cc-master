@@ -18,7 +18,10 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const require = createRequire(import.meta.url);
 const validateSource = require('../../scripts/skill-knowledge/validators/validate-source.cjs');
 
-const SKILL_DIR = 'plugin/src/knowledge/skills/using-ccm';
+const COMPOSITION_PATH =
+  'plugin/src/knowledge/compositions/skill.using-ccm.json';
+const ANALYSIS_PATH =
+  'plugin/src/knowledge/analyses/candidate.using-ccm.json';
 const CANONICAL_ROOT = 'plugin/src/skills/using-ccm/canonical';
 const CRITICAL = 'point:ccm.status-state-machine';
 const ENTRY = 'entry:using-ccm';
@@ -73,32 +76,36 @@ function displayRepoPath(target) {
 }
 
 /**
- * Ephemeral using-ccm-only knowledge source: fixture portfolio + live skill/module shards.
+ * Ephemeral using-ccm-only knowledge source: portfolio + live composition/global modules.
  * Markdown bindings stay on real repo canonical paths (inventory SSOT).
  */
 function withUsingCcmTempSource(callback) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'skg-using-ccm-'));
   const run = () => {
-    const liveSkill = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, SKILL_DIR, 'skill.json'), 'utf8'),
+    const liveComposition = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, COMPOSITION_PATH), 'utf8'),
     );
-    const modulesDir = path.join(dir, 'skills/using-ccm/modules');
+    const modulesDir = path.join(dir, 'graph/modules');
     fs.mkdirSync(modulesDir, { recursive: true });
 
     const moduleRefs = [];
-    for (const ref of liveSkill.modules) {
+    for (const ref of liveComposition.consumes.modules) {
       const base = path.basename(ref.manifest);
       const dest = path.join(modulesDir, base);
       fs.copyFileSync(path.join(repoRoot, ref.manifest), dest);
       moduleRefs.push({ id: ref.id, manifest: displayRepoPath(dest) });
     }
 
-    const skillPath = path.join(dir, 'skills/using-ccm/skill.json');
-    const skillDoc = {
-      ...liveSkill,
-      modules: moduleRefs,
+    const compositionPath = path.join(dir, 'compositions/skill.using-ccm.json');
+    fs.mkdirSync(path.dirname(compositionPath), { recursive: true });
+    const compositionDoc = {
+      ...liveComposition,
+      consumes: { modules: moduleRefs },
     };
-    fs.writeFileSync(skillPath, `${JSON.stringify(skillDoc, null, 2)}\n`);
+    fs.writeFileSync(compositionPath, `${JSON.stringify(compositionDoc, null, 2)}\n`);
+    const analysisPath = path.join(dir, 'analyses/candidate.using-ccm.json');
+    fs.mkdirSync(path.dirname(analysisPath), { recursive: true });
+    fs.copyFileSync(path.join(repoRoot, ANALYSIS_PATH), analysisPath);
 
     const portfolio = {
       schema_version: SCHEMA,
@@ -108,7 +115,7 @@ function withUsingCcmTempSource(callback) {
       skills: [
         {
           id: 'skill:using-ccm',
-          manifest: displayRepoPath(skillPath),
+          manifest: displayRepoPath(compositionPath),
         },
       ],
       entries: [
@@ -194,7 +201,7 @@ test('SKG-K2-USING-CCM-01: git denominator equals 4 canonical Markdown files at 
     ]),
   );
 
-  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_DIR, 'skill.json'), 'utf8'));
+  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, COMPOSITION_PATH), 'utf8'));
   const inventoryPaths = normalize(skill.canonical_source_inventory.map((row) => row.path));
   assert.deepEqual(inventoryPaths, tracked);
   assert.equal(
@@ -209,11 +216,11 @@ test('SKG-K2-USING-CCM-01: git denominator equals 4 canonical Markdown files at 
 
 test('SKG-K2-USING-CCM-02: schema + markers + unbound hashes + unique canonical authority', async () => {
   const { extractMarkers, hashUnboundRegions, buildAndValidateGraph } = await loadGraphTools();
-  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_DIR, 'skill.json'), 'utf8'));
+  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, COMPOSITION_PATH), 'utf8'));
   assert.equal(Boolean(validateSource(skill)), true, JSON.stringify(validateSource.errors ?? []));
 
   const subjects = new Map();
-  for (const ref of skill.modules) {
+  for (const ref of skill.consumes.modules) {
     const mod = JSON.parse(fs.readFileSync(path.join(repoRoot, ref.manifest), 'utf8'));
     assert.equal(
       Boolean(validateSource(mod)),
@@ -261,9 +268,9 @@ test('SKG-K2-USING-CCM-02: schema + markers + unbound hashes + unique canonical 
 });
 
 test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit', () => {
-  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_DIR, 'skill.json'), 'utf8'));
+  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, COMPOSITION_PATH), 'utf8'));
   const byModule = new Map();
-  for (const ref of skill.modules) {
+  for (const ref of skill.consumes.modules) {
     const mod = JSON.parse(fs.readFileSync(path.join(repoRoot, ref.manifest), 'utf8'));
     byModule.set(mod.id, mod);
   }
@@ -383,8 +390,8 @@ function parseExcludeCanonical(strategyText) {
 }
 
 test('SKG-K2-USING-CCM-06: adapter-excluded canonical points cannot be claimed host full', () => {
-  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, SKILL_DIR, 'skill.json'), 'utf8'));
-  const modules = skill.modules.map((ref) =>
+  const skill = JSON.parse(fs.readFileSync(path.join(repoRoot, COMPOSITION_PATH), 'utf8'));
+  const modules = skill.consumes.modules.map((ref) =>
     JSON.parse(fs.readFileSync(path.join(repoRoot, ref.manifest), 'utf8')),
   );
   const coverageByHost = new Map(skill.host_coverage.map((row) => [row.host, row]));

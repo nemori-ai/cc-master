@@ -2,13 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc-master.dev/schemas/skill-knowledge-source-v1alpha1.json",
   "title": "cc-master skill knowledge authored source",
-  "description": "Normative source contract for portfolio, skill, module, composition, and candidate_analysis shards (graph-first).",
+  "description": "Normative graph-only source contract for portfolio, global module, composition, and candidate_analysis shards.",
   "oneOf": [
     {
       "$ref": "#/$defs/portfolio"
-    },
-    {
-      "$ref": "#/$defs/skill"
     },
     {
       "$ref": "#/$defs/module"
@@ -814,112 +811,6 @@
         }
       ]
     },
-    "skill": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schema_version",
-        "kind",
-        "id",
-        "name",
-        "package_root",
-        "intent",
-        "modules",
-        "entry_modules",
-        "canonical_source_inventory",
-        "host_coverage",
-        "lifecycle",
-        "admission"
-      ],
-      "properties": {
-        "schema_version": {
-          "$ref": "#/$defs/schemaVersion"
-        },
-        "kind": {
-          "const": "skill"
-        },
-        "id": {
-          "$ref": "#/$defs/skillId"
-        },
-        "name": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        },
-        "package_root": {
-          "type": "string",
-          "pattern": "^plugin/src/skills/[a-z0-9-]+$"
-        },
-        "intent": {
-          "$ref": "#/$defs/nonEmptyString"
-        },
-        "modules": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/moduleRef"
-          }
-        },
-        "entry_modules": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/moduleId"
-          },
-          "uniqueItems": true
-        },
-        "canonical_source_inventory": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/sourceInventoryEntry"
-          }
-        },
-        "host_coverage": {
-          "type": "array",
-          "minItems": 4,
-          "maxItems": 4,
-          "items": {
-            "$ref": "#/$defs/hostCoverage"
-          },
-          "allOf": [
-            {
-              "contains": {
-                "type": "object",
-                "required": ["host"],
-                "properties": {"host": {"const": "claude-code"}}
-              }
-            },
-            {
-              "contains": {
-                "type": "object",
-                "required": ["host"],
-                "properties": {"host": {"const": "codex"}}
-              }
-            },
-            {
-              "contains": {
-                "type": "object",
-                "required": ["host"],
-                "properties": {"host": {"const": "cursor"}}
-              }
-            },
-            {
-              "contains": {
-                "type": "object",
-                "required": ["host"],
-                "properties": {"host": {"const": "kimi-code"}}
-              }
-            }
-          ]
-        },
-        "lifecycle": {
-          "$ref": "#/$defs/lifecycle"
-        },
-        "admission": {
-          "$ref": "#/$defs/admission"
-        }
-      }
-    },
     "moduleBoundary": {
       "type": "object",
       "additionalProperties": false,
@@ -1331,6 +1222,7 @@
           "additionalProperties": false,
           "required": [
             "score",
+            "audience_plane",
             "evidence"
           ],
           "properties": {
@@ -1339,6 +1231,12 @@
               "enum": [
                 0,
                 1
+              ]
+            },
+            "audience_plane": {
+              "enum": [
+                "runtime-user",
+                "repository-governance"
               ]
             },
             "evidence": {
@@ -1351,6 +1249,7 @@
           "additionalProperties": false,
           "required": [
             "score",
+            "bounded_context",
             "evidence"
           ],
           "properties": {
@@ -1360,6 +1259,9 @@
                 0,
                 1
               ]
+            },
+            "bounded_context": {
+              "$ref": "#/$defs/nonEmptyString"
             },
             "evidence": {
               "$ref": "#/$defs/nonEmptyString"
@@ -1628,10 +1530,6 @@
         },
         "id": {
           "$ref": "#/$defs/moduleId"
-        },
-        "owner_skill": {
-          "description": "Legacy skill-first field. Forbidden on graph-first global modules; transitional only for unmigrated skills.",
-          "$ref": "#/$defs/skillId"
         },
         "title": {
           "$ref": "#/$defs/nonEmptyString"

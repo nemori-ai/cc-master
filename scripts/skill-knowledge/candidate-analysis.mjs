@@ -638,6 +638,50 @@ function metricWitnessForPersistence(witness_metrics, graph_metrics, admission_g
 }
 
 /**
+ * Build the deterministic machine-derived half of an authored candidate analysis.
+ * Human curation remains explicit in `scoresheet`; graph metrics, budgets, host
+ * portability, gates, and verdict are always recomputed from the live graph.
+ */
+export function createCandidateAnalysisDocument({
+  repoRoot,
+  graph,
+  composition,
+  scoresheet,
+  reason,
+  lifecycle = null,
+  admission,
+}) {
+  const moduleIds = consumeModuleIds(composition);
+  const { graph_metrics, witness_metrics, admission_gates } = computeCandidateMetrics({
+    graph,
+    moduleIds,
+    composition,
+    repoRoot,
+  });
+  const verdict = deriveVerdict(scoresheet, admission_gates.ok === true);
+  return {
+    schema_version: composition.schema_version,
+    kind: 'candidate_analysis',
+    id: composition.analysis_ref,
+    skill_id: composition.skill_id,
+    composition_id: composition.id,
+    candidate_modules: moduleIds,
+    scoresheet,
+    graph_metrics,
+    verdict,
+    witness: {
+      reason:
+        reason ??
+        'D1/D2/D3 与实时图指标、预算、host portability 闸共同导出候选 verdict。',
+      composition_id: composition.id,
+      ...metricWitnessForPersistence(witness_metrics, graph_metrics, admission_gates),
+    },
+    lifecycle: lifecycle ?? composition.lifecycle,
+    admission,
+  };
+}
+
+/**
  * Analyze against an already-built graph IR (modules/points/edges/compositions populated).
  */
 export function analyzeAgainstGraph({
@@ -691,8 +735,16 @@ export function analyzeAgainstGraph({
       skill_id: skillId,
       candidate_modules: [...moduleIds].sort(),
       scoresheet: {
-        D1: { score: 0, evidence: 'analysis missing' },
-        D2: { score: 0, evidence: 'analysis missing' },
+        D1: {
+          score: 0,
+          audience_plane: 'repository-governance',
+          evidence: 'analysis missing',
+        },
+        D2: {
+          score: 0,
+          bounded_context: 'analysis missing',
+          evidence: 'analysis missing',
+        },
         D3: {
           probe_a: 'weak',
           probe_b: 'weak',
@@ -745,6 +797,31 @@ export function analyzeAgainstGraph({
   }
 
   const scoresheet = analysis.scoresheet;
+  if (
+    scoresheet?.D1?.score === 1 &&
+    scoresheet?.D1?.audience_plane !== 'runtime-user'
+  ) {
+    fail(
+      'SKG-ANALYSIS-AUDIENCE-PLANE',
+      'D1=1 requires the explicit runtime-user audience plane.',
+      {
+        score: scoresheet?.D1?.score ?? null,
+        audience_plane: scoresheet?.D1?.audience_plane ?? null,
+      },
+      'Classify repository-governance knowledge outside the runtime skill portfolio.',
+    );
+  }
+  if (
+    scoresheet?.D2?.score === 1 &&
+    String(scoresheet?.D2?.bounded_context ?? '').trim().length === 0
+  ) {
+    fail(
+      'SKG-ANALYSIS-BOUNDED-CONTEXT',
+      'D2=1 requires an explicit non-empty bounded_context.',
+      { score: scoresheet?.D2?.score ?? null },
+      'Name the one cognitive job owned by this composition candidate.',
+    );
+  }
   const evidenceRefs = scoresheet?.D3?.evidence_refs ?? [];
   const rationale = String(scoresheet?.D3?.evidence ?? '').trim();
   if (!Array.isArray(evidenceRefs) || evidenceRefs.length === 0 || rationale.length === 0) {
@@ -841,6 +918,8 @@ export function analyzeAgainstGraph({
     skill_id: skillId,
     ...derivedMetricWitness,
     counterfactual: {
+      audience_plane: scoresheet.D1.audience_plane,
+      bounded_context: scoresheet.D2.bounded_context,
       probe_a: scoresheet.D3.probe_a,
       probe_b: scoresheet.D3.probe_b,
       rationale,

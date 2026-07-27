@@ -11,7 +11,7 @@
   "skills": [
     {
       "id": "skill:master-orchestrator-guide",
-      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.master-orchestrator-guide.json"
     }
   ],
   "entries": [

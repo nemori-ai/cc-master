@@ -45,12 +45,11 @@ function point(id, subject, marker = id) {
   };
 }
 
-function moduleDoc(id, owner, points, edges = []) {
+function moduleDoc(id, points, edges = []) {
   return {
     schema_version: 'cc-master/skill-knowledge-source/v1alpha1',
     kind: 'module',
     id,
-    owner_skill: owner,
     title: id,
     intent: `${id} intent`,
     recognition_cues: [`recognize ${id}`],
@@ -63,18 +62,22 @@ function moduleDoc(id, owner, points, edges = []) {
   };
 }
 
-function skillDoc(id, moduleIds) {
+function compositionDoc(id, moduleIds) {
+  const name = id.replace('skill:', '');
   return {
     schema_version: 'cc-master/skill-knowledge-source/v1alpha1',
-    kind: 'skill',
-    id,
-    name: id.replace('skill:', ''),
-    package_root: `plugin/src/skills/${id.replace('skill:', '')}`,
+    kind: 'composition',
+    id: `composition:skill.${name}`,
+    skill_id: id,
+    name,
+    package_root: `plugin/src/skills/${name}`,
     intent: `${id} intent`,
-    modules: moduleIds.map((moduleId) => ({
-      id: moduleId,
-      manifest: `plugin/src/knowledge/skills/${id.replace('skill:', '')}/modules/${moduleId.replace('module:', '')}.json`,
-    })),
+    consumes: {
+      modules: moduleIds.map((moduleId) => ({
+        id: moduleId,
+        manifest: `plugin/src/knowledge/graph/modules/${moduleId.replace('module:', '')}.json`,
+      })),
+    },
     entry_modules: [moduleIds[0]],
     canonical_source_inventory: [
       {
@@ -90,8 +93,79 @@ function skillDoc(id, moduleIds) {
       state: 'stub',
       reason: 'transaction unit fixture has no SAP/dist surface; candidate runtime abstains',
     })),
+    analysis_ref: `analysis:candidate.${name}`,
     lifecycle: lifecycle(),
     admission: evidence(id),
+  };
+}
+
+function analysisDoc(id, moduleIds) {
+  const name = id.replace('skill:', '');
+  const graphMetrics = {
+    module_count: moduleIds.length,
+    point_count: 1,
+    internal_edge_count: 0,
+    external_edge_count: 0,
+  };
+  return {
+    schema_version: 'cc-master/skill-knowledge-source/v1alpha1',
+    kind: 'candidate_analysis',
+    id: `analysis:candidate.${name}`,
+    skill_id: id,
+    composition_id: `composition:skill.${name}`,
+    candidate_modules: moduleIds,
+    scoresheet: {
+      D1: {
+        score: 1,
+        audience_plane: 'runtime-user',
+        evidence: 'transaction runtime fixture',
+      },
+      D2: {
+        score: 1,
+        bounded_context: `${name} transaction fixture`,
+        evidence: 'single fixture job',
+      },
+      D3: {
+        probe_a: 'strong',
+        probe_b: 'strong',
+        evidence: 'fixture candidate exercises typed transaction mechanics',
+        evidence_refs: ['plugin/src/skills/demo/canonical/SKILL.md'],
+      },
+    },
+    graph_metrics: graphMetrics,
+    verdict: 'admit',
+    witness: {
+      reason: 'transaction fixture',
+      composition_id: `composition:skill.${name}`,
+      candidate_modules: moduleIds,
+      candidate_points: [],
+      trigger_job_coherence: true,
+      internal_cohesion: 1,
+      external_cut_coupling: 0,
+      overlap_signature: {},
+      ssot_closure: true,
+      budgets: {},
+      host_portability: {},
+      hop: {},
+      graph_metrics: graphMetrics,
+      admission_gates: {
+        ok: true,
+        module_count_matches_candidate: true,
+        point_count_positive: true,
+        trigger_job_coherence: true,
+        ssot_closure: true,
+        internal_cohesion: true,
+        external_cut: true,
+        overlap_within_budget: true,
+        hop: true,
+        read_budget: true,
+        token_budget: true,
+        four_host_denominator: true,
+        host_portability: true,
+      },
+    },
+    lifecycle: lifecycle(),
+    admission: evidence(`analysis:candidate.${name}`),
   };
 }
 
@@ -103,10 +177,13 @@ function writeJson(root, relative, value) {
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skg-change-'));
-  const moduleOnePath = 'plugin/src/knowledge/skills/demo/modules/one.json';
-  const moduleTwoPath = 'plugin/src/knowledge/skills/demo/modules/two.json';
-  const skillPath = 'plugin/src/knowledge/skills/demo/skill.json';
-  const otherSkillPath = 'plugin/src/knowledge/skills/other/skill.json';
+  const moduleOnePath = 'plugin/src/knowledge/graph/modules/demo.one.json';
+  const moduleTwoPath = 'plugin/src/knowledge/graph/modules/demo.two.json';
+  const otherModulePath = 'plugin/src/knowledge/graph/modules/demo.other.json';
+  const skillPath = 'plugin/src/knowledge/compositions/skill.demo.json';
+  const otherSkillPath = 'plugin/src/knowledge/compositions/skill.other.json';
+  const analysisPath = 'plugin/src/knowledge/analyses/candidate.demo.json';
+  const otherAnalysisPath = 'plugin/src/knowledge/analyses/candidate.other.json';
   const markdownPath = 'plugin/src/skills/demo/canonical/SKILL.md';
   const one = point('point:demo.one', 'subject:demo.one');
   const two = point('point:demo.two', 'subject:demo.two');
@@ -127,13 +204,15 @@ function fixture() {
     critical_pin_budget: { max_modules: 2, max_fraction: 1 },
     router_budget: { atlas_max_lines: 120, atlas_max_tokens: 1800, module_max_lines: 80, module_max_tokens: 1200, point_nav_max_lines: 4 }, rollout: 'K1',
   });
-  writeJson(root, skillPath, skillDoc('skill:demo', ['module:demo.one', 'module:demo.two']));
-  writeJson(root, otherSkillPath, skillDoc('skill:other', ['module:demo.other']));
-  writeJson(root, moduleOnePath, moduleDoc('module:demo.one', 'skill:demo', [one, two], [{
+  writeJson(root, skillPath, compositionDoc('skill:demo', ['module:demo.one', 'module:demo.two']));
+  writeJson(root, otherSkillPath, compositionDoc('skill:other', ['module:demo.other']));
+  writeJson(root, analysisPath, analysisDoc('skill:demo', ['module:demo.one', 'module:demo.two']));
+  writeJson(root, otherAnalysisPath, analysisDoc('skill:other', ['module:demo.other']));
+  writeJson(root, moduleOnePath, moduleDoc('module:demo.one', [one, two], [{
     id: 'edge:demo.one-to-two', type: 'next', from: one.id, to: two.id, when: ['next'], path_role: 'next', runtime: { enabled_by_default: true }, lifecycle: lifecycle(), admission: evidence('edge:demo.one-to-two'),
   }]));
-  writeJson(root, moduleTwoPath, moduleDoc('module:demo.two', 'skill:demo', [point('point:demo.three', 'subject:demo.three')]));
-  writeJson(root, 'plugin/src/knowledge/skills/other/modules/demo.other.json', moduleDoc('module:demo.other', 'skill:other', [point('point:demo.other', 'subject:demo.other')]));
+  writeJson(root, moduleTwoPath, moduleDoc('module:demo.two', [point('point:demo.three', 'subject:demo.three')]));
+  writeJson(root, otherModulePath, moduleDoc('module:demo.other', [point('point:demo.other', 'subject:demo.other')]));
   fs.mkdirSync(path.join(root, path.dirname(markdownPath)), { recursive: true });
   fs.writeFileSync(path.join(root, markdownPath), [
     '<!-- ccm:k:start point:demo.one -->', 'one', '<!-- ccm:k:end point:demo.one -->',
@@ -146,7 +225,17 @@ function fixture() {
   run('git', ['config', 'user.name', 'SKG Test'], root);
   run('git', ['add', '.'], root);
   run('git', ['commit', '-qm', 'base'], root);
-  return { root, moduleOnePath, moduleTwoPath, skillPath, otherSkillPath, markdownPath };
+  return {
+    root,
+    moduleOnePath,
+    moduleTwoPath,
+    otherModulePath,
+    skillPath,
+    otherSkillPath,
+    analysisPath,
+    otherAnalysisPath,
+    markdownPath,
+  };
 }
 
 function candidateJson(workspace, relative) {
@@ -212,12 +301,6 @@ const cases = {
     const markdown = candidateJson(workspace, files.markdownPath);
     fs.appendFileSync(markdown, '<!-- ccm:k:start point:demo.merged -->\nmerged\n<!-- ccm:k:end point:demo.merged -->\n');
     writeDraft(workspace, { op: 'merge', subjects: ['point:demo.one', 'point:demo.two'], result: 'point:demo.merged', edge_rewrites: [], rationale: 'one canonical concept' });
-  },
-  transfer_owner({ workspace, files }) {
-    editModule(workspace, files.moduleTwoPath, (document) => { document.owner_skill = 'skill:other'; });
-    editModule(workspace, files.skillPath, (document) => { document.modules = document.modules.filter((item) => item.id !== 'module:demo.two'); });
-    editModule(workspace, files.otherSkillPath, (document) => document.modules.push({ id: 'module:demo.two', manifest: files.moduleTwoPath }));
-    writeDraft(workspace, { op: 'transfer_owner', subject: 'module:demo.two', from_skill: 'skill:demo', to_skill: 'skill:other', edge_rewrites: [], rationale: 'responsibility moved' });
   },
   deprecate({ workspace, files }) {
     editModule(workspace, files.moduleOnePath, (document) => { document.points[0].lifecycle = lifecycle('deprecated', 'point:demo.two'); });
@@ -447,7 +530,7 @@ test('SKG-TX-06: rollback failure preserves an exact recovery bundle and names u
   } finally { fs.rmSync(files.root, { recursive: true, force: true }); }
 });
 
-test('SKG-TX-08: mislabeling point module relocation as transfer_owner fails; move passes', async () => {
+test('SKG-TX-08: retired transfer_owner is rejected; graph placement uses move', async () => {
   const tx = await import(transactionModule);
   const files = fixture();
   try {
@@ -457,25 +540,11 @@ test('SKG-TX-08: mislabeling point module relocation as transfer_owner fails; mo
       scope: [files.moduleOnePath, files.moduleTwoPath, files.skillPath, files.otherSkillPath, files.markdownPath],
       base: 'HEAD',
     });
-    assert.equal(wrongBegin.exitCode, 0, JSON.stringify(wrongBegin.diagnostics));
-    // Move point:demo.one into module:demo.two while drafting transfer_owner (wrong label).
-    editModule(wrongBegin.workspace, files.moduleOnePath, (document) => {
-      document.points = document.points.filter((item) => item.id !== 'point:demo.one');
-      document.edges = [];
-    });
-    editModule(wrongBegin.workspace, files.moduleTwoPath, (document) => {
-      document.points.push(point('point:demo.one', 'subject:demo.one'));
-    });
-    writeDraft(wrongBegin.workspace, {
-      op: 'transfer_owner',
-      subject: 'module:demo.two',
-      from_skill: 'skill:demo',
-      to_skill: 'skill:other',
-      edge_rewrites: [],
-      rationale: 'mislabel point move as owner transfer',
-    });
-    const wrong = tx.validateTransaction({ repoRoot: files.root, workspace: wrongBegin.workspace });
-    assert.notEqual(wrong.exitCode, 0);
+    assert.equal(wrongBegin.exitCode, 2, JSON.stringify(wrongBegin.diagnostics));
+    assert.ok(
+      wrongBegin.diagnostics.some((item) => item.code === 'SKG-USAGE'),
+      JSON.stringify(wrongBegin.diagnostics),
+    );
 
     const rightBegin = tx.beginTransaction({
       repoRoot: files.root,
@@ -515,7 +584,6 @@ test('SKG-TX-07: every typed operation has a concrete, non-noop graph preconditi
     move: { op: 'move', subject: 'point:demo.one', from: { module: 'module:demo.two' }, to: { module: 'module:demo.one' }, edge_rewrites: [], rationale: 'wrong frozen endpoint' },
     split: { op: 'split', subject: 'point:demo.one', results: ['point:demo.split-a', 'point:demo.split-b'], edge_rewrites: [], rationale: 'candidate did not retire or create results' },
     merge: { op: 'merge', subjects: ['point:demo.one', 'point:demo.two'], result: 'point:demo.merged', edge_rewrites: [], rationale: 'candidate did not retire or create result' },
-    transfer_owner: { op: 'transfer_owner', subject: 'module:demo.two', from_skill: 'skill:other', to_skill: 'skill:demo', edge_rewrites: [], rationale: 'wrong frozen owner' },
     deprecate: { op: 'deprecate', subjects: ['point:demo.one'], replacement: 'point:demo.two', edge_rewrites: [], rationale: 'candidate remains accepted' },
     retire: { op: 'retire', subjects: ['point:demo.one'], replacement: 'point:demo.two', edge_rewrites: [], rationale: 'candidate remains accepted' },
   };

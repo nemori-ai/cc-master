@@ -11,7 +11,7 @@
   "skills": [
     {
       "id": "skill:master-orchestrator-guide",
-      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.master-orchestrator-guide.json"
     }
   ],
   "entries": [
@@ -142,5 +142,5 @@
     "module_max_tokens": 1200,
     "point_nav_max_lines": 4
   },
-  "rollout": "K1"
+  "rollout": "K3"
 }

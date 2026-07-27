@@ -11,19 +11,19 @@
   "skills": [
     {
       "id": "skill:master-orchestrator-guide",
-      "manifest": "plugin/src/knowledge/skills/master-orchestrator-guide/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.master-orchestrator-guide.json"
     },
     {
       "id": "skill:authoring-workflows",
-      "manifest": "plugin/src/knowledge/skills/authoring-workflows/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.authoring-workflows.json"
     },
     {
       "id": "skill:engineering-with-craft",
-      "manifest": "plugin/src/knowledge/skills/engineering-with-craft/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.engineering-with-craft.json"
     },
     {
       "id": "skill:using-ccm",
-      "manifest": "plugin/src/knowledge/skills/using-ccm/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.using-ccm.json"
     },
     {
       "id": "skill:dev-as-ml-loop",
@@ -31,15 +31,15 @@
     },
     {
       "id": "skill:slicing-goals-into-dags",
-      "manifest": "plugin/src/knowledge/skills/slicing-goals-into-dags/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.slicing-goals-into-dags.json"
     },
     {
       "id": "skill:pacing-and-estimation",
-      "manifest": "plugin/src/knowledge/skills/pacing-and-estimation/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.pacing-and-estimation.json"
     },
     {
       "id": "skill:distilling-lessons-into-assets",
-      "manifest": "plugin/src/knowledge/skills/distilling-lessons-into-assets/skill.json"
+      "manifest": "plugin/src/knowledge/compositions/skill.distilling-lessons-into-assets.json"
     }
   ],
   "entries": [
@@ -927,10 +927,10 @@
     "point_nav_max_lines": 4
   },
   "candidate_admission": {
-    "inventory_max_utf8_bytes": 65536,
-    "inventory_max_lines": 2000,
-    "inventory_max_tokens": 20000,
-    "min_internal_cohesion": 0.5,
+    "inventory_max_utf8_bytes": 524288,
+    "inventory_max_lines": 8192,
+    "inventory_max_tokens": 131072,
+    "min_internal_cohesion": 0.1,
     "max_external_edge_count": 0,
     "max_overlap_shared_modules": 2,
     "require_ssot_closure": true,
@@ -939,5 +939,5 @@
     "require_declared_projection": true,
     "hop_gate": "directed_projection_topology"
   },
-  "rollout": "K2"
+  "rollout": "K3"
 }

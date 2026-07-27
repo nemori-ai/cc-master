@@ -6,9 +6,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { withIsolatedSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
+import {
+  copyMinimalSkillKnowledgeRepo,
+  withIsolatedSkillKnowledgeRepo,
+} from './helpers/skill-knowledge-isolated-repo.mjs';
 import { validateChangeValidationSemantics } from '../../scripts/skill-knowledge/validation-envelope.mjs';
 import { parseStructuredJsonStdout } from '../../scripts/skill-knowledge/json-framing.mjs';
 import {
@@ -16,10 +20,15 @@ import {
   resolveHostCoveragePlan,
 } from '../../scripts/skill-knowledge/host-coverage.mjs';
 import { buildAndValidateGraph } from '../../scripts/skill-knowledge/graph.mjs';
+import { createCandidateAnalysisDocument } from '../../scripts/skill-knowledge/candidate-analysis.mjs';
 
 const PRODUCT_HOSTS = Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']);
 const MODULE_PATH =
-  'plugin/src/knowledge/skills/master-orchestrator-guide/modules/conduct.never-play.json';
+  'plugin/src/knowledge/graph/modules/conduct.never-play.json';
+const ANALYSIS_PATH =
+  'plugin/src/knowledge/analyses/candidate.master-orchestrator-guide.json';
+const COMPOSITION_PATH =
+  'plugin/src/knowledge/compositions/skill.master-orchestrator-guide.json';
 const transactionModule = '../../scripts/skill-knowledge/transactions.mjs';
 
 function run(command, args, cwd) {
@@ -76,6 +85,62 @@ function refineSummary(workspace, suffix) {
     changed_fields: ['summary'],
     rationale: 'typed refine for codex review fix regressions',
   });
+}
+
+function refreshMasterCandidateAnalysis(repoRoot, workspace) {
+  const analysisRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'skg-codex-analysis-refresh-'));
+  try {
+    copyMinimalSkillKnowledgeRepo(analysisRepo, { sourceRoot: repoRoot });
+    fs.copyFileSync(
+      path.join(workspace, 'candidate', MODULE_PATH),
+      path.join(analysisRepo, MODULE_PATH),
+    );
+    const composition = JSON.parse(
+      fs.readFileSync(path.join(analysisRepo, COMPOSITION_PATH), 'utf8'),
+    );
+    const currentAnalysis = JSON.parse(
+      fs.readFileSync(path.join(analysisRepo, ANALYSIS_PATH), 'utf8'),
+    );
+    const provisional = buildAndValidateGraph({
+      repoRoot: analysisRepo,
+      sourceRoot: 'plugin/src/knowledge',
+      skipCompositionAdmission: true,
+    });
+    assert.ok(provisional.graph, 'analysis refresh requires a provisional production graph');
+    const refreshed = createCandidateAnalysisDocument({
+      repoRoot: analysisRepo,
+      graph: provisional.graph,
+      composition,
+      scoresheet: currentAnalysis.scoresheet,
+      reason: currentAnalysis.witness?.reason,
+      lifecycle: currentAnalysis.lifecycle,
+      admission: currentAnalysis.admission,
+    });
+    assert.equal(refreshed.verdict, 'admit', 'fixture graph mutation must preserve admission');
+    fs.writeFileSync(
+      path.join(workspace, 'candidate', ANALYSIS_PATH),
+      `${JSON.stringify(refreshed, null, 2)}\n`,
+    );
+  } finally {
+    fs.rmSync(analysisRepo, { recursive: true, force: true });
+  }
+}
+
+function appendDisabledEdge(workspace, edgeId) {
+  const modulePath = path.join(workspace, 'candidate', MODULE_PATH);
+  const document = JSON.parse(fs.readFileSync(modulePath, 'utf8'));
+  document.edges.push({
+    id: edgeId,
+    type: 'next',
+    from: 'point:conduct.never-play',
+    to: 'point:conduct.red-lines',
+    when: ['never-default'],
+    path_role: 'next',
+    runtime: { enabled_by_default: false },
+    lifecycle: document.edges[0].lifecycle,
+    admission: document.edges[0].admission,
+  });
+  fs.writeFileSync(modulePath, `${JSON.stringify(document, null, 2)}\n`);
 }
 
 test('CODEX-F1: envelope rejects missing snapshot / single check / empty budgets on ok full/partial', () => {
@@ -417,7 +482,7 @@ test('CODEX-A-product: disabled authored edge absent from snapshot edges and adj
     const begun = tx.beginTransaction({
       repoRoot,
       operation: 'add',
-      scope: [MODULE_PATH],
+      scope: [MODULE_PATH, ANALYSIS_PATH],
       base: 'HEAD',
     });
     const modulePath = path.join(begun.workspace, 'candidate', MODULE_PATH);
@@ -434,6 +499,7 @@ test('CODEX-A-product: disabled authored edge absent from snapshot edges and adj
       admission: document.edges[0].admission,
     });
     fs.writeFileSync(modulePath, `${JSON.stringify(document, null, 2)}\n`);
+    refreshMasterCandidateAnalysis(repoRoot, begun.workspace);
     writeDraft(begun.workspace, {
       op: 'add',
       entities: [disabledId],
@@ -452,6 +518,145 @@ test('CODEX-A-product: disabled authored edge absent from snapshot edges and adj
   });
 });
 
+test('CODEX-A-analysis-effect: analysis outside transaction scope cannot ride a graph mutation', async () => {
+  const tx = await import(transactionModule);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    initGit(repoRoot);
+    const edgeId = 'edge:conduct.analysis-outside-scope';
+    const begun = tx.beginTransaction({
+      repoRoot,
+      operation: 'add',
+      scope: [MODULE_PATH],
+      base: 'HEAD',
+    });
+    appendDisabledEdge(begun.workspace, edgeId);
+    writeDraft(begun.workspace, {
+      op: 'add',
+      entities: [edgeId],
+      rationale: 'analysis refresh is deliberately absent from scope',
+    });
+
+    const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
+    assert.equal(validated.exitCode, 4);
+    assert.ok(
+      validated.diagnostics.some(
+        (item) =>
+          item.code === 'SKG-COMPOSITION-NOT-ADMITTED' ||
+          item.code === 'SKG-ANALYSIS-METRICS-MISMATCH' ||
+          item.code === 'SKG-ANALYSIS-WITNESS-MISMATCH',
+      ),
+      JSON.stringify(validated.diagnostics?.slice(0, 8)),
+    );
+  });
+});
+
+test('CODEX-A-analysis-effect: tampered derived analysis remains not admitted', async () => {
+  const tx = await import(transactionModule);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    initGit(repoRoot);
+    const edgeId = 'edge:conduct.analysis-tampered';
+    const begun = tx.beginTransaction({
+      repoRoot,
+      operation: 'add',
+      scope: [MODULE_PATH, ANALYSIS_PATH],
+      base: 'HEAD',
+    });
+    appendDisabledEdge(begun.workspace, edgeId);
+    refreshMasterCandidateAnalysis(repoRoot, begun.workspace);
+    const analysisFile = path.join(begun.workspace, 'candidate', ANALYSIS_PATH);
+    const analysis = JSON.parse(fs.readFileSync(analysisFile, 'utf8'));
+    analysis.graph_metrics.internal_edge_count += 1;
+    fs.writeFileSync(analysisFile, `${JSON.stringify(analysis, null, 2)}\n`);
+    writeDraft(begun.workspace, {
+      op: 'add',
+      entities: [edgeId],
+      rationale: 'tampered analyzer output must fail exact production admission',
+    });
+
+    const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
+    assert.equal(validated.exitCode, 4);
+    assert.ok(
+      validated.diagnostics.some(
+        (item) =>
+          item.code === 'SKG-COMPOSITION-NOT-ADMITTED' ||
+          item.code === 'SKG-ANALYSIS-METRICS-MISMATCH',
+      ),
+      JSON.stringify(validated.diagnostics?.slice(0, 8)),
+    );
+  });
+});
+
+test('CODEX-A-analysis-effect: authored scoresheet change is never a derived effect', async () => {
+  const tx = await import(transactionModule);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    initGit(repoRoot);
+    const edgeId = 'edge:conduct.analysis-scoresheet-smuggle';
+    const begun = tx.beginTransaction({
+      repoRoot,
+      operation: 'add',
+      scope: [MODULE_PATH, ANALYSIS_PATH],
+      base: 'HEAD',
+    });
+    appendDisabledEdge(begun.workspace, edgeId);
+    refreshMasterCandidateAnalysis(repoRoot, begun.workspace);
+    const analysisFile = path.join(begun.workspace, 'candidate', ANALYSIS_PATH);
+    const analysis = JSON.parse(fs.readFileSync(analysisFile, 'utf8'));
+    analysis.scoresheet.D1.evidence = `${analysis.scoresheet.D1.evidence} [undeclared]`;
+    fs.writeFileSync(analysisFile, `${JSON.stringify(analysis, null, 2)}\n`);
+    writeDraft(begun.workspace, {
+      op: 'add',
+      entities: [edgeId],
+      rationale: 'a graph add cannot smuggle authored Counterfactual evidence',
+    });
+
+    const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
+    assert.equal(validated.exitCode, 4);
+    const unexplained = validated.diagnostics.find(
+      (item) =>
+        item.code === 'SKG-CHANGE-UNEXPLAINED-DIFF' &&
+        item.witness?.delta?.id === 'analysis:candidate.master-orchestrator-guide',
+    );
+    assert.ok(unexplained, JSON.stringify(validated.diagnostics?.slice(0, 8)));
+    assert.ok(unexplained.witness.delta.paths.includes('scoresheet.D1.evidence'));
+  });
+});
+
+test('CODEX-A-analysis-effect: derived refresh requires an explained primary operation', async () => {
+  const tx = await import(transactionModule);
+  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
+    initGit(repoRoot);
+    const edgeId = 'edge:conduct.analysis-no-primary-op';
+    const begun = tx.beginTransaction({
+      repoRoot,
+      operation: 'add',
+      scope: [MODULE_PATH, ANALYSIS_PATH],
+      base: 'HEAD',
+    });
+    appendDisabledEdge(begun.workspace, edgeId);
+    refreshMasterCandidateAnalysis(repoRoot, begun.workspace);
+    writeDraft(begun.workspace, {
+      op: 'add',
+      entities: [edgeId],
+      rationale: 'fixture will remove the causal primary operation',
+    });
+    const draftPath = path.join(begun.workspace, 'change.draft.json');
+    const draft = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
+    draft.operations[0].entities = ['edge:conduct.unmaterialized-primary'];
+    fs.writeFileSync(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
+
+    const validated = tx.validateTransaction({ repoRoot, workspace: begun.workspace });
+    assert.equal(validated.exitCode, 4);
+    assert.ok(
+      validated.diagnostics.some(
+        (item) =>
+          item.code === 'SKG-CHANGE-UNEXPLAINED-DIFF' &&
+          item.witness?.delta?.id === 'analysis:candidate.master-orchestrator-guide',
+      ),
+      JSON.stringify(validated.diagnostics?.slice(0, 8)),
+    );
+  });
+});
+
 test('CODEX-A-product: parallel typed edges keep distinct edge-id markers in snapshot', async () => {
   const tx = await import(transactionModule);
   await withIsolatedSkillKnowledgeRepo(async ({ repoRoot }) => {
@@ -460,7 +665,7 @@ test('CODEX-A-product: parallel typed edges keep distinct edge-id markers in sna
     const begun = tx.beginTransaction({
       repoRoot,
       operation: 'add',
-      scope: [MODULE_PATH],
+      scope: [MODULE_PATH, ANALYSIS_PATH],
       base: 'HEAD',
     });
     const modulePath = path.join(begun.workspace, 'candidate', MODULE_PATH);
@@ -478,6 +683,7 @@ test('CODEX-A-product: parallel typed edges keep distinct edge-id markers in sna
       runtime: { enabled_by_default: true },
     });
     fs.writeFileSync(modulePath, `${JSON.stringify(document, null, 2)}\n`);
+    refreshMasterCandidateAnalysis(repoRoot, begun.workspace);
     writeDraft(begun.workspace, {
       op: 'add',
       entities: [dupId],
@@ -761,7 +967,7 @@ test('CODEX-B: standalone change validator enforces mode+ok snapshot branches', 
     base_graph_sha256: hash,
     scope: [
       {
-        path: 'plugin/src/knowledge/skills/master-orchestrator-guide/modules/conduct.never-play.json',
+        path: 'plugin/src/knowledge/graph/modules/conduct.never-play.json',
         sha256: hash,
       },
     ],

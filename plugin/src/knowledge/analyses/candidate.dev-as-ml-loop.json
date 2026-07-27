@@ -6,16 +6,18 @@
   "composition_id": "composition:skill.dev-as-ml-loop",
   "candidate_modules": [
     "module:devloop.core",
-    "module:devloop.outer",
-    "module:devloop.ledger"
+    "module:devloop.ledger",
+    "module:devloop.outer"
   ],
   "scoresheet": {
     "D1": {
       "score": 1,
+      "audience_plane": "runtime-user",
       "evidence": "受众是装插件后替用户执行开发任务的 runtime agent（用户面），落 plugin/src/skills/。"
     },
     "D2": {
       "score": 1,
+      "bounded_context": "把一个已切好的开发任务优化到可测验收",
       "evidence": "单一职责：把已切好的任务建成可测优化循环（objective/iterate/plateau→restart）；不跨切 DAG 或工程手艺内容。"
     },
     "D3": {
@@ -104,13 +106,13 @@
         ],
         "utf8_bytes": 24026,
         "estimated_lines": 290,
-        "policy_max_lines": 2000,
-        "policy_max_utf8_bytes": 65536,
+        "policy_max_lines": 8192,
+        "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
         "estimated_tokens": 8009,
-        "policy_max_tokens": 20000,
+        "policy_max_tokens": 131072,
         "within_token_budget": true
       }
     },

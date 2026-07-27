@@ -580,8 +580,16 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
       composition_id: compositionId,
       candidate_modules: ['module:devloop.core'],
       scoresheet: {
-        D1: { score: 1, evidence: 'user-plane shared consumer' },
-        D2: { score: 1, evidence: 'single job slice over shared SSOT' },
+        D1: {
+          score: 1,
+          audience_plane: 'runtime-user',
+          evidence: 'user-plane shared consumer',
+        },
+        D2: {
+          score: 1,
+          bounded_context: 'single shared-SSOT consumer job',
+          evidence: 'single job slice over shared SSOT',
+        },
         D3: {
           probe_a: 'strong',
           probe_b: 'strong',
@@ -772,6 +780,34 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
     assert.ok(Array.isArray(core.consumers));
     assert.ok(core.consumers.includes('skill:shared-a'));
     assert.ok(core.consumers.includes('skill:shared-b'));
+    assert.deepEqual(core.consumers, ['skill:shared-a', 'skill:shared-b']);
+    for (const pointId of ['point:shared.a', 'point:shared.b']) {
+      const placements = built.graph.points.filter((point) => point.id === pointId);
+      assert.equal(placements.length, 1, `${pointId} must have one global placement`);
+      assert.equal(placements[0].module_id, 'module:devloop.core');
+      assert.equal(placements[0].authority.role, 'canonical');
+      const sameSubjectCanonicals = built.graph.points.filter(
+        (point) =>
+          point.authority?.role === 'canonical' &&
+          point.authority.subject === placements[0].authority.subject,
+      );
+      assert.equal(
+        sameSubjectCanonicals.length,
+        1,
+        `${pointId} authority must remain globally unique`,
+      );
+    }
+    const { runExplain } = await import('../../scripts/skill-knowledge/query.mjs');
+    const explained = runExplain({
+      repoRoot: tmp,
+      source: 'plugin/src/knowledge',
+      target: 'module:devloop.core',
+    });
+    assert.equal(explained.exitCode, 0, JSON.stringify(explained.body.diagnostics));
+    assert.deepEqual(explained.body.entity.witness.consumers, [
+      'skill:shared-a',
+      'skill:shared-b',
+    ]);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -975,8 +1011,16 @@ test('SKG-K3-00-R09: ownerless module+composition+analysis typed change begin/va
       composition_id: 'composition:skill.demo',
       candidate_modules: ['module:demo.core'],
       scoresheet: {
-        D1: { score: 1, evidence: 'user plane demo' },
-        D2: { score: 1, evidence: 'single job' },
+        D1: {
+          score: 1,
+          audience_plane: 'runtime-user',
+          evidence: 'user plane demo',
+        },
+        D2: {
+          score: 1,
+          bounded_context: 'single demo runtime job',
+          evidence: 'single job',
+        },
         D3: {
           probe_a: 'strong',
           probe_b: 'strong',
@@ -1032,7 +1076,9 @@ test('SKG-K3-00-R09: ownerless module+composition+analysis typed change begin/va
       admitted.graph.compositions.some((item) => item.id === 'composition:skill.demo'),
     );
     assert.ok(
-      admitted.graph.analyses.some((item) => item.id === 'analysis:candidate.demo'),
+      admitted.graph.candidate_analyses.some(
+        (item) => item.id === 'analysis:candidate.demo',
+      ),
     );
     const projected = admitted.graph.skills.find((s) => s.id === 'skill:demo');
     assert.ok(projected, 'admitted composition must project skill:demo');

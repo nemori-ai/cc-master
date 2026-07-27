@@ -1,0 +1,221 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "candidate_analysis",
+  "id": "analysis:candidate.slicing-goals-into-dags",
+  "skill_id": "skill:slicing-goals-into-dags",
+  "composition_id": "composition:skill.slicing-goals-into-dags",
+  "candidate_modules": [
+    "module:slicing.craft",
+    "module:slicing.example",
+    "module:slicing.vertical"
+  ],
+  "scoresheet": {
+    "D1": {
+      "score": 1,
+      "audience_plane": "runtime-user",
+      "evidence": "受众是需要在实现或排期前切分目标的 runtime agent；它直接塑造用户目标的交付增量。"
+    },
+    "D2": {
+      "score": 1,
+      "bounded_context": "把一个目标切成可验收、可并行、能尽早交付价值的 board DAG",
+      "evidence": "单一 bounded context：把一个目标切成可验收、可并行、能尽早交付价值的 board DAG；不吸收相邻 runtime skill 的认知职责。"
+    },
+    "D3": {
+      "probe_a": "weak",
+      "probe_b": "strong",
+      "evidence": "Probe A 弱：纵切、walking skeleton 与依赖 DAG 是可从通用敏捷资料获得的方法；Probe B 强：本资产持续覆写 agent 按技术层横切、先造全套基础设施或把任务切得不可独立验收的默认倾向。",
+      "evidence_refs": [
+        "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md"
+      ]
+    }
+  },
+  "graph_metrics": {
+    "module_count": 3,
+    "point_count": 8,
+    "internal_edge_count": 16,
+    "external_edge_count": 0
+  },
+  "verdict": "admit",
+  "witness": {
+    "reason": "D1=1 ∧ D2=1 ∧ (Probe A ∨ Probe B strong)，且实时图指标、预算与四 host portability 闸全部通过。",
+    "composition_id": "composition:skill.slicing-goals-into-dags",
+    "candidate_modules": [
+      "module:slicing.craft",
+      "module:slicing.example",
+      "module:slicing.vertical"
+    ],
+    "candidate_points": [
+      "point:slicing.antipatterns",
+      "point:slicing.board-landing",
+      "point:slicing.example-contrast",
+      "point:slicing.grain",
+      "point:slicing.value-risk",
+      "point:slicing.vertical-rule",
+      "point:slicing.walking-skeleton",
+      "point:slicing.why-cut"
+    ],
+    "trigger_job_coherence": true,
+    "internal_cohesion": 2,
+    "external_cut_coupling": 0,
+    "overlap_signature": {},
+    "ssot_closure": true,
+    "budgets": {
+      "hop": {
+        "observed": {
+          "protocol": "directed_projection_topology",
+          "projected_ok": true,
+          "projected_scc_count": 1,
+          "projected_directed_diameter": 3,
+          "undirected_entry_distance_max": 1,
+          "directed_diameter": 3,
+          "directed_unreachable_pair_count": 0,
+          "undirected_unreachable_count": 0
+        },
+        "policy": {
+          "point_diameter_max": 3,
+          "entry_discovery_max": 3,
+          "critical_any_point_to_primary_max": 2
+        }
+      },
+      "read": {
+        "inventory_files": 2,
+        "missing_files": [],
+        "files": [
+          {
+            "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+            "utf8_bytes": 12867,
+            "lines": 126,
+            "estimated_tokens": 4289
+          },
+          {
+            "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
+            "utf8_bytes": 3246,
+            "lines": 64,
+            "estimated_tokens": 1082
+          }
+        ],
+        "utf8_bytes": 16113,
+        "estimated_lines": 190,
+        "policy_max_lines": 8192,
+        "policy_max_utf8_bytes": 524288,
+        "within_read_budget": true
+      },
+      "token": {
+        "estimated_tokens": 5371,
+        "policy_max_tokens": 131072,
+        "within_token_budget": true
+      }
+    },
+    "host_portability": {
+      "claude-code": "full",
+      "codex": "full",
+      "cursor": "full",
+      "kimi-code": "full"
+    },
+    "hop": {
+      "protocol": "directed_projection_topology",
+      "entry_roots": [
+        "point:slicing.vertical-rule",
+        "point:slicing.walking-skeleton"
+      ],
+      "authored_directed_diameter": 6,
+      "authored_directed_unreachable_pair_count": 0,
+      "authored_directed_unreachable_sample": [],
+      "projected_scc_count": 1,
+      "projected_directed_diameter": 3,
+      "projected_hosts": {
+        "claude-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "codex": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "cursor": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "kimi-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        }
+      },
+      "projected_ok": true,
+      "undirected_entry_distance_max": 1,
+      "undirected_unreachable_from_entry_primary": [],
+      "directed_diameter": 3,
+      "directed_unreachable_pair_count": 0,
+      "directed_unreachable_sample": [],
+      "policy": {
+        "point_diameter_max": 3,
+        "entry_discovery_max": 3,
+        "critical_any_point_to_primary_max": 2
+      }
+    },
+    "graph_metrics": {
+      "module_count": 3,
+      "point_count": 8,
+      "internal_edge_count": 16,
+      "external_edge_count": 0
+    },
+    "admission_gates": {
+      "ok": true,
+      "module_count_matches_candidate": true,
+      "point_count_positive": true,
+      "trigger_job_coherence": true,
+      "ssot_closure": true,
+      "internal_cohesion": true,
+      "external_cut": true,
+      "overlap_within_budget": true,
+      "hop": true,
+      "read_budget": true,
+      "token_budget": true,
+      "four_host_denominator": true,
+      "host_portability": true
+    }
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md"
+      },
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "golden.analysis.slicing-goals-into-dags"
+      }
+    ]
+  }
+}

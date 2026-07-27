@@ -22,29 +22,20 @@ const SKILLS = [
   'distilling-lessons-into-assets',
 ];
 
-/** Graph-first K3-00 pilot — product view is a composition, not a skill shard. */
-const COMPOSITION_SKILLS = new Set(['dev-as-ml-loop']);
-
 function skillProductRel(skill) {
-  if (COMPOSITION_SKILLS.has(skill)) {
-    return `plugin/src/knowledge/compositions/skill.${skill}.json`;
-  }
-  return `plugin/src/knowledge/skills/${skill}/skill.json`;
+  return `plugin/src/knowledge/compositions/skill.${skill}.json`;
 }
 
-/** Normalize skill shard or composition into a skill-shaped product view. */
+/** Normalize the authored composition into the projected skill-shaped product view. */
 function readSkillProductView(skill) {
   const doc = readJson(skillProductRel(skill));
-  if (doc.kind === 'composition') {
-    return {
-      ...doc,
-      kind: 'skill',
-      id: doc.skill_id,
-      modules: doc.consumes?.modules ?? [],
-      _composition_id: doc.id,
-    };
-  }
-  return doc;
+  return {
+    ...doc,
+    kind: 'skill',
+    id: doc.skill_id,
+    modules: doc.consumes?.modules ?? [],
+    _composition_id: doc.id,
+  };
 }
 
 function pointsConsumedBySkill(builtGraph, skillId) {
@@ -115,16 +106,6 @@ function writeJson(abs, value) {
   fs.writeFileSync(abs, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function copyTree(from, to) {
-  fs.mkdirSync(to, { recursive: true });
-  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    const src = path.join(from, entry.name);
-    const dest = path.join(to, entry.name);
-    if (entry.isDirectory()) copyTree(src, dest);
-    else fs.copyFileSync(src, dest);
-  }
-}
-
 /** Match loader displayPath: in-repo → relative posix; outside → absolute. */
 function displayRepoPath(target) {
   const relative = path.relative(repoRoot, target);
@@ -143,54 +124,35 @@ function buildClosedSetSource() {
   const entries = [];
 
   for (const skill of SKILLS) {
-    if (COMPOSITION_SKILLS.has(skill)) {
-      const compositionFrom = path.join(
-        repoRoot,
-        'plugin/src/knowledge/compositions',
-        `skill.${skill}.json`,
-      );
-      const compositionTo = path.join(sourceRoot, 'compositions', `skill.${skill}.json`);
-      fs.mkdirSync(path.dirname(compositionTo), { recursive: true });
-      const compositionDoc = JSON.parse(fs.readFileSync(compositionFrom, 'utf8'));
-      for (const ref of compositionDoc.consumes?.modules ?? []) {
-        const moduleName = path.basename(ref.manifest);
-        const moduleFrom = path.join(repoRoot, ref.manifest);
-        const moduleTo = path.join(sourceRoot, 'graph', 'modules', moduleName);
-        fs.mkdirSync(path.dirname(moduleTo), { recursive: true });
-        fs.copyFileSync(moduleFrom, moduleTo);
-        ref.manifest = displayRepoPath(moduleTo);
-      }
-      const analysisFrom = path.join(
-        repoRoot,
-        'plugin/src/knowledge/analyses',
-        `candidate.${skill}.json`,
-      );
-      const analysisTo = path.join(sourceRoot, 'analyses', `candidate.${skill}.json`);
-      fs.mkdirSync(path.dirname(analysisTo), { recursive: true });
-      fs.copyFileSync(analysisFrom, analysisTo);
-      writeJson(compositionTo, compositionDoc);
-      skillRefs.push({
-        id: `skill:${skill}`,
-        manifest: displayRepoPath(compositionTo),
-      });
-    } else {
-      const from = path.join(repoRoot, 'plugin/src/knowledge/skills', skill);
-      const to = path.join(sourceRoot, 'skills', skill);
-      copyTree(from, to);
-
-      // Rewrite module manifests to loader-visible paths (absolute when outside repo).
-      const skillDoc = JSON.parse(fs.readFileSync(path.join(to, 'skill.json'), 'utf8'));
-      for (const ref of skillDoc.modules) {
-        const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-        ref.manifest = displayRepoPath(path.join(sourceRoot, suffix));
-      }
-      writeJson(path.join(to, 'skill.json'), skillDoc);
-
-      skillRefs.push({
-        id: `skill:${skill}`,
-        manifest: displayRepoPath(path.join(to, 'skill.json')),
-      });
+    const compositionFrom = path.join(
+      repoRoot,
+      'plugin/src/knowledge/compositions',
+      `skill.${skill}.json`,
+    );
+    const compositionTo = path.join(sourceRoot, 'compositions', `skill.${skill}.json`);
+    fs.mkdirSync(path.dirname(compositionTo), { recursive: true });
+    const compositionDoc = JSON.parse(fs.readFileSync(compositionFrom, 'utf8'));
+    for (const ref of compositionDoc.consumes?.modules ?? []) {
+      const moduleName = path.basename(ref.manifest);
+      const moduleFrom = path.join(repoRoot, ref.manifest);
+      const moduleTo = path.join(sourceRoot, 'graph', 'modules', moduleName);
+      fs.mkdirSync(path.dirname(moduleTo), { recursive: true });
+      fs.copyFileSync(moduleFrom, moduleTo);
+      ref.manifest = displayRepoPath(moduleTo);
     }
+    const analysisFrom = path.join(
+      repoRoot,
+      'plugin/src/knowledge/analyses',
+      `candidate.${skill}.json`,
+    );
+    const analysisTo = path.join(sourceRoot, 'analyses', `candidate.${skill}.json`);
+    fs.mkdirSync(path.dirname(analysisTo), { recursive: true });
+    fs.copyFileSync(analysisFrom, analysisTo);
+    writeJson(compositionTo, compositionDoc);
+    skillRefs.push({
+      id: `skill:${skill}`,
+      manifest: displayRepoPath(compositionTo),
+    });
 
     const entry = ENTRY_BY_SKILL[skill];
     const hosts = ['claude-code', 'codex', 'cursor', 'kimi-code'];

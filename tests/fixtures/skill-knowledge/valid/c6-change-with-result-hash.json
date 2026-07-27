@@ -8,7 +8,7 @@
   "parent_change": null,
   "scope": [
     {
-      "path": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json",
+      "path": "plugin/src/knowledge/graph/modules/verification.endpoint.json",
       "before_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "after_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
     },

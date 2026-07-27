@@ -1,9 +1,9 @@
 # Skill knowledge source root
 
-> Status: **K2 — eight runtime skills / full portfolio inventory + K3-00 graph-first walking skeleton (`dev-as-ml-loop`)**
+> Status: **K3 — eight runtime skills fully migrated to graph-first compositions**
 >
 > This directory is an authored maintainer source root, not runtime prose. Inventory claims
-> must match `portfolio.json` + per-skill shards / compositions; do not cite the old three-module pilot as live truth.
+> must match `portfolio.json` + global modules + accepted compositions/analyses.
 
 Source layout:
 
@@ -12,20 +12,13 @@ plugin/src/knowledge/
 ├── CONTRACT.md
 ├── portfolio.json
 ├── graph/modules/          # global modules (graph-first; not nested under skill)
-├── compositions/           # admitted skill product views (K3-00 pilot)
+├── compositions/           # eight admitted skill product views
 ├── analyses/               # candidate analysis + scoresheet/witness
-└── skills/                 # transitional skill shards (7 remaining until K3-01A)
-    ├── master-orchestrator-guide/
-    ├── authoring-workflows/
-    ├── engineering-with-craft/
-    ├── using-ccm/
-    ├── slicing-goals-into-dags/
-    ├── pacing-and-estimation/
-    └── distilling-lessons-into-assets/
+└── changes/                # immutable typed-change ledger
 ```
 
-K2 admits **all eight** runtime skills under `portfolio.skills` (seven transitional shards + one
-`composition` for `dev-as-ml-loop`), with module/point shards bound to real canonical Markdown
+K3 admits **all eight** runtime skills under `portfolio.skills` as `composition` artifacts, with
+46 global modules / 249 points / 404 authored typed edges bound to real canonical Markdown
 markers. JSON holds identity / authority / routing / inventory metadata only — exact HOW remains
 in Markdown spans (no second SSOT). Host honesty stays in each skill's `host_coverage` (including
 workflow stubs and using-ccm / master-orchestrator partial hosts).
@@ -45,14 +38,23 @@ node scripts/skill-knowledge.mjs path --from <id> --to <id> --host claude-code -
 node scripts/skill-knowledge.mjs explain <id-or-code> --json
 ```
 
-K3-00 walking skeleton: `dev-as-ml-loop` is graph-first — global modules under
-`graph/modules/`, admitted via `analyses/` + `compositions/` (`consumes.modules` locator SSOT),
-materialized with `materialize` only when lifecycle=accepted and derived verdict=admit.
-`--analysis-override` is forbidden. Other skills remain transitional skill-first until K3-01A.
+All runtime skills are graph-first: global modules live only under `graph/modules/`, and skill
+product views are admitted via `analyses/` + `compositions/` (`consumes.modules` locator SSOT).
+`materialize` accepts only lifecycle=accepted and derived verdict=admit; `--analysis-override`
+is forbidden. There is no legacy skill-manifest or `owner_skill` compatibility path.
 `plugin/src/knowledge` is repo-only authored/meta; `plugin/dist/<host>/knowledge` is generated
 atlas/router only. Candidate analysis persists derived `graph_metrics` + metric witness (must
 match recompute); admission gates use portfolio `candidate_admission` + hop_policy (not echoed
 host_coverage declarations). Package hardening is deferred to K3-01P.
+
+The candidate read/token limits are **composition-closure** limits, not an eager-read claim.
+They are fixed powers-of-two safety envelopes, deliberately independent of the current candidate
+maxima: 512 KiB bounds raw bytes read/hashed for one composition; 8192 lines independently bounds
+fragmented review/navigation surface; 131072 estimated tokens bounds dense semantic volume. All
+three apply, so no encoding/layout trick can evade the other dimensions. `min_internal_cohesion=0.1`
+is likewise structural rather than inventory-fitted: it requires at least one authored typed
+relation per ten points while still allowing intentionally sparse orchestration/reference modules.
+Boundary tests lower each cap to one unit below a live witness and require fail-closed.
 
 Implemented capabilities (see `contract --json`): schema validation, markdown binding, canonical
 source inventory attestation, derived authority freshness, graph invariants, entry-surface
@@ -77,7 +79,7 @@ capability=`true`。但 `check --host` CLI 集成尚未接通，带 `--host`/`--
 并只把真实可解析相对 link/anchor 计为 runtime 边；H1–H4 与 budget 带 witness/remediation。
 
 Typed change transaction 已交付：`change begin → validate → apply` 在 ignored candidate
-workspace 冻结 scope/base/hash、验证九类 closed operation，并在 rollback-safe atomic publication
+workspace 冻结 scope/base/hash、验证八类 closed operation，并在 rollback-safe atomic publication
 后追加 immutable ledger；`typed_change_transactions=true`。
 
 Still declared-unavailable (exit 10): `check --host|--base`, `report --host`.

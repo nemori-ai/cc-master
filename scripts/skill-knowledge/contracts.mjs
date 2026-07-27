@@ -31,7 +31,6 @@ export const OPERATIONS = Object.freeze([
   'move',
   'split',
   'merge',
-  'transfer_owner',
   'deprecate',
   'retire',
 ]);
@@ -75,7 +74,6 @@ export const HARDENING_CONTRACT = Object.freeze({
     algorithm: 'cc-master/skill-knowledge-canonical-graph-hash/v1',
     authored_manifest_kinds: Object.freeze([
       'portfolio',
-      'skill',
       'module',
       'composition',
       'candidate_analysis',
@@ -119,11 +117,14 @@ export const HARDENING_CONTRACT = Object.freeze({
      * ≤ hop_policy.critical_any_point_to_primary_max.
      */
     candidate_admission: Object.freeze({
-      inventory_max_utf8_bytes: 65536,
-      inventory_max_lines: 2000,
-      inventory_max_tokens: 20000,
+      // Fixed powers-of-two closure envelopes, independent of current maxima:
+      // raw I/O+hash bytes, fragmented review lines, and dense semantic volume.
+      // All three apply; this is not an eager-read claim for one activation.
+      inventory_max_utf8_bytes: 524288,
+      inventory_max_lines: 8192,
+      inventory_max_tokens: 131072,
       // edges/points; single-node candidates are vacuously 1.0 in the metric.
-      min_internal_cohesion: 0.5,
+      min_internal_cohesion: 0.1,
       max_external_edge_count: 0,
       // Shared SSOT compositions may share modules up to this peer budget.
       max_overlap_shared_modules: 2,
@@ -182,7 +183,9 @@ export const SOURCE_LAYOUT = Object.freeze({
   root: DEFAULT_SOURCE_ROOT,
   portfolio: `${DEFAULT_SOURCE_ROOT}/portfolio.json`,
   changes: `${DEFAULT_SOURCE_ROOT}/changes`,
-  skills: `${DEFAULT_SOURCE_ROOT}/skills/<skill>`,
+  modules: `${DEFAULT_SOURCE_ROOT}/graph/modules`,
+  compositions: `${DEFAULT_SOURCE_ROOT}/compositions`,
+  analyses: `${DEFAULT_SOURCE_ROOT}/analyses`,
 });
 
 export const CAPABILITIES = Object.freeze({

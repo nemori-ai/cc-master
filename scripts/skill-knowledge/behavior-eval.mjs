@@ -314,25 +314,16 @@ function conservativeVerdict(conditions) {
 }
 
 export function resolveAcceptedCompositionOwner(graph, { pointId, moduleId }) {
-  const acceptedModuleConsumers = graph.skills.filter(
+  const compositionConsumers = graph.skills.filter(
     (skill) =>
+      skill._from_composition === true &&
       skill.lifecycle?.state === 'accepted' &&
       skill.modules?.some((module) => module.id === moduleId),
   );
-  // During incremental migration, an accepted composition is authoritative as
-  // soon as it consumes the module, even when its inventory accidentally omits
-  // the point. That omission must fail structurally rather than falling back to
-  // a legacy view. Markdown paths are never an ownership oracle.
-  const compositionConsumers = acceptedModuleConsumers.filter(
-    (skill) => skill._from_composition === true,
-  );
-  const authoritativeConsumers =
-    compositionConsumers.length > 0
-      ? compositionConsumers
-      : acceptedModuleConsumers.filter(
-          (skill) => skill._from_composition !== true,
-        );
-  const owners = authoritativeConsumers
+  // Accepted compositions are the only placement authority. An inventory
+  // omission fails closed; Markdown paths and compatibility views never infer
+  // membership or provide a fallback.
+  const owners = compositionConsumers
     .filter((skill) =>
       skill.canonical_source_inventory?.some((entry) =>
         entry.point_ids?.includes(pointId),
@@ -340,10 +331,8 @@ export function resolveAcceptedCompositionOwner(graph, { pointId, moduleId }) {
     )
     .map((skill) => skill.id);
   if (owners.length !== 1) {
-    const authority =
-      compositionConsumers.length > 0 ? 'accepted composition' : 'legacy';
     throw new Error(
-      `Behavior ground truth requires exactly one ${authority} placement for ${pointId} in ${moduleId}; found ${owners.length}: ${owners.join(', ') || '<none>'}.`,
+      `Behavior ground truth requires exactly one accepted composition placement for ${pointId} in ${moduleId}; found ${owners.length}: ${owners.join(', ') || '<none>'}.`,
     );
   }
   return owners[0];

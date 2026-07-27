@@ -20,8 +20,9 @@ import { buildAndValidateGraph } from '../../scripts/skill-knowledge/graph.mjs';
 
 const PRODUCT_HOSTS = Object.freeze(['claude-code', 'codex', 'cursor', 'kimi-code']);
 const MODULE_PATH =
-  'plugin/src/knowledge/skills/master-orchestrator-guide/modules/conduct.never-play.json';
-const SKILL_PATH = 'plugin/src/knowledge/skills/master-orchestrator-guide/skill.json';
+  'plugin/src/knowledge/graph/modules/conduct.never-play.json';
+const COMPOSITION_PATH =
+  'plugin/src/knowledge/compositions/skill.master-orchestrator-guide.json';
 const ENTRY_PATH = 'plugin/src/commands/as-master-orchestrator/adapters/claude-code/body.md';
 const LEDGER_DIR = 'plugin/src/knowledge/changes';
 const transactionModule = '../../scripts/skill-knowledge/transactions.mjs';
@@ -160,43 +161,34 @@ function editCandidateProjectionBreak(workspace) {
 }
 
 function setHostCoverage(workspace, coverageRows) {
-  const skillPath = path.join(workspace, 'candidate', SKILL_PATH);
-  const document = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
+  const compositionPath = path.join(workspace, 'candidate', COMPOSITION_PATH);
+  const document = JSON.parse(fs.readFileSync(compositionPath, 'utf8'));
   document.host_coverage = coverageRows;
-  fs.writeFileSync(skillPath, `${JSON.stringify(document, null, 2)}\n`);
+  fs.writeFileSync(compositionPath, `${JSON.stringify(document, null, 2)}\n`);
 }
 
 /**
  * Planner aggregates host_coverage across the whole portfolio. Stubbing one
  * skill while peers stay full yields overall `partial`, not `stub`. Apply the
- * same coverage rows to every skill shard + the admitted composition.
+ * same coverage rows to every accepted composition.
  * When composition coverage changes, keep analysis.witness.host_portability
  * lockstep so graph admission does not reject the composition on a forged mismatch.
  */
 function setAllPortfolioHostCoverage(repoRoot, coverageRows) {
-  const skillsRoot = path.join(repoRoot, 'plugin/src/knowledge/skills');
-  for (const name of fs.readdirSync(skillsRoot).sort()) {
-    const skillPath = path.join(skillsRoot, name, 'skill.json');
-    if (!fs.existsSync(skillPath)) continue;
-    const document = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-    document.host_coverage = coverageRows.map((row) => ({ ...row }));
-    fs.writeFileSync(skillPath, `${JSON.stringify(document, null, 2)}\n`);
-  }
-  const compositionPath = path.join(
-    repoRoot,
-    'plugin/src/knowledge/compositions/skill.dev-as-ml-loop.json',
-  );
-  if (fs.existsSync(compositionPath)) {
+  const compositionsRoot = path.join(repoRoot, 'plugin/src/knowledge/compositions');
+  const byHost = Object.fromEntries(coverageRows.map((row) => [row.host, row.state]));
+  for (const name of fs.readdirSync(compositionsRoot).sort()) {
+    if (!name.endsWith('.json')) continue;
+    const compositionPath = path.join(compositionsRoot, name);
     const document = JSON.parse(fs.readFileSync(compositionPath, 'utf8'));
     document.host_coverage = coverageRows.map((row) => ({ ...row }));
     fs.writeFileSync(compositionPath, `${JSON.stringify(document, null, 2)}\n`);
-  }
-  const byHost = Object.fromEntries(coverageRows.map((row) => [row.host, row.state]));
-  const analysisPath = path.join(
-    repoRoot,
-    'plugin/src/knowledge/analyses/candidate.dev-as-ml-loop.json',
-  );
-  if (fs.existsSync(analysisPath) && Object.keys(byHost).length > 0) {
+    const skillName = document.skill_id.replace(/^skill:/, '');
+    const analysisPath = path.join(
+      repoRoot,
+      'plugin/src/knowledge/analyses',
+      `candidate.${skillName}.json`,
+    );
     const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
     if (analysis.witness?.host_portability) {
       analysis.witness.host_portability = {
@@ -515,7 +507,7 @@ test('SKG-TX-RUNTIME-04: all-stub does not cleanup unknown/outside runtime symli
     const begun = tx.beginTransaction({
       repoRoot,
       operation: 'refine',
-      scope: [MODULE_PATH, SKILL_PATH],
+      scope: [MODULE_PATH, COMPOSITION_PATH],
       base: 'HEAD',
     });
     assert.equal(begun.exitCode, 0, JSON.stringify(begun.diagnostics));
@@ -635,7 +627,7 @@ test('SKG-TX-RUNTIME-06: mixed full/partial/stub four-host E2E excludes a real m
     // covered point bindings (routing.worker-chain → own references only).
     const excluded = 'module:routing.worker-chain';
     const covered = dropModuleFromPartialCoverage(repoRoot, {
-      skillPath: SKILL_PATH,
+      skillPath: COMPOSITION_PATH,
       host: 'codex',
       excludedModule: excluded,
       reason:

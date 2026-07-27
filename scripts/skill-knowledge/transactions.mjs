@@ -32,7 +32,6 @@ const WORKSPACE_ROOT = '.skill-knowledge/workspaces';
 const ZERO_HASH = '0'.repeat(64);
 const SOURCE_KINDS = new Set([
   'portfolio',
-  'skill',
   'module',
   'composition',
   'candidate_analysis',
@@ -133,6 +132,21 @@ function acceptedOrCandidatePath(repoRoot, workspace, scopeSet, relative) {
   return path.join(repoRoot, relative);
 }
 
+function expectedAuthoredPath(sourceRoot, document) {
+  const prefix = normalized(sourceRoot).replace(/\/+$/, '');
+  if (document?.kind === 'portfolio') return `${prefix}/portfolio.json`;
+  if (document?.kind === 'module') {
+    return `${prefix}/graph/modules/${document.id?.replace(/^module:/, '')}.json`;
+  }
+  if (document?.kind === 'composition') {
+    return `${prefix}/compositions/skill.${document.skill_id?.replace(/^skill:/, '')}.json`;
+  }
+  if (document?.kind === 'candidate_analysis') {
+    return `${prefix}/analyses/candidate.${document.skill_id?.replace(/^skill:/, '')}.json`;
+  }
+  return null;
+}
+
 function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scope = [] }) {
   const diagnostics = [];
   const sourceAbsolute = path.resolve(repoRoot, sourceRoot);
@@ -150,6 +164,23 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
     const data = readJson(file, diagnostics);
     if (!data) continue;
     if (!SOURCE_KINDS.has(data.kind) && data.kind !== 'change') continue;
+    const expectedPath = expectedAuthoredPath(sourceRoot, data);
+    const layoutOk =
+      relative === expectedPath ||
+      (data.kind === 'change' &&
+        relative.startsWith(`${normalized(sourceRoot).replace(/\/+$/, '')}/changes/`));
+    if (!layoutOk) {
+      diagnostics.push(
+        txDiagnostic(
+          'SKG-SOURCE-LAYOUT',
+          'Transaction source is outside the graph-only authored layout.',
+          relative,
+          { kind: data.kind, actual: relative, expected: expectedPath },
+          'Move the authored shard to graph/modules, compositions, analyses, or changes before transacting.',
+          EXIT_CODES.source_contract,
+        ),
+      );
+    }
     if (data.kind !== 'change' && validatorsAvailable()) {
       const validation = validateAuthoredDocument(data, 'source');
       if (!validation.ok) diagnostics.push(txDiagnostic('SKG-SCHEMA-INVALID', 'Candidate manifest fails the committed source schema.', relative, { errors: validation.errors.slice(0, 8) }, 'Repair the candidate manifest against knowledge-source.schema.json.', EXIT_CODES.source_contract));
@@ -161,7 +192,6 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
 
   const manifests = documents.filter(({ data }) => SOURCE_KINDS.has(data.kind));
   const portfolio = manifests.find(({ data }) => data.kind === 'portfolio')?.data ?? null;
-  const skills = manifests.filter(({ data }) => data.kind === 'skill');
   const modules = manifests.filter(({ data }) => data.kind === 'module');
   const compositions = manifests.filter(({ data }) => data.kind === 'composition');
   const analyses = manifests.filter(({ data }) => data.kind === 'candidate_analysis');
@@ -182,19 +212,12 @@ function loadGraph({ repoRoot, sourceRoot = DEFAULT_SOURCE_ROOT, workspace, scop
     register(portfolio.id, { kind: 'portfolio', data: portfolio, path: manifests.find(({ data }) => data === portfolio)?.path });
     for (const entry of portfolio.entries ?? []) register(entry.id, { kind: 'entry', data: entry, path: 'portfolio.entries' });
   }
-  for (const item of skills) {
-    skillsById.set(item.data.id, item);
-    register(item.data.id, { kind: 'skill', ...item });
-  }
-  const productSkills = [...skills];
+  const productSkills = [];
   for (const item of compositions) {
     compositionsById.set(item.data.id, item);
     register(item.data.id, { kind: 'composition', ...item });
-    // Admitted product skill view: lifecycle-accepted compositions enter the same
-    // host-coverage / inventory / admission / runtime projection denominator as
-    // legacy skill manifests (skillsById alone is not enough).
+    // Accepted compositions are the only source of runtime skill product views.
     if (item.data.lifecycle?.state !== 'accepted') continue;
-    if (skillsById.has(item.data.skill_id)) continue;
     const projected = {
       path: item.path,
       data: {
@@ -293,28 +316,7 @@ function validateGraph(graph, repoRoot, workspace, scope) {
     if (entries.length > 1) diagnostics.push(txDiagnostic('SKG-ID-DUPLICATE', 'Knowledge identity is declared more than once.', entries[0].path, { id, locations: entries.map((item) => item.path) }, 'Keep exactly one declaration for each identity.'));
   }
   for (const module of graph.modules) {
-    const hasOwnerSkill = typeof module.data.owner_skill === 'string';
-    if (hasOwnerSkill) {
-      const owner = graph.skillsById.get(module.data.owner_skill);
-      const referenced = owner?.data.modules?.filter((ref) => ref.id === module.data.id) ?? [];
-      if (!owner || referenced.length !== 1) {
-        diagnostics.push(
-          txDiagnostic(
-            'SKG-MEMBERSHIP-INVALID',
-            'Legacy module must belong to exactly one declared owner skill.',
-            module.path,
-            {
-              module: module.data.id,
-              owner_skill: module.data.owner_skill,
-              references: referenced.length,
-            },
-            'Synchronize module.owner_skill with exactly one skill.modules entry.',
-          ),
-        );
-      }
-      continue;
-    }
-    // Graph-first ownerless module: must be consumed by at least one skill/composition view.
+    // Global modules are admitted only through one or more composition consumers.
     const consumers = [...graph.skillsById.values()].filter((skill) =>
       (skill.data.modules ?? []).some((ref) => ref.id === module.data.id),
     );
@@ -322,10 +324,10 @@ function validateGraph(graph, repoRoot, workspace, scope) {
       diagnostics.push(
         txDiagnostic(
           'SKG-MEMBERSHIP-INVALID',
-          'Ownerless module must be consumed by a composition or skill product view.',
+          'Global module must be consumed by an accepted composition.',
           module.path,
           { module: module.data.id, consumers: 0 },
-          'Add the module to composition.consumes.modules or a transitional skill.modules list.',
+          'Add the module locator to composition.consumes.modules.',
         ),
       );
     }
@@ -337,25 +339,10 @@ function validateGraph(graph, repoRoot, workspace, scope) {
         diagnostics.push(
           txDiagnostic(
             'SKG-MEMBERSHIP-INVALID',
-            'Skill/composition module reference does not resolve.',
+            'Composition module reference does not resolve.',
             skill.path,
             { skill: skill.data.id, module: reference.id },
-            'Repair modules/consumes locators.',
-          ),
-        );
-        continue;
-      }
-      if (
-        typeof module.data.owner_skill === 'string' &&
-        module.data.owner_skill !== skill.data.id
-      ) {
-        diagnostics.push(
-          txDiagnostic(
-            'SKG-MEMBERSHIP-INVALID',
-            'Skill module reference does not resolve to a module owned by the skill.',
-            skill.path,
-            { skill: skill.data.id, module: reference.id },
-            'Repair both skill.modules and module.owner_skill.',
+            'Repair composition.consumes.modules locators.',
           ),
         );
       }
@@ -456,8 +443,24 @@ function canonicalJson(value) {
 function semanticEntity(kind, data) {
   const clone = structuredClone(data);
   if (kind === 'portfolio') { delete clone.skills; delete clone.entries; }
-  if (kind === 'skill') delete clone.modules;
   if (kind === 'module') { delete clone.points; delete clone.edges; }
+  return clone;
+}
+
+// createCandidateAnalysisDocument owns these fields as a deterministic projection
+// of the live graph. They are not silently erased from the semantic snapshot:
+// a delta may be treated as a causal derived effect only by
+// candidateAnalysisDerivedEffectExplained(), and the candidate runtime must still
+// rebuild the overlaid repo and accept every persisted derived value as exact-stable.
+function authoredCandidateAnalysisSemantic(data) {
+  const clone = structuredClone(data);
+  delete clone.candidate_modules;
+  delete clone.graph_metrics;
+  delete clone.verdict;
+  clone.witness =
+    clone.witness && Object.hasOwn(clone.witness, 'reason')
+      ? { reason: clone.witness.reason }
+      : {};
   return clone;
 }
 
@@ -548,11 +551,6 @@ function operationExplainsDelta(operation, delta, base, candidate) {
     if (operation.op === 'merge' && subjectListed && lifecycleChange(delta, 'retired', undefined)) return true;
     if ((operation.op === 'split' && delta.id === operation.subject) || (operation.op === 'merge' && subjectListed)) return delta.category === 'span' && isRemoved;
   }
-  if (operation.op === 'transfer_owner') {
-    return delta.category === 'identity' && delta.kind === 'module' && delta.id === operation.subject
-      && delta.paths.every((item) => item === 'owner_skill')
-      && delta.before.owner_skill === operation.from_skill && delta.after.owner_skill === operation.to_skill;
-  }
   if (operation.op === 'deprecate' || operation.op === 'retire') {
     const state = operation.op === 'deprecate' ? 'deprecated' : 'retired';
     if (subjectListed && lifecycleChange(delta, state, operation.replacement)) return true;
@@ -561,11 +559,101 @@ function operationExplainsDelta(operation, delta, base, candidate) {
   return false;
 }
 
-function validateSemanticDiff(base, candidate, baseBindings, candidateBindings, operations) {
+function deltaModuleId(graph, delta) {
+  if (delta.kind === 'module') return delta.id;
+  if (delta.kind === 'point' || delta.category === 'span') {
+    return graph.points.get(delta.id)?.module?.data?.id ?? null;
+  }
+  if (delta.kind === 'edge') {
+    return graph.edges.get(delta.id)?.module?.data?.id ?? null;
+  }
+  return null;
+}
+
+function candidateAnalysisDerivedEffectExplained({
+  delta,
+  deltas,
+  base,
+  candidate,
+  operations,
+  scope,
+}) {
+  if (
+    delta.category !== 'identity' ||
+    delta.kind !== 'candidate_analysis' ||
+    !delta.before ||
+    !delta.after
+  ) {
+    return false;
+  }
+  if (
+    canonicalJson(authoredCandidateAnalysisSemantic(delta.before)) !==
+    canonicalJson(authoredCandidateAnalysisSemantic(delta.after))
+  ) {
+    return false;
+  }
+
+  const analysisEntry = candidate.identities.get(delta.id)?.[0];
+  const scopedPaths = new Set((scope ?? []).map((item) => item.path));
+  if (!analysisEntry?.path || !scopedPaths.has(analysisEntry.path)) return false;
+
+  const compositions = candidate.compositions.filter(
+    ({ data }) => data.analysis_ref === delta.id,
+  );
+  if (compositions.length !== 1) return false;
+  const composition = compositions[0].data;
+  if (
+    delta.after.composition_id !== composition.id ||
+    delta.after.skill_id !== composition.skill_id
+  ) {
+    return false;
+  }
+
+  const consumedModules = new Set(
+    (composition.consumes?.modules ?? []).map((item) =>
+      typeof item === 'string' ? item : item.id,
+    ),
+  );
+  const primaryDeltas = deltas.filter((item) => {
+    if (item.kind === 'candidate_analysis') return false;
+    if (item.kind === 'composition') return item.id === composition.id;
+    const moduleId = deltaModuleId(candidate, item) ?? deltaModuleId(base, item);
+    return moduleId !== null && consumedModules.has(moduleId);
+  });
+  return (
+    primaryDeltas.length > 0 &&
+    primaryDeltas.some((item) =>
+      (operations ?? []).some((operation) =>
+        operationExplainsDelta(operation, item, base, candidate),
+      ),
+    )
+  );
+}
+
+function validateSemanticDiff(
+  base,
+  candidate,
+  baseBindings,
+  candidateBindings,
+  operations,
+  scope,
+) {
   const diagnostics = [];
   const deltas = canonicalSemanticDiff(base, candidate, baseBindings, candidateBindings);
   for (const delta of deltas) {
     if ((operations ?? []).some((operation) => operationExplainsDelta(operation, delta, base, candidate))) continue;
+    if (
+      candidateAnalysisDerivedEffectExplained({
+        delta,
+        deltas,
+        base,
+        candidate,
+        operations,
+        scope,
+      })
+    ) {
+      continue;
+    }
     diagnostics.push(txDiagnostic('SKG-CHANGE-UNEXPLAINED-DIFF', 'Candidate graph contains a semantic delta not completely explained by a declared typed operation.', 'change.draft.json', {
       delta: { key: delta.key, category: delta.category, id: delta.id, kind: delta.kind, paths: delta.paths, before: delta.before, after: delta.after },
     }, 'Declare the matching typed operation and exact fields, or remove the unrelated candidate mutation.'));
@@ -577,7 +665,7 @@ function validateOperations(base, candidate, baseBindings, candidateBindings, op
   const diagnostics = [];
   for (const operation of operations ?? []) {
     if (!OPERATIONS.includes(operation.op)) {
-      diagnostics.push(txDiagnostic('SKG-CHANGE-OPERATION-UNKNOWN', 'Change draft contains an operation outside the closed operation set.', 'change.draft.json', { op: operation.op }, 'Use one of the nine declared typed operations.', EXIT_CODES.source_contract));
+      diagnostics.push(txDiagnostic('SKG-CHANGE-OPERATION-UNKNOWN', 'Change draft contains an operation outside the closed operation set.', 'change.draft.json', { op: operation.op }, 'Use one of the eight declared typed operations.', EXIT_CODES.source_contract));
       continue;
     }
     const baseHas = (id) => base.identities.has(id);
@@ -621,9 +709,6 @@ function validateOperations(base, candidate, baseBindings, candidateBindings, op
     } else if (operation.op === 'merge') {
       for (const id of operation.subjects ?? []) { requireBase(id); if (candidate.points.get(id)?.point.lifecycle?.state !== 'retired') diagnostics.push(txDiagnostic('SKG-CHANGE-PRECONDITION', 'merge subjects must be retired in the candidate graph.', 'change.draft.json', { id }, 'Retire each merged source identity.')); }
       if (baseHas(operation.result)) diagnostics.push(txDiagnostic('SKG-CHANGE-PRECONDITION', 'merge result must be a new identity.', 'change.draft.json', { result: operation.result }, 'Use a new result identity.')); requireCandidate(operation.result);
-    } else if (operation.op === 'transfer_owner') {
-      requireBase(operation.subject); requireCandidate(operation.subject);
-      if (base.modulesById.get(operation.subject)?.data.owner_skill !== operation.from_skill || candidate.modulesById.get(operation.subject)?.data.owner_skill !== operation.to_skill) diagnostics.push(txDiagnostic('SKG-CHANGE-PRECONDITION', 'transfer_owner must match base and candidate owner skills.', 'change.draft.json', { subject: operation.subject, from_skill: operation.from_skill, to_skill: operation.to_skill }, 'Synchronize module owner and both skills module membership.'));
     } else {
       for (const id of operation.subjects ?? []) {
         requireBase(id); requireCandidate(id);
@@ -661,7 +746,7 @@ function workspaceId(operation) {
 
 export function beginTransaction({ repoRoot, operation, scope, base, sourceRoot = DEFAULT_SOURCE_ROOT }) {
   const diagnostics = [];
-  if (!OPERATIONS.includes(operation)) diagnostics.push(txDiagnostic('SKG-USAGE', 'Unknown typed operation.', 'argv', { operation, allowed: [...OPERATIONS] }, 'Use one of the nine declared operations.', EXIT_CODES.usage));
+  if (!OPERATIONS.includes(operation)) diagnostics.push(txDiagnostic('SKG-USAGE', 'Unknown typed operation.', 'argv', { operation, allowed: [...OPERATIONS] }, 'Use one of the eight declared operations.', EXIT_CODES.usage));
   const baseRef = resolveBase(repoRoot, base);
   if (!baseRef) diagnostics.push(txDiagnostic('SKG-CHANGE-BASE-INVALID', 'Base ref does not resolve to a commit.', 'argv', { base }, 'Pass a resolvable Git commit or ref.', EXIT_CODES.usage));
   const normalizedScope = [...new Set(scope ?? [])].map((value) => safeScopePath(repoRoot, value));
@@ -836,7 +921,16 @@ export function validateTransaction({
   const candidateInvariant = validateGraph(candidate, repoRoot, workspace, metadata.scope);
   diagnostics.push(...candidateInvariant.diagnostics);
   diagnostics.push(...validateOperations(base, candidate, baseInvariant.bindings, candidateInvariant.bindings, draft.operations));
-  diagnostics.push(...validateSemanticDiff(base, candidate, baseInvariant.bindings, candidateInvariant.bindings, draft.operations));
+  diagnostics.push(
+    ...validateSemanticDiff(
+      base,
+      candidate,
+      baseInvariant.bindings,
+      candidateInvariant.bindings,
+      draft.operations,
+      metadata.scope,
+    ),
+  );
   const transitions = candidateTransitions(repoRoot, workspace, metadata.scope);
   const finalChange = { ...draft, parent_change: head ? { change_id: head.change_id, result_graph_sha256: head.result_graph_sha256 } : null, scope: transitions, result_graph_sha256: ZERO_HASH };
   const resultHash = graphHash(candidate, candidateInvariant.bindings, finalChange);

@@ -17,7 +17,12 @@ import {
   validatorsAvailable,
 } from './schema.mjs';
 
-  const SOURCE_KINDS = new Set(['portfolio', 'skill', 'module', 'composition', 'candidate_analysis']);
+const SOURCE_KINDS = new Set([
+  'portfolio',
+  'module',
+  'composition',
+  'candidate_analysis',
+]);
 const STAGES = new Set(['K0', 'K1', 'K2', 'K3']);
 const ID_PATTERNS = Object.freeze({
   portfolio: /^portfolio:[a-z0-9][a-z0-9.-]*$/,
@@ -182,7 +187,13 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
     );
   }
 
-  const counts = { portfolio: 0, skill: 0, module: 0, composition: 0, candidate_analysis: 0, change: 0 };
+  const counts = {
+    portfolio: 0,
+    module: 0,
+    composition: 0,
+    candidate_analysis: 0,
+    change: 0,
+  };
   const identities = new Map();
   let documents = 0;
   const files =
@@ -259,7 +270,7 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
         remediation:
           stage === 'K0'
             ? 'Start the admitted K1 pilot; do not create an empty portfolio that claims coverage.'
-            : 'Add an admitted portfolio/skill/module pilot before enforcing this rollout stage.',
+            : 'Add an admitted portfolio/composition/module graph before enforcing this rollout stage.',
         exitCode: stage === 'K0' ? 0 : 4,
       }),
     );
@@ -324,12 +335,11 @@ export function runCheck({ repoRoot, source = DEFAULT_SOURCE_ROOT, stage = 'K0' 
 
   const exitCode = selectExitCode(diagnostics);
   const publicDiagnostics = diagnostics.map(outputDiagnostic);
-  // summary.skill = skill product views (legacy skill shards + admitted compositions).
-  // composition / candidate_analysis remain separate authored-kind counters.
+  // summary.skill is the composition-projected runtime product count.
   const summary = {
     documents,
     ...counts,
-    skill: counts.skill + counts.composition,
+    skill: counts.composition,
     errors: publicDiagnostics.filter((item) => item.severity === 'error').length,
     debts: publicDiagnostics.filter((item) => item.severity === 'debt').length,
   };

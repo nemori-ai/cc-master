@@ -6,7 +6,7 @@
   "base_graph_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "scope": [
     {
-      "path": "plugin/src/knowledge/skills/master-orchestrator-guide/modules/verification.endpoint.json",
+      "path": "plugin/src/knowledge/graph/modules/verification.endpoint.json",
       "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
     },
     {
