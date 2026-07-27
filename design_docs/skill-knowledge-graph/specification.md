@@ -490,8 +490,9 @@ change begin --op <type> --scope ... --base <git-ref>
   → parse markers + bind spans
   → validate all structural/authority/navigation/lineage/admission invariants
   → materialize ignored runtime-candidate root (accepted ⊕ candidate overlay；不改 live accepted / live plugin/dist)
-  → compile all four host projections inside that root (claude-code / codex / cursor / kimi-code)
+  → compile all four host skill projections inside that root (claude-code / codex / cursor / kimi-code)
   → reparse final host Markdown relative links + explicit anchors；verify H1–H4 + per-router budgets
+  → remove repo-only knowledge tree；scan dist/package staging/archive boundary
   → record per-host projection witnesses + shared result_graph_sha256 into validation.json
   → calculate result graph hash and deterministic semantic diff
   → generate patch; check optimistic lock and git apply --check
@@ -644,7 +645,7 @@ binding、semantic invariant、projection、hop、drift 与 usage error。
 K1 尚未实现的 option（`check --host/--base`、`report --host`、`report --format markdown`）
 仍随所属命令 exit 10；参数出现在合同中不等于 capability 可用。
 
-### 10.4 Trusted product projection
+### 10.4 Product projection
 
 每个 host 最终只接收普通 host-native plugin surface：
 
@@ -660,14 +661,16 @@ plugin/dist/<host>/
   closed set 中排除。
 - point/module/typed edge 是 authored graph facts；只有 lifecycle=accepted 且 derived
   verdict=admit 的 composition 能成为 skill artifact。
-- source Markdown 不手写 generated block。
-- Trusted Projection Transaction 在 compiler 前冻结 source snapshot 与独立 trusted plan；
-  compiler 只能在该闭集内生成 candidate。
+- source Markdown 不手写 generated block；compiler 只把产品效果写进既有 skill-local Markdown。
 - final-dist verifier 重新 parse 所有 anchor/link，不能只信模板。
-- verifier seal 的 snapshot 是 publish/package 唯一字节权威；publisher 不重新发现文件，
-  package 不 sync、不重新 compile。
+- publish 前删除 candidate 的 repo-only knowledge tree，并机械扫描四 host dist、package staging
+  与 archive；runtime Markdown 不得链接回 repo-only source。
 - relative link 以 final host path 计算，不依赖 `${CLAUDE_PLUGIN_ROOT}` 在 Markdown 中展开。
 - `partial` host 只计算真实投影子图；`stub/unsupported` 不声称 coverage。
+
+这组 required checks 不建立第二套 runtime knowledge SSOT，也不要求 independent oracle、
+sealed snapshot、receipt/attestation 或独立 release protocol。此类 hardening 只有在另行授权后
+才能升级为 blocker。
 
 ## 11. 测试、防漂移与 CI
 
@@ -679,8 +682,8 @@ plugin/dist/<host>/
 4. **Golden fixtures**：单 module、跨文件 module、critical pin、summary fan-in、partial host。
 5. **Mutation/metamorphic**：删 marker、断 anchor、造 authority chain、改 owner 不改 routes、
    把 critical 全开、插入虚边骗 hop。
-6. **Projection integration**：frozen source + trusted plan → candidate → verify/seal → publish；
-   final host skill surface reparse → source map/hop。
+6. **Projection integration**：accepted composition → candidate → final host skill surface reparse
+   → source map/hop；dist/package/archive 做 repo-only knowledge 泄漏扫描。
 7. **Behavior eval**：结构绿后，用 Track A/B 量 agent 是否更精准触达；不进无 LLM 的 hard CI。
 
 ### 11.2 Drift matrix
@@ -692,8 +695,8 @@ plugin/dist/<host>/
 | source graph ↔ generated router/nav | deterministic compile + graph hash |
 | canonical path ↔ host adapter path | per-host source map + final link parse |
 | source ↔ committed dist | 现有 `check-plugin-dist-sync.sh` |
-| frozen source/plan ↔ sealed candidate ↔ published dist | Trusted Projection Transaction attestation + publish receipt |
-| committed dist ↔ release package | frozen bundle plan + release attestation；package 禁止 sync/recompile |
+| accepted graph/composition ↔ final host skill surface | compile/materialize witness + final link/anchor parse |
+| committed dist ↔ package/archive | repo-only `knowledge/` 路径与 runtime 反向链接机械扫描 |
 | base/result semantic diff ↔ change set | change replay + hash/diff explanation |
 | access class ↔ actual hop | per-host shortest path assertions |
 | host coverage claim ↔ surface | projection verifier |
@@ -708,13 +711,12 @@ canonical coverage 的 denominator 由 Git tree 枚举 `plugin/src/skills/<runti
 固定接线：
 
 - `run-tests.sh`：当前已自动发现 K0 content contract test；K1+ 再加入 marker、domain/graph tests；
-- `scripts/sync-plugin-dist.sh`：在 Trusted Projection Transaction 内冻结 source + trusted plan，
-  再投影、compile、verify/seal 并发布 host candidate；
+- `scripts/sync-plugin-dist.sh`：投影 accepted composition、compile 并验证 host skill candidate；
 - `scripts/check-plugin-dist-sync.sh`：继续作为 source/dist 同 commit 漂移门；
 - GitHub Actions 已新增 `plugin-contracts` job，执行 K0 contract test + source check；
 - 现有 required `build-and-check` 已保持名字稳定，作为 ccm + plugin jobs 的 aggregator；
-- release gate 只消费 committed publish receipt、对应 verified snapshot attestation 与冻结
-  bundle plan；package 不从 live source/dist 重新 sync 或 compile。
+- package/archive gate 机械拒绝 repo-only `knowledge/` 路径与 runtime 反向链接；不得把 graph
+  source 作为 runtime surface 分发。
 
 不要把 LLM eval 变成 deterministic CI 的依赖；它属于改行为时的带外证据。
 
@@ -759,22 +761,35 @@ root `AGENTS.md` 必须反映真实磁盘：runtime portfolio **8**；dev/meta *
 （含 `readme-steward` / `worktree-discipline`，**不含**已 DELETE 的 governing 候选）。
 删除/新增 `.claude/skills/*` 后跑 `bash scripts/sync-codex-skills.sh`。
 
-## 13. 开发迭代协议
+## 13. 维护者研发旅程（唯一流程 SSOT）
 
-一次正常知识变更：
+一次正常 knowledge / skill 产品变更按以下旅程走；其他入口只链接本节，不复制流程：
 
-1. 识别任务：wording、refine、move、split、merge、transfer、deprecate 或 retire。
-2. `explain/path/report` 读取当前 canonical authority、composition consumers、inbound routes、
-   host coverage、shortest witnesses。
-3. 用 typed command 构建 change set 与 candidate。
-4. 修改 canonical Markdown span；不手写 generated nav。
-5. candidate 全图校验；失败时按 witness 修复，不 suppress。
-6. 冻结 source snapshot 与 trusted host plan，再 compile 所有 affected hosts；只 seal
-   final-dist reparse 全绿的 candidate。
-7. 以 sealed verified snapshot 发布，跑 source tests、dist sync check；行为变化再跑 Track A/B。
-8. PR review 同时看 Markdown diff、JSON semantic diff、change set、health delta、dist diff
-   与 transaction witness。release package 只消费 receipt/attestation，不重跑 sync/compile。
-9. 合并后 change set immutable；错误用新 change 修正。
+1. **Discovery**：先用
+   [`requirement-elicitation`](../../.claude/skills/requirement-elicitation/SKILL.md)
+   确认真实 job、具体痛点与范围；未批准前不实现。
+2. **Global graph**：运行 `contract --json` 读取真实能力，再用 `report` / `explain` / `path`
+   读取全局 point/module/typed edge、唯一 canonical authority、composition consumers 与 witness。
+   binding path、marker 与行区间只是 evidence，不决定 membership。
+3. **Candidate analysis / admission**：边界或消费者变化先由
+   [`curating-skill-portfolios`](../../.claude/skills/curating-skill-portfolios/SKILL.md)
+   判断是否应成为 skill/composition；candidate analysis 以 graph metrics +
+   Counterfactual evidence 推导 verdict。未 admit 的 composition 不物化。
+4. **Typed graph change**：从实际 CLI closed set 选择
+   `add | wording | refine | move | split | merge | deprecate | retire`，走
+   `change begin → validate → apply`；只编辑 candidate scope，按最小 witness 修复，不 suppress。
+5. **Skill prose craft**：若 accepted composition 的 skill body / reference 需要变化，使用
+   [`cc-master-skillsmith`](../../.claude/skills/cc-master-skillsmith/SKILL.md)；exact HOW 仍只在
+   canonical Markdown span，graph metadata 不复制正文。
+6. **Grounding**：行为或 description 变化使用
+   [`grounding-skill-evals`](../../.claude/skills/grounding-skill-evals/SKILL.md)
+   声明 J、跑 Track A/B 与 holdout；结构全绿不能冒充行为提升。
+7. **Four-host materialization**：用 `materialize` / `compile` 把 accepted composition 投影为
+   `claude-code | codex | cursor | kimi-code` 的既有 skill-local Markdown，重解析 link/anchor
+   并验证 H1–H4；随后删除/扫描 repo-only knowledge，确保 dist/package/archive 不含它。
+8. **Review**：跑 source checks、dist sync 与 package boundary checks。PR 同时审
+   Markdown diff、JSON semantic diff、change set、health delta、四 host witness 与 dist diff。
+   合并后的 change set immutable；错误用新 change 修正。
 
 ## 14. 渐进启用
 
@@ -798,8 +813,8 @@ root `AGENTS.md` 必须反映真实磁盘：runtime portfolio **8**；dev/meta *
 - access class + pin budget；
 - typed change transactions；
 - Node in-memory compiler、accepted composition 与普通 host skill surface；
-- Trusted Projection Transaction 冻结 source + plan、sealed snapshot 单一发布权威，以及
-  package 不 sync/recompile；
+- accepted composition 只物化为 skill-local Markdown，repo-only knowledge 不进
+  dist/package/archive；
 - 维护者旅程走正式规范 + CLI（独立 governance meta-skill 已 DELETE）；
 - K0→K3 hardening。
 

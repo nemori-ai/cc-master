@@ -9,9 +9,10 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 | 目的 | 入口 |
 |---|---|
 | 理解完整拓扑、SSOT、三跳、事务、工具链与 CI 合同 | [specification.md](specification.md) |
-| 维护者执行 health / typed change / witness（无独立 meta-skill） | [specification.md](specification.md) §12–13 + [cli-contract.md](cli-contract.md) + `node scripts/skill-knowledge.mjs` |
+| 走 discovery→global graph→analysis/admission→skillsmith/grounding→四 host materialization（无独立 graph meta-skill） | [specification.md](specification.md) §13 |
+| 执行 health / typed change / witness | [cli-contract.md](cli-contract.md) + `node scripts/skill-knowledge.mjs` |
 | 查询当前可执行能力、稳定 JSON envelope、diagnostic 与 exit code | [cli-contract.md](cli-contract.md) |
-| 设计/实现 source→dist→release 的冻结、验证、原子发布与恢复 | [trusted-projection-transaction.md](trusted-projection-transaction.md) |
+| 查历史 trusted projection hardening 设计（非当前 required contract / blocker） | [trusted-projection-transaction.md](trusted-projection-transaction.md) |
 | 编写或验证 authored graph source | [schemas/knowledge-source.schema.json](schemas/knowledge-source.schema.json) |
 | 编写或验证语义变更事务 | [schemas/knowledge-change.schema.json](schemas/knowledge-change.schema.json) |
 | 看一套最小但完整的 source 示例 | [examples/](examples/) |
@@ -22,10 +23,7 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 ## SSOT 边界
 
 - [specification.md](specification.md) 是当前治理模型与不变式的 evergreen SSOT。
-- [trusted-projection-transaction.md](trusted-projection-transaction.md) 是 source→dist→release
-  事务状态机、artifact lineage、P1–P8 与 failure semantics 的 SSOT。
-- `schemas/` 是 source/change document 与 trusted projection transaction artifact 的机器合同
-  SSOT；若 prose 与 schema 冲突，先视为
+- `schemas/` 是 source/change document 与 CLI output 的机器合同 SSOT；若 prose 与 schema 冲突，先视为
   contract drift，必须在同一变更中消歧，不能任选一边。
 - canonical Markdown span 是知识正文 SSOT；JSON 不复制完整 HOW。
 - module JSON 是模块 intent、boundary、membership、access 与路由元数据的 SSOT。
@@ -33,9 +31,9 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 - `plugin/src/knowledge/` 整体是 repo-only maintainer source，不进入 host dist、package 或
   release artifact。accepted composition 才是可投影的 skill 产品；最终 host 中不存在平行的
   `knowledge/` runtime SSOT。
-- source 与 trusted projection plan 必须在 compiler 前冻结；sealed verified snapshot 是
-  publish/package 的唯一字节权威。package 只消费 receipt/attestation/frozen bundle plan，
-  不 sync、不重新 compile。
+- 当前 required distribution boundary 是：accepted composition 只物化为 skill-local Markdown；
+  publish 前删除/扫描 repo-only knowledge；dist、package staging 与 archive 都不得包含
+  `knowledge/` 或 runtime 反向链接。independent oracle / sealed protocol 属另行授权的 hardening。
 
 ## 当前成熟度
 
@@ -46,12 +44,9 @@ skills 中的 Markdown 知识正文保留为最终产品，同时为知识模块
 - standalone Draft 2020-12 validators、Markdown binding、graph invariants、authored hop analysis 已交付（`hop_analysis` 仍覆盖 authored navigation plane；final-host H1–H4 由 `compile` 证明）；
 - 四 host fixture probe 已交付（`host_portability_probe=true`），**不等于** CLI `check --host` integration；
 - `runtime_projection=true`：`compile` 只把 accepted composition 的产品效果写入普通 host skill
-  surface；final verifier 只计真实可点击边。trusted host plan 与 release bundler 都拒绝
-  repo-only `knowledge/` 路径；host honesty 保留 stub/partial coverage（workflow stubs；
+  surface；final verifier 只计真实可点击边。dist/package/archive 的机械边界拒绝 repo-only
+  `knowledge/` 路径；host honesty 保留 stub/partial coverage（workflow stubs；
   using-ccm / master-orchestrator partial hosts）；
-- Trusted Projection Transaction 已冻结 source + trusted plan 后再运行 compiler，并以 sealed
-  verified snapshot 授权 publish；release package 只消费 committed receipt/attestation 与
-  frozen bundle plan，禁止现场 sync/recompile；
 - typed change transactions 已交付：`change begin → validate → apply` 冻结 scope/base/hash，验证闭合集合并以 rollback-safe publication 写入 immutable ledger（`typed_change_transactions=true`）；
 - 带外行为评测脚手架已交付（`behavioral_evidence_tracking=true`）：冻结 train/holdout、
   no-router baseline / router candidate、Codex/Cursor runner、grounding/navigation grader 与

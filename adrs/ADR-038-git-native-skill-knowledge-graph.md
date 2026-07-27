@@ -57,7 +57,10 @@ cc-master 的分发知识目前以 Markdown 文件组织。文件级 progressive
 > 产品。module 可以被多个 composition 消费，但正文与 module/point 身份仍只有一个 SSOT。
 > `binding.path`、marker、anchor 与 source map 都是 evidence/projection，不是 owner，也不能从
 > skill 目录反推 membership。`plugin/src/knowledge/` 是 repo-only maintainer surface，禁止进入
-> host dist、package 或 release artifact；不存在平行的 knowledge runtime SSOT。
+> host dist、package 或 release artifact；不存在平行的 knowledge runtime SSOT。当前必需的
+> 分发边界是把 accepted composition 物化为既有 skill-local Markdown，并对 dist、package staging
+> 与 archive 做机械扫描；independent oracle、sealed snapshot / receipt / attestation protocol
+> 不属于当前交付门，若要恢复为 required contract 必须另行取得 scope 授权。
 
 ### 2.2 图是 multipane typed contract
 
@@ -89,8 +92,8 @@ primary points 与 portfolio pin budget 表达。
 
 ### 2.4 修改必须是类型化 graph transaction
 
-正式写入口使用 `add | wording | refine | move | split | merge | transfer_owner | deprecate |
-retire`，不提供无语义通用 CRUD。工具在内存 candidate graph 上应用 operation，完整验证
+正式写入口使用 `add | wording | refine | move | split | merge | deprecate | retire`，不提供
+无语义通用 CRUD。工具在内存 candidate graph 上应用 operation，完整验证
 binding/authority/lineage/navigation/projection/hop 后才原子落地 scoped files。Git PR 与 branch
 protection 是最终的人类授权和跨进程 transaction boundary。
 
@@ -100,13 +103,15 @@ compiler/editor 使用 Node 22 ESM、strict JSON、in-memory adjacency maps 和�
 pinned Ajv 只在开发时生成提交进仓的 standalone validator；clean clone routine check 不现场安装
 schema dependency。
 
-编译器只能消费冻结的 source snapshot 与独立冻结的 trusted projection plan，并把 accepted
-composition 投影进既有 host-native skill surface；repo-only graph、analysis、contract 与
-`knowledge/` 目录不进入 host dist。final verifier 在 sealed candidate 上重解析实际
-link/anchor 与 skill surface；只有这份 verified snapshot 可以发布。
+编译器只把 accepted composition 投影进既有 host-native skill Markdown；repo-only graph、
+analysis、contract 与 `knowledge/` 目录不进入 host dist。final verifier 重解析实际
+link/anchor 与 skill surface。发布前必须删除 candidate 中的 repo-only knowledge tree，并对
+四 host dist、package staging 与 archive 做机械扫描，保证没有 `knowledge/` 路径或指向
+repo-only source 的 runtime 链接。
 
-package/release 只消费 committed publish receipt、对应 attestation 与冻结 bundle plan。package
-阶段不得重新扫描 source、sync dist、重新 compile 或扩大文件集合。
+这条最小边界不要求另造 public knowledge 产品面、independent oracle、sealed release protocol
+或 receipt/attestation 链。那些机制若要成为 required release contract，必须由后续独立决策与
+明确 scope 授权引入，不能反向阻塞本决策的 graph-first / skill-as-artifact 验收。
 
 ### 2.6 不使用数据库作为 v1 canonical store
 

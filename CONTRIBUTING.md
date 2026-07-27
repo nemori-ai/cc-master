@@ -48,12 +48,18 @@ output and must be kept in the same commit as the source change that caused it.
 and accepted composition metadata. It must not appear in host dist, package, or
 release artifacts.
 
-Full host projection runs as a Trusted Projection Transaction. It freezes the
-source snapshot and an independently generated trusted plan before the compiler
-runs. Only the sealed snapshot that passed final-host verification may be
-published. Release packaging consumes that committed publish receipt, its
-attestation, and a frozen bundle plan; packaging never syncs dist, recompiles
-source, or expands the planned file set.
+Accepted compositions materialize only into the existing host skill-local
+Markdown surfaces. Before publication, remove or reject repo-only knowledge
+output and mechanically scan all four host dist trees, package staging, and
+archives for `knowledge/` paths or runtime links back to the repo-only source.
+Independent oracles and sealed receipt/attestation protocols are not current
+required gates; adding them requires a separately approved scope.
+
+For a knowledge or skill product change, follow the single maintainer journey in
+[`specification.md` §13](design_docs/skill-knowledge-graph/specification.md#13-维护者研发旅程唯一流程-ssot).
+It connects discovery, the global graph, candidate analysis/admission, the
+existing skill authoring/eval toolkit, and four-host materialization without
+creating another meta-skill or a second SSOT.
 
 Install the repo-local pre-push hook once per clone:
 

@@ -43,11 +43,12 @@ product views are admitted via `analyses/` + `compositions/` (`consumes.modules`
 `materialize` accepts only lifecycle=accepted and derived verdict=admit; `--analysis-override`
 is forbidden. There is no legacy skill-manifest or `owner_skill` compatibility path.
 `plugin/src/knowledge` is repo-only authored/meta. The compiler may materialize `knowledge/`
-routers inside its private candidate for graph verification, but the trusted host plan excludes
-that tree from published dist and release artifacts. Candidate analysis persists derived
+routers inside its private candidate for graph verification, but publication deletes or rejects
+that tree and mechanically scans dist/package/archive boundaries. Candidate analysis persists derived
 `graph_metrics` + metric witness (must
 match recompute); admission gates use portfolio `candidate_admission` + hop_policy (not echoed
-host_coverage declarations). Package hardening is deferred to K3-01P.
+host_coverage declarations). Independent oracle / sealed receipt or attestation protocols are not
+part of this source-root contract.
 
 The candidate read/token limits are **composition-closure** limits, not an eager-read claim.
 They are fixed powers-of-two safety envelopes, deliberately independent of the current candidate
@@ -78,8 +79,8 @@ capability=`true`。但 `check --host` CLI 集成尚未接通，带 `--host`/`--
 
 四 host `compile` + final surface verifier 已落地：`runtime_projection=true`。`compile`
 从本目录 portfolio source 经现有 SAP 投影在私有 candidate 中生成校验用 router，并写入
-skill nav/anchors；H1–H4 与 budget 带 witness/remediation。发布事务只提交冻结 host plan
-授权的 runtime skill / entry effects，顶层 `knowledge/` 不进入 dist、package 或 release。
+skill nav/anchors；H1–H4 与 budget 带 witness/remediation。最终只发布 runtime skill / entry
+effects；顶层 `knowledge/` 由机械边界检查确保不进入 dist、package 或 release。
 
 Typed change transaction 已交付：`change begin → validate → apply` 在 ignored candidate
 workspace 冻结 scope/base/hash、验证八类 closed operation，并在 rollback-safe atomic publication
