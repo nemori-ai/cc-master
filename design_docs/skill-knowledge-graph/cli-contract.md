@@ -351,9 +351,15 @@ change record。任一 scope stale/dirty/写失败或 runtime gate 失败都拒�
 - `behavioral_evidence_status.state`: `not_run | baseline | candidate | holdout_verdict`；
 - 可选 `graph_hash`（C6 canonical graph hash）与稳定排序的 counts / diagnostics；
 - 行为证据未到 `holdout_verdict` 时不得出现 improvement claim。
-- `report` 只消费与当前 canonical graph hash 精确匹配的
-  `design_docs/eval/skill-knowledge-router/evidence.json`；missing/invalid/stale evidence
-  一律显示 `not_run`，且不改变独立的 structural verdict。
+- `report` 默认只消费与当前 canonical graph hash 精确匹配的
+  `design_docs/eval/skill-knowledge-router/evidence.json`。唯一窄例外是 baseline-only
+  `compatible_graphs` attestation。兼容条目 schema 是封闭集合：entry 仅有
+  `graph_hash / scope / proof`；proof 必须精确给出 method、source/target graph hash、
+  source/target revision、`surface_host`、`file_count:62`、两侧非空且相等的 no-router
+  surface SHA-256、`model_runs_reexecuted:false` 与非空 rationale。证据条件必须精确为
+  baseline 2 runs、candidate 0、holdout 0；`verdict` / `improvement_claim` 即使值为 null
+  或空字符串，只要字段存在就拒绝。任何缺失、额外、类型错误、hash/revision 不匹配，
+  以及 candidate / holdout 跨 graph 复用均显示 `not_run`，且不改变独立的 structural verdict。
 
 `path` 成功 envelope 的 `result_kind` 为 `path`，必含 `path_query` + `path_result`
 （`reachable` / `hops` / `witness`；可达时附稳定排序的 `nodes`/`edges`）。

@@ -11,6 +11,7 @@ import {
   gradeBehaviorRun,
   loadBehaviorCases,
   loadPublishedBehaviorEvidence,
+  resolveAcceptedCompositionOwner,
 } from '../../scripts/skill-knowledge/behavior-eval.mjs';
 import { buildAndValidateGraph } from '../../scripts/skill-knowledge/graph.mjs';
 
@@ -39,6 +40,11 @@ test('SKG-BEH-01: train and holdout each cover the eight runtime skill owners', 
   assert.equal(built.ok, true);
   const expectedOwners = new Set(built.graph.skills.map((skill) => skill.id));
   assert.equal(expectedOwners.size, 8);
+  const migratedSkill = built.graph.skills.find(
+    (skill) => skill.id === 'skill:dev-as-ml-loop',
+  );
+  assert.equal(migratedSkill._from_composition, true);
+  assert.equal(migratedSkill._composition_id, 'composition:skill.dev-as-ml-loop');
 
   for (const split of ['train', 'holdout']) {
     const fixture = loadBehaviorCases({ repoRoot, split });
@@ -50,8 +56,14 @@ test('SKG-BEH-01: train and holdout each cover the eight runtime skill owners', 
     for (const item of fixture.cases) {
       const point = built.graph.points.find((candidate) => candidate.id === item.expected.point_id);
       assert.ok(point, `${split} missing ${item.expected.point_id}`);
-      assert.equal(point.owner_skill, item.expected.owner_skill);
       assert.equal(point.module_id, item.expected.module_id);
+      assert.equal(
+        resolveAcceptedCompositionOwner(built.graph, {
+          pointId: point.id,
+          moduleId: point.module_id,
+        }),
+        item.expected.owner_skill,
+      );
       assert.equal(
         item.prompt.includes(item.expected.point_id),
         false,
@@ -59,6 +71,53 @@ test('SKG-BEH-01: train and holdout each cover the eight runtime skill owners', 
       );
     }
   }
+
+  const legacyPlacement = {
+    id: 'skill:legacy',
+    lifecycle: { state: 'accepted' },
+    modules: [{ id: 'module:shared' }],
+    canonical_source_inventory: [{ point_ids: ['point:shared'] }],
+  };
+  const compositionWithoutPoint = {
+    id: 'skill:composition',
+    lifecycle: { state: 'accepted' },
+    modules: [{ id: 'module:shared' }],
+    canonical_source_inventory: [{ point_ids: [] }],
+    _from_composition: true,
+  };
+  assert.throws(
+    () =>
+      resolveAcceptedCompositionOwner(
+        { skills: [legacyPlacement, compositionWithoutPoint] },
+        { pointId: 'point:shared', moduleId: 'module:shared' },
+      ),
+    /found 0/,
+    'an accepted composition consuming the module must not fall back to a legacy placement',
+  );
+
+  const secondCompositionPlacement = {
+    ...compositionWithoutPoint,
+    id: 'skill:composition-two',
+    canonical_source_inventory: [{ point_ids: ['point:shared'] }],
+  };
+  assert.throws(
+    () =>
+      resolveAcceptedCompositionOwner(
+        {
+          skills: [
+            legacyPlacement,
+            {
+              ...compositionWithoutPoint,
+              canonical_source_inventory: [{ point_ids: ['point:shared'] }],
+            },
+            secondCompositionPlacement,
+          ],
+        },
+        { pointId: 'point:shared', moduleId: 'module:shared' },
+      ),
+    /found 2/,
+    'multiple accepted composition placements must fail structurally',
+  );
 });
 
 test('SKG-BEH-02: baseline surface removes router artifacts while candidate preserves them', () =>
@@ -121,7 +180,10 @@ test('SKG-BEH-03: grader emits point, owner, grounding, hops, reads and token me
       case_id: item.id,
       point_id: point.id,
       module_id: point.module_id,
-      owner_skill: point.owner_skill,
+      owner_skill: resolveAcceptedCompositionOwner(built.graph, {
+        pointId: point.id,
+        moduleId: point.module_id,
+      }),
       evidence_path: evidencePath,
       evidence_quote: quote,
       answer: 'restart',
@@ -287,37 +349,169 @@ test('SKG-BEH-06: harness invocation is closed to Codex and Cursor', () => {
   );
 });
 
-test('SKG-BEH-07: published evidence applies only to the exact current graph hash', () =>
+test('SKG-BEH-07: published evidence requires exact graph hash or explicit byte-identical baseline compatibility', () =>
   withTempDirectory((directory) => {
     const evidenceDirectory = path.join(directory, 'design_docs/eval/skill-knowledge-router');
+    const evidenceFile = path.join(evidenceDirectory, 'evidence.json');
     fs.mkdirSync(evidenceDirectory, { recursive: true });
-    fs.writeFileSync(
-      path.join(evidenceDirectory, 'evidence.json'),
-      `${JSON.stringify(
+    const compatibleGraphHash = 'b'.repeat(64);
+    const validEvidence = {
+      schema: 'cc-master/skill-knowledge-behavior-evidence/v1',
+      protocol_version: 'cc-master/skill-knowledge-router-eval/v1',
+      graph_hash: 'a'.repeat(64),
+      behavioral_evidence_status: {
+        state: 'baseline',
+        evidence: ['design_docs/eval/skill-knowledge-router/evidence.json'],
+      },
+      compatible_graphs: [
         {
-          schema: 'cc-master/skill-knowledge-behavior-evidence/v1',
-          protocol_version: 'cc-master/skill-knowledge-router-eval/v1',
-          graph_hash: 'a'.repeat(64),
-          behavioral_evidence_status: {
-            state: 'baseline',
-            evidence: ['design_docs/eval/skill-knowledge-router/evidence.json'],
+          graph_hash: compatibleGraphHash,
+          scope: 'baseline',
+          proof: {
+            method: 'byte-identical-no-router-surface/v1',
+            source_graph_hash: 'a'.repeat(64),
+            target_graph_hash: compatibleGraphHash,
+            source_revision: '1'.repeat(40),
+            target_revision: '2'.repeat(40),
+            surface_host: 'claude-code',
+            file_count: 62,
+            source_surface_sha256: 'd'.repeat(64),
+            target_surface_sha256: 'd'.repeat(64),
+            model_runs_reexecuted: false,
+            rationale: 'The no-router baseline surface is byte-identical.',
           },
-          coverage: { complete: false },
-          conditions: {},
         },
-        null,
-        2,
-      )}\n`,
-    );
+      ],
+      coverage: { complete: false },
+      conditions: {
+        baseline: { runs: 2 },
+        candidate: { runs: 0 },
+        holdout: { runs: 0 },
+      },
+    };
+    const publish = (value) => {
+      fs.writeFileSync(evidenceFile, `${JSON.stringify(value, null, 2)}\n`);
+    };
+    publish(validEvidence);
     const current = loadPublishedBehaviorEvidence({
       repoRoot: directory,
       graphHash: 'a'.repeat(64),
     });
     assert.equal(current.state, 'baseline');
-    const stale = loadPublishedBehaviorEvidence({
+    const compatible = loadPublishedBehaviorEvidence({
       repoRoot: directory,
       graphHash: 'b'.repeat(64),
     });
-    assert.equal(stale.state, 'not_run');
-    assert.equal(stale.stale, true);
+    assert.equal(compatible.state, 'baseline');
+    assert.equal(compatible.compatible_graph, true);
+
+    const mutations = [
+      ...['graph_hash', 'scope', 'proof'].map((field) => [
+        `missing compatibility ${field}`,
+        (value) => delete value.compatible_graphs[0][field],
+      ]),
+      ...[
+        'method',
+        'source_graph_hash',
+        'target_graph_hash',
+        'source_revision',
+        'target_revision',
+        'surface_host',
+        'file_count',
+        'source_surface_sha256',
+        'target_surface_sha256',
+        'model_runs_reexecuted',
+        'rationale',
+      ].map((field) => [
+        `missing proof ${field}`,
+        (value) => delete value.compatible_graphs[0].proof[field],
+      ]),
+      ['wrong target graph hash', (value) => {
+        value.compatible_graphs[0].proof.target_graph_hash = 'c'.repeat(64);
+      }],
+      ['wrong source graph hash', (value) => {
+        value.compatible_graphs[0].proof.source_graph_hash = 'c'.repeat(64);
+      }],
+      ['malformed matching source graph hashes', (value) => {
+        value.graph_hash = 'not-a-hash';
+        value.compatible_graphs[0].proof.source_graph_hash = 'not-a-hash';
+      }],
+      ['wrong proof method', (value) => {
+        value.compatible_graphs[0].proof.method = 'trust-me/v1';
+      }],
+      ['malformed source revision', (value) => {
+        value.compatible_graphs[0].proof.source_revision = 'not-a-revision';
+      }],
+      ['malformed target revision', (value) => {
+        value.compatible_graphs[0].proof.target_revision = 'not-a-revision';
+      }],
+      ['wrong surface host', (value) => {
+        value.compatible_graphs[0].proof.surface_host = 'codex';
+      }],
+      ['wrong file count', (value) => {
+        value.compatible_graphs[0].proof.file_count = 61;
+      }],
+      ['string file count', (value) => {
+        value.compatible_graphs[0].proof.file_count = '62';
+      }],
+      ['empty source digest', (value) => {
+        value.compatible_graphs[0].proof.source_surface_sha256 = '';
+      }],
+      ['unequal digest', (value) => {
+        value.compatible_graphs[0].proof.target_surface_sha256 = 'e'.repeat(64);
+      }],
+      ['model runs reexecuted', (value) => {
+        value.compatible_graphs[0].proof.model_runs_reexecuted = true;
+      }],
+      ['empty rationale', (value) => {
+        value.compatible_graphs[0].proof.rationale = '';
+      }],
+      ['candidate scope', (value) => {
+        value.compatible_graphs[0].scope = 'candidate';
+      }],
+      ['holdout scope', (value) => {
+        value.compatible_graphs[0].scope = 'holdout';
+      }],
+      ['candidate state', (value) => {
+        value.behavioral_evidence_status.state = 'candidate';
+      }],
+      ['holdout state', (value) => {
+        value.behavioral_evidence_status.state = 'holdout';
+      }],
+      ['wrong baseline count', (value) => {
+        value.conditions.baseline.runs = 1;
+      }],
+      ['candidate runs present', (value) => {
+        value.conditions.candidate.runs = 1;
+      }],
+      ['holdout runs present', (value) => {
+        value.conditions.holdout.runs = 1;
+      }],
+      ['verdict key present', (value) => {
+        value.behavioral_evidence_status.verdict = null;
+      }],
+      ['improvement claim key present', (value) => {
+        value.improvement_claim = '';
+      }],
+      ['extra compatibility field', (value) => {
+        value.compatible_graphs[0].extra = null;
+      }],
+      ['extra proof field', (value) => {
+        value.compatible_graphs[0].proof.extra = null;
+      }],
+      ['duplicate compatible attestation', (value) => {
+        value.compatible_graphs.push(structuredClone(value.compatible_graphs[0]));
+      }],
+    ];
+    for (const [label, mutate] of mutations) {
+      const mutated = structuredClone(validEvidence);
+      mutate(mutated);
+      publish(mutated);
+      const result = loadPublishedBehaviorEvidence({
+        repoRoot: directory,
+        graphHash: compatibleGraphHash,
+      });
+      assert.equal(result.state, 'not_run', label);
+      assert.equal(result.stale, true, label);
+    }
   }));

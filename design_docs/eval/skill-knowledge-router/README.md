@@ -52,6 +52,15 @@ CLI 可直接调用的精确 model id）。
 兼容性探针或旧 runner 留下、但没有当前 `protocol_version` 的 raw/run 可以保留用于诊断；
 聚合 freshness gate 会确定性丢弃它们，因此磁盘文件数不等于纳入指标的 run 数。
 
+默认 freshness 仍要求 exact graph hash。唯一窄例外是 **baseline-only compatibility
+attestation**：当一次 graph-only 迁移前后的 no-router surface 逐文件字节完全一致时，可保留原
+evidence graph hash。兼容条目只允许 `graph_hash / scope / proof` 三个字段；`proof` 必须精确
+包含 method、source/target graph hash、source/target revision、`surface_host`、`file_count:62`、
+两侧非空且相等的 surface SHA-256、`model_runs_reexecuted:false` 与非空 rationale，不能缺字段
+或夹带额外字段。只有 `baseline.runs=2 / candidate.runs=0 / holdout.runs=0` 且状态仍为 baseline
+时可复用；candidate / holdout、digest 不同、source/target hash 对不上，或哪怕以 null/空值携带
+`verdict` / `improvement_claim` 字段，均一律返回 `not_run`。
+
 可用 `--case <case-id>` 跑单例 baseline，`--dry-run` 只构建隔离 surface 和 prompt，不调用模型。
 
 ## 指标与诚实边界

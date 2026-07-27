@@ -12,6 +12,20 @@ const ALLOWED_HARNESSES = new Set(HARDENING_CONTRACT.C9.worker_allowlist);
 const CONDITIONS = new Set(['baseline', 'candidate', 'holdout']);
 const DEFAULT_EVIDENCE =
   'design_docs/eval/skill-knowledge-router/evidence.json';
+const COMPATIBLE_GRAPH_KEYS = Object.freeze(['graph_hash', 'scope', 'proof']);
+const COMPATIBILITY_PROOF_KEYS = Object.freeze([
+  'method',
+  'source_graph_hash',
+  'target_graph_hash',
+  'source_revision',
+  'target_revision',
+  'surface_host',
+  'file_count',
+  'source_surface_sha256',
+  'target_surface_sha256',
+  'model_runs_reexecuted',
+  'rationale',
+]);
 const HARNESS_EXECUTION_POSTURE = Object.freeze({
   codex: Object.freeze({
     mode: 'exec',
@@ -42,6 +56,61 @@ function repoPath(value) {
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function hasExactKeys(value, expectedKeys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const actualKeys = Object.keys(value).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  return (
+    actualKeys.length === sortedExpectedKeys.length &&
+    actualKeys.every((key, index) => key === sortedExpectedKeys[index])
+  );
+}
+
+function isLowerHex(value, length) {
+  return (
+    typeof value === 'string' &&
+    new RegExp(`^[a-f0-9]{${length}}$`).test(value)
+  );
+}
+
+function hasBaselineOnlyCompatibilityEvidence(parsed) {
+  return (
+    parsed.behavioral_evidence_status?.state === 'baseline' &&
+    !Object.hasOwn(parsed.behavioral_evidence_status, 'verdict') &&
+    !Object.hasOwn(parsed, 'improvement_claim') &&
+    parsed.conditions?.baseline?.runs === 2 &&
+    parsed.conditions?.candidate?.runs === 0 &&
+    parsed.conditions?.holdout?.runs === 0
+  );
+}
+
+function isValidCompatibleGraph(item, parsed) {
+  if (
+    !hasExactKeys(item, COMPATIBLE_GRAPH_KEYS) ||
+    !hasExactKeys(item.proof, COMPATIBILITY_PROOF_KEYS)
+  ) {
+    return false;
+  }
+  const proof = item.proof;
+  return (
+    isLowerHex(item.graph_hash, 64) &&
+    item.scope === 'baseline' &&
+    proof.method === 'byte-identical-no-router-surface/v1' &&
+    isLowerHex(proof.source_graph_hash, 64) &&
+    proof.source_graph_hash === parsed.graph_hash &&
+    proof.target_graph_hash === item.graph_hash &&
+    isLowerHex(proof.source_revision, 40) &&
+    isLowerHex(proof.target_revision, 40) &&
+    proof.surface_host === 'claude-code' &&
+    proof.file_count === 62 &&
+    isLowerHex(proof.source_surface_sha256, 64) &&
+    proof.source_surface_sha256 === proof.target_surface_sha256 &&
+    proof.model_runs_reexecuted === false &&
+    typeof proof.rationale === 'string' &&
+    proof.rationale.trim().length > 0
+  );
 }
 
 function assertGraph(repoRoot) {
@@ -244,6 +313,42 @@ function conservativeVerdict(conditions) {
   return 'no_material_change';
 }
 
+export function resolveAcceptedCompositionOwner(graph, { pointId, moduleId }) {
+  const acceptedModuleConsumers = graph.skills.filter(
+    (skill) =>
+      skill.lifecycle?.state === 'accepted' &&
+      skill.modules?.some((module) => module.id === moduleId),
+  );
+  // During incremental migration, an accepted composition is authoritative as
+  // soon as it consumes the module, even when its inventory accidentally omits
+  // the point. That omission must fail structurally rather than falling back to
+  // a legacy view. Markdown paths are never an ownership oracle.
+  const compositionConsumers = acceptedModuleConsumers.filter(
+    (skill) => skill._from_composition === true,
+  );
+  const authoritativeConsumers =
+    compositionConsumers.length > 0
+      ? compositionConsumers
+      : acceptedModuleConsumers.filter(
+          (skill) => skill._from_composition !== true,
+        );
+  const owners = authoritativeConsumers
+    .filter((skill) =>
+      skill.canonical_source_inventory?.some((entry) =>
+        entry.point_ids?.includes(pointId),
+      ),
+    )
+    .map((skill) => skill.id);
+  if (owners.length !== 1) {
+    const authority =
+      compositionConsumers.length > 0 ? 'accepted composition' : 'legacy';
+    throw new Error(
+      `Behavior ground truth requires exactly one ${authority} placement for ${pointId} in ${moduleId}; found ${owners.length}: ${owners.join(', ') || '<none>'}.`,
+    );
+  }
+  return owners[0];
+}
+
 export function loadBehaviorCases({ repoRoot, split }) {
   if (!['train', 'holdout'].includes(split)) {
     throw new Error(`Unknown behavior eval split: ${split}`);
@@ -265,9 +370,15 @@ export function loadBehaviorCases({ repoRoot, split }) {
     if (!item.id || seenIds.has(item.id)) throw new Error(`Duplicate/missing case id: ${item.id}`);
     seenIds.add(item.id);
     const point = graph.points.find((candidate) => candidate.id === item.expected?.point_id);
+    const compositionOwner = point
+      ? resolveAcceptedCompositionOwner(graph, {
+          pointId: point.id,
+          moduleId: point.module_id,
+        })
+      : null;
     if (
       !point ||
-      point.owner_skill !== item.expected.owner_skill ||
+      compositionOwner !== item.expected.owner_skill ||
       point.module_id !== item.expected.module_id
     ) {
       throw new Error(`Case ${item.id} ground truth does not match explicit graph IDs.`);
@@ -580,21 +691,40 @@ export function loadPublishedBehaviorEvidence({
   } catch {
     return { state: 'not_run', evidence: [], invalid: true };
   }
-  if (
-    parsed.schema !== EVIDENCE_SCHEMA ||
-    parsed.protocol_version !== PROTOCOL_VERSION ||
-    parsed.graph_hash !== graphHash
-  ) {
+  const envelopeValid =
+    parsed.schema === EVIDENCE_SCHEMA &&
+    parsed.protocol_version === PROTOCOL_VERSION;
+  const compatibleGraphsValid =
+    Array.isArray(parsed.compatible_graphs) &&
+    parsed.compatible_graphs.length > 0 &&
+    hasBaselineOnlyCompatibilityEvidence(parsed) &&
+    parsed.compatible_graphs.every((item) =>
+      isValidCompatibleGraph(item, parsed),
+    );
+  const matchingCompatibleGraphs = compatibleGraphsValid
+    ? parsed.compatible_graphs.filter((item) => item.graph_hash === graphHash)
+    : [];
+  const compatibleBaseline =
+    matchingCompatibleGraphs.length === 1 ? matchingCompatibleGraphs[0] : null;
+  if (!envelopeValid || (parsed.graph_hash !== graphHash && !compatibleBaseline)) {
     return {
       state: 'not_run',
       evidence: [],
       stale: parsed.graph_hash !== graphHash,
-      invalid:
-        parsed.schema !== EVIDENCE_SCHEMA ||
-        parsed.protocol_version !== PROTOCOL_VERSION,
+      invalid: !envelopeValid,
+      invalid_compatibility:
+        parsed.graph_hash !== graphHash && !compatibleBaseline,
     };
   }
-  return { ...parsed.behavioral_evidence_status };
+  return {
+    ...parsed.behavioral_evidence_status,
+    ...(compatibleBaseline
+      ? {
+          compatible_graph: true,
+          compatibility_proof: compatibleBaseline.proof,
+        }
+      : {}),
+  };
 }
 
 export const BEHAVIOR_EVAL = Object.freeze({

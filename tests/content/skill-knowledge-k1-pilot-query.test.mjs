@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { withIsolatedSkillKnowledgeRepo } from './helpers/skill-knowledge-isolated-repo.mjs';
+import { loadPublishedBehaviorEvidence } from '../../scripts/skill-knowledge/behavior-eval.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cliPath = path.join(repoRoot, 'scripts', 'skill-knowledge.mjs');
@@ -107,16 +108,11 @@ test('SKG-PILOT-01: check loads full portfolio inventory with stable graph hash'
   assertValidCliOutput(report, 'report success');
   assert.equal(report.result_kind, 'report');
   assert.equal(report.structural_status.state, 'pass');
-  const publishedEvidence = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        'design_docs/eval/skill-knowledge-router/evidence.json',
-      ),
-      'utf8',
-    ),
-  );
-  const evidenceIsCurrent = publishedEvidence.graph_hash === report.graph_hash;
+  const publishedEvidence = loadPublishedBehaviorEvidence({
+    repoRoot,
+    graphHash: report.graph_hash,
+  });
+  const evidenceIsCurrent = publishedEvidence.state === 'baseline';
   assert.equal(
     report.behavioral_evidence_status.state,
     evidenceIsCurrent ? 'baseline' : 'not_run',
