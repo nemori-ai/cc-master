@@ -6,11 +6,16 @@ import test from 'node:test';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const read = (relative) => readFileSync(path.join(ROOT, relative), 'utf8');
 
-test('package and workflow consume only the frozen four-host release transaction', () => {
+test('package exposes the normal four-host flow and keeps manifest packaging compatible', () => {
   const packageScript = read('scripts/package-plugin.sh');
-  assert.match(packageScript, /--manifest is required/u);
+  assert.match(packageScript, /--host claude-code/u);
+  assert.match(packageScript, /--all-hosts/u);
+  assert.match(packageScript, /sync-plugin-dist\.sh --host/u);
+  assert.match(packageScript, /package_one kimi-code/u);
+  assert.match(packageScript, /--manifest 需要一个非空路径/u);
   assert.match(packageScript, /trusted-release-bundle\.mjs/u);
-  assert.doesNotMatch(packageScript, /sync-plugin-dist|plugin\/dist|plugin\/src|--all-hosts/u);
+  assert.doesNotMatch(packageScript, /include_dirs=.*\bknowledge\b/u);
+  assert.match(packageScript, /package staging 中禁止 knowledge\//u);
 
   const workflow = read('.github/workflows/plugin-release.yml');
   assert.match(workflow, /Download attested immutable release inputs/u);

@@ -278,7 +278,7 @@ NODE
 
 validate_plugin_archives() {
   local host zip dest
-  for host in claude-code codex cursor; do
+  for host in claude-code codex cursor kimi-code; do
     zip="${EVIDENCE_DIR}/plugins/cc-master-plugin-${host}-v0.0.0-macos-qualification.zip"
     [ -f "${zip}" ] || return 31
     dest="${EVIDENCE_DIR}/plugin-extract-${host}"
@@ -323,7 +323,19 @@ validate_plugin_archives() {
         }
 NODE
         ;;
+      kimi-code)
+        test -f "${dest}/cc-master/kimi.plugin.json" || return 52
+        test -d "${dest}/cc-master/commands" || return 53
+        test -d "${dest}/cc-master/hooks" || return 54
+        ;;
     esac
+    if find "${dest}/cc-master" -type d -name knowledge -print -quit | grep -q .; then
+      return 55
+    fi
+    if grep -RIlE 'knowledge/atlas\.md|knowledge/modules/|plugin/src/knowledge' \
+      "${dest}/cc-master" --include='*.md' | grep -q .; then
+      return 56
+    fi
     unzip -Z -v "${zip}" >"${EVIDENCE_DIR}/plugin-${host}-zip-metadata.log" || return 44
   done
 }
@@ -403,18 +415,10 @@ run_required launchd_uninstall env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOM
 run_required launchd_deactivation_truth validate_launchd_uninstall_log
 
 mkdir -p "${EVIDENCE_DIR}/plugins"
-TRUSTED_PLUGIN_MANIFEST="${CCM_TRUSTED_RELEASE_MANIFEST:-}"
-[ -n "${TRUSTED_PLUGIN_MANIFEST}" ] || {
-  printf '%s\n' 'CCM_TRUSTED_RELEASE_MANIFEST is required; live dist packaging is forbidden' \
-    >"${EVIDENCE_DIR}/plugin_package.log"
-  record plugin_package FAIL 2
-  FAILURES=$((FAILURES + 1))
-}
 run_required plugin_package env CCM_PLUGIN_OUT_DIR="${EVIDENCE_DIR}/plugins" \
-  bash scripts/package-plugin.sh --manifest "${TRUSTED_PLUGIN_MANIFEST}" \
-    --out-dir "${EVIDENCE_DIR}/plugins"
+  bash scripts/package-plugin.sh --all-hosts v0.0.0-macos-qualification
 run_required plugin_checksums bash -c 'cd "$1" && shasum -a 256 -c SHA256SUMS' _ \
-  "$(dirname "$(find "${EVIDENCE_DIR}/plugins" -name SHA256SUMS -type f -print -quit)")"
+  "${EVIDENCE_DIR}/plugins"
 run_required plugin_extract_modes_manifests validate_plugin_archives
 run_required plugin_projection_clean bash scripts/check-plugin-dist-sync.sh
 

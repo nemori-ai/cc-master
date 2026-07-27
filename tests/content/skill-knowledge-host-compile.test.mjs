@@ -584,10 +584,20 @@ test('SKG-COMPILE-07: knowledge remains repo/dist metadata and never enters rele
   );
 
   const packager = fs.readFileSync(path.join(repoRoot, 'scripts/package-plugin.sh'), 'utf8');
+  assert.match(
+    packager,
+    /sync-plugin-dist\.sh --host/,
+    'normal package flow must package freshly projected per-host dist',
+  );
   assert.doesNotMatch(
     packager,
-    /\bknowledge\b|plugin\/dist|sync-plugin-dist/,
-    'manifest-only package adapter must not rediscover knowledge or live dist',
+    /include_dirs=.*\bknowledge\b/,
+    'normal package allowlist must not include repo-only knowledge',
+  );
+  assert.match(
+    packager,
+    /package staging 中禁止 knowledge\/[\s\S]*repo-only knowledge 链接/,
+    'normal package flow must mechanically reject knowledge paths and runtime back-links',
   );
   const bundler = fs.readFileSync(path.join(repoRoot, 'scripts/trusted-release-bundle.mjs'), 'utf8');
   assert.match(bundler, /repo-only knowledge\/meta path is forbidden/);
