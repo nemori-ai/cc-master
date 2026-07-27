@@ -39,8 +39,6 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 <!-- ccm:k:end point:multilayer.orthogonality -->
 <!-- ccm:k:nav:start point:multilayer.orthogonality -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:planning.multi-layer](../../../knowledge/modules/planning.multi-layer.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 派发契约：把「发现并遵循本项目 planning 规范」写进去
 
@@ -58,8 +56,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.handoff-contract -->
 <!-- ccm:k:nav:start point:multilayer.handoff-contract -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:planning.multi-layer](../../../knowledge/modules/planning.multi-layer.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 识别启发：哪些节点够格用这一层
 
@@ -94,8 +90,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.admission-and-escalation -->
 <!-- ccm:k:nav:start point:multilayer.admission-and-escalation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:planning.multi-layer](../../../knowledge/modules/planning.multi-layer.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
 ## 计划文档维护：落点与分工
 
@@ -116,6 +110,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:multilayer.maintenance -->
 <!-- ccm:k:nav:start point:multilayer.maintenance -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:planning.multi-layer](../../../knowledge/modules/planning.multi-layer.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->

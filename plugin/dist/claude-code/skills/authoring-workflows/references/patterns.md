@@ -58,8 +58,6 @@ const summary = await agent(`synthesize:\n${JSON.stringify(parts.filter(Boolean)
 <!-- ccm:k:end point:workflow.pattern-fan-out -->
 <!-- ccm:k:nav:start point:workflow.pattern-fan-out -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-fan-out-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-pipeline"></a>
@@ -84,8 +82,6 @@ const out = await pipeline(items,
 <!-- ccm:k:end point:workflow.pattern-pipeline -->
 <!-- ccm:k:nav:start point:workflow.pattern-pipeline -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [deepens_to: Adversarial verify](./patterns.md#ccm-k-point-workflow-pattern-adversarial-verify) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-adversarial-verify -->
 - [deepens_to: Bug hunt loop](./patterns.md#ccm-k-point-workflow-pattern-bug-hunt) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-bug-hunt -->
 - [deepens_to: Completeness critic](./patterns.md#ccm-k-point-workflow-pattern-completeness-critic) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-completeness-critic -->
@@ -131,8 +127,6 @@ return verified.filter((f) => f.verdict?.isReal)
 <!-- ccm:k:end point:workflow.pattern-adversarial-verify -->
 <!-- ccm:k:nav:start point:workflow.pattern-adversarial-verify -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-adversarial-verify-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-perspective-verify"></a>
@@ -160,8 +154,6 @@ const verdicts = await parallel(LENSES.map((lens) => () =>
 <!-- ccm:k:end point:workflow.pattern-perspective-verify -->
 <!-- ccm:k:nav:start point:workflow.pattern-perspective-verify -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-perspective-verify-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-judge-panel"></a>
@@ -187,8 +179,6 @@ const final = await agent(`synthesize from the winner:\n${JSON.stringify(winner)
 <!-- ccm:k:end point:workflow.pattern-judge-panel -->
 <!-- ccm:k:nav:start point:workflow.pattern-judge-panel -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-judge-panel-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-loop-count"></a>
@@ -214,8 +204,6 @@ while (found.length < 10) {
 <!-- ccm:k:end point:workflow.pattern-loop-count -->
 <!-- ccm:k:nav:start point:workflow.pattern-loop-count -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-count-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-loop-budget"></a>
@@ -241,8 +229,6 @@ while (budget.total && budget.remaining() > RESERVE) {
 <!-- ccm:k:end point:workflow.pattern-loop-budget -->
 <!-- ccm:k:nav:start point:workflow.pattern-loop-budget -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-budget-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-loop-dry"></a>
@@ -273,8 +259,6 @@ while (dry < DRY_LIMIT) {
 <!-- ccm:k:end point:workflow.pattern-loop-dry -->
 <!-- ccm:k:nav:start point:workflow.pattern-loop-dry -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-dry-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-multimodal-sweep"></a>
@@ -299,8 +283,6 @@ const reads = await pipeline(deduped, (ref) => agent(`deep-read ${ref}`))
 <!-- ccm:k:end point:workflow.pattern-multimodal-sweep -->
 <!-- ccm:k:nav:start point:workflow.pattern-multimodal-sweep -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-multimodal-sweep-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-completeness-critic"></a>
@@ -324,8 +306,6 @@ phase 正是这个 critic）。
 <!-- ccm:k:end point:workflow.pattern-completeness-critic -->
 <!-- ccm:k:nav:start point:workflow.pattern-completeness-critic -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-completeness-critic-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-migration"></a>
@@ -356,8 +336,6 @@ const out = await pipeline(found.sites ?? [],
 <!-- ccm:k:end point:workflow.pattern-migration -->
 <!-- ccm:k:nav:start point:workflow.pattern-migration -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-migration-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-scout-fanout"></a>
@@ -380,8 +358,6 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 <!-- ccm:k:end point:workflow.pattern-scout-fanout -->
 <!-- ccm:k:nav:start point:workflow.pattern-scout-fanout -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-scout-fanout-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 ## 组合形态——完整的真实-prompt workflow
@@ -407,8 +383,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.pattern-bug-hunt -->
 <!-- ccm:k:nav:start point:workflow.pattern-bug-hunt -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-bug-hunt-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-pr-triage"></a>
@@ -426,8 +400,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.pattern-pr-triage -->
 <!-- ccm:k:nav:start point:workflow.pattern-pr-triage -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pr-triage-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-dep-upgrade"></a>
@@ -446,8 +418,6 @@ bump。这是带 `isolation: 'worktree'` 的 **discover → transform → verify
 <!-- ccm:k:end point:workflow.pattern-dep-upgrade -->
 <!-- ccm:k:nav:start point:workflow.pattern-dep-upgrade -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-dep-upgrade-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-test-repair"></a>
@@ -465,8 +435,6 @@ attempt cap）组合起来。用它来「跨 codebase 生成并稳住 test」，
 <!-- ccm:k:end point:workflow.pattern-test-repair -->
 <!-- ccm:k:nav:start point:workflow.pattern-test-repair -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-test-repair-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-tournament"></a>
@@ -486,8 +454,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.pattern-tournament -->
 <!-- ccm:k:nav:start point:workflow.pattern-tournament -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-tournament-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-nested-composition"></a>
@@ -511,8 +477,6 @@ leaf-shaped），且名字未知 / `scriptPath` 读不到 / child 语法错误�
 <!-- ccm:k:end point:workflow.pattern-nested-composition -->
 <!-- ccm:k:nav:start point:workflow.pattern-nested-composition -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-nested-composition-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-self-repair"></a>
@@ -533,8 +497,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.pattern-self-repair -->
 <!-- ccm:k:nav:start point:workflow.pattern-self-repair -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-self-repair-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-pattern-staged-escalation"></a>
@@ -552,7 +514,5 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.pattern-staged-escalation -->
 <!-- ccm:k:nav:start point:workflow.pattern-staged-escalation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.pattern-catalog](../../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-staged-escalation-to-pattern-pipeline -->
 <!-- ccm:k:nav:end -->

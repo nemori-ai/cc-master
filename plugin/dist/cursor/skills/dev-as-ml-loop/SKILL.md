@@ -21,8 +21,6 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 <!-- ccm:k:end point:devloop.core-thesis -->
 <!-- ccm:k:nav:start point:devloop.core-thesis -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.core-thesis -->
 - [deepens_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.thesis-to-objective -->
 <!-- ccm:k:nav:end -->
@@ -40,8 +38,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.two-scale -->
 <!-- ccm:k:nav:start point:devloop.two-scale -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.outer](../../knowledge/modules/devloop.outer.md#ccm-k-module-devloop-outer)
 - [requires: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.two-scale-to-ledger -->
 - [operationalizes: subagents as ML components](./SKILL.md#ccm-k-point-devloop-ml-components) <!-- ccm:k:edge edge:devloop.two-scale-to-components -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.two-scale -->
@@ -69,8 +65,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.ml-components -->
 <!-- ccm:k:nav:start point:devloop.ml-components -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.outer](../../knowledge/modules/devloop.outer.md#ccm-k-module-devloop-outer)
 - [requires: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.components-to-objective -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.ml-components -->
 - [routes_to: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.components-to-two-scale -->
@@ -92,8 +86,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.objective -->
 <!-- ccm:k:nav:start point:devloop.objective -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [requires: 测试是测量仪器](./SKILL.md#ccm-k-point-devloop-instrument) <!-- ccm:k:edge edge:devloop.objective-to-instrument -->
 - [next: 小步迭代优化](./SKILL.md#ccm-k-point-devloop-iterate) <!-- ccm:k:edge edge:devloop.objective-to-iterate -->
 - [requires: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.objective-to-ledger-when -->
@@ -111,8 +103,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.iterate -->
 <!-- ccm:k:nav:start point:devloop.iterate -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [deepens_to: explore vs exploit](./SKILL.md#ccm-k-point-devloop-explore-exploit) <!-- ccm:k:edge edge:devloop.iterate-to-explore -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.iterate -->
 - [next: plateau 则 restart](./SKILL.md#ccm-k-point-devloop-plateau-restart) <!-- ccm:k:edge edge:devloop.iterate-to-plateau -->
@@ -132,8 +122,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.instrument -->
 <!-- ccm:k:nav:start point:devloop.instrument -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [next: 小步迭代优化](./SKILL.md#ccm-k-point-devloop-iterate) <!-- ccm:k:edge edge:devloop.instrument-to-iterate -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.instrument -->
 <!-- ccm:k:nav:end -->
@@ -151,8 +139,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.explore-exploit -->
 <!-- ccm:k:nav:start point:devloop.explore-exploit -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.explore-to-objective -->
 - [next: plateau 则 restart](./SKILL.md#ccm-k-point-devloop-plateau-restart) <!-- ccm:k:edge edge:devloop.explore-to-plateau -->
 <!-- ccm:k:nav:end -->
@@ -180,8 +166,6 @@ orchestrator 的 restart 不只是一句"继续试":可以换 hypothesis、拆�
 <!-- ccm:k:end point:devloop.plateau-restart -->
 <!-- ccm:k:nav:start point:devloop.plateau-restart -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [contrasts_with: 收敛即停](./SKILL.md#ccm-k-point-devloop-converge) <!-- ccm:k:edge edge:devloop.plateau-to-converge -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.plateau-restart -->
 <!-- ccm:k:nav:end -->
@@ -205,8 +189,6 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 <!-- ccm:k:end point:devloop.converge -->
 <!-- ccm:k:nav:start point:devloop.converge -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [requires: 拟合意图非用例](./SKILL.md#ccm-k-point-devloop-fit-intent) <!-- ccm:k:edge edge:devloop.converge-to-fit -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.converge -->
 <!-- ccm:k:nav:end -->
@@ -221,8 +203,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.fit-intent -->
 <!-- ccm:k:nav:start point:devloop.fit-intent -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.fit-intent -->
 - [next: 简单性正则](./SKILL.md#ccm-k-point-devloop-regularize) <!-- ccm:k:edge edge:devloop.fit-to-regularize -->
 <!-- ccm:k:nav:end -->
@@ -237,8 +217,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.regularize -->
 <!-- ccm:k:nav:start point:devloop.regularize -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.regularize -->
 - [operationalizes: 好 loop 手感与一图流](./SKILL.md#ccm-k-point-devloop-taste-and-cycle) <!-- ccm:k:edge edge:devloop.regularize-to-cycle -->
 <!-- ccm:k:nav:end -->
@@ -281,8 +259,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.taste-and-cycle -->
 <!-- ccm:k:nav:start point:devloop.taste-and-cycle -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.cycle-to-objective -->
 - [routes_to: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.cycle-to-two-scale -->
 <!-- ccm:k:nav:end -->
@@ -297,9 +273,6 @@ Knowledge navigation:
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:dev-as-ml-loop:
 - [验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective)
-- [Module module:devloop.core](../../knowledge/modules/devloop.core.md#ccm-k-module-devloop-core)
-- [Module module:devloop.ledger](../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [primary: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when)
-- [Module module:devloop.outer](../../knowledge/modules/devloop.outer.md#ccm-k-module-devloop-outer)
 - [primary: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale)
 <!-- ccm:k:entry-pin:end -->

@@ -64,8 +64,6 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 <!-- ccm:k:end point:control.identity-mandate -->
 <!-- ccm:k:nav:start point:control.identity-mandate -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ② 行动风格 · 哲学 · 纪律（action style · philosophy · discipline）
 
@@ -87,8 +85,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.role-consequences -->
 <!-- ccm:k:nav:start point:control.role-consequences -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 七镜头（The seven lenses）——操作哲学
 
@@ -98,8 +94,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.never-play -->
 <!-- ccm:k:nav:start point:conduct.never-play -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
 - [operationalizes: 红线完整体](./SKILL.md#ccm-k-point-conduct-red-lines) <!-- ccm:k:edge edge:conduct.principle-to-red-lines -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-control-operating-lenses"></a>
@@ -114,8 +108,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.operating-lenses -->
 <!-- ccm:k:nav:start point:control.operating-lenses -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 好编排长什么样——正向审美
 
@@ -130,8 +122,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.good-orchestration -->
 <!-- ccm:k:nav:start point:control.good-orchestration -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ### 红线（Red lines）——完整体
 
@@ -150,8 +140,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.red-lines -->
 <!-- ccm:k:nav:start point:conduct.red-lines -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
 - [contrasts_with: 离席四向命名](./SKILL.md#ccm-k-point-conduct-deserting-podium) <!-- ccm:k:edge edge:conduct.red-lines-to-deserting -->
 - [applies_to: 端点验收 procedure](./references/resume-verify.md#ccm-k-point-verification-endpoint-procedure) <!-- ccm:k:edge edge:conduct.to-verification-exception -->
 <!-- ccm:k:nav:end -->
@@ -170,8 +158,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:conduct.deserting-podium -->
 <!-- ccm:k:nav:start point:conduct.deserting-podium -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:conduct.never-play](../../knowledge/modules/conduct.never-play.md#ccm-k-module-conduct-never-play)
 <!-- ccm:k:nav:end -->
 ### Rationalization Table（合理化对照表）—— 借口，与真相
 
@@ -223,8 +209,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.rationalization-guards -->
 <!-- ccm:k:nav:start point:control.rationalization-guards -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ③ 你的工具箱：skills 地图（progressive disclosure）
 
@@ -287,8 +271,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:control.navigation-map -->
 <!-- ccm:k:nav:start point:control.navigation-map -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->
 ## ④ 最高频行为 / 范式：决策程序 + 操作指导
 
@@ -404,6 +386,4 @@ prefetch / surface 一个 `blocked_on:"user"` 决策时，**连判断依据一�
 <!-- ccm:k:end point:control.decision-program -->
 <!-- ccm:k:nav:start point:control.decision-program -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:control.decision-loop](../../knowledge/modules/control.decision-loop.md#ccm-k-module-control-decision-loop)
 <!-- ccm:k:nav:end -->

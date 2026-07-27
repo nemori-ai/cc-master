@@ -657,6 +657,13 @@ function buildHostCandidate({
     host,
     candidateRoot,
   });
+  // Knowledge graph sources and generated routers are maintainer/compiler
+  // intermediates. The reviewed host policy authorizes only their effects on
+  // runtime skills and entry surfaces, never a top-level runtime knowledge tree.
+  const runtimeKnowledge = path.join(candidateRoot, 'knowledge');
+  if (lstatOrNull(runtimeKnowledge)) {
+    rmNoFollow(runtimeKnowledge, candidateRoot);
+  }
 
   const skillsStaging = path.join(candidateRoot, 'skills');
   if (!fs.existsSync(skillsStaging)) return;

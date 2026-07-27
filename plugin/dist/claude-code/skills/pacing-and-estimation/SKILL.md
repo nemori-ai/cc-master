@@ -59,13 +59,7 @@ description: 'Use when 你（orchestrator/agent）从 Claude Code origin 读取 
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:pacing-and-estimation:
 - [先全局再下钻](./references/usage-signals.md#ccm-k-point-pacing-machine-wide-first)
-- [Module module:pacing.estimation](../../knowledge/modules/pacing.estimation.md#ccm-k-module-pacing-estimation)
 - [primary: 六 estimate verb 消费映射](./references/estimation.md#ccm-k-point-pacing-estimate-verbs)
-- [Module module:pacing.levers](../../knowledge/modules/pacing.levers.md#ccm-k-module-pacing-levers)
 - [primary: 只在上界收紧](./references/pacing-levers.md#ccm-k-point-pacing-upper-bound-only)
-- [Module module:pacing.model-facts](../../knowledge/modules/pacing.model-facts.md#ccm-k-module-pacing-model-facts)
-- [Module module:pacing.pool](../../knowledge/modules/pacing.pool.md#ccm-k-module-pacing-pool)
-- [Module module:pacing.signals](../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
-- [Module module:pacing.target-facts](../../knowledge/modules/pacing.target-facts.md#ccm-k-module-pacing-target-facts)
 - [primary: selected target 事实绑定](./references/cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts)
 <!-- ccm:k:entry-pin:end -->

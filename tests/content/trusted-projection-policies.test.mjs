@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import test from 'node:test';
@@ -20,9 +22,16 @@ import {
   computeContentId,
   computeTreeSha256,
 } from './helpers/trusted-projection/canonical-contract.mjs';
+import { buildAndValidateGraph } from '../../scripts/skill-knowledge/graph.mjs';
+import { buildHostArtifacts } from '../../scripts/skill-knowledge/compile/emit.mjs';
+import { materializeRuntimeArtifacts } from '../../scripts/skill-knowledge/compile/skill-overlay.mjs';
 
 const require = createRequire(import.meta.url);
 const { scanTree } = require('../../scripts/skill-knowledge/trusted-projection/transaction.cjs');
+const {
+  applySkillProjection,
+  planSkillProjection,
+} = require('../../scripts/project-skill.cjs');
 
 function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -425,5 +434,83 @@ test('real frozen repository sources produce exact four-host branded plans witho
       files.some((entry) => entry.path.includes('strategy.yaml')),
       false,
     );
+  }
+});
+
+test('pure pre-compiler planner applies skill anchors to all eight compositions', () => {
+  const repoRoot = path.resolve(new URL('../..', import.meta.url).pathname);
+  const built = buildAndValidateGraph({
+    repoRoot,
+    sourceRoot: 'plugin/src/knowledge',
+  });
+  assert.equal(built.ok, true);
+  assert.equal(built.graph.skills.length, 8);
+  const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tpt-anchor-parity-'));
+  try {
+    for (const skill of built.graph.skills) {
+      const slug = skill.id.replace(/^skill:/u, '');
+      applySkillProjection(
+        planSkillProjection({ repoRoot, host: 'claude-code', skill: slug }),
+        path.join(stagingRoot, 'skills', slug),
+      );
+    }
+    const artifacts = buildHostArtifacts({
+      host: 'claude-code',
+      graph: built.graph,
+      repoRoot,
+      hostDistAbsolute: stagingRoot,
+    }).artifacts;
+    for (const skill of built.graph.skills) {
+      const slug = skill.id.replace(/^skill:/u, '');
+      const runtimePath = `plugin/dist/claude-code/skills/${slug}/SKILL.md`;
+      assert.match(
+        artifacts.get(runtimePath),
+        new RegExp(`^<a id="ccm-k-skill-${slug}"></a>\\n`, 'u'),
+        runtimePath,
+      );
+    }
+  } finally {
+    fs.rmSync(stagingRoot, { recursive: true, force: true });
+  }
+});
+
+test('all four trusted runtime surfaces omit links to repo-only knowledge routers', () => {
+  const repoRoot = path.resolve(new URL('../..', import.meta.url).pathname);
+  const built = buildAndValidateGraph({
+    repoRoot,
+    sourceRoot: 'plugin/src/knowledge',
+  });
+  assert.equal(built.ok, true);
+  const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tpt-runtime-links-'));
+  try {
+    for (const host of PRODUCT_HOSTS) {
+      const hostRoot = path.join(stagingRoot, host);
+      for (const skill of built.graph.skills) {
+        const slug = skill.id.replace(/^skill:/u, '');
+        applySkillProjection(
+          planSkillProjection({ repoRoot, host, skill: slug }),
+          path.join(hostRoot, 'skills', slug),
+        );
+      }
+      const artifacts = materializeRuntimeArtifacts(
+        buildHostArtifacts({
+          host,
+          graph: built.graph,
+          repoRoot,
+          hostDistAbsolute: hostRoot,
+        }).artifacts,
+        { host },
+      );
+      for (const [runtimePath, bytes] of artifacts) {
+        if (runtimePath.startsWith(`plugin/dist/${host}/knowledge/`)) continue;
+        assert.doesNotMatch(
+          bytes,
+          /\]\((?:\.\.\/)*knowledge\/(?:atlas\.md|modules\/)/u,
+          `${host}: ${runtimePath} links to an unpublished knowledge router`,
+        );
+      }
+    }
+  } finally {
+    fs.rmSync(stagingRoot, { recursive: true, force: true });
   }
 });

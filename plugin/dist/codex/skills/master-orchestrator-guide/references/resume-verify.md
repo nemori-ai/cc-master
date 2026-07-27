@@ -28,8 +28,6 @@
 <!-- ccm:k:end point:verification.hash-and-stale -->
 <!-- ccm:k:nav:start point:verification.hash-and-stale -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
 <!-- ccm:k:nav:end -->
 ## 3. 端点验收 —— 唯一可靠的正确性点
 
@@ -47,8 +45,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:verification.endpoint-procedure -->
 <!-- ccm:k:nav:start point:verification.endpoint-procedure -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
 - [routes_to: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:verification.procedure-to-principle -->
 <!-- ccm:k:nav:end -->
 ### resume 第 0 步：先 `cd` 进 `board.git.worktree`，确认 cwd == 它，再接手
@@ -86,8 +82,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:verification.resume-takeover -->
 <!-- ccm:k:nav:start point:verification.resume-takeover -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
 <!-- ccm:k:nav:end -->
 ### 异构族系第二视角（高杠杆 / 临界强制）
 
@@ -132,8 +126,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:verification.heterogeneous-review -->
 <!-- ccm:k:nav:start point:verification.heterogeneous-review -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
 <!-- ccm:k:nav:end -->
 ## 4. Loop 收敛 —— 结构化闸 + 保险丝 + dedup
 
@@ -148,6 +140,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:verification.loop-convergence -->
 <!-- ccm:k:nav:start point:verification.loop-convergence -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:verification.endpoint](../../../knowledge/modules/verification.endpoint.md#ccm-k-module-verification-endpoint)
 <!-- ccm:k:nav:end -->

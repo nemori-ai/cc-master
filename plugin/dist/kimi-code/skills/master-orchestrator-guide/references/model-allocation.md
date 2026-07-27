@@ -21,8 +21,6 @@
 <!-- ccm:k:end point:capacity.task-first-allocation -->
 <!-- ccm:k:nav:start point:capacity.task-first-allocation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->
 ## 可执行排序与 fallback
 
@@ -44,6 +42,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:capacity.ranking-and-contraction -->
 <!-- ccm:k:nav:start point:capacity.ranking-and-contraction -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:capacity.delivery](../../../knowledge/modules/capacity.delivery.md#ccm-k-module-capacity-delivery)
 <!-- ccm:k:nav:end -->

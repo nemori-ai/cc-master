@@ -44,8 +44,6 @@
 <!-- ccm:k:end point:distill.landing-craft -->
 <!-- ccm:k:nav:start point:distill.landing-craft -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:distill.landing](../../../knowledge/modules/distill.landing.md#ccm-k-module-distill-landing)
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.craft-to-evidence -->
 - [contrasts_with: 落地合理化表](./landing-craft-by-asset-type.md#ccm-k-point-distill-landing-rationalization) <!-- ccm:k:edge edge:distill.craft-to-rat -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.craft-to-tree -->
@@ -66,8 +64,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:distill.landing-rationalization -->
 <!-- ccm:k:nav:start point:distill.landing-rationalization -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:distill.landing](../../../knowledge/modules/distill.landing.md#ccm-k-module-distill-landing)
 - [requires: 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity) <!-- ccm:k:edge edge:distill.rat-to-evidence -->
 - [routes_to: 按资产类型的落地手艺](./landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft) <!-- ccm:k:edge edge:distill.rat-to-craft -->
 - [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.hub-from.rat -->

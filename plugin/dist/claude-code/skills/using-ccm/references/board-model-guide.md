@@ -137,8 +137,6 @@
 <!-- ccm:k:end point:ccm.board.task-fields -->
 <!-- ccm:k:nav:start point:ccm.board.task-fields -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.board-core.0 -->
 - [requires: 三档字段操作规则](../SKILL.md#ccm-k-point-ccm-field-tiers) <!-- ccm:k:edge edge:ccm.board-fields-requires-tiers -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.board-core-to-critical -->
@@ -238,8 +236,6 @@ stale      → ready
 <!-- ccm:k:end point:ccm.board.status-semantics -->
 <!-- ccm:k:nav:start point:ccm.board.status-semantics -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: executor 五种语义与选择树](./board-model-guide.md#ccm-k-point-ccm-board-executor-choice) <!-- ccm:k:edge edge:ccm.board-core.1 -->
 - [requires: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.board-status-requires-mind -->
 <!-- ccm:k:nav:end -->
@@ -304,8 +300,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:ccm.board.executor-choice -->
 <!-- ccm:k:nav:start point:ccm.board.executor-choice -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: acceptance 怎么写好](./board-model-guide.md#ccm-k-point-ccm-board-acceptance) <!-- ccm:k:edge edge:ccm.board-core.2 -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.executor-choice.pri -->
 <!-- ccm:k:nav:end -->
@@ -424,8 +418,6 @@ ccm task update T8 --executor subagent
 <!-- ccm:k:end point:ccm.board.planning-routing -->
 <!-- ccm:k:nav:start point:ccm.board.planning-routing -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [next: agents［］ 登记簿语义](./board-model-guide.md#ccm-k-point-ccm-board-agents-registry) <!-- ccm:k:edge edge:ccm.board-ops.0 -->
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.planning-routing.pri -->
 - [requires: planning/routing 是 opt-in 合同](../SKILL.md#ccm-k-point-ccm-planning-opt-in) <!-- ccm:k:edge edge:ccm.planning-requires-optin -->
@@ -488,8 +480,6 @@ typed capability 合并是偏序：只有 `unavailable ≤ supported(同一 cano
 <!-- ccm:k:end point:ccm.board.agents-registry -->
 <!-- ccm:k:nav:start point:ccm.board.agents-registry -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.agents-registry.pri -->
 - [deepens_to: jc 何时建与 severity](./board-model-guide.md#ccm-k-point-ccm-board-jc-judgment) <!-- ccm:k:edge edge:ccm.board-ops.1 -->
 <!-- ccm:k:nav:end -->
@@ -542,8 +532,6 @@ ccm task update T3 --set-json 'acceptance={"criteria":[
 <!-- ccm:k:end point:ccm.board.acceptance -->
 <!-- ccm:k:nav:start point:ccm.board.acceptance -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: estimate 怎么估](./board-model-guide.md#ccm-k-point-ccm-board-estimate-judgment) <!-- ccm:k:edge edge:ccm.board-core.3 -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.acceptance.pri -->
 <!-- ccm:k:nav:end -->
@@ -583,8 +571,6 @@ ccm task add T6 --estimate 1w    # 1 周
 <!-- ccm:k:end point:ccm.board.estimate-judgment -->
 <!-- ccm:k:nav:start point:ccm.board.estimate-judgment -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: deps 怎么连](./board-model-guide.md#ccm-k-point-ccm-board-deps-linking) <!-- ccm:k:edge edge:ccm.board-core.4 -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.estimate-judgment.pri -->
 <!-- ccm:k:nav:end -->
@@ -671,8 +657,6 @@ deps 图的排期、临界路径计算（哪条链条最长、哪个 task 先派
 <!-- ccm:k:end point:ccm.board.deps-linking -->
 <!-- ccm:k:nav:start point:ccm.board.deps-linking -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: blocked_on 怎么选](./board-model-guide.md#ccm-k-point-ccm-board-blocked-on) <!-- ccm:k:edge edge:ccm.board-core.5 -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.deps-linking.pri -->
 <!-- ccm:k:nav:end -->
@@ -721,8 +705,6 @@ ccm task block T9 --on user --decision @/abs/path/decision.json
 <!-- ccm:k:end point:ccm.board.blocked-on -->
 <!-- ccm:k:nav:start point:ccm.board.blocked-on -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.lifecycle](../../../knowledge/modules/ccm.board-model.lifecycle.md#ccm-k-module-ccm-board-model-lifecycle)
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.blocked-on.pri -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-board-jc-judgment"></a>
@@ -785,8 +767,6 @@ high / critical jc 在 Stop hook 回前台时会被显眼提示——用户不�
 <!-- ccm:k:end point:ccm.board.jc-judgment -->
 <!-- ccm:k:nav:start point:ccm.board.jc-judgment -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.jc-judgment.pri -->
 - [next: cadence/iteration 节奏](./board-model-guide.md#ccm-k-point-ccm-board-cadence) <!-- ccm:k:edge edge:ccm.board-ops.2 -->
 <!-- ccm:k:nav:end -->
@@ -833,8 +813,6 @@ ccm cadence ship I1
 <!-- ccm:k:end point:ccm.board.cadence -->
 <!-- ccm:k:nav:start point:ccm.board.cadence -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.cadence.pri -->
 - [deepens_to: parent/owner 嵌套语义](./board-model-guide.md#ccm-k-point-ccm-board-parent-owner) <!-- ccm:k:edge edge:ccm.board-ops.3 -->
 <!-- ccm:k:nav:end -->
@@ -896,8 +874,6 @@ owner 容器节点的 `deps` 应该为空或只含真实的 board 级前置（�
 <!-- ccm:k:end point:ccm.board.parent-owner -->
 <!-- ccm:k:nav:start point:ccm.board.parent-owner -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [next: watchdog 何时 arm](./board-model-guide.md#ccm-k-point-ccm-board-watchdog) <!-- ccm:k:edge edge:ccm.board-ops.4 -->
 - [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.board.parent-owner.to-critical -->
 <!-- ccm:k:nav:end -->
@@ -977,8 +953,6 @@ handle，最后重新 arm。legacy 缺 handle 只触发 `FMT-WATCHDOG` warn，�
 <!-- ccm:k:end point:ccm.board.watchdog -->
 <!-- ccm:k:nav:start point:ccm.board.watchdog -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [deepens_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.board-ops.5 -->
 - [operationalizes: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.board-watchdog-ops-cmd -->
 <!-- ccm:k:nav:end -->
@@ -1054,8 +1028,6 @@ verified = true   ← 端点验收通过
 <!-- ccm:k:end point:ccm.board.artifact-verified -->
 <!-- ccm:k:nav:start point:ccm.board.artifact-verified -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [next: 决策树与反模式深化](./board-model-guide.md#ccm-k-point-ccm-board-antipatterns) <!-- ccm:k:edge edge:ccm.board-ops.6 -->
 - [requires: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.artifact-requires-status -->
 <!-- ccm:k:nav:end -->
@@ -1208,8 +1180,6 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 <!-- ccm:k:end point:ccm.board.antipatterns -->
 <!-- ccm:k:nav:start point:ccm.board.antipatterns -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.antipatterns.pri -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.board-ops-to-lifecycle -->
 - [deepens_to: FMT/GRAPH/BIZ 规则速查（操作视图）](./board-model-guide.md#ccm-k-point-ccm-board-validation-rules) <!-- ccm:k:edge edge:ccm.board-ops.7 -->
@@ -1335,8 +1305,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:ccm.board.validation-rules -->
 <!-- ccm:k:nav:start point:ccm.board.validation-rules -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.validation-rules.pri -->
 - [next: 交付 DDL 四态判断](./board-model-guide.md#ccm-k-point-ccm-board-deadline-ddl) <!-- ccm:k:edge edge:ccm.board-ops.8 -->
 <!-- ccm:k:nav:end -->
@@ -1388,7 +1356,5 @@ Knowledge navigation:
 <!-- ccm:k:end point:ccm.board.deadline-ddl -->
 <!-- ccm:k:nav:start point:ccm.board.deadline-ddl -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:ccm.board-model.contracts](../../../knowledge/modules/ccm.board-model.contracts.md#ccm-k-module-ccm-board-model-contracts)
 - [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.deadline-ddl.pri -->
 <!-- ccm:k:nav:end -->

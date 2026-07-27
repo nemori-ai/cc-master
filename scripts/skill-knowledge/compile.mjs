@@ -21,6 +21,7 @@ import {
   projectCoverageSubgraph,
   resolveHostCoveragePlan,
 } from './host-coverage.mjs';
+import { materializeRuntimeArtifacts } from './compile/skill-overlay.mjs';
 
 function publicDiagnostics(diagnostics) {
   return diagnostics.map(outputDiagnostic);
@@ -180,17 +181,39 @@ function compileOneHost({ host, graph, repoRoot, checkOnly, hostDistAbsolute = n
   diagnostics.push(...hops.diagnostics);
 
   const budgets = checkRouterBudgets(host, projectedGraph, built.artifacts, diagnostics);
+  let returnedArtifacts = built.artifacts;
+  if (!checkOnly && diagnostics.every((item) => item.severity !== 'error')) {
+    returnedArtifacts = materializeRuntimeArtifacts(built.artifacts, { host });
+    try {
+      // The first write is the private compiler proof surface. Only after all
+      // hop contracts pass do these sanitized bytes become runtime material.
+      writeArtifacts(repoRoot, returnedArtifacts, { candidateHostRoots });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      diagnostics.push(
+        diagnostic({
+          severity: 'error',
+          code: 'SKG-COMPILE-RUNTIME-MATERIALIZE',
+          message,
+          location: `plugin/dist/${host}`,
+          witness: { host, error: message },
+          remediation: 'Refuse publication unless the verified surface can be sanitized atomically.',
+          exitCode: EXIT_CODES.projection,
+        }),
+      );
+    }
+  }
   const ok = diagnostics.every((item) => item.severity !== 'error');
 
   return {
     host,
     ok,
     mode: hostPlan.mode === 'full' ? 'canonical' : hostPlan.mode,
-    artifacts: [...built.artifacts.keys()]
+    artifacts: [...returnedArtifacts.keys()]
       .sort()
       .map((item) => ({
         path: item,
-        bytes: Buffer.byteLength(built.artifacts.get(item), 'utf8'),
+        bytes: Buffer.byteLength(returnedArtifacts.get(item), 'utf8'),
       })),
     enabled_edges: surface.enabled_edges,
     point_anchors: surface.point_anchors,

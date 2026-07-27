@@ -24,6 +24,7 @@ import {
 } from './host-plans.mjs';
 import { buildAndValidateGraph } from '../graph.mjs';
 import { buildHostArtifacts } from '../compile/emit.mjs';
+import { materializeRuntimeArtifacts } from '../compile/skill-overlay.mjs';
 import { projectCoverageSubgraph, resolveHostCoveragePlan } from '../host-coverage.mjs';
 
 const require = createRequire(import.meta.url);
@@ -861,7 +862,7 @@ export function buildRepositoryReviewedStrategies({ repoRoot, sourceSnapshot }) 
         stagingRoot,
         frozen,
         sourcesByOutput,
-        overlayArtifacts: compiled.artifacts,
+        overlayArtifacts: materializeRuntimeArtifacts(compiled.artifacts, { host }),
         sourceSnapshot,
       });
       const skillsOutputs = hostOutputs

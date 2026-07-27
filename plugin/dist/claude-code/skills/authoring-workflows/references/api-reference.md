@@ -27,8 +27,6 @@
 <!-- ccm:k:end point:workflow.api-agent -->
 <!-- ccm:k:nav:start point:workflow.api-agent -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-agent-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-parallel"></a>
@@ -45,8 +43,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-parallel -->
 <!-- ccm:k:nav:start point:workflow.api-parallel -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-parallel-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-pipeline"></a>
@@ -62,8 +58,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-pipeline -->
 <!-- ccm:k:nav:start point:workflow.api-pipeline -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-pipeline-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-progress"></a>
@@ -81,8 +75,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-progress -->
 <!-- ccm:k:nav:start point:workflow.api-progress -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-progress-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-composition"></a>
@@ -100,8 +92,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-composition -->
 <!-- ccm:k:nav:start point:workflow.api-composition -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-composition-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-args"></a>
@@ -115,8 +105,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-args -->
 <!-- ccm:k:nav:start point:workflow.api-args -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-args-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-budget"></a>
@@ -137,8 +125,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-budget -->
 <!-- ccm:k:nav:start point:workflow.api-budget -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-budget-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-cache-key"></a>
@@ -159,8 +145,6 @@ Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` �
 <!-- ccm:k:end point:workflow.api-cache-key -->
 <!-- ccm:k:nav:start point:workflow.api-cache-key -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-cache-key-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-failure"></a>
@@ -179,8 +163,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-failure -->
 <!-- ccm:k:nav:start point:workflow.api-failure -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-failure-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-caps"></a>
@@ -195,8 +177,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.api-caps -->
 <!-- ccm:k:nav:start point:workflow.api-caps -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-caps-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-api-meta"></a>
@@ -211,7 +191,5 @@ caps / escape-hatch 违规在 runtime 抛错。没有独立的 linter——权�
 <!-- ccm:k:end point:workflow.api-meta -->
 <!-- ccm:k:nav:start point:workflow.api-meta -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-meta-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->

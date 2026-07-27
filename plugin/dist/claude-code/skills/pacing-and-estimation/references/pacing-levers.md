@@ -23,8 +23,6 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 <!-- ccm:k:end point:pacing.upper-bound-only -->
 <!-- ccm:k:nav:start point:pacing.upper-bound-only -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.levers](../../../knowledge/modules/pacing.levers.md#ccm-k-module-pacing-levers)
 - [operationalizes: 决策影响向量](./pacing-levers.md#ccm-k-point-pacing-decision-vectors) <!-- ccm:k:edge edge:pacing.upper-to-vectors -->
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.upper-to-global -->
 - [deepens_to: 读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row) <!-- ccm:k:edge edge:pacing.levers-to-pool -->
@@ -43,8 +41,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.decision-vectors -->
 <!-- ccm:k:nav:start point:pacing.decision-vectors -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.levers](../../../knowledge/modules/pacing.levers.md#ccm-k-module-pacing-levers)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.vectors -->
 - [routes_to: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.vectors-to-upper -->
 - [applies_to: usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension) <!-- ccm:k:edge edge:pacing.levers-to-tension -->

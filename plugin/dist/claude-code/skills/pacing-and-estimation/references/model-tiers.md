@@ -23,8 +23,6 @@ ccm provider facts <claude-code|codex|cursor|kimi-code> --json
 <!-- ccm:k:end point:pacing.model-tier-facts -->
 <!-- ccm:k:nav:start point:pacing.model-tier-facts -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.model-facts](../../../knowledge/modules/pacing.model-facts.md#ccm-k-module-pacing-model-facts)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.model-to-global -->
 - [routes_to: selected target 事实绑定](./cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts) <!-- ccm:k:edge edge:pacing.model-to-target -->
 <!-- ccm:k:nav:end -->

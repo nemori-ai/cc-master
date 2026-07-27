@@ -9,6 +9,10 @@ const {
   freezeSourceSnapshot,
 } = require('./host-plans.mjs');
 const {
+  buildRepositoryReviewedStrategies,
+  freezeTrustedProjectionPolicy,
+} = require('./policies.mjs');
+const {
   scanTree: scanReleaseArtifactTree,
 } = require('../../trusted-release-bundle.mjs');
 
@@ -269,6 +273,13 @@ function assertCandidateMatchesProjectionPlan(plan, candidate) {
     .map(comparable);
   const actualComparable = candidate.entries.map(comparable);
   if (stableJson(expectedComparable) !== stableJson(actualComparable)) {
+    const mismatchIndex = Array.from({
+      length: Math.max(expectedComparable.length, actualComparable.length),
+    }).findIndex(
+      (_, index) =>
+        stableJson(expectedComparable[index] ?? null) !==
+        stableJson(actualComparable[index] ?? null),
+    );
     throw new TrustedProjectionError(
       'TPT-PLAN-DRIFT',
       'candidate does not exactly match the pre-compile trusted ProjectionPlan',
@@ -277,9 +288,58 @@ function assertCandidateMatchesProjectionPlan(plan, candidate) {
           projection_plan_id: plan.projection_plan_id,
           expected_paths: expected.map(({ path: relative }) => relative),
           actual_paths: candidate.entries.map(({ path: relative }) => relative),
+          first_mismatch: {
+            index: mismatchIndex,
+            expected: expectedComparable[mismatchIndex] ?? null,
+            actual: actualComparable[mismatchIndex] ?? null,
+          },
         },
       },
     );
+  }
+}
+
+function pruneUnplannedEmptyDirectories(candidateRoot, projectionPlan) {
+  const planned = new Set(
+    projectionPlan.expected_entries
+      .filter(({ kind }) => kind === 'directory')
+      .map(({ path: relative }) => relative),
+  );
+  const visit = (absolute, relative) => {
+    for (const name of fs.readdirSync(absolute)) {
+      const child = path.join(absolute, name);
+      const stat = fs.lstatSync(child);
+      if (!stat.isSymbolicLink() && stat.isDirectory()) {
+        visit(child, relative ? `${relative}/${name}` : name);
+      }
+    }
+    if (
+      relative &&
+      !planned.has(relative) &&
+      fs.readdirSync(absolute).length === 0
+    ) {
+      fs.rmdirSync(absolute);
+    }
+  };
+  visit(candidateRoot, '');
+}
+
+function applyPlannedModes(candidateRoot, projectionPlan) {
+  for (const entry of projectionPlan.expected_entries) {
+    if (entry.path === '.') continue;
+    const target = path.join(candidateRoot, ...entry.path.split('/'));
+    const stat = lstatOrNull(target);
+    if (
+      !stat ||
+      stat.isSymbolicLink() ||
+      (entry.kind === 'directory' ? !stat.isDirectory() : !stat.isFile())
+    ) {
+      throw new TrustedProjectionError(
+        'TPT-PLAN-DRIFT',
+        `planned entry is missing or unsafe before verification: ${entry.path}`,
+      );
+    }
+    fs.chmodSync(target, entry.posix_mode);
   }
 }
 
@@ -682,26 +742,24 @@ function runTrustedProjectionTransaction({
       source_content_id: sourceObservation.artifact_content_id,
     }),
   )}`;
-  if (!projectionPolicy) {
-    throw new TrustedProjectionError(
-      'TPT-HOST-POLICY-UNSUPPORTED',
-      `trusted source/strategy projection policy is not available for ${host}; legacy candidate-derived planning is forbidden`,
-      {
-        transaction_id: transactionId,
-        remediation:
-          'Provide a freezeTrustedHostPolicy result with pre-compile expected entries; do not derive expected bytes from a candidate tree.',
-      },
-    );
-  }
   const sourceSnapshot = freezeSourceSnapshot({
     transactionId,
     entries: sourceObservation.entries,
   });
+  const effectiveProjectionPolicy =
+    projectionPolicy ??
+    freezeTrustedProjectionPolicy({
+      sourceSnapshot,
+      reviewedStrategies: buildRepositoryReviewedStrategies({
+        repoRoot,
+        sourceSnapshot,
+      }),
+    });
   const projectionPlan = freezeProjectionPlan({
     sourceSnapshot,
     host,
     scope: requestedSurface,
-    policy: projectionPolicy,
+    policy: effectiveProjectionPolicy,
     verifiedBase,
   });
   const { lockRoot, backup } = acquireHostLock({
@@ -739,6 +797,8 @@ function runTrustedProjectionTransaction({
       candidateRoot,
       purpose: 'candidate',
     });
+    pruneUnplannedEmptyDirectories(candidateRoot, projectionPlan);
+    applyPlannedModes(candidateRoot, projectionPlan);
     const candidateSnapshot = scanTree(candidateRoot, 'candidate');
     assertCandidateMatchesProjectionPlan(projectionPlan, candidateSnapshot);
     const sourceAtVerify = scanTree(sourceRoot, 'source-verify');

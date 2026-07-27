@@ -22,8 +22,6 @@
 <!-- ccm:k:end point:pacing.machine-wide-first -->
 <!-- ccm:k:nav:start point:pacing.machine-wide-first -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.signals](../../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
 - [next: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.signals-to-estimate -->
 - [next: refresh_hint 恢复边界](./usage-signals.md#ccm-k-point-pacing-refresh-hint) <!-- ccm:k:edge edge:pacing.global-to-refresh -->
 - [next: selected target 事实绑定](./cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts) <!-- ccm:k:edge edge:pacing.signals-to-target -->
@@ -44,8 +42,6 @@ healthy。无论哪条路径，ccm 都不输出 token；Kimi 以外不替 provid
 <!-- ccm:k:end point:pacing.refresh-hint -->
 <!-- ccm:k:nav:start point:pacing.refresh-hint -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.signals](../../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.refresh-to-global -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-pacing-window-contracts"></a>
@@ -69,8 +65,6 @@ Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平�
 <!-- ccm:k:end point:pacing.window-contracts -->
 <!-- ccm:k:nav:start point:pacing.window-contracts -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.signals](../../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.windows-to-global -->
 - [requires: 信号诚实天花板](./usage-signals.md#ccm-k-point-pacing-signal-ceiling) <!-- ccm:k:edge edge:pacing.windows-to-ceiling -->
 <!-- ccm:k:nav:end -->
@@ -93,8 +87,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:pacing.signal-ceiling -->
 <!-- ccm:k:nav:start point:pacing.signal-ceiling -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:pacing.signals](../../../knowledge/modules/pacing.signals.md#ccm-k-module-pacing-signals)
 - [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.ceiling-to-global -->
 - [next: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.signals-to-levers -->
 <!-- ccm:k:nav:end -->

@@ -634,16 +634,21 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
     }
   }
 
-  // Skill-level anchor on SKILL.md for C9 skill pattern completeness.
-  // When the skill file was already materialized above with skillId, skip.
-  const skill = graph.skills[0];
-  if (skill) {
+  // Skill-level anchors are part of every accepted composition's runtime
+  // identity. Apply them after point/entry overlays so the pure pre-compiler
+  // planner and the per-skill final-overlay bridge produce identical bytes.
+  for (const skill of graph.skills ?? []) {
     const skillPath = `plugin/dist/${host}/skills/${skill.id.replace(/^skill:/, '')}/SKILL.md`;
-    if (!artifacts.has(skillPath) && fs.existsSync(physicalFor(skillPath))) {
+    if (fs.existsSync(physicalFor(skillPath))) {
       try {
-        const raw = fs.readFileSync(physicalFor(skillPath), 'utf8');
+        const materialized = artifacts.get(skillPath);
+        const raw =
+          materialized === undefined
+            ? fs.readFileSync(physicalFor(skillPath), 'utf8')
+            : materialized;
         inspectCompilerOwnedOverlay(raw);
-        const base = stripCompilerOwnedOverlay(raw);
+        const base =
+          materialized === undefined ? stripCompilerOwnedOverlay(raw) : raw;
         artifacts.set(skillPath, applySkillLevelAnchor({ text: base, skillId: skill.id }));
       } catch (error) {
         diagnostics.push({

@@ -25,8 +25,6 @@
 <!-- ccm:k:end point:capacity.account-switch-gate -->
 <!-- ccm:k:nav:start point:capacity.account-switch-gate -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:capacity.account-switch](../../../knowledge/modules/capacity.account-switch.md#ccm-k-module-capacity-account-switch)
 <!-- ccm:k:nav:end -->
 ## 编排决策序列（无重启形态，4 步）
 
@@ -43,6 +41,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:capacity.account-switch-sequence -->
 <!-- ccm:k:nav:start point:capacity.account-switch-sequence -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:capacity.account-switch](../../../knowledge/modules/capacity.account-switch.md#ccm-k-module-capacity-account-switch)
 <!-- ccm:k:nav:end -->

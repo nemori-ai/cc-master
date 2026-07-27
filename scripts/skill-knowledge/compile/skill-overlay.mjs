@@ -35,6 +35,33 @@ import {
 
 export const NAV_END = '<!-- ccm:k:nav:end -->';
 
+const REPO_ONLY_KNOWLEDGE_LINK_LINE_RE =
+  /^- \[(?:Knowledge atlas|Module module:[^\]]+)\]\((?:\.\.\/)*knowledge\/(?:atlas\.md|modules\/[^)]+)\)\n?/gmu;
+
+/**
+ * Remove only compiler-owned links to the repo-only atlas/module router tree.
+ * The compiler retains them through graph verification; every runtime
+ * materializer applies this sanitizer before its bytes become trusted.
+ */
+export function stripRuntimeKnowledgeRouterLinks(text) {
+  return ensureTrailingNewline(
+    String(text ?? '').replace(REPO_ONLY_KNOWLEDGE_LINK_LINE_RE, ''),
+  );
+}
+
+export function materializeRuntimeArtifacts(artifacts, { host }) {
+  const runtimePrefix = `plugin/dist/${assertSafeOverlayHost(host)}/`;
+  const knowledgePrefix = `${runtimePrefix}knowledge/`;
+  return new Map(
+    [...artifacts].map(([artifactPath, text]) => [
+      artifactPath,
+      artifactPath.startsWith(runtimePrefix) && !artifactPath.startsWith(knowledgePrefix)
+        ? stripRuntimeKnowledgeRouterLinks(text)
+        : text,
+    ]),
+  );
+}
+
 /** Trailing compiler-owned authored-edge identity marker on nav link lines. */
 export const EDGE_MARKER_RE =
   /<!--\s*ccm:k:edge\s+(edge:[a-z0-9][a-z0-9.-]*)\s*-->/g;
@@ -517,7 +544,8 @@ export function applyPointOverlaysToSkillMarkdown({
     (inspection.nav_blocks > 0 ||
       inspection.point_anchors > 0 ||
       inspection.skill_anchors > 0) &&
-    sourceWithoutPins !== expectedNav
+    sourceWithoutPins !== expectedNav &&
+    sourceWithoutPins !== stripRuntimeKnowledgeRouterLinks(expectedNav)
   ) {
     throw new SkillOverlayError(
       'SKG-OVERLAY-PLAN-MISMATCH',
@@ -1208,14 +1236,14 @@ export function applyFinalSkillOverlaysToTree({
     const raw = stagingRootAbsolute
       ? readFileNoFollowContained(absolute, stagingRootAbsolute)
       : fs.readFileSync(absolute, 'utf8');
-    const finalBytes = applyPointOverlaysToSkillMarkdown({
+    const finalBytes = stripRuntimeKnowledgeRouterLinks(applyPointOverlaysToSkillMarkdown({
       text: raw,
       host: safeHost,
       graph: overlayGraph,
       distRel,
       pointsForFile: filePoints,
       skillId: relativeInside === 'SKILL.md' && skillInGraph ? skillId : null,
-    });
+    }));
     if (stagingRootAbsolute) {
       writeFileAtomicNoFollowContained(absolute, finalBytes, stagingRootAbsolute);
     } else {
@@ -1313,13 +1341,13 @@ export function applySkillsScopedEntryPins({
       const raw = stagingRootAbsolute
         ? readFileNoFollowContained(absolute, stagingRootAbsolute)
         : fs.readFileSync(absolute, 'utf8');
-      const finalBytes = applyEntryPinOverlay({
+      const finalBytes = stripRuntimeKnowledgeRouterLinks(applyEntryPinOverlay({
         text: raw,
         host: safeHost,
         entry,
         graph: overlayGraph,
         distRel,
-      });
+      }));
       if (stagingRootAbsolute) {
         writeFileAtomicNoFollowContained(absolute, finalBytes, stagingRootAbsolute);
       } else {

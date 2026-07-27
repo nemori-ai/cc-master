@@ -115,8 +115,6 @@ until <external state ready>; do sleep 60; done   # run_in_background → harnes
 <!-- ccm:k:end point:dispatch.dataflow-and-mechanisms -->
 <!-- ccm:k:nav:start point:dispatch.dataflow-and-mechanisms -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:dispatch.parallel-mechanisms](../../../knowledge/modules/dispatch.parallel-mechanisms.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## 稳定路由合同入口
 
@@ -151,8 +149,6 @@ origin 不是 worker pool 边界；target surface、真实 help、资格硬门�
 <!-- ccm:k:end point:dispatch.routing-and-isolation -->
 <!-- ccm:k:nav:start point:dispatch.routing-and-isolation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:dispatch.parallel-mechanisms](../../../knowledge/modules/dispatch.parallel-mechanisms.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## Intra vs inter workflow —— 轴 = 生命周期耦合
 
@@ -194,8 +190,6 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 <!-- ccm:k:end point:dispatch.workflow-and-escalation -->
 <!-- ccm:k:nav:start point:dispatch.workflow-and-escalation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:dispatch.parallel-mechanisms](../../../knowledge/modules/dispatch.parallel-mechanisms.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
@@ -227,6 +221,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:dispatch.hygiene-and-liveness -->
 <!-- ccm:k:nav:start point:dispatch.hygiene-and-liveness -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:dispatch.parallel-mechanisms](../../../knowledge/modules/dispatch.parallel-mechanisms.md#ccm-k-module-dispatch-parallel-mechanisms)
 <!-- ccm:k:nav:end -->

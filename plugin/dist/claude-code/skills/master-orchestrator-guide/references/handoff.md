@@ -44,8 +44,6 @@
 <!-- ccm:k:end point:handoff.procedure-and-drain -->
 <!-- ccm:k:nav:start point:handoff.procedure-and-drain -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:continuity.handoff](../../../knowledge/modules/continuity.handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->
 ## 叙事层 / 无噪声纪律（judgment-bearing）
 
@@ -113,8 +111,6 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 <!-- ccm:k:end point:handoff.judgment-template -->
 <!-- ccm:k:nav:start point:handoff.judgment-template -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:continuity.handoff](../../../knowledge/modules/continuity.handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->
 ## 归档换无摩擦 resume 的 rationale
 
@@ -153,6 +149,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:handoff.rationale-and-guards -->
 <!-- ccm:k:nav:start point:handoff.rationale-and-guards -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:continuity.handoff](../../../knowledge/modules/continuity.handoff.md#ccm-k-module-continuity-handoff)
 <!-- ccm:k:nav:end -->

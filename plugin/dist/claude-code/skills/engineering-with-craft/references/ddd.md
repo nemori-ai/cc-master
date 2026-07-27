@@ -45,8 +45,6 @@ DDD 的每一项仪式——aggregate、repository、分层、事件——都是
 <!-- ccm:k:end point:ddd.admission-question -->
 <!-- ccm:k:nav:start point:ddd.admission-question -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.domain-modeling.to-shared-spine -->
 - [deepens_to: Aggregate 与不变式所有权](./ddd.md#ccm-k-point-ddd-aggregate-ownership) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-aggregate-ownership -->
 - [deepens_to: 应用层推导](./ddd.md#ccm-k-point-ddd-application-derivation) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-application-derivation -->
@@ -124,8 +122,6 @@ Ubiquitous language 是你**培育**的活合约，不是你**写下**的术语�
 <!-- ccm:k:end point:ddd.strategic-boundaries -->
 <!-- ccm:k:nav:start point:ddd.strategic-boundaries -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.strategic-boundaries-to-admission-question -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ddd-aggregate-ownership"></a>
@@ -180,8 +176,6 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 <!-- ccm:k:end point:ddd.aggregate-ownership -->
 <!-- ccm:k:nav:start point:ddd.aggregate-ownership -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.aggregate-ownership-to-admission-question -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ddd-application-derivation"></a>
@@ -215,8 +209,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:ddd.application-derivation -->
 <!-- ccm:k:nav:start point:ddd.application-derivation -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.application-derivation-to-admission-question -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ddd-red-lines"></a>
@@ -242,8 +234,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:ddd.red-lines -->
 <!-- ccm:k:nav:start point:ddd.red-lines -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.red-lines-to-admission-question -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ddd-failure-radar"></a>
@@ -266,8 +256,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:ddd.failure-radar -->
 <!-- ccm:k:nav:start point:ddd.failure-radar -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.failure-radar-to-admission-question -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ddd-design-focus"></a>
@@ -295,7 +283,5 @@ Knowledge navigation:
 <!-- ccm:k:end point:ddd.design-focus -->
 <!-- ccm:k:nav:start point:ddd.design-focus -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:craft.domain-modeling](../../../knowledge/modules/craft.domain-modeling.md#ccm-k-module-craft-domain-modeling)
 - [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.design-focus-to-admission-question -->
 <!-- ccm:k:nav:end -->

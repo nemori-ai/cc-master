@@ -73,8 +73,6 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 <!-- ccm:k:end point:scheduling.dag-and-critical-path -->
 <!-- ccm:k:nav:start point:scheduling.dag-and-critical-path -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:scheduling.dependency-dag](../../../knowledge/modules/scheduling.dependency-dag.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->
 ## 4. 并行度 = T₁/T∞ —— 值得开几条道
 
@@ -110,8 +108,6 @@ work-span 模型量化并行到底值不值、天花板在哪（这些量由 `cc
 <!-- ccm:k:end point:scheduling.parallelism-and-granularity -->
 <!-- ccm:k:nav:start point:scheduling.parallelism-and-granularity -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:scheduling.dependency-dag](../../../knowledge/modules/scheduling.dependency-dag.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->
 ## 6. 每节点契约 —— 派发前定义
 
@@ -131,6 +127,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:scheduling.node-contract -->
 <!-- ccm:k:nav:start point:scheduling.node-contract -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:scheduling.dependency-dag](../../../knowledge/modules/scheduling.dependency-dag.md#ccm-k-module-scheduling-dependency-dag)
 <!-- ccm:k:nav:end -->

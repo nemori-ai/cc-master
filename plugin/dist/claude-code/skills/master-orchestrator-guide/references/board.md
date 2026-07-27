@@ -63,8 +63,6 @@
 <!-- ccm:k:end point:board.waist-and-write -->
 <!-- ccm:k:nav:start point:board.waist-and-write -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:state.board](../../../knowledge/modules/state.board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## Supersession —— 显式状态，非隐式 GC
 
@@ -110,8 +108,6 @@ lint 守「board 写得对不对」；**图分析**则在 board 写对之后回�
 <!-- ccm:k:end point:board.audit-and-graph -->
 <!-- ccm:k:nav:start point:board.audit-and-graph -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:state.board](../../../knowledge/modules/state.board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## `owner.heartbeat` —— resume 探测信号
 
@@ -161,8 +157,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:board.resume-and-interview -->
 <!-- ccm:k:nav:start point:board.resume-and-interview -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:state.board](../../../knowledge/modules/state.board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->
 ## 示例（worked board 全字段样例）
 
@@ -198,6 +192,4 @@ Knowledge navigation:
 <!-- ccm:k:end point:board.worked-example -->
 <!-- ccm:k:nav:start point:board.worked-example -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:state.board](../../../knowledge/modules/state.board.md#ccm-k-module-state-board)
 <!-- ccm:k:nav:end -->

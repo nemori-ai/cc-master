@@ -24,8 +24,6 @@ compact 是机械动作,不是你能可靠预判的日程点。你通常只能�
 <!-- ccm:k:end point:devloop.ledger-when -->
 <!-- ccm:k:nav:start point:devloop.ledger-when -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:devloop.ledger](../../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [next: ledger 写什么](./optimization-ledger.md#ccm-k-point-devloop-ledger-what) <!-- ccm:k:edge edge:devloop.ledger-when-to-what -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.ledger-when-to-objective -->
 - [routes_to: 外层编排与内层下降](../SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.ledger-when-to-two-scale -->
@@ -51,8 +49,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.ledger-what -->
 <!-- ccm:k:nav:start point:devloop.ledger-what -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:devloop.ledger](../../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [operationalizes: 用 ccm 管住优化目标](./optimization-ledger.md#ccm-k-point-devloop-ledger-ccm) <!-- ccm:k:edge edge:devloop.ledger-what-to-ccm -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-what -->
 <!-- ccm:k:nav:end -->
@@ -74,8 +70,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.ledger-ccm -->
 <!-- ccm:k:nav:start point:devloop.ledger-ccm -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:devloop.ledger](../../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [next: 持续 handoff](./optimization-ledger.md#ccm-k-point-devloop-ledger-handoff) <!-- ccm:k:edge edge:devloop.ledger-ccm-to-handoff -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-ccm -->
 <!-- ccm:k:nav:end -->
@@ -109,8 +103,6 @@ stop_or_restart: <继续 / 收敛停机 / restart 的条件>
 <!-- ccm:k:end point:devloop.ledger-handoff -->
 <!-- ccm:k:nav:start point:devloop.ledger-handoff -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:devloop.ledger](../../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [contrasts_with: ledger 反模式](./optimization-ledger.md#ccm-k-point-devloop-ledger-antipatterns) <!-- ccm:k:edge edge:devloop.ledger-handoff-to-anti -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-handoff -->
 <!-- ccm:k:nav:end -->
@@ -129,8 +121,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:devloop.ledger-antipatterns -->
 <!-- ccm:k:nav:start point:devloop.ledger-antipatterns -->
 Knowledge navigation:
-- [Knowledge atlas](../../../knowledge/atlas.md)
-- [Module module:devloop.ledger](../../../knowledge/modules/devloop.ledger.md#ccm-k-module-devloop-ledger)
 - [routes_to: 何时必须写 ledger](./optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.ledger-anti-to-when -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-antipatterns -->
 <!-- ccm:k:nav:end -->

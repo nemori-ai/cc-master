@@ -23,8 +23,6 @@ workflow 是有开销的，只值得任务要协调**几十到几百个 agent**�
 <!-- ccm:k:end point:workflow.admission -->
 <!-- ccm:k:nav:start point:workflow.admission -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:workflow.selection](../../knowledge/modules/workflow.selection.md#ccm-k-module-workflow-selection)
 - [routes_to: Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.selection.admission-to-shape-tree -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-shape-tree"></a>
@@ -62,8 +60,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.shape-tree -->
 <!-- ccm:k:nav:start point:workflow.shape-tree -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:workflow.selection](../../knowledge/modules/workflow.selection.md#ccm-k-module-workflow-selection)
 - [deepens_to: Workflow 准入](./SKILL.md#ccm-k-point-workflow-admission) <!-- ccm:k:edge edge:workflow.selection.shape-tree-to-admission -->
 - [routes_to: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.selection.to-runtime-contract -->
 - [deepens_to: Pipeline by default](./references/patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.selection.to-pattern-catalog -->
@@ -100,8 +96,6 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.authoring-contract -->
 <!-- ccm:k:nav:start point:workflow.authoring-contract -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:workflow.runtime-contract](../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [routes_to: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.authoring-contract-to-contract-vs-internals -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-workflow-resource-index"></a>
@@ -147,16 +141,11 @@ Knowledge navigation:
 <!-- ccm:k:end point:workflow.resource-index -->
 <!-- ccm:k:nav:start point:workflow.resource-index -->
 Knowledge navigation:
-- [Knowledge atlas](../../knowledge/atlas.md)
-- [Module module:workflow.selection](../../knowledge/modules/workflow.selection.md#ccm-k-module-workflow-selection)
 - [routes_to: Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.selection.resource-index-to-shape-tree -->
 <!-- ccm:k:nav:end -->
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:workflow-authoring:
 - [Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree)
-- [Module module:workflow.pattern-catalog](../../knowledge/modules/workflow.pattern-catalog.md#ccm-k-module-workflow-pattern-catalog)
 - [primary: Pipeline by default](./references/patterns.md#ccm-k-point-workflow-pattern-pipeline)
-- [Module module:workflow.runtime-contract](../../knowledge/modules/workflow.runtime-contract.md#ccm-k-module-workflow-runtime-contract)
 - [primary: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals)
-- [Module module:workflow.selection](../../knowledge/modules/workflow.selection.md#ccm-k-module-workflow-selection)
 <!-- ccm:k:entry-pin:end -->
