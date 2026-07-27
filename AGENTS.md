@@ -1,7 +1,7 @@
 ---
 path: AGENTS.md
 version: v1.0
-last-edited: 2026-07-24
+last-edited: 2026-07-27
 agent-edit-policy: |
   仓库根 AGENTS.md——agent / 贡献者进入 cc-master 的着陆页与导航地图。三类编辑分级：
   - 自主刷新（无需 PR 人审）：§12 目录/文件约定在子目录增减时刷新行级；§N 触发式深入阅读表新增行；§9 findings 台账新增条目的指针；frontmatter 的 last-edited / version 字段；命令或脚本落地后在对应表追加行。
@@ -180,6 +180,8 @@ cc-master 把 **codex 当独立的第二端点验收者**（呼应红线 4 "指�
 
 落地物：[`skills/master-orchestrator-guide/scripts/codex-review.sh`](plugin/src/skills/master-orchestrator-guide/canonical/scripts/codex-review.sh)——纯 shell 封装 `codex exec review ... --json`，只读 sandbox，对一段 diff 出 `verdict: approve | needs-attention` + 每条 finding 的 severity/file/line。**空 review / OAuth 过期 → 按"未通过"处理**（silent-pass-through guard，不静默放行）。`verdict` 映射现有 Joiner 闸：`needs-attention` → Replan；`approve` + 非空 + 已读 diff → done。
 → 文档化：[`skills/master-orchestrator-guide/references/resume-verify.md`](plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md)（codex 第二验收者小节）· 指针：`/codex` skill。
+
+**Reviewer scope contract**：本仓每个 feature slice 的 review prompt 必须逐字带上 acceptance 与 non-goals；finding 只有能映射回其中一条 acceptance 才能打回，out-of-scope finding 只能登记 follow-up。原因是 K3-01P 曾把派生的 public topology / independent oracle / sealed release 设计升级成 blocker，遮蔽了用户要求的最小 knowledge 分发边界。完整的 scope lock、最小充分方案与 restart threshold 见 [`CONTRIBUTING.md` 的 scope discipline](CONTRIBUTING.md#scope-discipline-evidence-grounded-by-k3-01p)。这是用户据本次事故明确要求建立的项目研发纪律；证据边界仍限于本仓，不外推成其他项目的通用 review 真理。
 
 ---
 
