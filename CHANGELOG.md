@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `master-orchestrator-guide` gains a new on-demand reference,
+  `references/user-unknowns.md`, covering how to surface what a user cannot
+  articulate: the four kinds of unknowns as an internal routing axis, which
+  discovery technique fits which kind (scan the terrain, offer contrasting
+  artifacts, interview, or build the user's judgment frame first), one-question
+  interview discipline ordered by architectural consequence, and preferring a
+  concrete artifact over prose. Low-risk reversible work stays ceremony-free.
+- Endpoint verification now has a second object: `references/resume-verify.md`
+  adds risk-tiered user-understanding checks, so a high-risk change ships with
+  a decision summary and a real comprehension check instead of a "looks good?".
+- `references/multi-layer-planning.md` adds a deviation trail requirement to
+  the dispatch contract for large nodes, so choices made when the plan meets
+  reality are visible at endpoint verification rather than silent.
+
+### Changed
+
+- Node contracts now ask for executable acceptance artifacts — a failing test,
+  a rubric, a real sample — in preference to prose acceptance descriptions.
+- Raised the knowledge atlas router budget from 2800 to 3000 estimated tokens.
+  The atlas carries one entry per module, so its size grows with the module
+  count; at 46 modules it had roughly 11 tokens of headroom and any new module
+  overflowed it.
+
 ## [0.22.0] — 2026-07-23
 
 > **Noncommercial license boundary release** — the first cc-master plugin

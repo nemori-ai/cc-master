@@ -259,6 +259,7 @@ Knowledge navigation:
 - [runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
 - [summary: routing 链中的 terminal 提醒](./worker-routing.md#ccm-k-point-verification-terminal-summary)
 - [canonicalize → runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [用户理解校验](./resume-verify.md#ccm-k-point-verification-user-understanding)
 
 ## Back to atlas
 

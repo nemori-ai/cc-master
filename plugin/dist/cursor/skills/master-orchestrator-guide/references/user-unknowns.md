@@ -1,0 +1,154 @@
+# 与用户共构未知：把说不出口的东西挖出来
+
+> **何时读：** 目标模糊、你对这片地不熟、或者用户给的是一个猜出来的方案而不是他真正的痛点时。你要判断三件事：现在缺的是哪一类未知？该用哪种手法去挖？以及——什么时候什么都不用挖，直接推进。
+
+## 地图不是那片地
+
+<a id="ccm-k-point-unknowns-four-quadrants"></a>
+<!-- ccm:k:start point:unknowns.four-quadrants -->
+你的请求、你的计划、你的 board、你手上这些指导，**全都只是对工作的表示，不是工作本身**。真实的代码库、真实的产品、真实的约束、用户真正想要的东西——那才是那片地。两者之差，就是你的未知。
+
+**模型越强，这个差越危险。** 能力弱时它会卡住、会报错、会明着说不懂；能力强时它带着一个错误假设自信地一路跑完，失败要到多个 session 之后才复合式爆出来。所以**「没人卡住」不是「没有未知」的证据**——顺畅本身就该让你警觉。
+
+四类未知，按「谁知道 / 谁不知道自己不知道」分：
+
+| 类型 | 是什么 | 主要障碍 |
+|---|---|---|
+| **已知的已知** | 用户写进请求里的 | 无 |
+| **已知的未知** | 用户知道自己还没想清的 | 他没说，你没问 |
+| **未知的已知** | 对用户显然到不会写下来、一看却立刻认得的（审美、交互、产品品味、团队惯例） | **说不出口**——语言这个通道本身失效 |
+| **未知的未知** | 用户压根没想到的 | **连问题都提不出来** |
+
+后两类是主战场。前两类你已经有办法（写下来的照做，没想清的开口问）；后两类需要专门的手法，因为它们各自坏在不同的通道上。
+
+**这是你的内部分派轴，不是对用户的话术。** 绝不对用户说「你有未知的未知」——既居高临下，又要求对方先学一套黑话。对用户只说你要做的动作，措辞样例见下一节。
+
+与 `references/outside-in.md` 的分工（不复述它）：那份管**已经表述出来的假设够不够硬**，问「哪项外部事实能推翻它」；本文管**哪些东西还没被表述出来**。一个假设得先被说出口，才谈得上被证伪——本文补的正是它上游那一段。两根轴正交，别把四类未知塞进它的证据分级里，也别拿证据分级当发现手法。
+<!-- ccm:k:end point:unknowns.four-quadrants -->
+<!-- ccm:k:nav:start point:unknowns.four-quadrants -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:collab.unknowns](./user-unknowns.md#ccm-k-module-collab-unknowns)
+- [contrasts_with: 外部有效性与证据等级](./outside-in.md#ccm-k-point-outside-evidence-levels) <!-- ccm:k:edge edge:unknowns.quadrants-to-evidence-levels -->
+- [deepens_to: 按未知类型分派发现手法](./user-unknowns.md#ccm-k-point-unknowns-technique-routing) <!-- ccm:k:edge edge:unknowns.quadrants-to-routing -->
+<!-- ccm:k:nav:end -->
+## 按未知的类型选手法，不是走一套通用流程
+
+<a id="ccm-k-point-unknowns-technique-routing"></a>
+<!-- ccm:k:start point:unknowns.technique-routing -->
+三种手法**不可互换**，因为它们修的是不同的坏掉的通道：
+
+- **未知的未知 → 扫描那片地。** 你连问题都提不出来，问什么都问不到点上。做法：派一个 worker 去读那片你不熟的地（相关模块、既有实现、现有约束），**要求它产出「你该问但没问的问题」清单，而不是产出方案**。这一步的产物是问题，不是答案；拿到清单后再决定哪几条值得升级成给用户的问题。
+- **未知的已知 → 造几个差别大的物，让人指着反应。** 语言通道在这里是失效的——用户说不出来，但一看就认得。做法：低成本、**方向差异要大**（不是同一个方案的三个色号），让用户指着说「这个不对」「这个对」。**指一个真实的既有实现当参照，常常比任何描述都准。**
+- **已知的未知 → 开口问。** 见下一节的提问纪律。
+- **用户连「什么叫好」都还没有 → 先建框架再问。** 见再下一节。
+
+**四类都不缺 → 直接推进，一个仪式都别加。** 豁免判据走 `references/outside-in.md` 的低风险可逆那一条（低影响范围 ∧ 可逆 ∧ 事实充分），此处不复述。**对一个可逆的小改堆访谈、堆原型、堆确认，和闭门造车是同一根走廊的两侧悬崖**——一侧是在没验证的假设上不可逆地大投入，另一侧是把预算和用户的注意力烧在临界路径外。
+
+### 对用户怎么说：说动作，不说分类
+
+| 场景 | 这样说 | 别这样说 |
+|---|---|---|
+| 要扫描不熟的地 | 「这块我不熟，我先让一个 worker 把这个模块扫一遍、列出我该问你但没问的，你看看有没有踩雷的。」 | 「让我先做一次未知的未知扫描。」 |
+| 要造物激发反应 | 「我给你三个差别比较大的方向，你指一个最接近的，或者说说都不对在哪。」 | 「我来帮你激发未知的已知。」 |
+| 要指参照 | 「你觉得它应该更像 A 还是更像 B？」 | 「请提供你的隐性偏好。」 |
+
+判据一句话：**你说完这句，用户知道接下来该干什么吗？** 知道就对了；要先理解一个术语才知道，就换成动作。
+<!-- ccm:k:end point:unknowns.technique-routing -->
+<!-- ccm:k:nav:start point:unknowns.technique-routing -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:collab.unknowns](./user-unknowns.md#ccm-k-module-collab-unknowns)
+- [deepens_to: 具体物优于散文描述](./user-unknowns.md#ccm-k-point-unknowns-artifact-over-prose) <!-- ccm:k:edge edge:unknowns.routing-to-artifact -->
+- [routes_to: 四类未知与地图/地形差](./user-unknowns.md#ccm-k-point-unknowns-four-quadrants) <!-- ccm:k:edge edge:unknowns.routing-to-quadrants -->
+- [deepens_to: 用户没有判断框架时先建框架](./user-unknowns.md#ccm-k-point-unknowns-frame-before-spec) <!-- ccm:k:edge edge:unknowns.routing-to-frame -->
+- [deepens_to: 提问纪律与停止判据](./user-unknowns.md#ccm-k-point-unknowns-interview-discipline) <!-- ccm:k:edge edge:unknowns.routing-to-interview -->
+<!-- ccm:k:nav:end -->
+## 提问纪律：一次一个，按会不会改方案排序
+
+<a id="ccm-k-point-unknowns-interview-discipline"></a>
+<!-- ccm:k:start point:unknowns.interview-discipline -->
+**一次只问一个问题**，而且是信息增益最高的那个。
+
+排序判据只有一条：**这个答案会不会改变架构、数据模型、用户流程、范围或验收定义？** 会改的排前面。不会改的，你自己拍——那本来就是你的活，别占用用户的注意力。
+
+**每收到一个答案，就更新你当前的理解和剩余未知清单**，下一个问题基于新状态重新选。不是照着一张预先列好的表往下念——前一个答案很可能让后面三个问题作废，也可能冒出一个原本不在表上的关键问题。
+
+两个反面，都会把用户从协作者降格成填表人：
+
+- **问卷**——一次抛十个问题。用户会挑好答的答，而最难答的那个，恰恰是最重要的那个。
+- **审讯**——连珠炮式追问，不给对方消化、反问、改主意的余地。协作的价值有一半来自用户在回答过程中自己想明白了什么。
+
+停止判据：**剩下的未知都不会改变方案形状时就停。** 别为了显得严谨再补几问。
+
+与 `references/async-hitl.md` 的分工（不复述）：那份管**怎么把一个问题备成一份带完整依据、带时效校验的采访包**，以及卡住的节点怎么不阻塞整板；本文管**问什么、按什么序、什么时候停**。备包是容器，选题是内容。
+<!-- ccm:k:end point:unknowns.interview-discipline -->
+<!-- ccm:k:nav:start point:unknowns.interview-discipline -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:collab.unknowns](./user-unknowns.md#ccm-k-module-collab-unknowns)
+- [routes_to: 四类未知与地图/地形差](./user-unknowns.md#ccm-k-point-unknowns-four-quadrants) <!-- ccm:k:edge edge:unknowns.interview-to-quadrants -->
+<!-- ccm:k:nav:end -->
+## 用户没有判断框架时：先建框架，别索要 spec
+
+<a id="ccm-k-point-unknowns-frame-before-spec"></a>
+<!-- ccm:k:start point:unknowns.frame-before-spec -->
+用户在这个领域还没有判断框架时，**先帮他建立「什么叫好」，而不是向他索要一份并不存在的 spec**。
+
+分流判据：
+
+- **答不出「这件事做成什么样算好」** → 先建框架：把这个领域的取舍轴讲清楚（每根轴的两端各牺牲什么），给两三个真实的对照实例，让他在轴上给自己定位。定位完了，他才有能力回答后面的问题。
+- **答得出、只是还没答** → 那是已知的未知，直接问（见上一节）。
+- **答得出、也答了，但他的「好」和实现现实冲突** → 那是一个承重假设，走 `references/outside-in.md` 找能落定它的最便宜证据。
+
+**绝不**把「你想要什么」反复抛回给一个还没有判断框架的人。那不是尊重用户，那是把你的活推给他——而且你会拿到一个他事后自己也不认的答案，返工算在你头上。
+
+与 `references/goal-contract.md` 的分工（不复述）：那份是目标成形的检查表，缺路线级信息就停下来备一份采访包；本文管**那一项拿不到时怎么办**——先建框架再问，而不是干等，也不是硬猜。
+<!-- ccm:k:end point:unknowns.frame-before-spec -->
+<!-- ccm:k:nav:start point:unknowns.frame-before-spec -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:collab.unknowns](./user-unknowns.md#ccm-k-module-collab-unknowns)
+- [routes_to: 四类未知与地图/地形差](./user-unknowns.md#ccm-k-point-unknowns-four-quadrants) <!-- ccm:k:edge edge:unknowns.frame-to-quadrants -->
+- [next: 提问纪律与停止判据](./user-unknowns.md#ccm-k-point-unknowns-interview-discipline) <!-- ccm:k:edge edge:unknowns.frame-to-interview -->
+<!-- ccm:k:nav:end -->
+## 能给具体物就别给描述
+
+<a id="ccm-k-point-unknowns-artifact-over-prose"></a>
+<!-- ccm:k:start point:unknowns.artifact-over-prose -->
+**高保真参照优于散文描述**：真实代码、可跑的样例、测试套件、真实数据、可点的原型。
+
+为什么：一段散文描述会被双方各自脑补成两个不同的东西，而且**分歧要到实现完才暴露**；一个具体物当场就能被指着说「不对」。你花在造那个物上的成本，换的是把分歧提前到还改得动的时候。
+
+两个方向都适用：
+
+- **向用户**——给物让他反应，见上文的手法分派。
+- **向 worker**——派发时优先给**可执行的验收物**（测试、评分标准、真实样例、反例），而不是散文式的验收描述。这条接在节点契约上，机制见 `references/decomposition.md`，此处不复述。
+
+**载体依赖当前 host。** 能不能给可交互原型、能不能渲染富文档，各 harness 不同。harness-neutral 的原则只有一条——**给一个能被指着说「不对」的具体物**。具体用什么载体，按你当前 host 的实际能力选；拿不准就退回「真实代码 + 可跑样例」这个哪儿都有的底，别为了追求形式而卡住。
+<!-- ccm:k:end point:unknowns.artifact-over-prose -->
+<!-- ccm:k:nav:start point:unknowns.artifact-over-prose -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:collab.unknowns](./user-unknowns.md#ccm-k-module-collab-unknowns)
+- [routes_to: 四类未知与地图/地形差](./user-unknowns.md#ccm-k-point-unknowns-four-quadrants) <!-- ccm:k:edge edge:unknowns.artifact-to-quadrants -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 与用户共构未知
+
+<a id="ccm-k-module-collab-unknowns"></a>
+
+在目标模糊或地形不熟时，按未知的类型选择发现手法，把用户说不出口和压根没想到的东西挖出来，同时不对低风险可逆工作增加协作仪式。
+
+## Member points
+
+- [具体物优于散文描述](./user-unknowns.md#ccm-k-point-unknowns-artifact-over-prose)
+- [四类未知与地图/地形差](./user-unknowns.md#ccm-k-point-unknowns-four-quadrants)
+- [用户没有判断框架时先建框架](./user-unknowns.md#ccm-k-point-unknowns-frame-before-spec)
+- [提问纪律与停止判据](./user-unknowns.md#ccm-k-point-unknowns-interview-discipline)
+- [按未知类型分派发现手法](./user-unknowns.md#ccm-k-point-unknowns-technique-routing)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

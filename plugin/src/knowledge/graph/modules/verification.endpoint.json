@@ -231,6 +231,24 @@
         "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md convergence"}],
         "verifiers": [{"kind": "review", "ref": "k2.point.verification.convergence"}]
       }
+    },
+    {
+      "id": "point:verification.user-understanding",
+      "title": "用户理解校验",
+      "point_kind": "check",
+      "summary": "按风险给理解材料并对高风险变化校验用户是否真的读懂，低风险不加仪式；它不替代端点验收，也不是事后追认授权的通道。",
+      "recognition_cues": ["交付时只给了 diff 与 gate 结果", "在实现中替用户拍了本该他拍的板", "想用一句可以吗收尾"],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.user-understanding",
+        "heading_hint": "用户理解校验"
+      },
+      "authority": {"role": "canonical", "subject": "subject:verification.user-understanding"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md 用户理解校验"}],
+        "verifiers": [{"kind": "review", "ref": "issue-211.point.verification.user-understanding"}]
+      }
     }
   ],
   "edges": [
@@ -298,6 +316,36 @@
             "ref": "authored-nav.edge.verification.procedure-to-principle"
           }
         ]
+      }
+    },
+    {
+      "id": "edge:verification.procedure-to-understanding",
+      "type": "next",
+      "from": "point:verification.endpoint-procedure",
+      "to": "point:verification.user-understanding",
+      "when": ["产物已通过自己的端点验收，需要判断用户是否也理解了变化"],
+      "avoid_when": ["低风险可逆且没有替用户做过判断"],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {"enabled_by_default": true},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md 验收的另一侧对象"}],
+        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.verification.procedure-to-understanding"}]
+      }
+    },
+    {
+      "id": "edge:verification.understanding-to-procedure",
+      "type": "routes_to",
+      "from": "point:verification.user-understanding",
+      "to": "point:verification.endpoint-procedure",
+      "when": ["需要复核理解校验不能替代自己的端点验收"],
+      "path_role": "support",
+      "runtime": {"enabled_by_default": true},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {
+        "evidence": [{"kind": "design", "ref": "module.verification.endpoint bidirectional route"}],
+        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.verification.understanding-to-procedure"}]
       }
     }
   ]

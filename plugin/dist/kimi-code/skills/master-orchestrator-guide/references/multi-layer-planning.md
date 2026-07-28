@@ -60,6 +60,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
+- [deepens_to: 偏离留痕](./multi-layer-planning.md#ccm-k-point-multilayer-deviation-notes) <!-- ccm:k:edge edge:multilayer.handoff-to-deviation -->
 <!-- ccm:k:nav:end -->
 ## 识别启发：哪些节点够格用这一层
 
@@ -119,6 +120,33 @@ Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
 <!-- ccm:k:nav:end -->
+---
+
+## 偏离留痕：计划遇上现实那一刻
+
+<a id="ccm-k-point-multilayer-deviation-notes"></a>
+<!-- ccm:k:start point:multilayer.deviation-notes -->
+计划是在动手之前写的，而**动手之后才会遇到那些让计划失真的东西**：一个没预料到的边界情形、一个此路不通的接口、一个只能二选一的取舍。执行者当场做了选择，然后继续往前——如果这个选择没留下痕迹，它就变成了一处**静默漂移**：你在端点验收时看到的是最终产物，看不到路上拐过的弯。
+
+所以，够格用这一层的大节点，**在派发契约里再加一条**：要求执行者在计划文档旁维护一份偏离记录，每条至少写清四件事——
+
+1. **偏离了什么**：原计划怎么写的，实际怎么做的。
+2. **为什么**：撞上了什么，让原方案走不通或不划算。
+3. **选了哪条以及放弃了什么**：尤其当存在一个更激进但更快的选项时，说明为什么取了保守的那条。
+4. **要不要你复核**：执行者自己判断这条偏离是「纯实现细节」还是「可能碰到你的验收定义」，把后者显式标出来。
+
+**这条只对够格的大节点生效**，判据沿用上文的准入启发（长程、内部多步、需可追溯、需可跨 session 接手）。给一个十分钟就能跑完、一次端点验收就能判完的原子节点强加偏离日志，是同一种镀金——成本超过它省下的。
+
+**升级边界（不复述机制）**：偏离记录本身是**执行者的工作痕迹**，不是决策授权通道。一条偏离若改变了产出、范围、验收定义或不可逆边界，就不是"记一笔"能了事的——它是一次目标语义变更，按 `references/goal-contract.md` 的分类走，该走用户确认的走用户确认。**执行者可以在保守方向上自行推进并留痕；绝不能靠留痕把一个本该升级的语义变更变成既成事实。**
+
+你这一侧的用法：端点验收时**先扫偏离记录里被标了「要复核」的那几条**，再看 diff。它告诉你该往哪儿看——比从头读一遍产物便宜得多。
+<!-- ccm:k:end point:multilayer.deviation-notes -->
+<!-- ccm:k:nav:start point:multilayer.deviation-notes -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:planning.multi-layer](./multi-layer-planning.md#ccm-k-module-planning-multi-layer)
+- [routes_to: 多层 planning 准入与 escalation 边界](./multi-layer-planning.md#ccm-k-point-multilayer-admission-and-escalation) <!-- ccm:k:edge edge:multilayer.deviation-to-admission -->
+<!-- ccm:k:nav:end -->
 
 <!-- ccm:k:generated -->
 ## 项目内多层 planning
@@ -130,6 +158,7 @@ Knowledge navigation:
 ## Member points
 
 - [多层 planning 准入与 escalation 边界](./multi-layer-planning.md#ccm-k-point-multilayer-admission-and-escalation)
+- [偏离留痕](./multi-layer-planning.md#ccm-k-point-multilayer-deviation-notes)
 - [项目 planning handoff contract](./multi-layer-planning.md#ccm-k-point-multilayer-handoff-contract)
 - [计划文档维护责任](./multi-layer-planning.md#ccm-k-point-multilayer-maintenance)
 - [Board 与项目 planning 正交](./multi-layer-planning.md#ccm-k-point-multilayer-orthogonality)
