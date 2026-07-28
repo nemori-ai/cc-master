@@ -108,6 +108,7 @@ jobs:
           name: ${{ matrix.asset }}
           path: ccm/apps/cli/dist/${{ matrix.asset }}
           if-no-files-found: error
+          retention-days: 14
 
       - name: Upload checksum part
         uses: actions/upload-artifact@v4
@@ -115,6 +116,7 @@ jobs:
           name: ${{ matrix.asset }}-sha256
           path: ccm/apps/cli/dist/${{ matrix.asset }}.sha256
           if-no-files-found: error
+          retention-days: 14
 
       - name: Plan GitHub release metadata
         id: release_meta
@@ -160,6 +162,7 @@ jobs:
           name: ccm-SHA256SUMS
           path: dist/SHA256SUMS
           if-no-files-found: error
+          retention-days: 14
 
       - name: Upload license documents artifact
         uses: actions/upload-artifact@v4
@@ -170,6 +173,7 @@ jobs:
             LICENSING.md
             TRADEMARKS.md
           if-no-files-found: error
+          retention-days: 14
 
       - name: Plan GitHub release metadata
         id: release_meta

@@ -218,8 +218,8 @@ const expectedStrategy = `    strategy:
             asset: ccm-darwin-x64
 `;
 
-test('validator-only changes require both real macOS architecture qualification jobs', () => {
-  assert.match(workflow, /^  pull_request:\n    paths:\n/m);
+test('label-gated validator changes retain both real macOS architecture qualification jobs', () => {
+  assert.match(workflow, /^  pull_request:\n    types: \[labeled\]\n    paths:\n/m);
   assert.match(workflow, /^      - "ccm\/\*\*"$/m);
   assert.match(workflow, /^      - "scripts\/qualify-macos-live\.sh"$/m);
   for (const trigger of ['push', 'pull_request']) {
@@ -232,6 +232,27 @@ test('validator-only changes require both real macOS architecture qualification 
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /runner: macos-14\n            contract: darwin-arm64/);
   assert.match(workflow, /runner: macos-15-intel\n            contract: darwin-x64/);
+});
+
+test('only the explicit macOS qualification label allocates runners for pull requests', () => {
+  const build = jobBlock('build-sea');
+  const evidenceIndex = jobBlock('evidence-index');
+  assert.match(
+    build,
+    /^    if: \$\{\{ github\.event_name != 'pull_request' \|\| github\.event\.label\.name == 'ci:macos-live' \}\}$/m,
+  );
+  assert.match(
+    evidenceIndex,
+    /^    if: \$\{\{ always\(\) && \(github\.event_name != 'pull_request' \|\| github\.event\.label\.name == 'ci:macos-live'\) \}\}$/m,
+  );
+  assert.match(
+    workflow,
+    /^  group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.label\.name == 'ci:macos-live' && github\.event\.pull_request\.number \|\| github\.run_id \}\}$/m,
+  );
+  assert.match(
+    workflow,
+    /^  cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' && github\.event\.label\.name == 'ci:macos-live' \}\}$/m,
+  );
 });
 
 test('every Darwin job checks out and attests the exact pull-request head tree', () => {
@@ -545,7 +566,7 @@ test('raw evidence upload intentionally includes hidden members only within the 
   assert.match(upload, /^ {10}include-hidden-files: true$/m);
   assert.match(upload, /^ {10}if-no-files-found: error$/m);
   assert.match(upload, /^ {10}overwrite: true$/m);
-  assert.match(upload, /^ {10}retention-days: 14$/m);
+  assert.match(upload, /^ {10}retention-days: 7$/m);
   assert.equal(
     (workflow.match(/^[ \t]+include-hidden-files: true$/gm) ?? []).length,
     1,
@@ -581,7 +602,7 @@ test('downloaded inner artifacts and the outer index are verified before index u
   assert.ok(indexUpload > outerVerify, 'index artifact must upload only after outer verification');
   assert.match(index.slice(outerVerify), /uses: actions\/upload-artifact@v4/);
   assert.match(index.slice(indexUpload), /^ {10}overwrite: true$/m);
-  assert.match(index.slice(indexUpload), /^ {10}retention-days: 14$/m);
+  assert.match(index.slice(indexUpload), /^ {10}retention-days: 7$/m);
   assert.match(
     verification,
     /^ {8}env:\n {10}EXPECTED_COMMIT: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}$/m,

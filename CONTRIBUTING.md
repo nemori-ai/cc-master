@@ -86,6 +86,14 @@ claude plugin validate plugin/dist/claude-code
 must leave no `plugin/dist` diff, and `claude plugin validate plugin/dist/claude-code`
 must report no errors.
 
+### PR 中按需请求真实 macOS 证据
+
+普通 PR 不再自动分配昂贵的 macOS runner。只有改动 Darwin SEA 构建、安装/卸载、
+launchd 行为、证据校验或 macOS qualification workflow 时，才给 PR 添加
+`ci:macos-live` 标签。请在需要验收的最新 commit 推送完成后再添加标签；workflow 会把
+arm64 与 x64 证据绑定到该 commit。标签添加后又有新 commit 时，先移除后重新添加该标签，
+以重新验收最新 revision。日常 Linux-only、文档和无关代码变更无需此标签。
+
 ### ccm 改动：本地验收必须对齐 CI `build-and-check`
 
 上面三道门覆盖 hook 行为 + content contract + plugin 结构，**但不含 ccm 的严格类型检查与

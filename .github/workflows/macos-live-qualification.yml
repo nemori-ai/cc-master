@@ -17,7 +17,10 @@ on:
       - "tests/scripts/test_install_integrity.sh"
       - "tests/scripts/test_macos_evidence_artifact.sh"
       - "tests/content/macos-qualification-workflow.test.mjs"
+  # Live Darwin qualification is intentionally opt-in: add `ci:macos-live` to the PR at the
+  # revision that needs evidence. Remove/re-add the label after later commits to re-qualify.
   pull_request:
+    types: [labeled]
     paths:
       - ".github/workflows/macos-live-qualification.yml"
       - "scripts/qualify-macos-live.sh"
@@ -30,9 +33,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Unrelated label events get a unique run-id group, so they cannot cancel a real qualification.
+  group: ${{ github.workflow }}-${{ github.event.label.name == 'ci:macos-live' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.label.name == 'ci:macos-live' }}
+
 jobs:
   build-sea:
     name: build / ${{ matrix.contract }}
+    if: ${{ github.event_name != 'pull_request' || github.event.label.name == 'ci:macos-live' }}
     strategy:
       fail-fast: false
       matrix:
@@ -161,7 +170,7 @@ jobs:
             ${{ runner.temp }}/macos-sea/${{ matrix.asset }}.sha256
             ${{ runner.temp }}/macos-sea/build-evidence
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
       - name: Enforce build verdict
         if: always()
         shell: bash
@@ -258,7 +267,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           overwrite: true
-          retention-days: 14
+          retention-days: 7
       - name: Enforce qualification verdict
         if: steps.live.outcome != 'success'
         shell: bash
@@ -268,7 +277,7 @@ jobs:
 
   evidence-index:
     name: evidence index
-    if: always()
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.label.name == 'ci:macos-live') }}
     needs: qualify
     runs-on: ubuntu-latest
     steps:
@@ -366,4 +375,4 @@ jobs:
           path: EVIDENCE_SHA256SUMS
           if-no-files-found: error
           overwrite: true
-          retention-days: 14
+          retention-days: 7
