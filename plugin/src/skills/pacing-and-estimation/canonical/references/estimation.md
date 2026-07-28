@@ -4,6 +4,7 @@
 
 `ccm estimate` 是**只读 advisory**：全 verb compute、零写、不抢 board-lock。历史语料范围 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）。seeded 确定性 `--seed`（默认 42·MC 复现）。**5% 硬墙**：所有 `p95` = 95% 分位，**绝不算到 100%**（真上限是 session hard-stop）。
 
+<!-- ccm:k:start point:pacing.estimate-verbs -->
 ## 6 个 verb 的消费映射（query → read → input）
 
 | verb | 何时查 | 读哪个字段 | 形成的决策输入 |
@@ -17,6 +18,8 @@
 
 （`estimate show [<id>]` 给每任务 raw vs `calibrated_h` + conformal `interval`——快速瞥单任务校准后工期。）
 
+<!-- ccm:k:end point:pacing.estimate-verbs -->
+<!-- ccm:k:start point:pacing.deadline-risk -->
 ## 交付 DDL 风险消费（estimate deadline-risk）
 
 当板背一个 `asserted` / `confirmed` 交付 DDL（`goal_contract.deadline`）时，`estimate deadline-risk` 出**单一 verdict**：准时概率 + 相对 DDL 的分位 margin + 六态 risk band。它是 DDL-aware 的进度 verdict（`evm` 只看 baseline SPI/SV、对 DDL 无感）。按「读 verdict → 形成决策输入」消费，**绝不重算风险数学**：
@@ -28,6 +31,8 @@
 
 **surface 门槛是 actionability 不是 certainty**：band 越过风险阈值就是把它作决策输入 surface 的时机，别等 `overdue`。verdict 出自 ccm；何时 surface / replan / 缩范围的编排决策归 `master-orchestrator-guide`——读数在这里，拍板在那边。
 
+<!-- ccm:k:end point:pacing.deadline-risk -->
+<!-- ccm:k:start point:pacing.baseline-precondition -->
 ## baseline 事实（EVM 的 plan 前置）
 
 EVM 只在此前已经建立 plan baseline 时可计算。baseline 是 board 内的写状态，不属于 `usage` / `estimate` 只读 advisory；创建、覆盖或 reset 都按 `using-ccm` 的 baseline namespace 操作。你在这里仅消费这些结果字段：
@@ -37,6 +42,8 @@ EVM 只在此前已经建立 plan baseline 时可计算。baseline 是 board 内
 - 范围变化后旧 baseline 会失真；任务集仍是占位 / rolling-wave 远期片时，PV 曲线也会建立在持续变化的计划上，后续 `spi` / `cpi` 只能降低信任权重。
 - 何时重开基线是编排决策；怎样写入或 reset 是 `using-ccm` 的操作机制。
 
+<!-- ccm:k:end point:pacing.baseline-precondition -->
+<!-- ccm:k:start point:pacing.honest-fields -->
 ## 诚实字段：什么时候降低对预测的信任权重
 
 估算引擎对冷启动 / 数据不足是**诚实**的——它不假装精确。读预测**先读这几个诚实字段**，命中即**降低信任权重**（别拿一个 cold-start 点估当承诺）：
@@ -49,9 +56,12 @@ EVM 只在此前已经建立 plan baseline 时可计算。baseline 是 board 内
 
 **用区间不用点估**：报 ETA / cost 时带上 p50–p80–p95 区间（或至少 p80），而非一个假精确的单点数——这正是「量力而行」镜头「方向性走廊而非精确收尾」在估算侧的镜像。
 
+<!-- ccm:k:end point:pacing.honest-fields -->
+<!-- ccm:k:start point:pacing.usage-estimate-tension -->
 ## usage ⊗ estimate 张力（典型 `blocked_on:"user"` 输入）
 
 配额侧 selected-target `ccm usage advise` 出 `throttle` 或硬停 verdict，但工作侧 `ccm estimate forecast` 的 p80 ETA 还很长 / `cost-to-complete` 的 p80 配额% 装不下该 target 当前可证余量——这是一个典型张力：**容量不够装完该装的活**。
 
 - **识别输入**（消费层）：读两个字段对比——usage verdict（`throttle` / 硬停）✕ estimate `forecast.p80` 超期 或 `cost_to_complete_pct.p80` > 当前余量。
 - **决策输入**：列出**范围 / 期限 / 用户已明确批准且 selected target 支持的容量**之间的张力；具体调度动作查 `master-orchestrator-guide`。
+<!-- ccm:k:end point:pacing.usage-estimate-tension -->

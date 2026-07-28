@@ -5,6 +5,7 @@
 
 ## 换号 lever —— 最重的一根（本窗口真烧穿 + 还有备号）
 
+<!-- ccm:k:start point:capacity.account-switch-gate -->
 减速侧轻 lever（降档 / 降 WIP / 推迟 float）在**同一份配额内**腾挪、不换底层容量。当一份配额真要在本窗口烧穿、而你手上还握着**未消费的备号**（effective-N>1、`ccm usage advise` 的 `switch_candidate` 非空）时，有一根**最重的 lever**：**切到下一份配额（换号），把整张 board 续过去继续跑。** 怎么读 `switch_candidate` / effective-N 的消费见 `pacing-and-estimation` skill；这里管「读完之后该不该切」。
 
 > **换号前必先过 board-policy 闸。** 在拍「要不要换号」之前，先确认这块板**是否被授权自主换号**：读 `ccm policy show --json` 的 `.data.effective.autonomous_account_switch`（缺省 = `allow`，向后兼容旧板）。
@@ -20,8 +21,11 @@
 > - **死依赖 refreshToken 续期**：keychain 里的 access token 仅 ~8h，换号靠 refreshToken 主动续期接管；**refresh 失效则换号硬失败**。故备号必须是**真 `/login` 走完整 OAuth 录的**（`claude setup-token` 铸的 headless token 结构上无 refreshToken、换不进——一句指针，机制见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md`）。
 > - **惰性 pickup**：运行中 claude 在 access token 临近过期才 re-read 被覆写的存储、接管新号（非立即）。
 
+<!-- ccm:k:end point:capacity.account-switch-gate -->
+
 ## 编排决策序列（无重启形态，4 步）
 
+<!-- ccm:k:start point:capacity.account-switch-sequence -->
 机制 SSOT 在 ccm `account` 引擎 + `using-ccm`——本文只留**编排决策序列**：
 
 1. **探测 + policy 闸** —— 在 pacing 决策点读 `ccm usage advise --json`：触发 = `verdict==="switch"`（= 5h 临界 + n>1 + 7d 有余量 + `switch_candidate` 非空）。**先过 board-policy 闸**（见上）：`ccm policy show --json` 的 `autonomous_account_switch==deny` → 不自主换号，把授权问题 surface 给用户（绝不自授权）。注：`usage-pacing.js` hook 在 `switch` + policy=allow 下已**机械换号**（切号执行归 hook·你只在事后调配速）；这里的编排决策只在 hook 未自动切（policy=deny / 全池逼顶 / 多板歧义）时接管。
@@ -30,3 +34,4 @@
 4. **续跑** —— claude 进程惰性 re-read 接管新号后照常推进；board 没动、整张 DAG 没忘。账号切了，目标没忘。无重启凭证覆写**不换进程、不换 session**——所以从前那套「换号前 drain 在飞 / 带飞切后孤儿 reconcile」**不再需要**：sub-agent / workflow 的 handle 不失效、board 连续性锚 `owner.session_id` 不变，在飞工作继续跑、照常在端点回收。
 
 > **ship-anywhere**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hook 层**。
+<!-- ccm:k:end point:capacity.account-switch-sequence -->

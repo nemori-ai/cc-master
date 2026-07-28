@@ -38,6 +38,8 @@
 
 ---
 
+<a id="ccm-k-point-ccm-board-task-fields"></a>
+<!-- ccm:k:start point:ccm.board.task-fields -->
 ## A. task 字段速查
 
 ### 🔒 load-bearing 字段
@@ -132,6 +134,17 @@
 
 ---
 
+<!-- ccm:k:end point:ccm.board.task-fields -->
+<!-- ccm:k:nav:start point:ccm.board.task-fields -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.board-core.0 -->
+- [requires: 三档字段操作规则](../SKILL.md#ccm-k-point-ccm-field-tiers) <!-- ccm:k:edge edge:ccm.board-fields-requires-tiers -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.board-core-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-status-semantics"></a>
+<!-- ccm:k:start point:ccm.board.status-semantics -->
 ## B. status 八态语义 + 生命周期
 
 ### 各态语义速查
@@ -222,6 +235,16 @@ stale      → ready
 
 ---
 
+<!-- ccm:k:end point:ccm.board.status-semantics -->
+<!-- ccm:k:nav:start point:ccm.board.status-semantics -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: executor 五种语义与选择树](./board-model-guide.md#ccm-k-point-ccm-board-executor-choice) <!-- ccm:k:edge edge:ccm.board-core.1 -->
+- [requires: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.board-status-requires-mind -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-executor-choice"></a>
+<!-- ccm:k:start point:ccm.board.executor-choice -->
 ## C. executor 五种语义 + 选择决策树
 
 ### 各 executor 语义
@@ -274,6 +297,16 @@ kimi-code 下，`executor` 仍是 board 的领域字段，不是 kimi-code API �
 
 ---
 
+<!-- ccm:k:end point:ccm.board.executor-choice -->
+<!-- ccm:k:nav:start point:ccm.board.executor-choice -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: acceptance 怎么写好](./board-model-guide.md#ccm-k-point-ccm-board-acceptance) <!-- ccm:k:edge edge:ccm.board-core.2 -->
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.executor-choice.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-planning-routing"></a>
+<!-- ccm:k:start point:ccm.board.planning-routing -->
 ## C.5 cross-harness planning / routing 合同
 
 这是 **opt-in 的 board planning / ledger / activation contract**，不是自动派发器。它把「任务需要什么」和「有哪些合格执行候选」分开持久化，使换 session、换 origin harness 或 resume 后仍能重建选择依据：
@@ -384,6 +417,18 @@ ccm task update T8 --executor subagent
 
 ---
 
+<!-- ccm:k:end point:ccm.board.planning-routing -->
+<!-- ccm:k:nav:start point:ccm.board.planning-routing -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [next: agents［］ 登记簿语义](./board-model-guide.md#ccm-k-point-ccm-board-agents-registry) <!-- ccm:k:edge edge:ccm.board-ops.0 -->
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.planning-routing.pri -->
+- [requires: planning/routing 是 opt-in 合同](../SKILL.md#ccm-k-point-ccm-planning-opt-in) <!-- ccm:k:edge edge:ccm.planning-requires-optin -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.board-ops-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-agents-registry"></a>
+<!-- ccm:k:start point:ccm.board.agents-registry -->
 ## C.6 agents[]：运行时 agent 登记簿
 
 `agents[]` 是 board 级 ✎ 段（hook 不读·窄腰零碰撞）：**跨所有派发类型的统一运行时花名册**。纪律一句话：**凡派发皆登记**——手工派出的 sub-agent / 后台 shell / workflow 用 `ccm agent create` 起账；跨 harness CLI worker 也可由 `ccm worker dispatch` 在同一个 aggregate 内自动 prepare/bind/link/terminal。两者都让花名册、viewer 和 resume 后的自己能看见「现在总共多少 agent 在跑、各自在干什么、还活着没」。
@@ -436,6 +481,16 @@ typed capability 合并是偏序：只有 `unavailable ≤ supported(同一 cano
 
 ---
 
+<!-- ccm:k:end point:ccm.board.agents-registry -->
+<!-- ccm:k:nav:start point:ccm.board.agents-registry -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.agents-registry.pri -->
+- [deepens_to: jc 何时建与 severity](./board-model-guide.md#ccm-k-point-ccm-board-jc-judgment) <!-- ccm:k:edge edge:ccm.board-ops.1 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-acceptance"></a>
+<!-- ccm:k:start point:ccm.board.acceptance -->
 ## D. acceptance 怎么写好
 
 `acceptance` 是这个 task 的「目标函数」——什么情况算完成。acceptance 哲学（验收 = ML 优化目标函数的设计）属于 `dev-as-ml-loop` skill；这里只给**操作侧：怎么填好这个字段**。
@@ -480,6 +535,16 @@ ccm task update T3 --set-json 'acceptance={"criteria":[
 
 ---
 
+<!-- ccm:k:end point:ccm.board.acceptance -->
+<!-- ccm:k:nav:start point:ccm.board.acceptance -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: estimate 怎么估](./board-model-guide.md#ccm-k-point-ccm-board-estimate-judgment) <!-- ccm:k:edge edge:ccm.board-core.3 -->
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.acceptance.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-estimate-judgment"></a>
+<!-- ccm:k:start point:ccm.board.estimate-judgment -->
 ## E. estimate 怎么估
 
 `estimate` 存时间估算，喂 CPM 算临界路径，也喂 cadence health 判断 iteration 是否装得下。
@@ -511,6 +576,16 @@ ccm task add T6 --estimate 1w    # 1 周
 
 ---
 
+<!-- ccm:k:end point:ccm.board.estimate-judgment -->
+<!-- ccm:k:nav:start point:ccm.board.estimate-judgment -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: deps 怎么连](./board-model-guide.md#ccm-k-point-ccm-board-deps-linking) <!-- ccm:k:edge edge:ccm.board-core.4 -->
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.estimate-judgment.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-deps-linking"></a>
+<!-- ccm:k:start point:ccm.board.deps-linking -->
 ## F. deps 怎么连
 
 `deps` 是 task 的「依赖边」——只有当 deps 中的 task 全部满足之后，这个 task 才进 readySet 可以派发。普通/旧 task 以 `status=done` 满足；显式 review gate 必须 `status=done` 且 verdict 为 `APPROVE`。
@@ -589,6 +664,16 @@ deps 图的排期、临界路径计算（哪条链条最长、哪个 task 先派
 
 ---
 
+<!-- ccm:k:end point:ccm.board.deps-linking -->
+<!-- ccm:k:nav:start point:ccm.board.deps-linking -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [next: blocked_on 怎么选](./board-model-guide.md#ccm-k-point-ccm-board-blocked-on) <!-- ccm:k:edge edge:ccm.board-core.5 -->
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.deps-linking.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-blocked-on"></a>
+<!-- ccm:k:start point:ccm.board.blocked-on -->
 ## G. blocked_on 怎么选
 
 `blocked_on` 由 `task block --on <target>` 命令设，只有两种合法值：
@@ -629,6 +714,15 @@ ccm task block T9 --on user --decision @/abs/path/decision.json
 
 ---
 
+<!-- ccm:k:end point:ccm.board.blocked-on -->
+<!-- ccm:k:nav:start point:ccm.board.blocked-on -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.blocked-on.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-jc-judgment"></a>
+<!-- ccm:k:start point:ccm.board.jc-judgment -->
 ## H. judgment_call（jc）：何时建、severity 怎么定
 
 **judgment_call（jc）是自驱决策记录（autonomous decision record / judgment record）**——记录 agent 在自驱模式下**已经做过**的重要判断。它的存在价值：用户回前台 / 新 session resume 后，能快速了解「这里 agent 自己判断了什么、为什么、影响多大、是否需要复盘或追认」。
@@ -684,6 +778,16 @@ high / critical jc 在 kimi-code Stop hook / recon 提醒回前台时会被显�
 
 ---
 
+<!-- ccm:k:end point:ccm.board.jc-judgment -->
+<!-- ccm:k:nav:start point:ccm.board.jc-judgment -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.jc-judgment.pri -->
+- [next: cadence/iteration 节奏](./board-model-guide.md#ccm-k-point-ccm-board-cadence) <!-- ccm:k:edge edge:ccm.board-ops.2 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-cadence"></a>
+<!-- ccm:k:start point:ccm.board.cadence -->
 ## I. cadence 与 iteration：节奏怎么定
 
 **cadence 是在纯 DAG 调度之上叠加节奏约束**——给长跑编排设定「多久应该交付一次可见的价值」和「当前这轮包含哪些任务」。适合需要对外持续汇报进度、或要求定期 ship 的目标。
@@ -722,6 +826,16 @@ ccm cadence ship I1
 
 ---
 
+<!-- ccm:k:end point:ccm.board.cadence -->
+<!-- ccm:k:nav:start point:ccm.board.cadence -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.cadence.pri -->
+- [deepens_to: parent/owner 嵌套语义](./board-model-guide.md#ccm-k-point-ccm-board-parent-owner) <!-- ccm:k:edge edge:ccm.board-ops.3 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-parent-owner"></a>
+<!-- ccm:k:start point:ccm.board.parent-owner -->
 ## J. parent / owner 嵌套语义
 
 `parent` 是容器边——让 board 承载 **depth=1 的嵌套调度图**（owner 节点 + 它的子节点）。
@@ -775,6 +889,16 @@ owner 容器节点的 `deps` 应该为空或只含真实的 board 级前置（�
 
 ---
 
+<!-- ccm:k:end point:ccm.board.parent-owner -->
+<!-- ccm:k:nav:start point:ccm.board.parent-owner -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [next: watchdog 何时 arm](./board-model-guide.md#ccm-k-point-ccm-board-watchdog) <!-- ccm:k:edge edge:ccm.board-ops.4 -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.board.parent-owner.to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-watchdog"></a>
+<!-- ccm:k:start point:ccm.board.watchdog -->
 ## K. watchdog：何时 arm、watchdog / legacy wakeup 字段含义
 
 kimi-code 下 watchdog 先是 board 里的 liveness 契约：记录“什么时候该回来 recon、回来查什么、超时如何处置”。它不等于已经存在一个 kimi-code-native 的 CronCreate/ScheduleWakeup 工具。需要自动唤醒时，降级到 background Bash-floor 或外部调度，并把句柄写进 board。
@@ -841,6 +965,16 @@ handle，最后重新 arm。legacy 缺 handle 只触发 `FMT-WATCHDOG` warn，�
 
 ---
 
+<!-- ccm:k:end point:ccm.board.watchdog -->
+<!-- ccm:k:nav:start point:ccm.board.watchdog -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [deepens_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.board-ops.5 -->
+- [operationalizes: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.board-watchdog-ops-cmd -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-artifact-verified"></a>
+<!-- ccm:k:start point:ccm.board.artifact-verified -->
 ## L. references、artifact、verified 语义
 
 ### references（任务引用）
@@ -908,6 +1042,16 @@ verified = true   ← 端点验收通过
 
 ---
 
+<!-- ccm:k:end point:ccm.board.artifact-verified -->
+<!-- ccm:k:nav:start point:ccm.board.artifact-verified -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [next: 决策树与反模式深化](./board-model-guide.md#ccm-k-point-ccm-board-antipatterns) <!-- ccm:k:edge edge:ccm.board-ops.6 -->
+- [requires: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.artifact-requires-status -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-antipatterns"></a>
+<!-- ccm:k:start point:ccm.board.antipatterns -->
 ## M. 决策树 / 反模式深化
 
 ### footgun 深化（比 SKILL.md 更详细的操作原因分析）
@@ -1052,6 +1196,17 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 
 ---
 
+<!-- ccm:k:end point:ccm.board.antipatterns -->
+<!-- ccm:k:nav:start point:ccm.board.antipatterns -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.antipatterns.pri -->
+- [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.board-ops-to-lifecycle -->
+- [deepens_to: FMT/GRAPH/BIZ 规则速查（操作视图）](./board-model-guide.md#ccm-k-point-ccm-board-validation-rules) <!-- ccm:k:edge edge:ccm.board-ops.7 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-validation-rules"></a>
+<!-- ccm:k:start point:ccm.board.validation-rules -->
 ## N. 校验规则全集速查（FMT / GRAPH / BIZ）
 
 这一节是为了让你**用 ccm 编辑字段 / 操作 board 时一次就写对**——不因不知道某条规则而反复撞 `exit 3` / warn 低效重试。
@@ -1168,6 +1323,16 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 
 ---
 
+<!-- ccm:k:end point:ccm.board.validation-rules -->
+<!-- ccm:k:nav:start point:ccm.board.validation-rules -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.validation-rules.pri -->
+- [next: 交付 DDL 四态判断](./board-model-guide.md#ccm-k-point-ccm-board-deadline-ddl) <!-- ccm:k:edge edge:ccm.board-ops.8 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-board-deadline-ddl"></a>
+<!-- ccm:k:start point:ccm.board.deadline-ddl -->
 ## O. 交付 DDL 字段取值 + 四态状态机
 
 交付 DDL（delivery deadline）落 `goal_contract.deadline`——「整块 board / 当前 Goal Contract revision 最终交付」的时间承诺，单一 SSOT，随 goal revision 走。它是 👁 观察字段（嵌在已是 👁 的 `goal_contract` 内），窄腰一字不动。只走专属 verb 写：`ccm goal deadline set / confirm / confirm-none / amend`（命令签名见 [command-catalog goal deadline](command-catalog.md#goal-deadline)）；泛型 `--set goal_contract.*` 被拒。
@@ -1211,3 +1376,54 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 ---
 
 > **实时真相永远以 `ccm <namespace> <cmd> --help` 为准**——本文是操作地图，`--help` 是当前领土。全量命令签名 / flag / `--json` 输出形状在 [command-catalog.md](command-catalog.md)。校验规则的权威实现在 ccm 引擎（board-model 注册表给每条规则的 level）。
+<!-- ccm:k:end point:ccm.board.deadline-ddl -->
+<!-- ccm:k:nav:start point:ccm.board.deadline-ddl -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.board-model.contracts](./board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [routes_to: artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.deadline-ddl.pri -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## board 模型：合同、节奏与校验判断
+
+<a id="ccm-k-module-ccm-board-model-contracts"></a>
+
+判断 planning/routing、agents、jc/cadence/watchdog、true-done、反模式、校验规则与 DDL。
+
+## Member points
+
+- [agents［］ 登记簿语义](./board-model-guide.md#ccm-k-point-ccm-board-agents-registry)
+- [决策树与反模式深化](./board-model-guide.md#ccm-k-point-ccm-board-antipatterns)
+- [artifact/verified 真完成](./board-model-guide.md#ccm-k-point-ccm-board-artifact-verified)
+- [cadence/iteration 节奏](./board-model-guide.md#ccm-k-point-ccm-board-cadence)
+- [交付 DDL 四态判断](./board-model-guide.md#ccm-k-point-ccm-board-deadline-ddl)
+- [jc 何时建与 severity](./board-model-guide.md#ccm-k-point-ccm-board-jc-judgment)
+- [parent/owner 嵌套语义](./board-model-guide.md#ccm-k-point-ccm-board-parent-owner)
+- [planning/routing 合同判断](./board-model-guide.md#ccm-k-point-ccm-board-planning-routing)
+- [FMT/GRAPH/BIZ 规则速查（操作视图）](./board-model-guide.md#ccm-k-point-ccm-board-validation-rules)
+- [watchdog 何时 arm](./board-model-guide.md#ccm-k-point-ccm-board-watchdog)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## board 模型：字段与生命周期判断
+
+<a id="ccm-k-module-ccm-board-model-lifecycle"></a>
+
+在 board-model-guide 中判断字段取值、status/executor/acceptance/deps/blocked_on 怎么选。
+
+## Member points
+
+- [acceptance 怎么写好](./board-model-guide.md#ccm-k-point-ccm-board-acceptance)
+- [blocked_on 怎么选](./board-model-guide.md#ccm-k-point-ccm-board-blocked-on)
+- [deps 怎么连](./board-model-guide.md#ccm-k-point-ccm-board-deps-linking)
+- [estimate 怎么估](./board-model-guide.md#ccm-k-point-ccm-board-estimate-judgment)
+- [executor 五种语义与选择树](./board-model-guide.md#ccm-k-point-ccm-board-executor-choice)
+- [status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics)
+- [task 字段三档速查](./board-model-guide.md#ccm-k-point-ccm-board-task-fields)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

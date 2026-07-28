@@ -1,5 +1,7 @@
 # 异步完成 + HITL
 
+<a id="ccm-k-point-hitl-inflight-and-user"></a>
+<!-- ccm:k:start point:hitl.inflight-and-user -->
 > **何时读：** 驱动异步完成 + human-in-the-loop 时——in-flight 的 p95 追踪与 hedging、收到通知即整合（integrate-on-notification）、HITL 模型（用户即异步 worker）、前台对话 ∥ 后台执行、step-6 ledger、**等待前 arm watchdog（自我唤醒安全网）**。
 
 怎样异步地驱动各项工作收尾，并把用户当成一个特殊的异步 worker——让前台对话与后台执行并行跑，主线永不空等（idle-wait）。
@@ -52,8 +54,16 @@ kimi-code 下不要等待其他 harness 的后台完成通知语义。当 Task s
 
 ---
 
+<!-- ccm:k:end point:hitl.inflight-and-user -->
+<!-- ccm:k:nav:start point:hitl.inflight-and-user -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
+<!-- ccm:k:nav:end -->
 ## 采访式决策 —— 为 awaiting-user 节点准备采访包 + 消化结论 sidecar
 
+<a id="ccm-k-point-hitl-decision-package"></a>
+<!-- ccm:k:start point:hitl.decision-package -->
 把一个 `blocked_on:"user"` 节点从「干问题」升级成「**对着准确且仍有时效的完整依据，做一次高质量决策**」的闭环。它接在上面 prefetch / recon 两条纪律上——不复述、只补两个具体动作（准备 / 消化）；讨论本身由独立满血 kimi-code conversation 承载（命令 `cc-master:discuss <node-id>`），master 既不亲自陪聊（强化「指挥不演奏」镜头）也不被打断。采访包 / sidecar 协议（字段、枚举、sidecar 结构）的 SSOT 在 `board.md` §`decision_package`，此处只讲方法论。
 
 ### 准备 decision_package（as prefetch / fill-work）
@@ -87,8 +97,16 @@ cc-master 对抗"过早停止"的确定性守卫是 **goal-hook**（`verify-boar
 
 因为 hook 是个 shell——它看到的是 board，不是对话——所以自检这件事得你自己来：让 board 的 `status` enum 保持诚实（依赖已满足、可派的标 `ready`，被卡住的标 `blocked`，做了但未验的标 `uncertain`），并把你的决策程序 step-6 ledger + 验收证据写进对话和 board 两边。hook 对 board 状态设闸；真正让一次 Stop 可信的，是你写下的那份自检。
 
+<!-- ccm:k:end point:hitl.decision-package -->
+<!-- ccm:k:nav:start point:hitl.decision-package -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
+<!-- ccm:k:nav:end -->
 ### step-6 ledger —— 固定形态（单一来源）
 
+<a id="ccm-k-point-hitl-step6-ledger"></a>
+<!-- ccm:k:start point:hitl.step6-ledger -->
 这是 SKILL.md 决策程序所指向的权威定义。goal-hook 读 board 来给你的 Stop 设闸，但**它读不到你的推理**——所以每当这一回合走到决策程序 step 6，就把结论**连同验收证据一起写进对话和 board 两边**，用一个固定形态：
 
 - **每条仍未关闭的路径一行**：`<task-id> · <status> · <blocker | evidence>`
@@ -101,8 +119,16 @@ hook 对 board 状态设闸；这份写下的 ledger 才是让"done"*可信*、�
 
 ---
 
+<!-- ccm:k:end point:hitl.step6-ledger -->
+<!-- ccm:k:nav:start point:hitl.step6-ledger -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
+<!-- ccm:k:nav:end -->
 ## 等待前 arm watchdog —— 静默失败盲区的安全网
 
+<a id="ccm-k-point-hitl-watchdog"></a>
+<!-- ccm:k:start point:hitl.watchdog -->
 > 这是 SKILL.md 决策程序 `wait` 边所指向的权威心智。它**层叠于** harness 自动重唤起**之上**，不替代它。
 
 ### 探活双轨 —— 机械兜底 ∥ 心智防迟钝
@@ -187,3 +213,27 @@ canonical `watchdog` / legacy `wakeup`。只有带 nonblank `job_id` 且 `fire_a
 > `missing-accountable-handle` / `expired`，按它的 `action` 先 disarm；仍需守护时创建真实 wakeup、拿 handle 后重 arm。
 
 后台 Bash → 外部 scheduler + 手动 recon → manual recon；每档先拿真实 handle 再 arm，没有 handle 就记 blocked / recon 状态、不要伪造 CronCreate/ScheduleWakeup在 `dispatch.md` §派发卫生（watchdog/liveness 维度）。
+<!-- ccm:k:end point:hitl.watchdog -->
+<!-- ccm:k:nav:start point:hitl.watchdog -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:coordination.async-hitl](./async-hitl.md#ccm-k-module-coordination-async-hitl)
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 异步完成与 HITL
+
+<a id="ccm-k-module-coordination-async-hitl"></a>
+
+把后台 in-flight、用户决策、step-6 ledger 与 watchdog 组成不阻塞整板的异步协调协议。
+
+## Member points
+
+- [采访式 decision package](./async-hitl.md#ccm-k-point-hitl-decision-package)
+- [in-flight 与用户异步依赖](./async-hitl.md#ccm-k-point-hitl-inflight-and-user)
+- [step-6 ledger 固定形态](./async-hitl.md#ccm-k-point-hitl-step6-ledger)
+- [等待前 watchdog](./async-hitl.md#ccm-k-point-hitl-watchdog)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

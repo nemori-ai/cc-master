@@ -4,6 +4,8 @@
 这条细则讲清楚"泛化"具体长什么样、遇到措辞不够用时该怎么**收窄**而不是**泛化**,以及"绝不静默丢弃"
 在证据强度这个维度上具体怎么落地。
 
+<a id="ccm-k-point-distill-evidence-fidelity"></a>
+<!-- ccm:k:start point:distill.evidence-fidelity -->
 ## 什么是"脱离证据的泛化"
 
 泛化是把一个**有场景限定**的观察,写成一个**没有限定**的普遍规则。典型模式:
@@ -52,3 +54,29 @@
 真正应该发生的是:**弱证据 → 收窄措辞 + 标注低置信 + 落地成本最低的归宿;不是 弱证据 → 直接不处理**。
 让人工审阅环节看到"这条证据弱,已收窄且标注",审阅者可以选择否决它,但否决权在人工审阅,不在蒸馏阶段
 的规划环节。
+<!-- ccm:k:end point:distill.evidence-fidelity -->
+<!-- ccm:k:nav:start point:distill.evidence-fidelity -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:distill.evidence](./evidence-fidelity.md#ccm-k-module-distill-evidence)
+- [routes_to: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line) <!-- ccm:k:edge edge:distill.fidelity-to-hardline -->
+- [applies_to: 不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop) <!-- ccm:k:edge edge:distill.fidelity-to-fallback -->
+- [routes_to: 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree) <!-- ccm:k:edge edge:distill.fidelity-to-tree -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 证据忠实性
+
+<a id="ccm-k-module-distill-evidence"></a>
+
+守住本 skill 唯一硬约束：不脱离证据泛化，弱证据收窄托底。
+
+## Member points
+
+- [泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+- [summary: 证据忠实性硬约束声明](../SKILL.md#ccm-k-point-distill-evidence-hard-line)
+- [canonicalize → 泛化 vs 收窄细则](./evidence-fidelity.md#ccm-k-point-distill-evidence-fidelity)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

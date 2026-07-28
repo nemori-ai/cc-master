@@ -2,6 +2,7 @@
 
 > **何时读：** 需要从任意 origin 确认全机四个 provider 有哪些模型候选、角色证据、相对成本、任务亲和度、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
 
+<!-- ccm:k:start point:pacing.model-tier-facts -->
 不要读“当前 host 的内嵌型号表”。统一查询当前安装的 ccm registry：
 
 ```bash
@@ -18,3 +19,4 @@ ccm provider facts <claude-code|codex|cursor|kimi-code> --json
 成本比较也要 target-bound：官方 API price、订阅内 credits、on-demand、BYOK 和未知 payer 不是同一个成本池。缺真实 payer / quota / authorization 时标 unknown，不因为另一个 surface、同品牌账号或宣传价格看起来便宜就补值。
 
 本页只解释事实与不确定性，不决定 executor、route、WIP 或是否发车。排序决策与 ample / tight fallback 回 `master-orchestrator-guide`；命令输入形状查 `using-ccm`。
+<!-- ccm:k:end point:pacing.model-tier-facts -->

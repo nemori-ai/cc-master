@@ -71,23 +71,14 @@ test('public documentation states the source-available noncommercial boundary in
 });
 
 test('plugin and ccm release paths distribute the license documents', () => {
-  const packager = read('scripts/package-plugin.sh');
+  const bundler = read('scripts/trusted-release-bundle.mjs');
   for (const file of ['LICENSE', 'LICENSING.md', 'TRADEMARKS.md']) {
-    assert.match(packager, new RegExp(`include_files=.*\\b${file.replace('.', '\\.')}\\b`, 'u'), file);
+    assert.match(bundler, new RegExp(`['"]${file.replace('.', '\\.')}['"]`, 'u'), file);
   }
 
   const pluginWorkflow = read('.github/workflows/plugin-release.yml');
-  const validationBlocks = pluginWorkflow
-    .split(/      - name: Validate /u)
-    .slice(1)
-    .filter((block) => /packaged (plugin|adapter)/u.test(block.split('\n', 1)[0]));
-  assert.equal(validationBlocks.length, 4);
-  for (const block of validationBlocks) {
-    const step = block.split(/\n      - name: /u, 1)[0];
-    for (const file of ['LICENSE', 'LICENSING.md', 'TRADEMARKS.md']) {
-      assert.match(step, new RegExp(`/cc-master/${file.replace('.', '\\.')}"`, 'u'), file);
-    }
-  }
+  assert.match(pluginWorkflow, /release-attestation\.json|Upload exact attested release bytes/u);
+  assert.match(pluginWorkflow, /sha256sum --check SHA256SUMS/u);
 
   const ccmWorkflow = read('.github/workflows/ccm-release.yml');
   assert.match(ccmWorkflow, /name: ccm-license-documents/u);

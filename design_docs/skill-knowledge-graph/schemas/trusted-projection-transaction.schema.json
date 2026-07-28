@@ -1,0 +1,959 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-master.dev/schemas/trusted-projection-transaction-v1alpha1.json",
+  "title": "cc-master Trusted Projection Transaction",
+  "description": "Executable shape contract for six transaction artifacts and the explicit production property witness.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/sourceSnapshot"
+    },
+    {
+      "$ref": "#/$defs/projectionPlan"
+    },
+    {
+      "$ref": "#/$defs/artifactSnapshot"
+    },
+    {
+      "$ref": "#/$defs/verifiedSnapshotAttestation"
+    },
+    {
+      "$ref": "#/$defs/publishReceipt"
+    },
+    {
+      "$ref": "#/$defs/releaseBundleAttestation"
+    },
+    {
+      "$ref": "#/$defs/scenarioWitness"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "transactionId": {
+      "type": "string",
+      "pattern": "^tpt:tx:[a-z0-9][a-z0-9.-]*$"
+    },
+    "sourceSnapshotId": {
+      "type": "string",
+      "pattern": "^tpt:source:[a-f0-9]{64}$"
+    },
+    "projectionPlanId": {
+      "type": "string",
+      "pattern": "^tpt:plan:[a-f0-9]{64}$"
+    },
+    "artifactSnapshotId": {
+      "type": "string",
+      "pattern": "^tpt:observation:[a-f0-9]{64}$"
+    },
+    "artifactContentId": {
+      "type": "string",
+      "pattern": "^tpt:content:[a-f0-9]{64}$"
+    },
+    "verifiedSnapshotAttestationId": {
+      "type": "string",
+      "pattern": "^tpt:verify:[a-f0-9]{64}$"
+    },
+    "publishReceiptId": {
+      "type": "string",
+      "pattern": "^tpt:publish:[a-f0-9]{64}$"
+    },
+    "releaseBundleAttestationId": {
+      "type": "string",
+      "pattern": "^tpt:release:[a-f0-9]{64}$"
+    },
+    "logicalId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]*$"
+    },
+    "host": {
+      "enum": [
+        "claude-code",
+        "codex",
+        "cursor",
+        "kimi-code"
+      ]
+    },
+    "projectionSurface": {
+      "enum": [
+        "host",
+        "skills",
+        "release_bundle"
+      ]
+    },
+    "scenarioSurface": {
+      "const": "host"
+    },
+    "state": {
+      "enum": [
+        "NEW",
+        "LOCKED",
+        "SOURCE_FROZEN",
+        "PLAN_FROZEN",
+        "CANDIDATE_BUILT",
+        "VERIFIED",
+        "SEALED",
+        "COMMIT_PREPARED",
+        "COMMITTING",
+        "COMMITTED",
+        "CLEANED",
+        "ABORTED",
+        "RECOVERY_REQUIRED"
+      ]
+    },
+    "invariantId": {
+      "enum": [
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "P7",
+        "P8"
+      ]
+    },
+    "portablePath": {
+      "oneOf": [
+        {
+          "const": "."
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/\\u0000-\\u001f\\u007f\\\\]+(?:/[^/\\u0000-\\u001f\\u007f\\\\]+)*$"
+        }
+      ]
+    },
+    "artifactEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "kind",
+        "sha256",
+        "size",
+        "executable",
+        "posix_mode"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/portablePath"
+        },
+        "kind": {
+          "enum": [
+            "file",
+            "directory"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executable": {
+          "type": "boolean"
+        },
+        "posix_mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4095
+        }
+      }
+    },
+    "artifactEntries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifactEntry"
+      }
+    },
+    "attestationCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invariant",
+        "ok",
+        "code",
+        "witness_sha256"
+      ],
+      "properties": {
+        "invariant": {
+          "$ref": "#/$defs/invariantId"
+        },
+        "ok": {
+          "const": true
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^TPT-[A-Z0-9-]+$"
+        },
+        "witness_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sourceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "source_snapshot_id",
+        "source_content_id",
+        "source_root_id",
+        "git_tree",
+        "mode_model",
+        "entries",
+        "tree_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/source-snapshot/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/sourceSnapshotId"
+        },
+        "source_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "source_root_id": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "git_tree": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode_model": {
+          "const": "posix-12bit"
+        },
+        "entries": {
+          "$ref": "#/$defs/artifactEntries"
+        },
+        "tree_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "projectionOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator",
+        "inputs",
+        "outputs",
+        "parameters_sha256"
+      ],
+      "properties": {
+        "operator": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "inputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/portablePath"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/portablePath"
+          }
+        },
+        "parameters_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "projectionPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "projection_plan_id",
+        "host",
+        "surface",
+        "input_kind",
+        "input_snapshot_id",
+        "input_content_id",
+        "upstream_publish_receipt_id",
+        "trusted_policy_id",
+        "trusted_policy_sha256",
+        "operations",
+        "expected_entries"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/projection-plan/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "projection_plan_id": {
+          "$ref": "#/$defs/projectionPlanId"
+        },
+        "host": {
+          "$ref": "#/$defs/host"
+        },
+        "surface": {
+          "$ref": "#/$defs/projectionSurface"
+        },
+        "input_kind": {
+          "enum": [
+            "source_snapshot",
+            "committed_artifact"
+          ]
+        },
+        "input_snapshot_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sourceSnapshotId"
+            },
+            {
+              "$ref": "#/$defs/artifactSnapshotId"
+            }
+          ]
+        },
+        "input_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "upstream_publish_receipt_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/publishReceiptId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trusted_policy_id": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "trusted_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/projectionOperation"
+          }
+        },
+        "expected_entries": {
+          "$ref": "#/$defs/artifactEntries"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "surface": {
+                "const": "release_bundle"
+              }
+            },
+            "required": [
+              "surface"
+            ]
+          },
+          "then": {
+            "properties": {
+              "input_kind": {
+                "const": "committed_artifact"
+              },
+              "input_snapshot_id": {
+                "$ref": "#/$defs/artifactSnapshotId"
+              },
+              "upstream_publish_receipt_id": {
+                "$ref": "#/$defs/publishReceiptId"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "input_kind": {
+                "const": "source_snapshot"
+              },
+              "input_snapshot_id": {
+                "$ref": "#/$defs/sourceSnapshotId"
+              },
+              "upstream_publish_receipt_id": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "artifactSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "artifact_snapshot_id",
+        "artifact_content_id",
+        "root_id",
+        "mode_model",
+        "entries",
+        "tree_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/artifact-snapshot/v1alpha1"
+        },
+        "artifact_snapshot_id": {
+          "$ref": "#/$defs/artifactSnapshotId"
+        },
+        "artifact_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "root_id": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "mode_model": {
+          "const": "posix-12bit"
+        },
+        "entries": {
+          "$ref": "#/$defs/artifactEntries"
+        },
+        "tree_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "verifiedSnapshotAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "verified_snapshot_attestation_id",
+        "source_snapshot_id",
+        "projection_plan_id",
+        "candidate_snapshot_id",
+        "authorized_content_id",
+        "verifier_id",
+        "verifier_contract_sha256",
+        "checks",
+        "trace_head_sha256",
+        "sealed_content_id"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/verified-snapshot-attestation/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "verified_snapshot_attestation_id": {
+          "$ref": "#/$defs/verifiedSnapshotAttestationId"
+        },
+        "source_snapshot_id": {
+          "$ref": "#/$defs/sourceSnapshotId"
+        },
+        "projection_plan_id": {
+          "$ref": "#/$defs/projectionPlanId"
+        },
+        "candidate_snapshot_id": {
+          "$ref": "#/$defs/artifactSnapshotId"
+        },
+        "authorized_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "verifier_id": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "verifier_contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/attestationCheck"
+          }
+        },
+        "trace_head_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sealed_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        }
+      }
+    },
+    "committedPublishReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "publish_receipt_id",
+        "verified_snapshot_attestation_id",
+        "live_before_snapshot_id",
+        "outcome",
+        "live_after_snapshot_id",
+        "committed_content_id",
+        "commit_method",
+        "durability_barrier",
+        "backup_retained",
+        "recovery_ref",
+        "trace_head_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/publish-receipt/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "publish_receipt_id": {
+          "$ref": "#/$defs/publishReceiptId"
+        },
+        "verified_snapshot_attestation_id": {
+          "$ref": "#/$defs/verifiedSnapshotAttestationId"
+        },
+        "live_before_snapshot_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifactSnapshotId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "const": "committed"
+        },
+        "live_after_snapshot_id": {
+          "$ref": "#/$defs/artifactSnapshotId"
+        },
+        "committed_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "commit_method": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "durability_barrier": {
+          "enum": [
+            "parent-directory-fsync",
+            "platform-equivalent"
+          ]
+        },
+        "backup_retained": {
+          "type": "boolean"
+        },
+        "recovery_ref": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/logicalId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trace_head_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "recoveryRequiredPublishReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "publish_receipt_id",
+        "verified_snapshot_attestation_id",
+        "live_before_snapshot_id",
+        "outcome",
+        "last_observation_snapshot_id",
+        "recovery_journal_id",
+        "operator_action",
+        "backup_retained",
+        "trace_head_sha256"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/publish-receipt/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "publish_receipt_id": {
+          "$ref": "#/$defs/publishReceiptId"
+        },
+        "verified_snapshot_attestation_id": {
+          "$ref": "#/$defs/verifiedSnapshotAttestationId"
+        },
+        "live_before_snapshot_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifactSnapshotId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "const": "recovery_required"
+        },
+        "last_observation_snapshot_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifactSnapshotId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recovery_journal_id": {
+          "$ref": "#/$defs/logicalId"
+        },
+        "operator_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "backup_retained": {
+          "const": true
+        },
+        "trace_head_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "publishReceipt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/committedPublishReceipt"
+        },
+        {
+          "$ref": "#/$defs/recoveryRequiredPublishReceipt"
+        }
+      ]
+    },
+    "releaseBundleAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "transaction_id",
+        "release_bundle_attestation_id",
+        "publish_receipt_id",
+        "bundle_projection_plan_id",
+        "archive_sha256",
+        "archive_format",
+        "extracted_snapshot_id",
+        "extracted_content_id",
+        "checks"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection/release-bundle-attestation/v1alpha1"
+        },
+        "transaction_id": {
+          "$ref": "#/$defs/transactionId"
+        },
+        "release_bundle_attestation_id": {
+          "$ref": "#/$defs/releaseBundleAttestationId"
+        },
+        "publish_receipt_id": {
+          "$ref": "#/$defs/publishReceiptId"
+        },
+        "bundle_projection_plan_id": {
+          "$ref": "#/$defs/projectionPlanId"
+        },
+        "archive_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "archive_format": {
+          "enum": [
+            "zip",
+            "tar",
+            "tar.gz"
+          ]
+        },
+        "extracted_snapshot_id": {
+          "$ref": "#/$defs/artifactSnapshotId"
+        },
+        "extracted_content_id": {
+          "$ref": "#/$defs/artifactContentId"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/attestationCheck"
+          }
+        }
+      }
+    },
+    "scenarioMutation": {
+      "enum": [
+        "add-legal-artifact-after-attestation",
+        "rewrite-existing-artifact-after-attestation",
+        "flip-executable-bit-after-attestation",
+        "replace-with-hardlink-after-attestation",
+        "none",
+        "mutate-source-after-attestation"
+      ]
+    },
+    "scenarioFailpoint": {
+      "enum": [
+        "none",
+        "sync-host-surface:post-publish"
+      ]
+    },
+    "productionCheckpoint": {
+      "enum": [
+        "projectAndPublishHostSurface:return",
+        "projectAndPublishHostSurface:throw",
+        "sync-host-surface:injectLateFault:after-compile-attestation-before-publish",
+        "sync-host-surface:injectPostPublishFault:after-publish",
+        "postcondition:live-snapshot"
+      ]
+    },
+    "traceRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "checkpoint",
+        "state",
+        "observation_sha256"
+      ],
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/productionCheckpoint"
+        },
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "observation_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invariant",
+        "code",
+        "checkpoint",
+        "expected_sha256",
+        "actual_sha256"
+      ],
+      "properties": {
+        "invariant": {
+          "$ref": "#/$defs/invariantId"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^TPT-[A-Z0-9-]+$"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/productionCheckpoint"
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "actual_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "scenarioWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "scenario_id",
+        "host",
+        "surface",
+        "seed",
+        "operator",
+        "production_subject",
+        "trace",
+        "outcome",
+        "contract"
+      ],
+      "properties": {
+        "schema": {
+          "const": "cc-master/trusted-projection-scenario-witness/v1alpha1"
+        },
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^tpt:scenario:[a-f0-9]{64}$"
+        },
+        "host": {
+          "$ref": "#/$defs/host"
+        },
+        "surface": {
+          "$ref": "#/$defs/scenarioSurface"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "operator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mutation",
+            "failpoint"
+          ],
+          "properties": {
+            "mutation": {
+              "$ref": "#/$defs/scenarioMutation"
+            },
+            "failpoint": {
+              "$ref": "#/$defs/scenarioFailpoint"
+            }
+          }
+        },
+        "production_subject": {
+          "const": "scripts/skill-knowledge/sync-host-surface.cjs#projectAndPublishHostSurface"
+        },
+        "trace": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/traceRow"
+          }
+        },
+        "outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "process_status",
+            "production_returned",
+            "production_error_code",
+            "live_changed",
+            "live_before_content_id",
+            "live_after_content_id",
+            "live_before_forensic_sha256",
+            "live_after_forensic_sha256",
+            "production_residues"
+          ],
+          "properties": {
+            "process_status": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "production_returned": {
+              "type": "boolean"
+            },
+            "production_error_code": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "live_changed": {
+              "type": "boolean"
+            },
+            "live_before_content_id": {
+              "$ref": "#/$defs/artifactContentId"
+            },
+            "live_after_content_id": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/artifactContentId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "live_before_forensic_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "live_after_forensic_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "production_residues": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/portablePath"
+              }
+            }
+          }
+        },
+        "contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ok",
+            "primary_violation",
+            "violations"
+          ],
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "primary_violation": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/invariantId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "violations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/violation"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 ---
 name: adapter-projection-engineering
-description: 当你要实现、修改或调试 cc-master/paragoge 式 source-to-adapter 投影脚本时使用；覆盖 SAP/PHIP 文件复制、slot/placeholder rewrite、host dist 生成、sync check、path token 和测试策略。
+description: '当你要实现、修改或调试 cc-master/paragoge 式 source-to-adapter 投影脚本时使用；覆盖 SAP/PHIP 文件复制、slot/placeholder rewrite、host dist 生成、sync check、path token 和测试策略。Do NOT use when 只查 skill knowledge graph 正式规范/CLI（→ design_docs/skill-knowledge-graph）；投影脚本实现仍归本 skill。'
 ---
 
 # Adapter 投影工程
@@ -72,3 +72,5 @@ claude plugin validate plugin/dist/claude-code
 ```
 
 如果改 Codex adapter，不要假设 `${CODEX_PLUGIN_ROOT}`；先写 probe 或使用 Codex 文档明确支持的路径策略。
+
+知识 graph 的 `compile` 消费 / typed change 协议 → `design_docs/skill-knowledge-graph` + CLI；本 skill 只实现 projection 脚本本身。

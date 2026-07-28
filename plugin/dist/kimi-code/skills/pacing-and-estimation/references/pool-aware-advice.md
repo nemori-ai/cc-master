@@ -4,6 +4,8 @@
 
 先由 `using-ccm` 的 coordination 操作面或 monitor 产出本板 own row：该过程会把 usage signal 归一成 `PoolPressure`，按同池 peer 的 `coordination.priority` 和 `coordination.state.current.burn_contribution` 计算相对分配，并在命中边沿时写本板 `coordination.inbox`。这里不执行这项写操作，只消费已经产出的 own row；建议仍是 advisory，不是强制调度。
 
+<a id="ccm-k-point-pacing-own-row"></a>
+<!-- ccm:k:start point:pacing.own-row -->
 ## 读 `own_row`
 
 `own_row.kind` 是你要读的主字段：
@@ -19,12 +21,32 @@
 
 `target_headroom_pct` 是本板在当前池压力下按优先级权重分到的目标 headroom。`delta_headroom_pct = target - burn`：负数表示你超额，正数表示你有可 claim 空间。单位就是 headroom 百分点，不是 WIP 档位。
 
+<!-- ccm:k:end point:pacing.own-row -->
+<!-- ccm:k:nav:start point:pacing.own-row -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
+- [requires: pool 相对轴 vs usage 绝对轴](./pool-aware-advice.md#ccm-k-point-pacing-pool-vs-usage) <!-- ccm:k:edge edge:pacing.own-to-vs -->
+- [routes_to: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.own-to-upper -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-pool-vs-usage"></a>
+<!-- ccm:k:start point:pacing.pool-vs-usage -->
 ## 与 `usage advise` 的关系
 
 selected-target `usage advise` 是绝对配额压力轴：这个池有多满、是否该 throttle / stop / 考虑该 target 支持的重 lever。pool-aware own row 是相对分配轴：在同一个已证明池里，本板相对 sibling 该让还是该接。只有一块 active board 时，相对分配退化成单板 verdict，不制造额外协调噪音。
 
 优先级权重是固定校准值：`urgent=8`、`high=4`、`normal=2`、`low=1`、`trivial=0.5`。低优 board 只有 fair-share floor，不能靠轮转抢占高优 work；这防止低优任务饿死，但不会把它提升成同等紧急。
 
+<!-- ccm:k:end point:pacing.pool-vs-usage -->
+<!-- ccm:k:nav:start point:pacing.pool-vs-usage -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.vs -->
+- [contrasts_with: pool 合理化表与消费顺序](./pool-aware-advice.md#ccm-k-point-pacing-pool-rationalization) <!-- ccm:k:edge edge:pacing.vs-to-rat -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-pool-rationalization"></a>
+<!-- ccm:k:start point:pacing.pool-rationalization -->
 ## Rationalization Table
 
 | 借口 | 现实 |
@@ -40,3 +62,28 @@ selected-target `usage advise` 是绝对配额压力轴：这个池有多满、�
 2. 读 `own_row` 与 `allocation.rows`，只把 sibling rows 当解释上下文，不要试图写 sibling board。
 3. 把 `own_row`、reset 事实与未消费通知作为决策输入交给 `master-orchestrator-guide`。
 4. 通知缺失或陈旧时，不在这里触发写操作；回到 `using-ccm` 刷新或检查 coordination 状态。
+<!-- ccm:k:end point:pacing.pool-rationalization -->
+<!-- ccm:k:nav:start point:pacing.pool-rationalization -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.pool](./pool-aware-advice.md#ccm-k-module-pacing-pool)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.rat -->
+- [routes_to: 读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row) <!-- ccm:k:edge edge:pacing.rat-to-own -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 池感知建议
+
+<a id="ccm-k-module-pacing-pool"></a>
+
+消费同池 own_row 相对分配，不与绝对 usage 轴混淆。
+
+## Member points
+
+- [读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row)
+- [pool 合理化表与消费顺序](./pool-aware-advice.md#ccm-k-point-pacing-pool-rationalization)
+- [pool 相对轴 vs usage 绝对轴](./pool-aware-advice.md#ccm-k-point-pacing-pool-vs-usage)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

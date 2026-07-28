@@ -4,6 +4,7 @@
 > reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。本页不调 WIP、不换号、
 > 不派发 worker，也不创建 watchdog。
 
+<!-- ccm:k:start point:pacing.upper-bound-only -->
 ## 只在上界收紧
 
 pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hold` 只表示当前已证明的承重窗口未触发收紧；
@@ -18,6 +19,8 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 - **Cursor**：IDE 与 Agent 各自只接受自己的 billing-period posture；`stop_billing_period` 只约束对应
   surface。Cursor 自动换号永久禁止，两条 surface 不互相兜底事实。
 
+<!-- ccm:k:end point:pacing.upper-bound-only -->
+<!-- ccm:k:start point:pacing.decision-vectors -->
 ## 可交给决策层的影响向量
 
 1. **模型 / effort**：在不跌破任务 effect floor 的前提下，较低成本候选可能降低 burn，也可能增加返工。
@@ -27,3 +30,4 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 这些只是决策输入，不是动作。是否减 WIP、换候选、延后任务、停派、请求用户拍板或建立 watchdog，全部交回
 `master-orchestrator-guide`。若决策层选择 wakeup，必须先取得真实 scheduler / background handle，再通过
 `using-ccm` 记录；`nearest_reset` 本身不是 handle，也不授权自动续跑。
+<!-- ccm:k:end point:pacing.decision-vectors -->

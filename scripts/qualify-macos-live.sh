@@ -278,7 +278,7 @@ NODE
 
 validate_plugin_archives() {
   local host zip dest
-  for host in claude-code codex cursor; do
+  for host in claude-code codex cursor kimi-code; do
     zip="${EVIDENCE_DIR}/plugins/cc-master-plugin-${host}-v0.0.0-macos-qualification.zip"
     [ -f "${zip}" ] || return 31
     dest="${EVIDENCE_DIR}/plugin-extract-${host}"
@@ -323,7 +323,19 @@ validate_plugin_archives() {
         }
 NODE
         ;;
+      kimi-code)
+        test -f "${dest}/cc-master/kimi.plugin.json" || return 52
+        test -d "${dest}/cc-master/commands" || return 53
+        test -d "${dest}/cc-master/hooks" || return 54
+        ;;
     esac
+    if find "${dest}/cc-master" -type d -name knowledge -print -quit | grep -q .; then
+      return 55
+    fi
+    if grep -RIlE 'knowledge/atlas\.md|knowledge/modules/|plugin/src/knowledge' \
+      "${dest}/cc-master" --include='*.md' | grep -q .; then
+      return 56
+    fi
     unzip -Z -v "${zip}" >"${EVIDENCE_DIR}/plugin-${host}-zip-metadata.log" || return 44
   done
 }

@@ -17,6 +17,7 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 
 ## 澄清：「项目」指被编排项目，不是 cc-master
 
+<!-- ccm:k:start point:multilayer.orthogonality -->
 **这是承重语言，全文贯穿、绝不可搞混。** 这里说的「项目」「项目的 planning 规范」，永远指 **orchestrator 当前所编排 / 所服务的那个目标项目**——某个 web app repo、某个业务后端仓库、某个被你驱动着推进长程目标的代码库。**它不是 cc-master 这个插件仓库本身。**
 
 指导的语义只有一句：当你作为编排者在为*某个项目*推进一个长程大任务时，让承接该任务的执行者去**发现并遵循那个项目自己约定的** planning 流程 / 规范，并维护那个项目约定位置的计划文档。「发现」= 让执行者去读那个项目的 `CONTRIBUTING` / `AGENTS.md` / `CLAUDE.md` / 既有 design docs 等，把它**自己**约定的 planning 规范挖出来再遵循——而不是套用任何外来的（更不是 cc-master 自己的）planning 规范。
@@ -34,8 +35,11 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 
 ---
 
+<!-- ccm:k:end point:multilayer.orthogonality -->
+
 ## 派发契约：把「发现并遵循本项目 planning 规范」写进去
 
+<!-- ccm:k:start point:multilayer.handoff-contract -->
 核心驱动点在**派发那一刻**。当你派发一个够大够长的节点时，把这两件事作为**节点契约的一部分**写进派发指令：
 
 1. **发现并遵循被编排项目的 planning 规范** —— 指令里要求执行者先去读该项目的 `CONTRIBUTING` / `AGENTS.md` / `CLAUDE.md` / 既有 design docs，把它约定的 planning 流程挖出来再按它推进。
@@ -45,8 +49,11 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 
 ---
 
+<!-- ccm:k:end point:multilayer.handoff-contract -->
+
 ## 识别启发：哪些节点够格用这一层
 
+<!-- ccm:k:start point:multilayer.admission-and-escalation -->
 不是每个节点都需要这一层——它有成本（执行者要先发现规范、要维护文档）。够格的节点特征：
 
 - **长程、工作量大** —— 一个 sub-agent 一口气吃不下、自然要分阶段。
@@ -73,8 +80,11 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 
 ---
 
+<!-- ccm:k:end point:multilayer.admission-and-escalation -->
+
 ## 计划文档维护：落点与分工
 
+<!-- ccm:k:start point:multilayer.maintenance -->
 执行者产出并维护的计划文档，落在**被编排项目约定的位置**——那个项目的 `PLAN.md` / design doc 目录 / 它自己的 planning skill 产物等，**按该项目的约定走**，不是 cc-master 指定一个固定文件名。它一物两用：① 单任务*内部*分步的可追溯记录（决策 / 取舍 / 已完成 / 待办）；② 续跑 / 换 session 接手的锚点（下一个执行者从它接上手）。
 
 与 board 的分工要钉清楚：
@@ -87,3 +97,4 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 | 续跑用途 | 你跨 compaction / session 的记忆 | 执行者在单节点内续跑 / 换手的锚点 |
 
 两者都服务「可续跑」，但尺度不同：board 让**你**记得整张图，项目计划文档让**执行者**记得这一个节点内部走到哪了。端点验收时，board 节点的 done 仍以**你自己端点的独立验收**为准（见 `resume-verify.md`），项目计划文档是执行者的工作记录、不替代你的验收。
+<!-- ccm:k:end point:multilayer.maintenance -->

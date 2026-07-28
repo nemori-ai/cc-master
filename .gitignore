@@ -1,6 +1,11 @@
 # test scratch (hook tests create temp project dirs)
 .tmp-*/
 tests/**/.tmp-*/
+# controlled attestation / updater staging only (unknown .tmp content stays visible)
+/.tmp/ccm-provider-guidance-*/
+/.tmp/ccm-pacing-read-only-*/
+# whole-host sync staging siblings under plugin/dist (K1-06 v9; bak stays visible)
+/plugin/dist/*.write-*/
 # OS / editor
 .DS_Store
 *.swp
@@ -8,6 +13,10 @@ tests/**/.tmp-*/
 .claude/cc-master/
 # working plans + build board — not version-controlled
 design_docs/plans/
+# local skill-knowledge begin/validate/apply transaction workspaces
+.skill-knowledge/workspaces/
+# stochastic Codex/Cursor transcripts; only sanitized evidence.json may be committed
+design_docs/eval/skill-knowledge-router/.runs/
 .gstack/
 # ccm monorepo build artifacts (T0 industrial stack)
 ccm/node_modules

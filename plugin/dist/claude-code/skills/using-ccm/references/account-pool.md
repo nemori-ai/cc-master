@@ -13,6 +13,8 @@
 - [vault 两形态 + 明文 floor 的诚实局限](#vault-两形态--明文-floor-的诚实局限)
 - [token-blind：agent 永不见 token](#token-blindagent-永不见-token)
 
+<a id="ccm-k-point-ccm-account-pool-model"></a>
+<!-- ccm:k:start point:ccm.account-pool-model -->
 ## 号池模型（registry 指针 vs token 值）
 
 一个用户级、跨编排、跨 repo 的号池台账：`${CC_MASTER_HOME:-$HOME/.cc_master}/accounts.json`（`0600`·**绝不落 repo 树**）。它把每个 **email**（账号唯一标识）映射到：
@@ -28,7 +30,16 @@
 - **`identity`**（`oauthAccount` 非密副本）/ **`subscription_type`**（非密订阅枚举）/ **`last_observed_quota`** / **`last_switch_out`**（切出快照·选号核心输入）。
 
 **关键不变式：registry 零凭证。** 读到它的任何 agent / 程序都无害（vault 是指针，仍要过 OS keychain 解锁 / 文件 0600 才拿得到 token）。**「指针 vs 值」的分离不是官僚，是让 registry 永远可安全读**：registry 是会被 cat / 贴 bug 报告 / 截图 / 同步 / 误 commit 的台账——token 进去就把每个日常操作变成泄漏面。`base64` / 标 `# sensitive` 都不算缓解（base64 `atob()` 一下就解、不是加密）。token 进 vault，registry 进指针，没有第三条路。
-
+<!-- ccm:k:end point:ccm.account-pool-model -->
+<!-- ccm:k:nav:start point:ccm.account-pool-model -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
+- [next: 录号机制 why + refreshToken 硬要求](./account-pool.md#ccm-k-point-ccm-account-enroll-why) <!-- ccm:k:edge edge:ccm.account-model-enroll -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.account-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-account-enroll-why"></a>
+<!-- ccm:k:start point:ccm.account-enroll-why -->
 ## 录号机制 why（keychain 直读完整 blob）
 
 录号（`ccm account add`）的捕获源 = **macOS keychain「Claude Code-credentials」(`account=$USER`)**，**直读当前机器登录号的完整 `claudeAiOauth` blob**（含 `accessToken`/`refreshToken`/`expiresAt`/…）——**不是** `setup-token`、**不是** `credentials.json` 文件。为什么这样设计：
@@ -40,7 +51,16 @@
 ## refreshToken 是硬要求（无重启换号死依赖它）
 
 vault 必须存**含非空 refreshToken 的完整 blob**。换号是**无重启凭证覆写**（switch 覆写官方共享凭证、运行中 claude 惰性 re-read 接管），它靠 refreshToken 续期——keychain blob 里的 access token 仅 ~8h 有效，无 refreshToken 续不上、切进去很快认证失败。**只有真 `/login` 走完整 OAuth 才在 keychain 写下非空 refreshToken**；`claude setup-token`（旧弃用路径）铸长寿命 headless token、**结构上不产生 refreshToken**（实测 `credentials.json` 里 refreshToken 值为空·残缺副本）。故 `ccm account add` 取不到非空 refreshToken 即 FAIL，绝不存残缺 blob——这是个该 surface 给用户的失败模式（提示「多半没真 `/login`→ 请用 Orca / `claude login` 登录后重跑」），不是静默放弃。
-
+<!-- ccm:k:end point:ccm.account-enroll-why -->
+<!-- ccm:k:nav:start point:ccm.account-enroll-why -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-enroll-why.pri -->
+- [next: 选号方法论判据](./account-pool.md#ccm-k-point-ccm-account-select-method) <!-- ccm:k:edge edge:ccm.account-enroll-select -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-account-select-method"></a>
+<!-- ccm:k:start point:ccm.account-select-method -->
 ## 选号方法论判据
 
 换号时从所有**非 active 且 token 未过期**的号中，选一个**预计可用配额最优**的切入。判据（权重 / 阈值是引擎可 env 覆写的常量·实现在 ccm 引擎的选号逻辑、本文只蒸馏 why）：
@@ -50,7 +70,16 @@ vault 必须存**含非空 refreshToken 的完整 blob**。换号是**无重启�
 - **可用度评分**：`score = W5×(100-p5) + W7×(100-p7)`——两窗口各自剩余额度加权，**7d 加权更重**（W7>W5·它是跨窗口总闸、最易不知不觉逼顶）。
 - **source 信任分级（最大精度风险）**：切出快照带 `source`——`"account"`（账户权威）= 1.0；`"local-derived-approx"`（降级反推·reset 失真）→ 整号评分乘信任折扣 + warn 口径不可靠。**算法只保证相对排序方向性正确、不承诺精确**——真换号必 dogfood 验证选出的号是否真更经烧。
 - **临到期降权 + 边界**：token 临近到期 → 降权（不归零·还能用、只是该续期）；无历史新号视作满血最优先；全池无双窗口健康号（每个都 5h 或 7d 逼顶）→ `NONE_ALL_EXHAUSTED`，**surface 用户别盲切**（是 `blocked_on:"user"` 决策·全池 5h 墙 / 7d 健康时也 stop、不空切）。
-
+<!-- ccm:k:end point:ccm.account-select-method -->
+<!-- ccm:k:nav:start point:ccm.account-select-method -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
+- [next: policy 硬闸 + vault/token-blind](./account-pool.md#ccm-k-point-ccm-account-policy-vault) <!-- ccm:k:edge edge:ccm.account-select-policy -->
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-select-method.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-account-policy-vault"></a>
+<!-- ccm:k:start point:ccm.account-policy-vault -->
 ## policy 机制硬闸（切号前读 board.policy）
 
 `ccm account switch` 在**真正覆写官方凭证存储之前**多一道**机制硬闸**（纵深防御的机制侧）：读目标 board 的 `policy.autonomous_account_switch`，显式 `deny` → 拒绝本次换号、**exit 7**（policy-deny·不取锁 / 不覆写任何凭证 / registry 原封不动）+ best-effort 往 board.log 记一条 `decision`（供审计）。fail-open/closed 分流：真·无 ccm 上下文 → fail-open `allow`；有明确目标板（`--board`/`$CC_MASTER_BOARD`）但 policy 读不到 / 歧义 → fail-closed `deny`（exit 7·绝不让 deny 因 discovery 失败被绕过）。
@@ -69,3 +98,30 @@ vault 路径必须在 gitignored 用户级区（`${CC_MASTER_HOME:-$HOME/.cc_mas
 ## token-blind：agent 永不见 token
 
 换号 / 录号 / 续期都跑 `ccm account` 命令——**token 全程活在 ccm 引擎子进程内**（从 keychain 直读 / refresh POST body / 三存储原子写都在引擎子进程），**绝不进 agent context / transcript / log / registry / board / commit**。agent 跑命令、但**不见 token**——引擎是 token 的隔离边界。这就是「最大化 agentic（直接跑命令录号换号）」与「token no-leak」并存的关键：agent 不必、也绝不该手 `cat` vault / 手拼 `security -w` 取值。token 安全实现纪律（vault 两形态读写、argv 写 keychain 的 128 字节例外、refresh 端点白名单、切出 token 抢救…）已固化在 ccm 引擎——**不靠 skill prose 守、不靠 agent 自律**（agent 已不直接碰 token，那套抗合理化纪律的触发场景消失）。读手册的人只需知道：**凭证由 ccm 引擎读写、全程不进 agent / 不 log，切不切由用户拍。**
+<!-- ccm:k:end point:ccm.account-policy-vault -->
+<!-- ccm:k:nav:start point:ccm.account-policy-vault -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
+- [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-policy-vault.pri -->
+- [operationalizes: namespace account 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-account) <!-- ccm:k:edge edge:ccm.account-policy-ops-cmd -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 号池概念 + account 命令面
+
+<a id="ccm-k-module-ccm-account-pool"></a>
+
+分离号池 why/选号判据/vault 安全与 account 命令机械事实；换号决策不在本模块。
+
+## Member points
+
+- [录号机制 why + refreshToken 硬要求](./account-pool.md#ccm-k-point-ccm-account-enroll-why)
+- [policy 硬闸 + vault/token-blind](./account-pool.md#ccm-k-point-ccm-account-policy-vault)
+- [号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model)
+- [选号方法论判据](./account-pool.md#ccm-k-point-ccm-account-select-method)
+- [namespace account 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-account)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

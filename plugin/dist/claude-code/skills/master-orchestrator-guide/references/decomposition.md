@@ -10,6 +10,8 @@
 
 ## 1. 当前增量 = 一张 DAG —— 拓扑序是排期地基
 
+<a id="ccm-k-point-scheduling-dag-and-critical-path"></a>
+<!-- ccm:k:start point:scheduling.dag-and-critical-path -->
 当前增量是一张 **DAG**（节点 = 工作单元，边 = 依赖）。执行序合法与否由**拓扑排序（topological sort）**保证：一个节点只有在所有前驱都做完之后才 `ready`。这正是 dataflow「就绪即派」思想的图论根基——出度 > 1 的节点是 fork 点，入度 > 1 的节点是 join 点。
 
 - **每条依赖边都是债务**（「目标即依赖图」镜头的硬规则）：默认全并行，逐边举证——除非能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉那条边。「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。
@@ -68,8 +70,16 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 
 ---
 
+<!-- ccm:k:end point:scheduling.dag-and-critical-path -->
+<!-- ccm:k:nav:start point:scheduling.dag-and-critical-path -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
+<!-- ccm:k:nav:end -->
 ## 4. 并行度 = T₁/T∞ —— 值得开几条道
 
+<a id="ccm-k-point-scheduling-parallelism-and-granularity"></a>
+<!-- ccm:k:start point:scheduling.parallelism-and-granularity -->
 work-span 模型量化并行到底值不值、天花板在哪（这些量由 `ccm board graph` 的 `parallelism` 直接给出，概念如下）：
 
 - **Work T₁** = 单处理器上的总操作量（≈ 节点总数）。
@@ -97,8 +107,16 @@ work-span 模型量化并行到底值不值、天花板在哪（这些量由 `cc
 
 ---
 
+<!-- ccm:k:end point:scheduling.parallelism-and-granularity -->
+<!-- ccm:k:nav:start point:scheduling.parallelism-and-granularity -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
+<!-- ccm:k:nav:end -->
 ## 6. 每节点契约 —— 派发前定义
 
+<a id="ccm-k-point-scheduling-node-contract"></a>
+<!-- ccm:k:start point:scheduling.node-contract -->
 派发一个节点之前，先定义它的契约：
 
 - **Input deps** —— pin 住每条依赖喂进来的上游产物（version / hash）。依赖 pinning 与 stale 检测见 `resume-verify.md`。
@@ -110,3 +128,26 @@ work-span 模型量化并行到底值不值、天花板在哪（这些量由 `cc
 没有契约的节点无法被安全派发、无法在端点验证、也无法从一个 content hash 续跑。
 
 > **字段怎么落进 board**（`acceptance` / `estimate` / `deps` / `executor` 怎么写、撞哪条校验规则）见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`——本文只给排期判断，不教 ccm 命令与字段取值。
+<!-- ccm:k:end point:scheduling.node-contract -->
+<!-- ccm:k:nav:start point:scheduling.node-contract -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:scheduling.dependency-dag](./decomposition.md#ccm-k-module-scheduling-dependency-dag)
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 依赖 DAG 排期
+
+<a id="ccm-k-module-scheduling-dependency-dag"></a>
+
+对已切好的当前增量按真实依赖、临界路径、并行度与节点契约排期。
+
+## Member points
+
+- [DAG、临界路径与机器 graph](./decomposition.md#ccm-k-point-scheduling-dag-and-critical-path)
+- [派发前节点契约](./decomposition.md#ccm-k-point-scheduling-node-contract)
+- [并行度与粒度](./decomposition.md#ccm-k-point-scheduling-parallelism-and-granularity)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

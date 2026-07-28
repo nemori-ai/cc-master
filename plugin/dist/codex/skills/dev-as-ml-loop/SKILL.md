@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-dev-as-ml-loop"></a>
 ---
 name: dev-as-ml-loop
 description: 'Use when dev work should be run as an ML-style optimization loop, either by a master orchestrator shaping dev-task handoffs/subagent roles or by an execution agent driving one task to acceptance —— 当你要把开发工作当成优化过程来跑:master orchestrator 用它设计外层 dev loop/objective/measurement/subagent 组件分工/restart-stop/board ledger 语义,执行 agent 用它把单个开发任务推进到验收。心智锚:验收=目标函数、loop=迭代优化(提议→测量→调整)、测试=测量仪器/梯度、explore vs exploit、局部最小值=钻牛角尖→restart、收敛即停别过拟合、拟合意图非用例、简单性=正则、持续用 board 维护优化状态以便 compact 后续接。Triggers: 派发或接手 dev 任务、要把 work order 改造成可测优化问题、要设计 subagent 分工/测量/验收/重启条件、要用 board 管理优化目标和迭代状态、compact 后续接 dev loop、卡住在一个方案上越改越深(钻牛角尖)、怎么判断"做完了"、要不要先写测试/测量、要不要换方案。Do NOT use when 你在决定顶层该编排什么 / WIP / 临界路径 / HITL / 配额(master-orchestrator-guide)、怎么把目标切成任务 DAG(slicing-goals-into-dags)、领域 / 类 / 合约 / 测试本身怎么建得好——DDD/OOP/SDD/TDD 手艺内容(engineering-with-craft)、怎么用 ccm 写 board(using-ccm)、workflow 脚本怎么写(authoring-workflows)。'
@@ -11,10 +12,22 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<a id="ccm-k-point-devloop-core-thesis"></a>
+<!-- ccm:k:start point:devloop.core-thesis -->
 ## 核心论题:dev work 本质是在跑一个优化过程
 
 每一轮 propose 一个改动、跑一下、看结果、再调——这不是"试错",这是**带测量的迭代优化**:目标函数是验收标准,每一轮在缩小"当前状态 ↔ 验收"的距离,直到收敛(验收达标)。**「一次性想清楚、写一大坨、跑一次祈祷它对」是非优化思维**——它放弃了每一轮本可拿到的梯度信息。用下面八个命名锚换掉"线性把活干完"的默认心智。
 
+<!-- ccm:k:end point:devloop.core-thesis -->
+<!-- ccm:k:nav:start point:devloop.core-thesis -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.core-thesis -->
+- [deepens_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.thesis-to-objective -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-two-scale"></a>
+<!-- ccm:k:start point:devloop.two-scale -->
 ## 两尺度 dev loop:外层编排,内层下降
 
 同一套优化语言在两个尺度上工作:
@@ -24,6 +37,17 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 坏 handoff 把 dev task 写成一句 work order;好 handoff 把它写成可优化问题:objective 是什么、instrument 在哪、artifact 是什么、哪些约束不可碰、何时 stop/restart、哪些优化状态必须持续写回 board。长程任务的外层 loop 要有一份 optimization ledger:目标函数、当前 hypothesis、测量读数、plateau / restart 判断、下一步 probe。compact 是机械动作,你通常只能在 after compact 后感知;所以不要等某个"压缩前时机",而是在工作过程中持续用 board 管住这些信息。怎么用 board 承载这份 ledger,见 [references/optimization-ledger.md](references/optimization-ledger.md)。
 
+<!-- ccm:k:end point:devloop.two-scale -->
+<!-- ccm:k:nav:start point:devloop.two-scale -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.outer](./SKILL.md#ccm-k-module-devloop-outer)
+- [requires: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.two-scale-to-ledger -->
+- [operationalizes: subagents as ML components](./SKILL.md#ccm-k-point-devloop-ml-components) <!-- ccm:k:edge edge:devloop.two-scale-to-components -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.two-scale -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-ml-components"></a>
+<!-- ccm:k:start point:devloop.ml-components -->
 ## subagents as ML components
 
 派发前先问:这个优化系统缺哪个组件,而不只是"谁来写代码"。
@@ -42,6 +66,17 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<!-- ccm:k:end point:devloop.ml-components -->
+<!-- ccm:k:nav:start point:devloop.ml-components -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.outer](./SKILL.md#ccm-k-module-devloop-outer)
+- [requires: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.components-to-objective -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.ml-components -->
+- [routes_to: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.components-to-two-scale -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-objective"></a>
+<!-- ccm:k:start point:devloop.objective -->
 ## 心智锚 1:验收标准 = 目标函数(objective / loss)
 
 整个 loop 只有一个朝向:**最小化"当前实现 ↔ 验收标准"的距离**。所以第一件事永远是**把目标函数看清楚**——这个任务的验收标准(DoD)到底是什么、怎么测。
@@ -54,6 +89,17 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<!-- ccm:k:end point:devloop.objective -->
+<!-- ccm:k:nav:start point:devloop.objective -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [requires: 测试是测量仪器](./SKILL.md#ccm-k-point-devloop-instrument) <!-- ccm:k:edge edge:devloop.objective-to-instrument -->
+- [next: 小步迭代优化](./SKILL.md#ccm-k-point-devloop-iterate) <!-- ccm:k:edge edge:devloop.objective-to-iterate -->
+- [requires: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.objective-to-ledger-when -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-iterate"></a>
+<!-- ccm:k:start point:devloop.iterate -->
 ## 心智锚 2:dev loop = 迭代优化,不是一次成型
 
 **propose 改动 → 测量 → 读梯度 → 调整 → 重复。** 小步、每步测量,优于"写一大坨再跑"——后者等于一步迈到谷底、放弃了沿途所有方向信息。每一轮的产出不是"更多代码",是"更小的 loss + 一点关于下一步往哪走的信息"。
@@ -62,6 +108,17 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<!-- ccm:k:end point:devloop.iterate -->
+<!-- ccm:k:nav:start point:devloop.iterate -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [deepens_to: explore vs exploit](./SKILL.md#ccm-k-point-devloop-explore-exploit) <!-- ccm:k:edge edge:devloop.iterate-to-explore -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.iterate -->
+- [next: plateau 则 restart](./SKILL.md#ccm-k-point-devloop-plateau-restart) <!-- ccm:k:edge edge:devloop.iterate-to-plateau -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-instrument"></a>
+<!-- ccm:k:start point:devloop.instrument -->
 ## 心智锚 3:测试 / 检查 = 你的测量仪器(梯度的来源)
 
 没有测量,优化就是闭眼下山。**先架好仪器,再下降**——这正是 TDD 的优化学解读:先写验收 / 测试 = 先把目标函数和测量装置摆好,之后每一步都有读数。
@@ -72,6 +129,16 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<!-- ccm:k:end point:devloop.instrument -->
+<!-- ccm:k:nav:start point:devloop.instrument -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [next: 小步迭代优化](./SKILL.md#ccm-k-point-devloop-iterate) <!-- ccm:k:edge edge:devloop.instrument-to-iterate -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.instrument -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-explore-exploit"></a>
+<!-- ccm:k:start point:devloop.explore-exploit -->
 ## 心智锚 4:explore vs exploit(调你的学习率)
 
 - **早期(不确定高)→ explore**:用 spike / 草稿试几个方向,大步长、容忍粗糙,目的是**学到地形**(哪条路通)。explore 必须买到信息:一个 spike 若不降低不确定性,就是随机游走。
@@ -81,6 +148,16 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ---
 
+<!-- ccm:k:end point:devloop.explore-exploit -->
+<!-- ccm:k:nav:start point:devloop.explore-exploit -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.explore-to-objective -->
+- [next: plateau 则 restart](./SKILL.md#ccm-k-point-devloop-plateau-restart) <!-- ccm:k:edge edge:devloop.explore-to-plateau -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-plateau-restart"></a>
+<!-- ccm:k:start point:devloop.plateau-restart -->
 ## 心智锚 5:局部最小值 = 钻牛角尖;解药是 restart / 换方向,不是再下降
 
 当一个方案 **plateau**(你改了又改,loss 却不再真正下降、离验收还差得远)——你陷在一个**局部最小值**里了。此刻"沿同一条沟再走几步"(给补丁打补丁、再 tweak 一下同一个方案)是错的;正确动作是**退一步、换一个方案 restart**(从不同起点重新下降)。
@@ -100,6 +177,16 @@ orchestrator 的 restart 不只是一句"继续试":可以换 hypothesis、拆�
 
 ---
 
+<!-- ccm:k:end point:devloop.plateau-restart -->
+<!-- ccm:k:nav:start point:devloop.plateau-restart -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [contrasts_with: 收敛即停](./SKILL.md#ccm-k-point-devloop-converge) <!-- ccm:k:edge edge:devloop.plateau-to-converge -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.plateau-restart -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-converge"></a>
+<!-- ccm:k:start point:devloop.converge -->
 ## 心智锚 6:收敛 = 验收达标即停,别过拟合
 
 loss 到 0(验收每一条都绿)= **收敛,停**。继续"优化"就是**过拟合**:
@@ -115,18 +202,48 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 
 ---
 
+<!-- ccm:k:end point:devloop.converge -->
+<!-- ccm:k:nav:start point:devloop.converge -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [requires: 拟合意图非用例](./SKILL.md#ccm-k-point-devloop-fit-intent) <!-- ccm:k:edge edge:devloop.converge-to-fit -->
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.converge -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-fit-intent"></a>
+<!-- ccm:k:start point:devloop.fit-intent -->
 ## 心智锚 7:拟合意图,别拟合用例(过拟合 vs 泛化)
 
 让实现满足验收**背后的真实意图**,而不是表面骗过那几个检查点。**hard-code 让测试变绿 = 过拟合**:在训练样本(那几个测试用例)上 loss=0,泛化能力=0(真实输入一来就崩)。问自己:我是真解决了这个问题,还是只拟合了验收的几个采样点?
 
 ---
 
+<!-- ccm:k:end point:devloop.fit-intent -->
+<!-- ccm:k:nav:start point:devloop.fit-intent -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.fit-intent -->
+- [next: 简单性正则](./SKILL.md#ccm-k-point-devloop-regularize) <!-- ccm:k:edge edge:devloop.fit-to-regularize -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-regularize"></a>
+<!-- ccm:k:start point:devloop.regularize -->
 ## 心智锚 8:正则化 = 简单性先验
 
 在**同样满足目标函数**的多个方案里,选**最简单**的(最小改动、最少新概念、最少新依赖)。复杂度是目标函数没奖励、却要长期偿还的成本——简单性是你的正则项,防止"为复杂而复杂"的过拟合。(这与 `slicing-goals-into-dags` 的"薄增量"同源:小而简,在切分层和执行层都是正则。)
 
 工程手艺是 regularization 的来源:SDD 把 objective 固成契约,DDD/OOP 缩小坏模型空间,TDD 保证 instrument 可读。细节归 `engineering-with-craft`;本 skill 只把它们放进优化图里。
 
+<!-- ccm:k:end point:devloop.regularize -->
+<!-- ccm:k:nav:start point:devloop.regularize -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.regularize -->
+- [operationalizes: 好 loop 手感与一图流](./SKILL.md#ccm-k-point-devloop-taste-and-cycle) <!-- ccm:k:edge edge:devloop.regularize-to-cycle -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-taste-and-cycle"></a>
+<!-- ccm:k:start point:devloop.taste-and-cycle -->
 ## Taste:好 loop 的手感
 
 好的 dev loop 像稳定训练:objective 清楚、instrument 可信、hypothesis 小、反馈短、失败可读、重启不拖、收敛即停。坏 loop 像失控训练:目标漂移、测量假绿、补丁栈变深、同形失败反复出现、"再改一下"替代 hypothesis、验收已绿还继续镀金。
@@ -161,6 +278,14 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 
 ---
 
+<!-- ccm:k:end point:devloop.taste-and-cycle -->
+<!-- ccm:k:nav:start point:devloop.taste-and-cycle -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.cycle-to-objective -->
+- [routes_to: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.cycle-to-two-scale -->
+<!-- ccm:k:nav:end -->
 ## Pointers
 
 - **slicing-goals-into-dags** —— 在执行**之前**,目标怎么**切**成带验收的任务。它切出小 batch;本 skill 把每片当优化问题跑。
@@ -169,3 +294,51 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 - [references/optimization-ledger.md](references/optimization-ledger.md) —— 怎么把 objective / measurement / hypothesis / plateau / restart / compact 后续接所需状态持续落到 board,并与 `using-ccm` 分工。
 - **engineering-with-craft** —— 本 skill 给循环的**形状**(怎么把 dev work 优化到验收);engineering-with-craft 给循环里那双手的**工程手艺内容**(领域怎么建模 / 类怎么写 / 要不要 spec-first / **test-first 这条纪律本身怎么执行**)。测试触点:本 skill 锚 3 讲「测试为何是循环里的梯度信号」,`engineering-with-craft` 讲「红绿铁律怎么执行」——不同 plane,互补。
 - board 的 `acceptance` 字段语义(两态 objective function:一句话 DoD / `{criteria}`)以 `using-ccm` 为准——本 skill 是它在 dev loop 里的优化心智。
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:dev-as-ml-loop:
+- [验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective)
+- [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [Module module:devloop.ledger](./references/optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [primary: 何时必须写 ledger](./references/optimization-ledger.md#ccm-k-point-devloop-ledger-when)
+- [Module module:devloop.outer](./SKILL.md#ccm-k-module-devloop-outer)
+- [primary: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale)
+<!-- ccm:k:entry-pin:end -->
+
+<!-- ccm:k:generated -->
+## 优化循环心智锚
+
+<a id="ccm-k-module-devloop-core"></a>
+
+把单任务/内层下降建成带目标函数、测量、迭代、收敛的优化循环。
+
+## Member points
+
+- [收敛即停](./SKILL.md#ccm-k-point-devloop-converge)
+- [dev work 是优化过程](./SKILL.md#ccm-k-point-devloop-core-thesis)
+- [explore vs exploit](./SKILL.md#ccm-k-point-devloop-explore-exploit)
+- [拟合意图非用例](./SKILL.md#ccm-k-point-devloop-fit-intent)
+- [测试是测量仪器](./SKILL.md#ccm-k-point-devloop-instrument)
+- [小步迭代优化](./SKILL.md#ccm-k-point-devloop-iterate)
+- [验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective)
+- [plateau 则 restart](./SKILL.md#ccm-k-point-devloop-plateau-restart)
+- [简单性正则](./SKILL.md#ccm-k-point-devloop-regularize)
+- [好 loop 手感与一图流](./SKILL.md#ccm-k-point-devloop-taste-and-cycle)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 外层编排与组件分工
+
+<a id="ccm-k-module-devloop-outer"></a>
+
+让 orchestrator 把外层 loop 建成可调度的优化系统，而不是 work order。
+
+## Member points
+
+- [subagents as ML components](./SKILL.md#ccm-k-point-devloop-ml-components)
+- [外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

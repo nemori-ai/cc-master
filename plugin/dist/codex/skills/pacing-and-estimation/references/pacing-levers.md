@@ -4,6 +4,8 @@
 > reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。本页不调 WIP、不换号、
 > 不派发 worker，也不创建 watchdog。
 
+<a id="ccm-k-point-pacing-upper-bound-only"></a>
+<!-- ccm:k:start point:pacing.upper-bound-only -->
 ## 只在上界收紧
 
 pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hold` 只表示当前已证明的承重窗口未触发收紧；
@@ -18,6 +20,17 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 - **Cursor**：IDE 与 Agent 各自只接受自己的 billing-period posture；`stop_billing_period` 只约束对应
   surface。Cursor 自动换号永久禁止，两条 surface 不互相兜底事实。
 
+<!-- ccm:k:end point:pacing.upper-bound-only -->
+<!-- ccm:k:nav:start point:pacing.upper-bound-only -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.levers](./pacing-levers.md#ccm-k-module-pacing-levers)
+- [operationalizes: 决策影响向量](./pacing-levers.md#ccm-k-point-pacing-decision-vectors) <!-- ccm:k:edge edge:pacing.upper-to-vectors -->
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.upper-to-global -->
+- [deepens_to: 读 pool own_row](./pool-aware-advice.md#ccm-k-point-pacing-own-row) <!-- ccm:k:edge edge:pacing.levers-to-pool -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-decision-vectors"></a>
+<!-- ccm:k:start point:pacing.decision-vectors -->
 ## 可交给决策层的影响向量
 
 1. **模型 / effort**：在不跌破任务 effect floor 的前提下，较低成本候选可能降低 burn，也可能增加返工。
@@ -27,3 +40,28 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 这些只是决策输入，不是动作。是否减 WIP、换候选、延后任务、停派、请求用户拍板或建立 watchdog，全部交回
 `master-orchestrator-guide`。若决策层选择 wakeup，必须先取得真实 scheduler / background handle，再通过
 `using-ccm` 记录；`nearest_reset` 本身不是 handle，也不授权自动续跑。
+<!-- ccm:k:end point:pacing.decision-vectors -->
+<!-- ccm:k:nav:start point:pacing.decision-vectors -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.levers](./pacing-levers.md#ccm-k-module-pacing-levers)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.hub-from.vectors -->
+- [routes_to: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.vectors-to-upper -->
+- [applies_to: usage⊗estimate 张力](./estimation.md#ccm-k-point-pacing-usage-estimate-tension) <!-- ccm:k:edge edge:pacing.levers-to-tension -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 单侧收紧 levers
+
+<a id="ccm-k-module-pacing-levers"></a>
+
+把压力整理成上界收紧决策输入，不执行编排动作。
+
+## Member points
+
+- [决策影响向量](./pacing-levers.md#ccm-k-point-pacing-decision-vectors)
+- [只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

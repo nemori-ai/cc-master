@@ -44,6 +44,23 @@ pnpm -C ccm install && pnpm -C ccm build   # 出 dist
 
 `plugin/src` is the semantic source. `plugin/dist/<harness>` is committed generated
 output and must be kept in the same commit as the source change that caused it.
+`plugin/src/knowledge` is repo-only governance data: raw points/modules/typed edges
+and accepted composition metadata. It must not appear in host dist, package, or
+release artifacts.
+
+Accepted compositions materialize only into the existing host skill-local
+Markdown surfaces. Before publication, remove or reject repo-only knowledge
+output and mechanically scan all four host dist trees, package staging, and
+archives for `knowledge/` paths or runtime links back to the repo-only source.
+Independent oracles and sealed receipt/attestation protocols are not current
+required gates; adding them requires a separately approved scope.
+
+For a knowledge or skill product change, follow the single maintainer journey in
+[`specification.md` §13](design_docs/skill-knowledge-graph/specification.md#13-维护者研发旅程唯一流程-ssot).
+It connects discovery, the global graph, candidate analysis/admission, the
+existing skill authoring/eval toolkit, and four-host materialization without
+creating another meta-skill or a second SSOT.
+
 Install the repo-local pre-push hook once per clone:
 
 ```bash
@@ -131,6 +148,28 @@ gh pr merge <N> --squash --auto --delete-branch
 
    口径与矩阵表头一致：`grep -v '/scripts/'` 排除 skill 自身的脚本源码；纯 `.design/` 的设计性
    提及不算 agent 指导 prose（保留作交叉参考标注即可，不计入引用列）。
+
+### Scope discipline (evidence grounded by K3-01P)
+
+下面五条约束本仓 feature slice 的设计、实现与 review。直接证据只有 2026-07-27 这一次事故：
+一个“knowledge 不进 dist/package”的机械边界任务，被派生的 public topology、independent oracle
+和 sealed release protocol 连续抬高为 blocker；用户据此明确要求把防过度设计 / 过度实现立为本仓
+研发纪律。证据与授权都不支持把它泛化成所有项目的普适方法论。
+
+- **Scope lock**：任务 acceptance 只能来自用户原句或用户已经批准的 spec。由 reviewer、实现者或
+  设计推导出的“更漂亮不变式”不能升级为 blocker；否则团队会优化自己新增的问题，而不是交付用户目标。
+- **Minimum sufficient solution**：若已有简单、机械、可复现的方案满足 acceptance，新增 schema、
+  protocol、transaction 或新产品面之前，必须先给出该简单方案失败的可复现证据，并指明它打穿了哪条
+  acceptance；否则保持简单方案，因为架构完整感本身不是需求。
+- **Scope-change gate**：新增 acceptance 或修改 non-goal，必须先取得用户授权，并把授权原文写入
+  board log。reviewer 的 out-of-scope finding 只能登记 follow-up，不能打回当前 slice；否则 review
+  会在没有用户授权时改写交付合同。
+- **Restart threshold**：同一 slice 连续两次因 `HIGH` / `CRITICAL` finding 而扩大范围时，立即停止
+  production work，重述用户目标、最小 acceptance 与 non-goals；没有新的用户授权，不得继续处理扩张项。
+  这条停线防止 review—修复循环变成没有终点的“打地鼠”。
+- **Reviewer scope contract**：review prompt 必须逐字带上 acceptance 与 non-goals，并要求每条
+  blocking finding 指向其中一项；缺少映射的 finding 只能进入 follow-up。这样 reviewer 审的是当前
+  slice，而不是它偏好的更大系统。
 
 If your change is behavioral, also **dogfood it**: start a real orchestration with
 `/cc-master:as-master-orchestrator <goal>` and confirm the change works against the

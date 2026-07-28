@@ -1,28 +1,17 @@
 #!/usr/bin/env bash
-# package-plugin.sh — 把 cc-master plugin 的**可分发子集**按 harness 打成 zip。
+# package-plugin.sh — 把 cc-master plugin 的可分发子集按 harness 打成 zip。
 #
-# 用途：发版时随 GitHub release 附「解压即装」的 per-harness plugin 制品，
-#   解压后即得 plugin 根目录 `cc-master/`；所有 harness 共享同一 plugin tag/version，只拆 asset。
+# 正常入口从已验证的 plugin/dist/<host> 打包：
+#   bash scripts/package-plugin.sh --host claude-code [tag]
+#   bash scripts/package-plugin.sh --all-hosts [tag]
 #
-# 落点（红线5）：这是 **dev-only** 构建脚本——只从 **repo 根**调用、**不随 plugin 分发**，
-#   故用裸相对路径（从 repo 根解析正确）。运行时脚本才进 `plugin/src/skills/<skill>/canonical/scripts/`。
+# 兼容入口消费既有 immutable release-input.json；它不改变正常入口：
+#   bash scripts/package-plugin.sh --manifest /absolute/release-input.json [--out-dir dist]
 #
-# allowlist 模型：只 ship 约定的分发目录 + 顶层 doc，**显式列入**而非排除——
-#   宁可漏装一个新目录（validate 会现形）也不误带 dev-only 物（ccm/ design_docs/ tests/ scripts/ adrs/ examples/）。
-#
-# 用法：
-#   bash scripts/package-plugin.sh --host claude-code          # tag 从 git/plugin.json 推导
-#   bash scripts/package-plugin.sh --host codex v0.10.0        # 显式指定 tag（CI 传 GITHUB_REF_NAME）
-#   bash scripts/package-plugin.sh --host cursor v0.10.0       # Cursor adapter zip
-#   bash scripts/package-plugin.sh --host kimi-code v0.10.0    # kimi-code adapter zip（根 manifest kimi.plugin.json）
-#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品（claude-code + codex + cursor + kimi-code）
-#   CCM_PLUGIN_OUT_DIR=dist bash ...          # 自定义产物目录（默认 dist/）
-#
-# 产物路径打到 stdout；同时在输出目录生成 SHA256SUMS，供 install.sh fail-closed 校验 release asset。
+# Stdout 只输出 release upload set 的绝对路径。
 
 set -euo pipefail
 
-# ── 定位 repo 根（脚本在 scripts/ 下·从任意 cwd 调皆可）────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
@@ -52,7 +41,6 @@ zip_dir() {
   command -v python3 >/dev/null 2>&1 || die "缺 zip；也找不到 python3 fallback 来生成 zip。"
   STAGE="$stage" ZIP="$zip" python3 <<'PY'
 import os
-import stat
 import zipfile
 
 stage = os.environ["STAGE"]
@@ -66,183 +54,220 @@ with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         rel_dir = os.path.relpath(dirpath, stage)
         if rel_dir != ".":
             info = zipfile.ZipInfo(rel_dir.rstrip("/") + "/")
-            mode = os.stat(dirpath).st_mode
-            info.external_attr = (mode & 0xFFFF) << 16
+            info.external_attr = (os.stat(dirpath).st_mode & 0xFFFF) << 16
             zf.writestr(info, b"")
         for name in filenames:
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, stage)
             info = zipfile.ZipInfo(rel)
-            mode = os.stat(full).st_mode
-            info.external_attr = (mode & 0xFFFF) << 16
+            info.external_attr = (os.stat(full).st_mode & 0xFFFF) << 16
             with open(full, "rb") as fh:
                 zf.writestr(info, fh.read())
 PY
 }
 
-# ── tag 推导：参数 > git exact tag > plugin.json version（前缀 v）──────────────────────────────────
-HOST="claude-code"
-ALL_HOSTS=0
-TAG=""
+has_manifest_arg=0
+for arg in "$@"; do
+  case "${arg}" in
+    --manifest|--manifest=*) has_manifest_arg=1 ;;
+  esac
+done
+
+if [ "${has_manifest_arg}" -eq 1 ]; then
+  manifest=""
+  out_dir="${CCM_PLUGIN_OUT_DIR:-${REPO_ROOT}/dist}"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --manifest)
+        manifest="${2:-}"
+        shift 2
+        ;;
+      --manifest=*)
+        manifest="${1#*=}"
+        shift
+        ;;
+      --out-dir)
+        out_dir="${2:-}"
+        shift 2
+        ;;
+      --out-dir=*)
+        out_dir="${1#*=}"
+        shift
+        ;;
+      *) die "manifest 入口不接受参数：$1" ;;
+    esac
+  done
+  [ -n "${manifest}" ] || die "--manifest 需要一个非空路径"
+  [ -f "${manifest}" ] || die "manifest 不存在：${manifest}"
+  [ -n "${out_dir}" ] || die "--out-dir 不能为空"
+  exec node "${SCRIPT_DIR}/trusted-release-bundle.mjs" build \
+    --manifest "${manifest}" \
+    --out-dir "${out_dir}"
+fi
+
+host="claude-code"
+all_hosts=0
+tag=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --host)
-      HOST="${2:-}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
+      host="${2:-}"
+      [ -n "${host}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
       shift 2
       ;;
     --host=*)
-      HOST="${1#*=}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
+      host="${1#*=}"
+      [ -n "${host}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
       shift
       ;;
     --all-hosts)
-      ALL_HOSTS=1
+      all_hosts=1
+      shift
+      ;;
+    --out-dir)
+      CCM_PLUGIN_OUT_DIR="${2:-}"
+      [ -n "${CCM_PLUGIN_OUT_DIR}" ] || die "--out-dir 不能为空"
+      shift 2
+      ;;
+    --out-dir=*)
+      CCM_PLUGIN_OUT_DIR="${1#*=}"
+      [ -n "${CCM_PLUGIN_OUT_DIR}" ] || die "--out-dir 不能为空"
       shift
       ;;
     -h|--help)
-      sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
-      [ -z "${TAG}" ] || die "只能传一个 tag；多余参数：$1"
-      TAG="$1"
+      [ -z "${tag}" ] || die "只能传一个 tag；多余参数：$1"
+      tag="$1"
       shift
       ;;
   esac
 done
-[ "${ALL_HOSTS}" = "1" ] && [ "${HOST}" != "claude-code" ] && die "--host 与 --all-hosts 不能同时使用。"
-if [ -z "${TAG}" ]; then
-  TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
-fi
-if [ -z "${TAG}" ]; then
-  VER="$(node -e 'process.stdout.write(require("./plugin/src/.claude-plugin/plugin.json").version)')" \
-    || die "读 plugin.json version 失败"
-  TAG="v${VER}"
-fi
-log "tag: ${TAG}"
+[ "${all_hosts}" = "1" ] && [ "${host}" != "claude-code" ] \
+  && die "--host 与 --all-hosts 不能同时使用。"
 
-# ── 可分发 allowlist ─────────────────────────────────────────────────────────────────────────────
-PACKAGE_SEQ=0
+if [ -z "${tag}" ]; then
+  tag="$(git describe --tags --exact-match 2>/dev/null || true)"
+fi
+if [ -z "${tag}" ]; then
+  version="$(node -e 'process.stdout.write(require("./plugin/src/.claude-plugin/plugin.json").version)')" \
+    || die "读 plugin.json version 失败"
+  tag="v${version}"
+fi
+log "tag: ${tag}"
+
+package_seq=0
 package_one() {
-  local host="$1" stage pkg plugin_root zip out_dir manifest hash
-  case "$host" in
+  local package_host="$1" stage package_root dist_root zip output_dir checksum hash
+  case "${package_host}" in
     claude-code|codex|cursor|kimi-code) ;;
-    *) die "未知 host：${host}（支持：claude-code / codex / cursor / kimi-code）" ;;
+    *) die "未知 host：${package_host}（支持：claude-code / codex / cursor / kimi-code）" ;;
   esac
 
-  bash scripts/sync-plugin-dist.sh --host "$host" >/dev/null
-  plugin_root="plugin/dist/${host}"
-  [ -d "$plugin_root" ] || die "缺 ${plugin_root}"
+  bash scripts/sync-plugin-dist.sh --host "${package_host}" >/dev/null
+  dist_root="plugin/dist/${package_host}"
+  [ -d "${dist_root}" ] || die "缺 ${dist_root}"
 
   stage="$(mktemp -d)"
-  pkg="${stage}/cc-master"
-  mkdir -p "$pkg"
+  package_root="${stage}/cc-master"
+  mkdir -p "${package_root}"
 
   local include_dirs=( skills hooks docs agents bin )
-  local root_manifest_file=""
-  if [ "$host" = "claude-code" ]; then
-    include_dirs=( .claude-plugin commands "${include_dirs[@]}" )
-  elif [ "$host" = "cursor" ]; then
-    # Track B reinject ships as alwaysApply rules/; commands are Cursor adapter stubs/bodies.
-    include_dirs=( .cursor-plugin commands rules "${include_dirs[@]}" )
-  elif [ "$host" = "kimi-code" ]; then
-    # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ directory; commands
-    # project host-native under commands/.
-    include_dirs=( commands "${include_dirs[@]}" )
-    root_manifest_file="kimi.plugin.json"
-  else
-    include_dirs=( .codex-plugin "${include_dirs[@]}" )
-  fi
+  local root_manifest=""
+  case "${package_host}" in
+    claude-code) include_dirs=( .claude-plugin commands "${include_dirs[@]}" ) ;;
+    codex) include_dirs=( .codex-plugin "${include_dirs[@]}" ) ;;
+    cursor) include_dirs=( .cursor-plugin commands rules "${include_dirs[@]}" ) ;;
+    kimi-code)
+      include_dirs=( commands "${include_dirs[@]}" )
+      root_manifest="kimi.plugin.json"
+      ;;
+  esac
   local include_files=( README.md README_zh.md CHANGELOG.md LICENSE LICENSING.md TRADEMARKS.md )
 
-  log "host: ${host}"
-  for d in "${include_dirs[@]}"; do
-    if [ -d "${plugin_root}/${d}" ]; then
-      cp -R "${plugin_root}/${d}" "${pkg}/${d}"
-      log "+ dir  ${d}/"
-    elif [ -d "${d}" ]; then
-      cp -R "${d}" "${pkg}/${d}"
-      log "+ dir  ${d}/"
+  log "host: ${package_host}"
+  local directory file
+  for directory in "${include_dirs[@]}"; do
+    if [ -d "${dist_root}/${directory}" ]; then
+      cp -R "${dist_root}/${directory}" "${package_root}/${directory}"
+      log "+ dir  ${directory}/"
     fi
   done
-  if [ -n "${root_manifest_file}" ]; then
-    [ -f "${plugin_root}/${root_manifest_file}" ] || die "缺 ${plugin_root}/${root_manifest_file}"
-    cp "${plugin_root}/${root_manifest_file}" "${pkg}/${root_manifest_file}"
-    log "+ file ${root_manifest_file}"
+  if [ -n "${root_manifest}" ]; then
+    [ -f "${dist_root}/${root_manifest}" ] || die "缺 ${dist_root}/${root_manifest}"
+    cp "${dist_root}/${root_manifest}" "${package_root}/${root_manifest}"
+    log "+ file ${root_manifest}"
   fi
-  [ -d "${pkg}/skills" ] || die "缺 skills/"
-  if [ "$host" = "claude-code" ]; then
-    [ -d "${pkg}/.claude-plugin" ] || die "缺 .claude-plugin/——Claude Code 制品不会是合法 plugin"
-    [ -d "${pkg}/commands" ] || die "缺 commands/"
-  elif [ "$host" = "cursor" ]; then
-    [ -d "${pkg}/.cursor-plugin" ] || die "缺 .cursor-plugin/"
-    [ -f "${pkg}/.cursor-plugin/plugin.json" ] || die "缺 .cursor-plugin/plugin.json"
-  elif [ "$host" = "kimi-code" ]; then
-    [ -f "${pkg}/kimi.plugin.json" ] || die "缺 kimi.plugin.json——kimi-code 制品不会是合法 plugin"
-    [ -d "${pkg}/commands" ] || die "缺 commands/"
-    [ -d "${pkg}/hooks" ] || die "缺 hooks/——kimi.plugin.json 已注册运行时 hooks，不能发布悬空命令"
-    KIMI_MANIFEST="${pkg}/kimi.plugin.json" KIMI_PACKAGE_ROOT="${pkg}" node <<'NODE' \
-      || die "kimi.plugin.json 引用的 hook 文件未完整进入制品"
-const { existsSync, readFileSync } = require('node:fs');
-const { join } = require('node:path');
-
-const manifest = JSON.parse(readFileSync(process.env.KIMI_MANIFEST, 'utf8'));
-const hooks = Array.isArray(manifest.hooks) ? manifest.hooks : [];
-if (hooks.length === 0) throw new Error('kimi.plugin.json has no hooks');
-for (const [index, hook] of hooks.entries()) {
-  const command = typeof hook.command === 'string' ? hook.command : '';
-  const refs = [...command.matchAll(/\$KIMI_PLUGIN_ROOT\/([^"\s]+)/g)].map((match) => match[1]);
-  if (refs.length === 0) throw new Error(`hooks[${index}] has no package-root reference`);
-  for (const relative of refs) {
-    if (!existsSync(join(process.env.KIMI_PACKAGE_ROOT, relative))) {
-      throw new Error(`hooks[${index}] references missing ${relative}`);
-    }
-  }
-}
-NODE
-  else
-    [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
-  fi
-
-  for f in "${include_files[@]}"; do
-    if [ -f "${f}" ]; then
-      cp "${f}" "${pkg}/${f}"
-      log "+ file ${f}"
+  for file in "${include_files[@]}"; do
+    if [ -f "${file}" ]; then
+      cp "${file}" "${package_root}/${file}"
+      log "+ file ${file}"
     fi
   done
 
-  find "${pkg}" -name '.DS_Store' -delete 2>/dev/null || true
-  find "${pkg}" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
-  find "${pkg}/skills" -type d -name .design -prune -exec rm -rf {} + 2>/dev/null || true
-
-  out_dir="${CCM_PLUGIN_OUT_DIR:-dist}"
-  case "$out_dir" in
-    /*) ;;
-    *) out_dir="${REPO_ROOT}/${out_dir}" ;;
+  [ -d "${package_root}/skills" ] || die "缺 skills/"
+  case "${package_host}" in
+    claude-code)
+      [ -f "${package_root}/.claude-plugin/plugin.json" ] || die "缺 .claude-plugin/plugin.json"
+      [ -d "${package_root}/commands" ] || die "缺 commands/"
+      ;;
+    codex)
+      [ -f "${package_root}/.codex-plugin/plugin.json" ] || die "缺 .codex-plugin/plugin.json"
+      ;;
+    cursor)
+      [ -f "${package_root}/.cursor-plugin/plugin.json" ] || die "缺 .cursor-plugin/plugin.json"
+      [ -d "${package_root}/rules" ] || die "缺 rules/"
+      ;;
+    kimi-code)
+      [ -f "${package_root}/kimi.plugin.json" ] || die "缺 kimi.plugin.json"
+      [ -d "${package_root}/commands" ] || die "缺 commands/"
+      [ -d "${package_root}/hooks" ] || die "缺 hooks/"
+      ;;
   esac
-  mkdir -p "${out_dir}"
-  zip="${out_dir}/cc-master-plugin-${host}-${TAG}.zip"
-  rm -f "$zip"
-  zip_dir "$stage" "$zip"
-  rm -rf "$stage"
-  manifest="${out_dir}/SHA256SUMS"
-  if [ "$PACKAGE_SEQ" -eq 0 ]; then
-    rm -f "$manifest"
+
+  find "${package_root}" -name '.DS_Store' -delete 2>/dev/null || true
+  find "${package_root}" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
+  find "${package_root}/skills" -type d -name .design -prune -exec rm -rf {} + 2>/dev/null || true
+
+  if find "${package_root}" -type d -name knowledge -print -quit | grep -q .; then
+    rm -rf "${stage}"
+    die "package staging 中禁止 knowledge/"
   fi
-  hash="$(sha256_file "$zip")"
-  printf '%s  %s\n' "$hash" "${zip##*/}" >>"$manifest"
-  PACKAGE_SEQ=$((PACKAGE_SEQ + 1))
-  log "✔ 打包完成：${zip} ($(du -h "${zip}" | cut -f1))"
-  log "✔ checksum：${manifest} ← ${zip##*/}"
-  printf '%s\n' "$zip"
+  if grep -RIlE 'knowledge/atlas\.md|knowledge/modules/|plugin/src/knowledge' \
+    "${package_root}" --include='*.md' | grep -q .; then
+    rm -rf "${stage}"
+    die "package staging 中存在 repo-only knowledge 链接"
+  fi
+
+  output_dir="${CCM_PLUGIN_OUT_DIR:-dist}"
+  case "${output_dir}" in
+    /*) ;;
+    *) output_dir="${REPO_ROOT}/${output_dir}" ;;
+  esac
+  mkdir -p "${output_dir}"
+  zip="${output_dir}/cc-master-plugin-${package_host}-${tag}.zip"
+  rm -f "${zip}"
+  zip_dir "${stage}" "${zip}"
+  rm -rf "${stage}"
+
+  checksum="${output_dir}/SHA256SUMS"
+  if [ "${package_seq}" -eq 0 ]; then
+    rm -f "${checksum}"
+  fi
+  hash="$(sha256_file "${zip}")"
+  printf '%s  %s\n' "${hash}" "${zip##*/}" >>"${checksum}"
+  package_seq=$((package_seq + 1))
+  log "✔ 打包完成：${zip}"
+  printf '%s\n' "${zip}"
 }
 
-if [ "$ALL_HOSTS" = "1" ]; then
+if [ "${all_hosts}" = "1" ]; then
   package_one claude-code
   package_one codex
   package_one cursor
   package_one kimi-code
 else
-  package_one "$HOST"
+  package_one "${host}"
 fi

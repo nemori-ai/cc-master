@@ -193,6 +193,8 @@
 
 ---
 
+<a id="ccm-k-point-ccm-cmd-overview"></a>
+<!-- ccm:k:start point:ccm.cmd.overview -->
 ## 顶层结构
 
 `ccm` = cc-master board 命令行，数据模型 SSOT 的唯一写入关卡。
@@ -311,6 +313,16 @@ ccm <alias> [args] [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.overview -->
+<!-- ccm:k:nav:start point:ccm.cmd.overview -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [next: namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board) <!-- ccm:k:edge edge:ccm.cmd-core.0 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.overview.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-cross-harness-facts"></a>
+<!-- ccm:k:start point:ccm.cmd.cross-harness-facts -->
 ## 跨 harness 主动查询目标事实
 
 这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → orchestrator 显式选择 raw transport 或 tracked transport**。事实查询与 advice 都不会启动 worker；只有调用者明确执行 `worker run|dispatch` 才会启动。
@@ -371,6 +383,16 @@ ccm worker dispatch --board /abs/run.board.json --harness <codex|claude-code|cur
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.cross-harness-facts -->
+<!-- ccm:k:nav:start point:ccm.cmd.cross-harness-facts -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.cross-harness-facts.pri -->
+- [next: worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota) <!-- ccm:k:edge edge:ccm.cmd-ext.0 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-worker-quota"></a>
+<!-- ccm:k:start point:ccm.cmd.worker-quota -->
 ## namespace worker（raw transport + tracked dispatch）
 
 ### worker help
@@ -630,6 +652,16 @@ projection 再返回。
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.worker-quota -->
+<!-- ccm:k:nav:start point:ccm.cmd.worker-quota -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps) <!-- ccm:k:edge edge:ccm.cmd-ext.1 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.worker-quota.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-board"></a>
+<!-- ccm:k:start point:ccm.cmd.board -->
 ## namespace board
 
 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置。
@@ -838,6 +870,16 @@ ccm board enable-contract [--preflight] [--json]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.board -->
+<!-- ccm:k:nav:start point:ccm.cmd.board -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [routes_to: task 字段三档速查](./board-model-guide.md#ccm-k-point-ccm-board-task-fields) <!-- ccm:k:edge edge:ccm.cmd-board-to-fields -->
+- [next: namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal) <!-- ccm:k:edge edge:ccm.cmd-core.1 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-goal"></a>
+<!-- ccm:k:start point:ccm.cmd.goal -->
 ## namespace goal
 
 Goal Contract 是 `board.goal` 的 revisioned 写入面。raw request / issue 只作证据；agent 先澄清转写，再通过本 namespace 持久化。`--brief-file` 的输入必须是 ≤1 MiB、有效 UTF-8、非 symlink 的普通文件；ccm 把它复制到 `<home>/goals/<board-stem>/rNNNN.goal.md`，以 `0600` 权限保存，并在 `board.goal_contract.brief` 记录 home-relative ref + SHA-256。revision 文件 immutable，不覆盖旧版。
@@ -929,6 +971,15 @@ ccm goal deadline show [--json]
 - **绕路封堵**：deadline 只能经这些 verb 写；`ccm board update` 无 deadline arg、`ccm board set-param` 白名单只含 `runtime.*`、`--set goal_contract.*` 被拒——都指向专属 verb。
 - exit：0 成功·2 用法错（非 ISO / precision=day 缺 tz-input / amend 缺 reason）·3 校验拒绝（confirm 缺 --user-authorized / set 已 confirmed / 写后 FMT-DEADLINE）。
 
+<!-- ccm:k:end point:ccm.cmd.goal -->
+<!-- ccm:k:nav:start point:ccm.cmd.goal -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [next: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-core.2 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-capability-deps"></a>
+<!-- ccm:k:start point:ccm.cmd.capability-deps -->
 ## namespace capability
 
 ### capability check
@@ -1033,6 +1084,16 @@ qualification 与 diagnostic codes；不持久化布尔。显式 edge 一律先�
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.capability-deps -->
+<!-- ccm:k:nav:start point:ccm.cmd.capability-deps -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord) <!-- ccm:k:edge edge:ccm.cmd-ext.2 -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.capability-deps.to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-task"></a>
+<!-- ccm:k:start point:ccm.cmd.task -->
 ## namespace task
 
 任务：增删改查 + 状态机（DAG 节点）。
@@ -1514,6 +1575,16 @@ ccm task rm <id> [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.task -->
+<!-- ccm:k:nav:start point:ccm.cmd.task -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [next: namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log) <!-- ccm:k:edge edge:ccm.cmd-core.3 -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-task-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-log"></a>
+<!-- ccm:k:start point:ccm.cmd.log -->
 ## namespace log
 
 append-only 审计轨迹。
@@ -1564,6 +1635,16 @@ ccm log list [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.log -->
+<!-- ccm:k:nav:start point:ccm.cmd.log -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [next: --json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape) <!-- ccm:k:edge edge:ccm.cmd-core.4 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.log.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-jc"></a>
+<!-- ccm:k:start point:ccm.cmd.jc -->
 ## namespace jc
 
 judgment_calls 自驱决策记录。
@@ -1665,6 +1746,16 @@ ccm jc resolve <id> --status <upheld|overturned> [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.jc -->
+<!-- ccm:k:nav:start point:ccm.cmd.jc -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [next: namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence) <!-- ccm:k:edge edge:ccm.cmd-jc-cadence -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hop.ccm.cmd.jc.to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-cadence"></a>
+<!-- ccm:k:start point:ccm.cmd.cadence -->
 ## namespace cadence
 
 节奏 / iteration 收口。
@@ -1752,6 +1843,15 @@ ccm cadence status [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.cadence -->
+<!-- ccm:k:nav:start point:ccm.cmd.cadence -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [next: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.cmd-cadence-watchdog -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-watchdog"></a>
+<!-- ccm:k:start point:ccm.cmd.watchdog -->
 ## namespace watchdog
 
 自我唤醒 watchdog。
@@ -1809,6 +1909,16 @@ ccm watchdog status [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.watchdog -->
+<!-- ccm:k:nav:start point:ccm.cmd.watchdog -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [next: namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent) <!-- ccm:k:edge edge:ccm.cmd-watchdog-agent -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-sched-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-baseline"></a>
+<!-- ccm:k:start point:ccm.cmd.baseline -->
 ## namespace baseline
 
 EVM 计划基线（plan baseline）：从当前 tasks 的 `estimate` + `deps` 快照成 `board.baseline`（`task_estimates` + `dag_snapshot` + `bac_h`），供 estimate 引擎算 EVM / SPI。**board 内唯一写 noun**——`usage` / `estimate` 两 namespace 纯只读，baseline 刻意置于只读之外（写关卡）。
@@ -1888,6 +1998,15 @@ ccm baseline reset [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.baseline -->
+<!-- ccm:k:nav:start point:ccm.cmd.baseline -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.baseline.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-agent"></a>
+<!-- ccm:k:start point:ccm.cmd.agent -->
 ## namespace agent（Agent Registry·登记/探测/读取）
 
 运行时 agent 登记簿：凡派发皆登记——sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进本板 ✎ `agents[]` 花名册。**它是登记 / 探测 / 读取 noun**：九个 verb（create / bind / amend / link / terminal / probe / list / show / rm）不含任何 spawn / route / dispatch 语义（不起进程、不选路、不派活；dispatch 命令面归 `worker`）。其中 create / bind / terminal / probe 走生命周期状态机，`amend`（补正 handle 域）与 `rm`（删登记）是**登记簿事后修正**——不经状态机、不做状态转移。agent = 实际跑起来的运行时实例（runtime 层），与 task 的 `executor`（planning 层的计划执行者类型）分层不合并——概念与字段取值见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)。
@@ -2080,6 +2199,16 @@ ccm agent rm <id> [--yes] [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.agent -->
+<!-- ccm:k:nav:start point:ccm.cmd.agent -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.scheduling](./command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [next: namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline) <!-- ccm:k:edge edge:ccm.cmd-agent-baseline -->
+- [routes_to: namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.agent.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-peers-coord"></a>
+<!-- ccm:k:start point:ccm.cmd.peers-coord -->
 ## namespace peers（协调感知·只读跨板）
 
 多 orchestrator 协调的**感知层**：M 个 orchestrator 并行抽同一活跃配额缸，各自孤立 pacing 会公地悲剧——感知通道让每个 orchestrator 看见全体 peer 的 goal / workload / priority / 死活，喂价值感知的**独立**自我配速（不必双向协商即可单方面合理让路 / 认领 slack；通信通道**不存在**·只读感知 + 机械 fair-share floor 收口）。**纯只读跨板**——扫 `<home>/boards/` 全体板，零写、不抢 board-lock、**不需要 active board 自身**（感知是用户级跨板·同 usage/estimate）。**token-blind**：花名册只投影 goal / priority / workload / state% / liveness——**无任何 secret / token**。
@@ -2203,6 +2332,15 @@ ccm coordination arbitrate [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.peers-coord -->
+<!-- ccm:k:nav:start point:ccm.cmd.peers-coord -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.cmd-ext.3 -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-usage"></a>
+<!-- ccm:k:start point:ccm.cmd.usage -->
 ## namespace usage（只读 advisory）
 
 `usage` 用全局 `--harness <target>` 下钻一个 selected target 的当前登录态；它不是 machine-wide inventory。
@@ -2327,6 +2465,17 @@ ccm usage runway [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.usage -->
+<!-- ccm:k:nav:start point:ccm.cmd.usage -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces) <!-- ccm:k:edge edge:ccm.cmd-ext.4 -->
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.cmd-ext-to-core -->
+- [routes_to: status 是状态机不是赋值字段](../SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.cmd-ext-to-critical -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-ops-surfaces"></a>
+<!-- ccm:k:start point:ccm.cmd.ops-surfaces -->
 ## namespace status-report
 
 生成式 board 状态报告。`render` 纯 stdout 计算；`write` / `show` / `watch` 只写 derived report artifact 到 `<home>/reports/status-report/boards/<board-file-stem>.status-report.json`，**不写 board JSON**。JSON schema 是 `ccm/status-report/v1`；freshness 由 board hash / topology hash / advisory hash / input hash / TTL 判定。报告 `delivery` 块列 mode 与每条 dep edge 的同源 qualification；readySet 使用注入本地 target drift/missing-object facts 的同一 evaluator。web viewer 的 Status module 读同一报告路径，DAG view-model 的 dep edge 也携带 qualification，不另造第二套交付模型。
@@ -2751,6 +2900,16 @@ ccm runtime rollback [--json]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.ops-surfaces -->
+<!-- ccm:k:nav:start point:ccm.cmd.ops-surfaces -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate) <!-- ccm:k:edge edge:ccm.cmd-ext.5 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.ops-surfaces.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-estimate"></a>
+<!-- ccm:k:start point:ccm.cmd.estimate -->
 ## namespace estimate（只读 advisory）
 
 工作侧只读 advisory（分解/规划 + 按时长选档）：消费 ccm 引擎的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**。
@@ -2909,6 +3068,16 @@ ccm estimate deadline-risk [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.estimate -->
+<!-- ccm:k:nav:start point:ccm.cmd.estimate -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration) <!-- ccm:k:edge edge:ccm.cmd-ext.6 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.estimate.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-calibration"></a>
+<!-- ccm:k:start point:ccm.cmd.calibration -->
 ## namespace calibration（显式写校准语料）
 
 ### calibration capture
@@ -2939,6 +3108,15 @@ ccm calibration capture [flags]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.calibration -->
+<!-- ccm:k:nav:start point:ccm.cmd.calibration -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [next: statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns) <!-- ccm:k:edge edge:ccm.cmd-ext.7 -->
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.calibration.pri -->
+<!-- ccm:k:nav:end -->
+<!-- ccm:k:start point:ccm.cmd.account -->
 ## namespace account
 
 Cursor host 当前**不支持账号池管理 / 换号**。`ccm account add/delete/refresh/list/switch` 走到时必须显式报 `NotImplemented` 或 unsupported；不要读取或覆写其他 harness 的 credential store，也不要把账号池当 Cursor 可用容量。Cursor 只保留 `ccm usage show/advise/burn-rate` 对**当前账户 billing_period** 用量的只读能力。
@@ -2974,6 +3152,9 @@ Cursor host 当前**不支持账号池管理 / 换号**。`ccm account add/delet
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.account -->
+<a id="ccm-k-point-ccm-cmd-misc-ns"></a>
+<!-- ccm:k:start point:ccm.cmd.misc-ns -->
 ## namespace statusline
 
 Cursor host 当前没有 Claude Code 那种外部命令式 status-line hook。`ccm statusline install/uninstall` 在 Cursor 下必须显式 `NotImplemented`，且不得写 Claude Code settings。当前 Cursor 用量信号来自 `Cursor dashboard GetCurrentPeriodUsage` 的 rate limits，而不是 statusline sidecar。
@@ -3105,6 +3286,15 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 
 ---
 
+<!-- ccm:k:end point:ccm.cmd.misc-ns -->
+<!-- ccm:k:nav:start point:ccm.cmd.misc-ns -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.extended](./command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [routes_to: namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.misc-ns.pri -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-cmd-json-shape"></a>
+<!-- ccm:k:start point:ccm.cmd.json-shape -->
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
@@ -3775,3 +3965,70 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 ```
 
 诚实降级（**绝不假绿**）：无 DDL / 含环 / 无估值 / 低置信 / 双通道分歧 > 0.25 / RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`（**绝不退 throughput 冒充 resource-aware**）；`now ≥ DDL` 且未完成 → `overdue`（strong）。`on_time_probability_source` 恒为 `rcpsp-in-trial` 或 `unknown`——throughput 通道永不做 verdict 源。band 阈值 `uncalibrated-conservative`（未经经验校准的保守起点）。
+<!-- ccm:k:end point:ccm.cmd.json-shape -->
+<!-- ccm:k:nav:start point:ccm.cmd.json-shape -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.commands.core](./command-catalog.md#ccm-k-module-ccm-commands-core)
+- [routes_to: namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.ret.pointccm.cmd.json-shape.pri -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 命令面：board/goal/task 核心
+
+<a id="ccm-k-module-ccm-commands-core"></a>
+
+提供易腐 CLI 事实的 canonical 段：board/goal/task/log 与 --json 形状。
+
+## Member points
+
+- [namespace board 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-board)
+- [namespace goal 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-goal)
+- [--json 输出形状](./command-catalog.md#ccm-k-point-ccm-cmd-json-shape)
+- [namespace log 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-log)
+- [ccm 顶层结构与 namespaces](./command-catalog.md#ccm-k-point-ccm-cmd-overview)
+- [namespace task 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-task)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 命令面：cross-harness / advisory / ops
+
+<a id="ccm-k-module-ccm-commands-extended"></a>
+
+覆盖其余易腐 CLI namespace：cross-harness、usage/estimate、ops surfaces。
+
+## Member points
+
+- [namespace calibration](./command-catalog.md#ccm-k-point-ccm-cmd-calibration)
+- [capability/target/delivery/dependency](./command-catalog.md#ccm-k-point-ccm-cmd-capability-deps)
+- [跨 harness 目标事实查询](./command-catalog.md#ccm-k-point-ccm-cmd-cross-harness-facts)
+- [namespace estimate](./command-catalog.md#ccm-k-point-ccm-cmd-estimate)
+- [statusline/attempt/harness/upgrade](./command-catalog.md#ccm-k-point-ccm-cmd-misc-ns)
+- [status-report/web-viewer/monitor/services/runtime](./command-catalog.md#ccm-k-point-ccm-cmd-ops-surfaces)
+- [peers/coordination](./command-catalog.md#ccm-k-point-ccm-cmd-peers-coord)
+- [namespace usage](./command-catalog.md#ccm-k-point-ccm-cmd-usage)
+- [worker/provider/model-policy/orchestrator/route/quota](./command-catalog.md#ccm-k-point-ccm-cmd-worker-quota)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 命令面：jc/cadence/watchdog/agent
+
+<a id="ccm-k-module-ccm-commands-scheduling"></a>
+
+调度与运行时登记相关 namespace 的机械命令事实。
+
+## Member points
+
+- [namespace agent](./command-catalog.md#ccm-k-point-ccm-cmd-agent)
+- [namespace baseline](./command-catalog.md#ccm-k-point-ccm-cmd-baseline)
+- [namespace cadence](./command-catalog.md#ccm-k-point-ccm-cmd-cadence)
+- [namespace jc](./command-catalog.md#ccm-k-point-ccm-cmd-jc)
+- [namespace watchdog](./command-catalog.md#ccm-k-point-ccm-cmd-watchdog)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

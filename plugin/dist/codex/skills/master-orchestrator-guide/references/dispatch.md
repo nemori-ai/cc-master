@@ -25,6 +25,8 @@
 
 ## 先分清两件事：executor 值 vs 后台机制
 
+<a id="ccm-k-point-dispatch-dataflow-and-mechanisms"></a>
+<!-- ccm:k:start point:dispatch.dataflow-and-mechanisms -->
 派发一个 task，你在做**两个不同层面**的选择，别混为一谈：
 
 - **executor 值**（board 上「谁执行」）—— 记在 task 上的一个 5 选 1 长期语义，扛 compaction、resume 靠它 recon。它回答「这个 task 归谁负责」：`subagent` / `workflow` / `master-orchestrator` / `user` / `external`。
@@ -114,8 +116,16 @@ codex exec resume --last "cc-master watchdog: recon board, check <predicate>, up
 
 ---
 
+<!-- ccm:k:end point:dispatch.dataflow-and-mechanisms -->
+<!-- ccm:k:nav:start point:dispatch.dataflow-and-mechanisms -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
+<!-- ccm:k:nav:end -->
 ## 稳定路由合同入口
 
+<a id="ccm-k-point-dispatch-routing-and-isolation"></a>
+<!-- ccm:k:start point:dispatch.routing-and-isolation -->
 executor 不按数量选，harness × model 也不是默认值。完整顺序只有一份：[`worker-routing.md`](worker-routing.md#一条不可换序的路由链) 的「任务形状 → executor → target surface → effect floor → exact qualification → 同档排序/fallback → 真实 handle → 端点验收」。本页只展开其中并行与 runtime 机制，不另写 executor 决策树或模型资格表。
 
 ---
@@ -142,8 +152,16 @@ origin 不是 worker pool 边界；target surface、真实 help、资格硬门�
 
 ---
 
+<!-- ccm:k:end point:dispatch.routing-and-isolation -->
+<!-- ccm:k:nav:start point:dispatch.routing-and-isolation -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
+<!-- ccm:k:nav:end -->
 ## Intra vs inter workflow —— 轴 = 生命周期耦合
 
+<a id="ccm-k-point-dispatch-workflow-and-escalation"></a>
+<!-- ccm:k:start point:dispatch.workflow-and-escalation -->
 当一个节点选了 `workflow` executor，下一个问题是把活收进**一个** workflow 还是**多个**。首要的轴是**生命周期耦合（lifecycle coupling）**，不是数量。
 
 - **一个 workflow** —— 叶子共享同一条生命周期：同一个 goal / schema / 质量闸 / budget envelope / 综合点 / 可接受失败策略，且运行中途没有 HITL 需求。
@@ -177,8 +195,16 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 
 ---
 
+<!-- ccm:k:end point:dispatch.workflow-and-escalation -->
+<!-- ccm:k:nav:start point:dispatch.workflow-and-escalation -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
+<!-- ccm:k:nav:end -->
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
+<a id="ccm-k-point-dispatch-hygiene-and-liveness"></a>
+<!-- ccm:k:start point:dispatch.hygiene-and-liveness -->
 - **注册先于 task 起跑，handle 是 `in_flight` 的唯一入场券。** `agent create` 只是建立 `starting` runtime 记录，可以先于 spawn；它不证明 worker 已经运行。真正派出 worker 后，先把返回的真实 handle bind 到 agent、link 到 task，再经 `ccm` 生命周期 verb 让普通 task 进入 `in_flight`。没有 handle 或 link 的 `in_flight` 是**幽灵任务（phantom）**。recon 时先 `ccm agent list` 重建 roster，再对关联条目做 `ccm agent show` / `ccm agent probe`，核对 handle、task link、liveness 与 git / transcript / 工具产物；三者皆空就按 phantom 处置。若 `ccm agent show` 返回已存的 attach command，只执行那条自包含命令；不要凭记忆编造新的 attach 操作。agent terminal 仍只是 runtime 事实，父 task 必须独立验收。
 - **用隔离树的绝对路径指向工作目标——绝不靠继承 cwd。** 你的 cwd 常常*不是*工作落地的那棵树。每个被派发 writer 的 prompt 都必须给出其专属工作树的**绝对路径**、要求先核对位置，并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
 - **单一提交者：叶子负责写 + 自测，你负责提交。** 独立 worktree 解决并行写入隔离，不授予叶子提交权。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由你在各树端点验收、统一集成，再按依赖序提交。（又是 end-to-end argument——commit 完整性归你的端点，不归叶子。见 `resume-verify.md`。）
@@ -203,3 +229,27 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 5. **manual recon（诚实兜底）** —— 没有真实 wakeup handle 时，**不要 arm watchdog**；把下一次检查时间、predicate、负责人、取消条件记进 blocked / recon 状态与 log，等待可续事件。不要伪造自动唤醒。
 
 被唤醒后 recon 用的就是上面派发卫生那套地面真相验证法（handle / `git status` / 工具结果），处置完静默失败的、该 re-arm 的 re-arm——细节在 `async-hitl.md` §等待前 arm watchdog。
+<!-- ccm:k:end point:dispatch.hygiene-and-liveness -->
+<!-- ccm:k:nav:start point:dispatch.hygiene-and-liveness -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:dispatch.parallel-mechanisms](./dispatch.md#ccm-k-module-dispatch-parallel-mechanisms)
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 并行派发机制
+
+<a id="ccm-k-module-dispatch-parallel-mechanisms"></a>
+
+把 executor 规划语义映射为真实后台机制，并守住 dataflow、writer 隔离、escalation、admission 与 liveness。
+
+## Member points
+
+- [dataflow 与后台机制](./dispatch.md#ccm-k-point-dispatch-dataflow-and-mechanisms)
+- [派发卫生与 liveness](./dispatch.md#ccm-k-point-dispatch-hygiene-and-liveness)
+- [路由取证与 writer 隔离](./dispatch.md#ccm-k-point-dispatch-routing-and-isolation)
+- [workflow 生命周期与 escalation](./dispatch.md#ccm-k-point-dispatch-workflow-and-escalation)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

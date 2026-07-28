@@ -1,6 +1,6 @@
 ---
 name: grounding-skill-evals
-description: 'Use when measuring a cc-master skill — 当你写完一个 skill 的 body 要度量它好不好、要迭代它、或在改 description / 纪律段前后想知道改动有没有用时. Triggers: 写完 body 要量化、给 skill 写 OBJECTIVE.md 或 .design/OBJECTIVE.md、跑 trigger 准确率 eval、改 description 前后比 accuracy、防 description 过拟合 / 防自欺、读 eval 判决. Do NOT use for writing the skill body itself (→ cc-master-skillsmith) or deciding whether a skill should exist at all / portfolio 准入 (→ curating-skill-portfolios).'
+description: 'Use when measuring a cc-master skill — 当你写完一个 skill 的 body 要度量它好不好、要迭代它、或在改 description / 纪律段前后想知道改动有没有用时. Triggers: 写完 body 要量化、给 skill 写 OBJECTIVE.md 或 .design/OBJECTIVE.md、跑 trigger 准确率 eval、改 description 前后比 accuracy、防 description 过拟合 / 防自欺、读 eval 判决. Do NOT use for writing the skill body itself (→ cc-master-skillsmith) or deciding whether a skill should exist at all / portfolio 准入 (→ curating-skill-portfolios); Do NOT use when 你要跑 skill knowledge graph 正式规范/CLI（→ design_docs/skill-knowledge-graph）。'
 ---
 
 # grounding-skill-evals —— 怎么度量一个 cc-master skill

@@ -23,6 +23,8 @@
 
 ---
 
+<a id="ccm-k-point-ddd-admission-question"></a>
+<!-- ccm:k:start point:ddd.admission-question -->
 ## 那一个问题（道）
 
 > **有没有值得保护的不变式或语言？**
@@ -40,6 +42,21 @@ DDD 的每一项仪式——aggregate、repository、分层、事件——都是
 
 ---
 
+<!-- ccm:k:end point:ddd.admission-question -->
+<!-- ccm:k:nav:start point:ddd.admission-question -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: 四理论共享脊椎](../SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.domain-modeling.to-shared-spine -->
+- [deepens_to: Aggregate 与不变式所有权](./ddd.md#ccm-k-point-ddd-aggregate-ownership) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-aggregate-ownership -->
+- [deepens_to: 应用层推导](./ddd.md#ccm-k-point-ddd-application-derivation) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-application-derivation -->
+- [deepens_to: 设计阶段焦点](./ddd.md#ccm-k-point-ddd-design-focus) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-design-focus -->
+- [deepens_to: DDD 反模式雷达](./ddd.md#ccm-k-point-ddd-failure-radar) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-failure-radar -->
+- [deepens_to: DDD 红线](./ddd.md#ccm-k-point-ddd-red-lines) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-red-lines -->
+- [deepens_to: 战略边界与语言](./ddd.md#ccm-k-point-ddd-strategic-boundaries) <!-- ccm:k:edge edge:craft.domain-modeling.admission-question-to-strategic-boundaries -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-strategic-boundaries"></a>
+<!-- ccm:k:start point:ddd.strategic-boundaries -->
 ## 战略设计：边界即语言边界
 
 ### Bounded context 发现启发式
@@ -104,6 +121,15 @@ Ubiquitous language 是你**培育**的活合约，不是你**写下**的术语�
 
 ---
 
+<!-- ccm:k:end point:ddd.strategic-boundaries -->
+<!-- ccm:k:nav:start point:ddd.strategic-boundaries -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.strategic-boundaries-to-admission-question -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-aggregate-ownership"></a>
+<!-- ccm:k:start point:ddd.aggregate-ownership -->
 ## 战术设计：Aggregate 是一致性承诺
 
 ### 边界判断：生命周期与原子性，不是重要性
@@ -151,6 +177,15 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 
 ---
 
+<!-- ccm:k:end point:ddd.aggregate-ownership -->
+<!-- ccm:k:nav:start point:ddd.aggregate-ownership -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.aggregate-ownership-to-admission-question -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-application-derivation"></a>
+<!-- ccm:k:start point:ddd.application-derivation -->
 ## 应用层是派生的，不是手写的
 
 **原则**：应用层的责任清单是从业务流程推导出来的结果，不是直觉产物。先交出「答案卷」而不展示推导过程，使设计无从验证、用例无从追溯。
@@ -177,6 +212,15 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 
 ---
 
+<!-- ccm:k:end point:ddd.application-derivation -->
+<!-- ccm:k:nav:start point:ddd.application-derivation -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.application-derivation-to-admission-question -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-red-lines"></a>
+<!-- ccm:k:start point:ddd.red-lines -->
 ## DDD 红线
 
 违背字面就是违背精神。
@@ -195,6 +239,15 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 
 ---
 
+<!-- ccm:k:end point:ddd.red-lines -->
+<!-- ccm:k:nav:start point:ddd.red-lines -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.red-lines-to-admission-question -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-failure-radar"></a>
+<!-- ccm:k:start point:ddd.failure-radar -->
 ## 反模式速查表
 
 | 反模式 | 识别信号 | 修复方向 |
@@ -210,6 +263,15 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 
 ---
 
+<!-- ccm:k:end point:ddd.failure-radar -->
+<!-- ccm:k:nav:start point:ddd.failure-radar -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.failure-radar-to-admission-question -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ddd-design-focus"></a>
+<!-- ccm:k:start point:ddd.design-focus -->
 ## 设计阶段焦点纪律
 
 设计阶段只解决贵的事，其余推迟到实现阶段。
@@ -230,3 +292,31 @@ Bounded context 的 events 是其**唯一**公开面。其他一切——entity�
 ---
 
 「根4·分层思维」贯穿本文：依赖单向（domain 不依赖 persistence）、编排与规则分离（应用服务纯编排、domain 纯规则）、跨 BC 层级只向前——这条根在 DDD 里以「无跨 BC 回滚、无 2PC」的形式固化。
+<!-- ccm:k:end point:ddd.design-focus -->
+<!-- ccm:k:nav:start point:ddd.design-focus -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:craft.domain-modeling](./ddd.md#ccm-k-module-craft-domain-modeling)
+- [routes_to: DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.domain-modeling.design-focus-to-admission-question -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## DDD 领域建模
+
+<a id="ccm-k-module-craft-domain-modeling"></a>
+
+判断何时值得 DDD，并从语言边界、不变式与业务流程推导领域和应用层。
+
+## Member points
+
+- [DDD 准入问题](./ddd.md#ccm-k-point-ddd-admission-question)
+- [Aggregate 与不变式所有权](./ddd.md#ccm-k-point-ddd-aggregate-ownership)
+- [应用层推导](./ddd.md#ccm-k-point-ddd-application-derivation)
+- [设计阶段焦点](./ddd.md#ccm-k-point-ddd-design-focus)
+- [DDD 反模式雷达](./ddd.md#ccm-k-point-ddd-failure-radar)
+- [DDD 红线](./ddd.md#ccm-k-point-ddd-red-lines)
+- [战略边界与语言](./ddd.md#ccm-k-point-ddd-strategic-boundaries)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

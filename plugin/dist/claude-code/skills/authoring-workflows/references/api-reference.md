@@ -3,6 +3,8 @@
 > `Workflow` 工具契约的速查。下面每个签名和选项都出自工具 schema——**没有一个是编造的**。
 > 没列在这里的选项就是不存在，别去传它。
 
+<a id="ccm-k-point-workflow-api-agent"></a>
+<!-- ccm:k:start point:workflow.api-agent -->
 ## `agent(prompt, opts?) → Promise<string | object>`
 
 派生一个 fresh-context 的 leaf subagent。
@@ -22,6 +24,15 @@
 | `isolation` | `'worktree'` | 让这个 agent 在一个全新的 git worktree 里跑。**只**在并行 agent 会改到同一批文件、可能冲突时才用（每个 agent 约 200–500 ms + 占磁盘）。**改它会让 cache 失效。** |
 | `agentType` | string | 改用一个自定义 subagent 类型，从与 Agent 工具同一个 registry 里解析。**改它会让 cache 失效。** |
 
+<!-- ccm:k:end point:workflow.api-agent -->
+<!-- ccm:k:nav:start point:workflow.api-agent -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-agent-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-parallel"></a>
+<!-- ccm:k:start point:workflow.api-parallel -->
 ## `parallel(thunks) → Promise<any[]>`  — BARRIER
 
 - **参数：** 一个 **thunk 数组**——`[() => agent(...), () => agent(...)]`。绝不是
@@ -31,6 +42,15 @@
   `.filter(Boolean)`。
 - **Cap：** 单次调用 ≤ 4,096 个 thunk。
 
+<!-- ccm:k:end point:workflow.api-parallel -->
+<!-- ccm:k:nav:start point:workflow.api-parallel -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-parallel-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-pipeline"></a>
+<!-- ccm:k:start point:workflow.api-pipeline -->
 ## `pipeline(items, ...stages) → Promise<any[]>`  — NO BARRIER
 
 - **参数：** 先一个 `items` 数组，再跟一个或多个 stage 回调。
@@ -39,6 +59,15 @@
 - **Failure：** 抛错的 stage 把那个 item 降为 `null`，并跳过它余下的 stage。
 - **Cap：** 单次调用 ≤ 4,096 个 item。
 
+<!-- ccm:k:end point:workflow.api-pipeline -->
+<!-- ccm:k:nav:start point:workflow.api-pipeline -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-pipeline-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-progress"></a>
+<!-- ccm:k:start point:workflow.api-progress -->
 ## `phase(title) → void`
 
 开启一个命名的 progress group；此后派生的 agent 都归进这个 group。`title` 必须精确匹配
@@ -49,6 +78,15 @@
 在 progress tree 上方发一行叙述。用它来**把丢掉的东西明明白白说出来**——top-N 截断、
 没重试、采样——免得这种悄悄的收窄被当成「full coverage」。
 
+<!-- ccm:k:end point:workflow.api-progress -->
+<!-- ccm:k:nav:start point:workflow.api-progress -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-progress-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-composition"></a>
+<!-- ccm:k:start point:workflow.api-composition -->
 ## `workflow(nameOrRef, args?) → Promise<any>`
 
 内联跑另一个 workflow，并返回它的返回值。传一个 saved workflow 名字或 `{scriptPath}`。
@@ -59,12 +97,30 @@
 - 由 `assets/examples/nested-workflow-composition.js` 演示（逐项的 child run +
   catch-and-degrade fallback）。
 
+<!-- ccm:k:end point:workflow.api-composition -->
+<!-- ccm:k:nav:start point:workflow.api-composition -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-composition-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-args"></a>
+<!-- ccm:k:start point:workflow.api-args -->
 ## `args`——注入的全局
 
 传给 `Workflow` 工具的输入值，原样作为脚本全局暴露。**传真正的 JSON 值（数组 / 对象），
 别传 JSON 字符串**——被 stringify 过的 list 会以 `string` 的形态抵达，`args.filter` /
 `args.map` 一调就抛错。什么都没传时为 `undefined`。
 
+<!-- ccm:k:end point:workflow.api-args -->
+<!-- ccm:k:nav:start point:workflow.api-args -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-args-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-budget"></a>
+<!-- ccm:k:start point:workflow.api-budget -->
 ## `budget`——注入的全局
 
 `{ total, spent(), remaining() }`，一个共享的 output-token 池。
@@ -78,6 +134,15 @@
   `while (budget.total && budget.remaining() > 50_000) { ... }`——少了这个守卫，
   `remaining()` 就是 `Infinity`，loop 会一路冲到 1,000-agent 的 cap。
 
+<!-- ccm:k:end point:workflow.api-budget -->
+<!-- ccm:k:nav:start point:workflow.api-budget -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-budget-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-cache-key"></a>
+<!-- ccm:k:start point:workflow.api-cache-key -->
 ## Cache key——四要素（`agent()` 的 resume 身份）
 
 Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` 调用的 cache 身份由
@@ -91,6 +156,15 @@ Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` �
 其中任何一个（或 `prompt` 文本）一变，这个调用——以及它之后的一切——都会 live 重跑。
 `label` 和 `phase` 是装饰，**绝不**进 cache key。
 
+<!-- ccm:k:end point:workflow.api-cache-key -->
+<!-- ccm:k:nav:start point:workflow.api-cache-key -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-cache-key-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-failure"></a>
+<!-- ccm:k:start point:workflow.api-failure -->
 ## Failure 语义（汇总）
 
 | 位置 | 出错时 |
@@ -102,6 +176,15 @@ Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` �
 | `budget.total` 耗尽后再调 `agent()` | **抛错** |
 | `Date.now()` / `Math.random()` / 无参 `new Date()` | **抛错**（determinism 守卫） |
 
+<!-- ccm:k:end point:workflow.api-failure -->
+<!-- ccm:k:nav:start point:workflow.api-failure -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-failure-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-caps"></a>
+<!-- ccm:k:start point:workflow.api-caps -->
 ## 硬 caps（见 `mechanism.md` §6）
 
 - 并发：每个 workflow `min(16, cpu cores − 2)`。
@@ -109,6 +192,15 @@ Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` �
 - 每次 `parallel`/`pipeline` 调用的 item 数：4,096。
 - 脚本大小：512 KB。
 
+<!-- ccm:k:end point:workflow.api-caps -->
+<!-- ccm:k:nav:start point:workflow.api-caps -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-caps-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-api-meta"></a>
+<!-- ccm:k:start point:workflow.api-meta -->
 ## `meta`（必需的脚本头）
 
 第一条语句必须是 `export const meta = { ... }`，且是一个**纯字面量**（不含标识符、调用、
@@ -116,3 +208,10 @@ Resume 身份是按内容算的（见 `mechanism.md` §5）。一个 `agent()` �
 `phases: [{ title }]` 是惯例，它的 title 应当匹配你的 `phase()` / `opts.phase` 字符串。
 **以上全部由 harness 强制**——`meta`（纯字面量 + 必填 key）在 launch 时校验；determinism /
 caps / escape-hatch 违规在 runtime 抛错。没有独立的 linter——权威的检查就是 runtime。
+<!-- ccm:k:end point:workflow.api-meta -->
+<!-- ccm:k:nav:start point:workflow.api-meta -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.api-meta-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->

@@ -81,5 +81,5 @@ reviewer 能从 Card/CONTRACT、declared divergence、per-host strategy、equiva
   - N-host capability equivalence → Capability Cards/CONTRACT anchors + equivalence fixtures + host probe；
   - origin/runtime plane 不互吞 → Track A near-miss + reference link/scope review；
   - current claim 不领先证据 → host facts、generated matrices、package/probe review。
-- **Evidence anchor**：`design_docs/plans/harness-plugin-architecture-cursor-phase1-eval/` 的 Phase 1 RED、Track A 与 Track B；强模型 RED 3/3 已正确，不授权编造新纪律。Independent-review targeted rerun 的 A3 直接证据为 `1/3 → 2/3`，但非 Claude 二评超时不可用；这仍是 open consistency gap，不声称 Track-B 行为门已稳定全过。
+- **Evidence anchor**：`design_docs/eval/harness-plugin-architecture-cursor-phase1-eval/` 的 Phase 1 RED、Track A 与 Track B；强模型 RED 3/3 已正确，不授权编造新纪律。Independent-review targeted rerun 的 A3 直接证据为 `1/3 → 2/3`，但非 Claude 二评超时不可用；这仍是 open consistency gap，不声称 Track-B 行为门已稳定全过。
 - **Cross-major review owner**：`curating-skill-portfolios`。

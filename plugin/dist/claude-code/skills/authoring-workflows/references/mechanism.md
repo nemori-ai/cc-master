@@ -14,6 +14,8 @@
 - [§6 硬 caps](#6-hard-caps-resource-bounds)
 - [§7 后台执行](#7-background-execution-the-contract-that-makes-the-main-thread-free)
 
+<a id="ccm-k-point-workflow-contract-vs-internals"></a>
+<!-- ccm:k:start point:workflow.contract-vs-internals -->
 ## 0. 统御一切的那个区分：契约 vs 内部
 
 永远把两层分开：
@@ -52,6 +54,34 @@
 - 180 s 的 per-agent stall timeout 和 30 s 的 VM timeout（社区单来源；依赖前先对当前
   build 重新核实）。
 
+<!-- ccm:k:end point:workflow.contract-vs-internals -->
+<!-- ccm:k:nav:start point:workflow.contract-vs-internals -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [deepens_to: agent API](./api-reference.md#ccm-k-point-workflow-api-agent) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-agent -->
+- [deepens_to: args 注入](./api-reference.md#ccm-k-point-workflow-api-args) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-args -->
+- [deepens_to: 共享 budget API](./api-reference.md#ccm-k-point-workflow-api-budget) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-budget -->
+- [deepens_to: Resume cache key](./api-reference.md#ccm-k-point-workflow-api-cache-key) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-cache-key -->
+- [deepens_to: API 硬 caps](./api-reference.md#ccm-k-point-workflow-api-caps) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-caps -->
+- [deepens_to: workflow 组合 API](./api-reference.md#ccm-k-point-workflow-api-composition) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-composition -->
+- [deepens_to: Workflow failure 语义](./api-reference.md#ccm-k-point-workflow-api-failure) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-failure -->
+- [deepens_to: meta 脚本头](./api-reference.md#ccm-k-point-workflow-api-meta) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-meta -->
+- [deepens_to: parallel API](./api-reference.md#ccm-k-point-workflow-api-parallel) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-parallel -->
+- [deepens_to: pipeline API](./api-reference.md#ccm-k-point-workflow-api-pipeline) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-pipeline -->
+- [deepens_to: phase 与 log API](./api-reference.md#ccm-k-point-workflow-api-progress) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-api-progress -->
+- [deepens_to: 起草与 launch 契约](../SKILL.md#ccm-k-point-workflow-authoring-contract) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-authoring-contract -->
+- [deepens_to: 后台执行契约](./mechanism.md#ccm-k-point-workflow-background-contract) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-background-contract -->
+- [deepens_to: Barrier 与 streaming 判断](./mechanism.md#ccm-k-point-workflow-barrier-vs-streaming) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-barrier-vs-streaming -->
+- [deepens_to: Determinism 三禁](./mechanism.md#ccm-k-point-workflow-determinism) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-determinism -->
+- [deepens_to: 确定性协调器本质](./mechanism.md#ccm-k-point-workflow-execution-model) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-execution-model -->
+- [deepens_to: Primitive 与注入对象模型](./mechanism.md#ccm-k-point-workflow-primitive-model) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-primitive-model -->
+- [deepens_to: Workflow 资源上限](./mechanism.md#ccm-k-point-workflow-resource-caps) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-resource-caps -->
+- [deepens_to: 最长未变前缀 Resume](./mechanism.md#ccm-k-point-workflow-resume-prefix) <!-- ccm:k:edge edge:workflow.runtime-contract.contract-vs-internals-to-resume-prefix -->
+- [routes_to: Workflow 形状决策树](../SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.runtime-contract.to-selection -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-execution-model"></a>
+<!-- ccm:k:start point:workflow.execution-model -->
 ## 1. 一句话本质
 
 一个 dynamic workflow 把「下一步跑什么」的决策**从 LLM 手里收走、交给一段确定性的
@@ -62,6 +92,15 @@ JavaScript 脚本**。LLM 把脚本写一次；runtime 在后台执行它。中�
 脚本是个**纯协调器**：没有文件系统、没有 shell、没有 Node API。所有带副作用的活（读、写、
 跑命令）都委托给带一次性 context 的 leaf agent，只有它们的结果回来。
 
+<!-- ccm:k:end point:workflow.execution-model -->
+<!-- ccm:k:nav:start point:workflow.execution-model -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.execution-model-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-primitive-model"></a>
+<!-- ccm:k:start point:workflow.primitive-model -->
 ## 2. 7 个 primitive + 2 个注入对象（真实语义）
 
 | Primitive / 对象 | 它做什么 | Barrier？ |
@@ -80,6 +119,15 @@ JavaScript 脚本**。LLM 把脚本写一次；runtime 在后台执行它。中�
 model 重试。被用户跳过的 agent 返回 `null`，这就是到处都见 `.filter(Boolean)` 的缘由。
 （完整 opts 见 `api-reference.md`。）
 
+<!-- ccm:k:end point:workflow.primitive-model -->
+<!-- ccm:k:nav:start point:workflow.primitive-model -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.primitive-model-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-barrier-vs-streaming"></a>
+<!-- ccm:k:start point:workflow.barrier-vs-streaming -->
 ## 3. `parallel`（barrier）vs `pipeline`（streaming）——核心澄清
 
 两者都「并行跑东西」，但**形状**截然不同。这是最常见的混淆来源。
@@ -120,6 +168,15 @@ const c = await parallel(b.map(...))
 独立」**都不是**用 barrier 的理由——barrier latency 是实打实的：5 个 finder、最慢的是
 最快的 3 倍时，barrier 白白浪费掉那几个快 finder 三分之二的空闲时间。
 
+<!-- ccm:k:end point:workflow.barrier-vs-streaming -->
+<!-- ccm:k:nav:start point:workflow.barrier-vs-streaming -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.barrier-vs-streaming-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-determinism"></a>
+<!-- ccm:k:start point:workflow.determinism -->
 ## 4. Determinism三禁（三件被禁的事）——以及*为什么*
 
 在 workflow 脚本里，三个经典的 JavaScript 非确定性来源会**抛错（fail-loud）**：
@@ -141,6 +198,15 @@ run 分叉、journal 也就失去意义——cache 会悄悄变 stale。所以 r
 所以你的 `Date.now()`「破坏了 resume」，真相其实是反过来的：runtime 抛错正是为了*保护*
 resume——脚本必须确定，最长未变前缀的 cache 才成立。
 
+<!-- ccm:k:end point:workflow.determinism -->
+<!-- ccm:k:nav:start point:workflow.determinism -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.determinism-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-resume-prefix"></a>
+<!-- ccm:k:start point:workflow.resume-prefix -->
 ## 5. Resume =「最长未变前缀」
 
 契约的原话：
@@ -160,6 +226,15 @@ content-hash。
 `{scriptPath, resumeFromRunId}` 重新调用；未变前缀立刻重放，于是你只为改动的部分、以及
 它之后的部分付 live 成本。
 
+<!-- ccm:k:end point:workflow.resume-prefix -->
+<!-- ccm:k:nav:start point:workflow.resume-prefix -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.resume-prefix-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-resource-caps"></a>
+<!-- ccm:k:start point:workflow.resource-caps -->
 ## 6. 硬 caps（资源边界）
 
 | Cap | 值 |
@@ -174,6 +249,15 @@ content-hash。
 **并不**等于 100× 加速：一个固定的并发窗口卡住了吞吐（Amdahl / Gustafson + 一道固定窗口）。
 按你实际拥有的窗口来规划并行度，别按 item 数。
 
+<!-- ccm:k:end point:workflow.resource-caps -->
+<!-- ccm:k:nav:start point:workflow.resource-caps -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.resource-caps-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-background-contract"></a>
+<!-- ccm:k:start point:workflow.background-contract -->
 ## 7. 后台执行（让主线空出来的那个契约）
 
 一次 `Workflow` 工具调用**立刻带一个 task ID 返回**；workflow 在后台跑，完成时往对话里
@@ -182,3 +266,44 @@ content-hash。
 记牢：workflow 一旦启动，它的脚本结构就定死了——**没有 mid-run 输入**。workflow 内部的
 「持续推进」，是你写流式 `pipeline()` 时就做下的 compile-time 决策，而不是 runtime 现场的
 临场调整。
+<!-- ccm:k:end point:workflow.background-contract -->
+<!-- ccm:k:nav:start point:workflow.background-contract -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.background-contract-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Workflow Runtime/API 契约
+
+<a id="ccm-k-module-workflow-runtime-contract"></a>
+
+以 harness 契约为权威起草、launch、resume 并处理 primitive、budget、failure 与 caps。
+
+## Member points
+
+- [agent API](./api-reference.md#ccm-k-point-workflow-api-agent)
+- [args 注入](./api-reference.md#ccm-k-point-workflow-api-args)
+- [共享 budget API](./api-reference.md#ccm-k-point-workflow-api-budget)
+- [Resume cache key](./api-reference.md#ccm-k-point-workflow-api-cache-key)
+- [API 硬 caps](./api-reference.md#ccm-k-point-workflow-api-caps)
+- [workflow 组合 API](./api-reference.md#ccm-k-point-workflow-api-composition)
+- [Workflow failure 语义](./api-reference.md#ccm-k-point-workflow-api-failure)
+- [meta 脚本头](./api-reference.md#ccm-k-point-workflow-api-meta)
+- [parallel API](./api-reference.md#ccm-k-point-workflow-api-parallel)
+- [pipeline API](./api-reference.md#ccm-k-point-workflow-api-pipeline)
+- [phase 与 log API](./api-reference.md#ccm-k-point-workflow-api-progress)
+- [起草与 launch 契约](../SKILL.md#ccm-k-point-workflow-authoring-contract)
+- [后台执行契约](./mechanism.md#ccm-k-point-workflow-background-contract)
+- [Barrier 与 streaming 判断](./mechanism.md#ccm-k-point-workflow-barrier-vs-streaming)
+- [契约与内部机制分界](./mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [Determinism 三禁](./mechanism.md#ccm-k-point-workflow-determinism)
+- [确定性协调器本质](./mechanism.md#ccm-k-point-workflow-execution-model)
+- [Primitive 与注入对象模型](./mechanism.md#ccm-k-point-workflow-primitive-model)
+- [Workflow 资源上限](./mechanism.md#ccm-k-point-workflow-resource-caps)
+- [最长未变前缀 Resume](./mechanism.md#ccm-k-point-workflow-resume-prefix)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

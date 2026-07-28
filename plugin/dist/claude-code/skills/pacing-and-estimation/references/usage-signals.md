@@ -4,6 +4,8 @@
 > `available:false` / `state:"unknown"` 时怎么办，或理解为什么 pacing 只能做方向性走廊时。
 > **ccm 出事实与 verdict、你（作为 orchestrator）决策**；本页不执行编排动作。
 
+<a id="ccm-k-point-pacing-machine-wide-first"></a>
+<!-- ccm:k:start point:pacing.machine-wide-first -->
 ## 先全局，再下钻
 
 1. 先读 `ccm quota status --machine-wide --json`。这是 cached-only 的全机视图，不调用 provider；把
@@ -17,6 +19,18 @@
 
 完整 flags 与 JSON schema 查 `using-ccm`；不要在这里复制 provider CLI 参数。
 
+<!-- ccm:k:end point:pacing.machine-wide-first -->
+<!-- ccm:k:nav:start point:pacing.machine-wide-first -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.signals](./usage-signals.md#ccm-k-module-pacing-signals)
+- [next: 六 estimate verb 消费映射](./estimation.md#ccm-k-point-pacing-estimate-verbs) <!-- ccm:k:edge edge:pacing.signals-to-estimate -->
+- [next: refresh_hint 恢复边界](./usage-signals.md#ccm-k-point-pacing-refresh-hint) <!-- ccm:k:edge edge:pacing.global-to-refresh -->
+- [next: selected target 事实绑定](./cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts) <!-- ccm:k:edge edge:pacing.signals-to-target -->
+- [deepens_to: 四类 harness 窗口合同](./usage-signals.md#ccm-k-point-pacing-window-contracts) <!-- ccm:k:edge edge:pacing.global-to-windows -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-refresh-hint"></a>
+<!-- ccm:k:start point:pacing.refresh-hint -->
 ## `available:false` 且带 `refresh_hint`：短命 token 的恢复边界
 
 `usage advise` / `usage show` 返回 `available:false` 且 `refresh_hint.recoverable:true` 时，不是配额真耗尽，
@@ -27,6 +41,15 @@ token（完整人读步骤在 `refresh_hint.remedy`），再重跑 `refresh_hint
 （网络 / 401 / API 变更）时 `command` / `remedy` 为 `null`，不是你能就地修的，按普通 unknown 处理、不推断为
 healthy。无论哪条路径，ccm 都不输出 token；Kimi 以外不替 provider 刷新或写凭证。
 
+<!-- ccm:k:end point:pacing.refresh-hint -->
+<!-- ccm:k:nav:start point:pacing.refresh-hint -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.signals](./usage-signals.md#ccm-k-module-pacing-signals)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.refresh-to-global -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-window-contracts"></a>
+<!-- ccm:k:start point:pacing.window-contracts -->
 ## 四类 harness 的窗口与独立池合同
 
 | target | 承重窗口 | 信号语义 |
@@ -43,6 +66,16 @@ Cursor 两条 surface 即使可能观察到同一订阅，也必须分别保留 
 `usage show` 则在兼容的 `billing_period` 之外用 named pools 保留原始分池事实。
 Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平均日预算的 burn risk，不能成为第二个 hard window。
 
+<!-- ccm:k:end point:pacing.window-contracts -->
+<!-- ccm:k:nav:start point:pacing.window-contracts -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.signals](./usage-signals.md#ccm-k-module-pacing-signals)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.windows-to-global -->
+- [requires: 信号诚实天花板](./usage-signals.md#ccm-k-point-pacing-signal-ceiling) <!-- ccm:k:edge edge:pacing.windows-to-ceiling -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-pacing-signal-ceiling"></a>
+<!-- ccm:k:start point:pacing.signal-ceiling -->
 ## 信号源与诚实天花板
 
 - machine-wide `readings[]` 暴露 target、`used_percentage`、reset / observation / validity 时间与 source；
@@ -57,3 +90,29 @@ Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平�
   used% 精确收敛到某点。
 - 账户级 pacing 与 per-node observability 正交。task token / duration / tool uses 来自对应后台任务的真实
   telemetry；不要用并发期间的账户级 delta 反推单节点成本。
+<!-- ccm:k:end point:pacing.signal-ceiling -->
+<!-- ccm:k:nav:start point:pacing.signal-ceiling -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.signals](./usage-signals.md#ccm-k-module-pacing-signals)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.ceiling-to-global -->
+- [next: 只在上界收紧](./pacing-levers.md#ccm-k-point-pacing-upper-bound-only) <!-- ccm:k:edge edge:pacing.signals-to-levers -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 配额信号消费
+
+<a id="ccm-k-module-pacing-signals"></a>
+
+从任意 origin 正确读取全机配额信号、恢复边界与诚实天花板。
+
+## Member points
+
+- [先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first)
+- [refresh_hint 恢复边界](./usage-signals.md#ccm-k-point-pacing-refresh-hint)
+- [信号诚实天花板](./usage-signals.md#ccm-k-point-pacing-signal-ceiling)
+- [四类 harness 窗口合同](./usage-signals.md#ccm-k-point-pacing-window-contracts)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -6,6 +6,8 @@
 
 compact 是机械动作,不是你能可靠预判的日程点。你通常只能在 after compact 后发现上下文已被压缩;那时再补写已经晚了。真正的跨 compact 保护,是你在任何工作时刻都把 load-bearing 的目标、产物、读数和下一步意图持续写进 board。after compact 的正确动作是从 board 恢复优化状态,不是从残余记忆里重建它。
 
+<a id="ccm-k-point-devloop-ledger-when"></a>
+<!-- ccm:k:start point:devloop.ledger-when -->
 ## 什么时候必须写 ledger
 
 简单任务可以只靠 task 的 `acceptance` / `artifact` / `verified`。一旦出现下面任一信号,你就把优化状态显式写进 board:
@@ -19,6 +21,17 @@ compact 是机械动作,不是你能可靠预判的日程点。你通常只能�
 
 不要等 subagent 做完才补 ledger。外层 loop 的 objective / instrument / stop 条件没有先落 board,subagent 就是在优化一个口头 loss。
 
+<!-- ccm:k:end point:devloop.ledger-when -->
+<!-- ccm:k:nav:start point:devloop.ledger-when -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [next: ledger 写什么](./optimization-ledger.md#ccm-k-point-devloop-ledger-what) <!-- ccm:k:edge edge:devloop.ledger-when-to-what -->
+- [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.ledger-when-to-objective -->
+- [routes_to: 外层编排与内层下降](../SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.ledger-when-to-two-scale -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-ledger-what"></a>
+<!-- ccm:k:start point:devloop.ledger-what -->
 ## 写什么
 
 每次只写会改变下一轮优化方向的信息。你要让接手者一眼看出当前 loss、测量仪器、最近梯度和下一步 probe。
@@ -35,6 +48,16 @@ compact 是机械动作,不是你能可靠预判的日程点。你通常只能�
 
 具体命令语法、字段取值、状态机合法转移都归 `using-ccm`。你在这里先判断**哪类优化状态必须落 board**;要敲命令时再切到 `using-ccm`。
 
+<!-- ccm:k:end point:devloop.ledger-what -->
+<!-- ccm:k:nav:start point:devloop.ledger-what -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [operationalizes: 用 ccm 管住优化目标](./optimization-ledger.md#ccm-k-point-devloop-ledger-ccm) <!-- ccm:k:edge edge:devloop.ledger-what-to-ccm -->
+- [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-what -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-ledger-ccm"></a>
+<!-- ccm:k:start point:devloop.ledger-ccm -->
 ## 用 ccm 管住优化目标
 
 每次 board 写入前先问一个优化问题,再让 `using-ccm` 负责命令细节:
@@ -48,6 +71,16 @@ compact 是机械动作,不是你能可靠预判的日程点。你通常只能�
 
 不要把 `using-ccm` 当事后文书工具。ccm 是你把优化目标、读数和停机条件变成 durable state 的写入关卡。
 
+<!-- ccm:k:end point:devloop.ledger-ccm -->
+<!-- ccm:k:nav:start point:devloop.ledger-ccm -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [next: 持续 handoff](./optimization-ledger.md#ccm-k-point-devloop-ledger-handoff) <!-- ccm:k:edge edge:devloop.ledger-ccm-to-handoff -->
+- [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-ccm -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-ledger-handoff"></a>
+<!-- ccm:k:start point:devloop.ledger-handoff -->
 ## continuous handoff
 
 不要把 handoff 理解成 compact 前的一次动作。你无法可靠知道 compact 什么时候发生。把 handoff 理解成**持续维护 durable state**:每当优化状态发生 load-bearing 变化,立刻用 ccm 写回 board。
@@ -73,6 +106,16 @@ stop_or_restart: <继续 / 收敛停机 / restart 的条件>
 
 如果这六行写不出来,说明 loop 状态还没被你理解清楚;不要把模糊状态留给 after compact 的自己猜。
 
+<!-- ccm:k:end point:devloop.ledger-handoff -->
+<!-- ccm:k:nav:start point:devloop.ledger-handoff -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [contrasts_with: ledger 反模式](./optimization-ledger.md#ccm-k-point-devloop-ledger-antipatterns) <!-- ccm:k:edge edge:devloop.ledger-handoff-to-anti -->
+- [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-handoff -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-devloop-ledger-antipatterns"></a>
+<!-- ccm:k:start point:devloop.ledger-antipatterns -->
 ## anti-patterns
 
 | 反模式 | 现实 |
@@ -83,3 +126,30 @@ stop_or_restart: <继续 / 收敛停机 / restart 的条件>
 | "restart 就是把任务打 failed。" | failed 只是状态;optimization restart 还需要留下旧 hypothesis 为什么不再走、新起点是什么、用什么测量确认它更好。 |
 | "等 compact 前再总结一次。" | 你通常不能预知 compact。持续写 board 才是跨 compact 保护。 |
 | "compaction 后我大概记得。" | 记忆不是协议。写 handoff 是把优化状态从短期上下文提升到 board。 |
+<!-- ccm:k:end point:devloop.ledger-antipatterns -->
+<!-- ccm:k:nav:start point:devloop.ledger-antipatterns -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [routes_to: 何时必须写 ledger](./optimization-ledger.md#ccm-k-point-devloop-ledger-when) <!-- ccm:k:edge edge:devloop.ledger-anti-to-when -->
+- [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-antipatterns -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## optimization ledger
+
+<a id="ccm-k-module-devloop-ledger"></a>
+
+把外层优化状态持续写进 board，使 compact/换人后续接同一 loss。
+
+## Member points
+
+- [ledger 反模式](./optimization-ledger.md#ccm-k-point-devloop-ledger-antipatterns)
+- [用 ccm 管住优化目标](./optimization-ledger.md#ccm-k-point-devloop-ledger-ccm)
+- [持续 handoff](./optimization-ledger.md#ccm-k-point-devloop-ledger-handoff)
+- [ledger 写什么](./optimization-ledger.md#ccm-k-point-devloop-ledger-what)
+- [何时必须写 ledger](./optimization-ledger.md#ccm-k-point-devloop-ledger-when)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

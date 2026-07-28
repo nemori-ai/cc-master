@@ -38,6 +38,8 @@
 
 ---
 
+<a id="ccm-k-point-workflow-pattern-fan-out"></a>
+<!-- ccm:k:start point:workflow.pattern-fan-out -->
 ## fan-out + synthesize
 
 **何时：** 一个任务拆成若干独立部分，而你得把它们*全部*收齐才能合并——「review 这个 diff
@@ -53,6 +55,15 @@ const summary = await agent(`synthesize:\n${JSON.stringify(parts.filter(Boolean)
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-fan-out -->
+<!-- ccm:k:nav:start point:workflow.pattern-fan-out -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-fan-out-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-pipeline"></a>
+<!-- ccm:k:start point:workflow.pattern-pipeline -->
 ## pipeline-by-default
 
 **何时：** 多阶段工作，stage 之间**无须**同步——item A 可以走到 stage 2，而 item B 还在
@@ -70,6 +81,34 @@ const out = await pipeline(items,
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-pipeline -->
+<!-- ccm:k:nav:start point:workflow.pattern-pipeline -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [deepens_to: Adversarial verify](./patterns.md#ccm-k-point-workflow-pattern-adversarial-verify) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-adversarial-verify -->
+- [deepens_to: Bug hunt loop](./patterns.md#ccm-k-point-workflow-pattern-bug-hunt) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-bug-hunt -->
+- [deepens_to: Completeness critic](./patterns.md#ccm-k-point-workflow-pattern-completeness-critic) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-completeness-critic -->
+- [deepens_to: Dependency upgrade sweep](./patterns.md#ccm-k-point-workflow-pattern-dep-upgrade) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-dep-upgrade -->
+- [deepens_to: Fan-out + synthesize](./patterns.md#ccm-k-point-workflow-pattern-fan-out) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-fan-out -->
+- [deepens_to: Judge panel](./patterns.md#ccm-k-point-workflow-pattern-judge-panel) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-judge-panel -->
+- [deepens_to: Loop until budget](./patterns.md#ccm-k-point-workflow-pattern-loop-budget) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-budget -->
+- [deepens_to: Loop until count](./patterns.md#ccm-k-point-workflow-pattern-loop-count) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-count -->
+- [deepens_to: Loop until dry](./patterns.md#ccm-k-point-workflow-pattern-loop-dry) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-loop-dry -->
+- [deepens_to: Discover-transform-verify 迁移](./patterns.md#ccm-k-point-workflow-pattern-migration) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-migration -->
+- [deepens_to: Multi-modal sweep](./patterns.md#ccm-k-point-workflow-pattern-multimodal-sweep) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-multimodal-sweep -->
+- [deepens_to: Nested workflow composition](./patterns.md#ccm-k-point-workflow-pattern-nested-composition) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-nested-composition -->
+- [deepens_to: Perspective-diverse verify](./patterns.md#ccm-k-point-workflow-pattern-perspective-verify) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-perspective-verify -->
+- [deepens_to: PR/issue triage](./patterns.md#ccm-k-point-workflow-pattern-pr-triage) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-pr-triage -->
+- [deepens_to: Scout then fan-out](./patterns.md#ccm-k-point-workflow-pattern-scout-fanout) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-scout-fanout -->
+- [deepens_to: Self-repair loop](./patterns.md#ccm-k-point-workflow-pattern-self-repair) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-self-repair -->
+- [deepens_to: Staged escalation](./patterns.md#ccm-k-point-workflow-pattern-staged-escalation) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-staged-escalation -->
+- [deepens_to: Test generation and repair](./patterns.md#ccm-k-point-workflow-pattern-test-repair) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-test-repair -->
+- [deepens_to: Tournament bracket](./patterns.md#ccm-k-point-workflow-pattern-tournament) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pipeline-to-pattern-tournament -->
+- [routes_to: Workflow 形状决策树](../SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.pattern-catalog.to-selection -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-adversarial-verify"></a>
+<!-- ccm:k:start point:workflow.pattern-adversarial-verify -->
 ## adversarial-verify
 
 **何时：** finding 必须可信。对每个 finding，派一个 skeptic agent 去试着 **refute** 它
@@ -89,6 +128,15 @@ return verified.filter((f) => f.verdict?.isReal)
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-adversarial-verify -->
+<!-- ccm:k:nav:start point:workflow.pattern-adversarial-verify -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-adversarial-verify-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-perspective-verify"></a>
+<!-- ccm:k:start point:workflow.pattern-perspective-verify -->
 ## perspective-diverse-verify
 
 **何时：** 一个 finding 可能以好几种不同方式翻车，单一 verifier 的视角会漏掉那些它管不到
@@ -109,6 +157,15 @@ const verdicts = await parallel(LENSES.map((lens) => () =>
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-perspective-verify -->
+<!-- ccm:k:nav:start point:workflow.pattern-perspective-verify -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-perspective-verify-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-judge-panel"></a>
+<!-- ccm:k:start point:workflow.pattern-judge-panel -->
 ## judge-panel
 
 **何时：** 解空间很宽，「在一个 attempt 上反复迭代」不如「生成几个独立 attempt 再挑」。从
@@ -127,6 +184,15 @@ const final = await agent(`synthesize from the winner:\n${JSON.stringify(winner)
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-judge-panel -->
+<!-- ccm:k:nav:start point:workflow.pattern-judge-panel -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-judge-panel-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-loop-count"></a>
+<!-- ccm:k:start point:workflow.pattern-loop-count -->
 ## loop-until-count
 
 **何时：** 你有一个明确的目标 count——「找 10 个 bug」「产出 5 个选项」。count 没到目标
@@ -145,6 +211,15 @@ while (found.length < 10) {
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-loop-count -->
+<!-- ccm:k:nav:start point:workflow.pattern-loop-count -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-count-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-loop-budget"></a>
+<!-- ccm:k:start point:workflow.pattern-loop-budget -->
 ## loop-until-budget
 
 **何时：** 深度要随用户的 `'+Nk'` budget 指令伸缩，而理想的 count 又说不准。共享 token
@@ -163,6 +238,15 @@ while (budget.total && budget.remaining() > RESERVE) {
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-loop-budget -->
+<!-- ccm:k:nav:start point:workflow.pattern-loop-budget -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-budget-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-loop-dry"></a>
+<!-- ccm:k:start point:workflow.pattern-loop-dry -->
 ## loop-until-dry
 
 **何时：** 规模未知的发现——找出*所有* bug、*所有*调用点。固定计数会漏掉尾巴，dry-round
@@ -186,6 +270,15 @@ while (dry < DRY_LIMIT) {
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-loop-dry -->
+<!-- ccm:k:nav:start point:workflow.pattern-loop-dry -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-loop-dry-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-multimodal-sweep"></a>
+<!-- ccm:k:start point:workflow.pattern-multimodal-sweep -->
 ## multi-modal-sweep
 
 **何时：** 一个问题最好从几个**独立角度**分头搜索来回答，各角度各抓到不同的东西——按
@@ -203,6 +296,15 @@ const reads = await pipeline(deduped, (ref) => agent(`deep-read ${ref}`))
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-multimodal-sweep -->
+<!-- ccm:k:nav:start point:workflow.pattern-multimodal-sweep -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-multimodal-sweep-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-completeness-critic"></a>
+<!-- ccm:k:start point:workflow.pattern-completeness-critic -->
 ## completeness-critic
 
 **何时：** 你想知道自己*漏了*什么，而不只是确认自己找到了什么。工作做完后，派一个 critic
@@ -219,6 +321,15 @@ phase 正是这个 critic）。
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-completeness-critic -->
+<!-- ccm:k:nav:start point:workflow.pattern-completeness-critic -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-completeness-critic-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-migration"></a>
+<!-- ccm:k:start point:workflow.pattern-migration -->
 ## migrate / discover → transform → verify（带 worktree 隔离）
 
 **何时：** 一场迁移触及很多 site，你得 (1) 把它们发现出来、(2) 在隔离里逐个 transform，让
@@ -242,6 +353,15 @@ const out = await pipeline(found.sites ?? [],
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-migration -->
+<!-- ccm:k:nav:start point:workflow.pattern-migration -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-migration-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-scout-fanout"></a>
+<!-- ccm:k:start point:workflow.pattern-scout-fanout -->
 ## scout-then-fanout (entry shape)
 
 **何时：** 动手之前你还不知道 work-list——现实里最常见的入口形状。让一个 scout agent 返回
@@ -257,6 +377,13 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-scout-fanout -->
+<!-- ccm:k:nav:start point:workflow.pattern-scout-fanout -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-scout-fanout-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
 ## 组合形态——完整的真实-prompt workflow
 
 这些把上面的 primitive 和质量 pattern 拼成完整、可跑的 workflow。每一个都作为一个 bundled
@@ -264,6 +391,8 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 
 ---
 
+<a id="ccm-k-point-workflow-pattern-bug-hunt"></a>
+<!-- ccm:k:start point:workflow.pattern-bug-hunt -->
 ## bug-hunt-loop
 
 **何时：** 全仓找 bug，你既不知道总共有多少、又要求每个报出来的 bug 都可信。把
@@ -275,6 +404,15 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-bug-hunt -->
+<!-- ccm:k:nav:start point:workflow.pattern-bug-hunt -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-bug-hunt-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-pr-triage"></a>
+<!-- ccm:k:start point:workflow.pattern-pr-triage -->
 ## pr-issue-triage
 
 **何时：** 你有一批打开的 PR/issue 要分类、定优先级，但这份 list 事先并不知道。组合
@@ -285,6 +423,15 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-pr-triage -->
+<!-- ccm:k:nav:start point:workflow.pattern-pr-triage -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-pr-triage-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-dep-upgrade"></a>
+<!-- ccm:k:start point:workflow.pattern-dep-upgrade -->
 ## dep-upgrade-sweep
 
 **何时：** 你想一次 bump 很多依赖，每个 upgrade 各自隔离让并行编辑不冲突、只保留仍然绿的
@@ -296,6 +443,15 @@ bump。这是带 `isolation: 'worktree'` 的 **discover → transform → verify
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-dep-upgrade -->
+<!-- ccm:k:nav:start point:workflow.pattern-dep-upgrade -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-dep-upgrade-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-test-repair"></a>
+<!-- ccm:k:start point:workflow.pattern-test-repair -->
 ## test-generation-and-repair
 
 **何时：** 你想给很多 module 生成 test suite，*并且*要让每个失败的 suite 被自动驱动到绿。
@@ -306,6 +462,15 @@ attempt cap）组合起来。用它来「跨 codebase 生成并稳住 test」，
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-test-repair -->
+<!-- ccm:k:nav:start point:workflow.pattern-test-repair -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-test-repair-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-tournament"></a>
+<!-- ccm:k:start point:workflow.pattern-tournament -->
 ## tournament-bracket
 
 **何时：** 你有很多候选，想靠两两淘汰、而非绝对打分选出单一胜者（judge-panel 是*绝对*
@@ -318,6 +483,15 @@ attempt cap）组合起来。用它来「跨 codebase 生成并稳住 test」，
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-tournament -->
+<!-- ccm:k:nav:start point:workflow.pattern-tournament -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-tournament-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-nested-composition"></a>
+<!-- ccm:k:start point:workflow.pattern-nested-composition -->
 ## nested-workflow-composition
 
 **何时：** 一个可复用的子流程已经存在——它是一个 saved workflow（或你早先 Write 出来的脚本
@@ -334,6 +508,15 @@ leaf-shaped），且名字未知 / `scriptPath` 读不到 / child 语法错误�
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-nested-composition -->
+<!-- ccm:k:nav:start point:workflow.pattern-nested-composition -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-nested-composition-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-self-repair"></a>
+<!-- ccm:k:start point:workflow.pattern-self-repair -->
 ## self-repair-loop
 
 **何时：** 一个 agent 的输出必须通过某个 gate，而你想让它在有限次 attempt 之内自己修自己的
@@ -347,6 +530,15 @@ leaf-shaped），且名字未知 / `scriptPath` 读不到 / child 语法错误�
 
 ---
 
+<!-- ccm:k:end point:workflow.pattern-self-repair -->
+<!-- ccm:k:nav:start point:workflow.pattern-self-repair -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-self-repair-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-pattern-staged-escalation"></a>
+<!-- ccm:k:start point:workflow.pattern-staged-escalation -->
 ## staged-escalation
 
 **何时：** 工作应当从便宜起步，只在便宜的 stage 失败或返回低信心时，才升级到昂贵的
@@ -357,3 +549,44 @@ leaf-shaped），且名字未知 / `scriptPath` 读不到 / child 语法错误�
 选择，escalation 分支在 resume 时会 live 重跑。
 
 **由谁演示：** `assets/examples/staged-escalation.js`。
+<!-- ccm:k:end point:workflow.pattern-staged-escalation -->
+<!-- ccm:k:nav:start point:workflow.pattern-staged-escalation -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.pattern-catalog](./patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [routes_to: Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.pattern-catalog.pattern-staged-escalation-to-pattern-pipeline -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Workflow Pattern 目录
+
+<a id="ccm-k-module-workflow-pattern-catalog"></a>
+
+按任务与质量目标选择有 bundled asset 证明的控制流、验证和组合形状。
+
+## Member points
+
+- [Adversarial verify](./patterns.md#ccm-k-point-workflow-pattern-adversarial-verify)
+- [Bug hunt loop](./patterns.md#ccm-k-point-workflow-pattern-bug-hunt)
+- [Completeness critic](./patterns.md#ccm-k-point-workflow-pattern-completeness-critic)
+- [Dependency upgrade sweep](./patterns.md#ccm-k-point-workflow-pattern-dep-upgrade)
+- [Fan-out + synthesize](./patterns.md#ccm-k-point-workflow-pattern-fan-out)
+- [Judge panel](./patterns.md#ccm-k-point-workflow-pattern-judge-panel)
+- [Loop until budget](./patterns.md#ccm-k-point-workflow-pattern-loop-budget)
+- [Loop until count](./patterns.md#ccm-k-point-workflow-pattern-loop-count)
+- [Loop until dry](./patterns.md#ccm-k-point-workflow-pattern-loop-dry)
+- [Discover-transform-verify 迁移](./patterns.md#ccm-k-point-workflow-pattern-migration)
+- [Multi-modal sweep](./patterns.md#ccm-k-point-workflow-pattern-multimodal-sweep)
+- [Nested workflow composition](./patterns.md#ccm-k-point-workflow-pattern-nested-composition)
+- [Perspective-diverse verify](./patterns.md#ccm-k-point-workflow-pattern-perspective-verify)
+- [Pipeline by default](./patterns.md#ccm-k-point-workflow-pattern-pipeline)
+- [PR/issue triage](./patterns.md#ccm-k-point-workflow-pattern-pr-triage)
+- [Scout then fan-out](./patterns.md#ccm-k-point-workflow-pattern-scout-fanout)
+- [Self-repair loop](./patterns.md#ccm-k-point-workflow-pattern-self-repair)
+- [Staged escalation](./patterns.md#ccm-k-point-workflow-pattern-staged-escalation)
+- [Test generation and repair](./patterns.md#ccm-k-point-workflow-pattern-test-repair)
+- [Tournament bracket](./patterns.md#ccm-k-point-workflow-pattern-tournament)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -1,0 +1,260 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "candidate_analysis",
+  "id": "analysis:candidate.authoring-workflows",
+  "skill_id": "skill:authoring-workflows",
+  "composition_id": "composition:skill.authoring-workflows",
+  "candidate_modules": [
+    "module:workflow.pattern-catalog",
+    "module:workflow.runtime-contract",
+    "module:workflow.selection"
+  ],
+  "scoresheet": {
+    "D1": {
+      "score": 1,
+      "audience_plane": "runtime-user",
+      "evidence": "受众是需要起草或修复 Workflow 脚本的 runtime agent；它直接改变用户任务的执行方式。"
+    },
+    "D2": {
+      "score": 1,
+      "bounded_context": "Claude Code Workflow 的准入、运行时契约与组合形状",
+      "evidence": "单一 bounded context：Claude Code Workflow 的准入、运行时契约与组合形状；不吸收相邻 runtime skill 的认知职责。"
+    },
+    "D3": {
+      "probe_a": "strong",
+      "probe_b": "strong",
+      "evidence": "Probe A 强：项目特有的 Workflow runtime API、资源上限与 bundled pattern 形成私有契约；Probe B 强：缺少本资产时 agent 会猜测 barrier/streaming、resume 与失败语义，导致脚本不可运行。",
+      "evidence_refs": [
+        "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+      ]
+    }
+  },
+  "graph_metrics": {
+    "module_count": 3,
+    "point_count": 43,
+    "internal_edge_count": 84,
+    "external_edge_count": 0
+  },
+  "verdict": "admit",
+  "witness": {
+    "reason": "D1=1 ∧ D2=1 ∧ (Probe A ∨ Probe B strong)，且实时图指标、预算与四 host portability 闸全部通过。",
+    "composition_id": "composition:skill.authoring-workflows",
+    "candidate_modules": [
+      "module:workflow.pattern-catalog",
+      "module:workflow.runtime-contract",
+      "module:workflow.selection"
+    ],
+    "candidate_points": [
+      "point:workflow.admission",
+      "point:workflow.api-agent",
+      "point:workflow.api-args",
+      "point:workflow.api-budget",
+      "point:workflow.api-cache-key",
+      "point:workflow.api-caps",
+      "point:workflow.api-composition",
+      "point:workflow.api-failure",
+      "point:workflow.api-meta",
+      "point:workflow.api-parallel",
+      "point:workflow.api-pipeline",
+      "point:workflow.api-progress",
+      "point:workflow.authoring-contract",
+      "point:workflow.background-contract",
+      "point:workflow.barrier-vs-streaming",
+      "point:workflow.contract-vs-internals",
+      "point:workflow.determinism",
+      "point:workflow.execution-model",
+      "point:workflow.pattern-adversarial-verify",
+      "point:workflow.pattern-bug-hunt",
+      "point:workflow.pattern-completeness-critic",
+      "point:workflow.pattern-dep-upgrade",
+      "point:workflow.pattern-fan-out",
+      "point:workflow.pattern-judge-panel",
+      "point:workflow.pattern-loop-budget",
+      "point:workflow.pattern-loop-count",
+      "point:workflow.pattern-loop-dry",
+      "point:workflow.pattern-migration",
+      "point:workflow.pattern-multimodal-sweep",
+      "point:workflow.pattern-nested-composition",
+      "point:workflow.pattern-perspective-verify",
+      "point:workflow.pattern-pipeline",
+      "point:workflow.pattern-pr-triage",
+      "point:workflow.pattern-scout-fanout",
+      "point:workflow.pattern-self-repair",
+      "point:workflow.pattern-staged-escalation",
+      "point:workflow.pattern-test-repair",
+      "point:workflow.pattern-tournament",
+      "point:workflow.primitive-model",
+      "point:workflow.resource-caps",
+      "point:workflow.resource-index",
+      "point:workflow.resume-prefix",
+      "point:workflow.shape-tree"
+    ],
+    "trigger_job_coherence": true,
+    "internal_cohesion": 1.953488,
+    "external_cut_coupling": 0,
+    "overlap_signature": {},
+    "ssot_closure": true,
+    "budgets": {
+      "hop": {
+        "observed": {
+          "protocol": "directed_projection_topology",
+          "projected_ok": true,
+          "projected_scc_count": 1,
+          "projected_directed_diameter": 3,
+          "undirected_entry_distance_max": 1,
+          "directed_diameter": 3,
+          "directed_unreachable_pair_count": 0,
+          "undirected_unreachable_count": 0
+        },
+        "policy": {
+          "point_diameter_max": 3,
+          "entry_discovery_max": 3,
+          "critical_any_point_to_primary_max": 2
+        }
+      },
+      "read": {
+        "inventory_files": 5,
+        "missing_files": [],
+        "files": [
+          {
+            "path": "plugin/src/skills/authoring-workflows/canonical/.design/OBJECTIVE.md",
+            "utf8_bytes": 1601,
+            "lines": 12,
+            "estimated_tokens": 534
+          },
+          {
+            "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+            "utf8_bytes": 8981,
+            "lines": 121,
+            "estimated_tokens": 2994
+          },
+          {
+            "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+            "utf8_bytes": 7731,
+            "lines": 140,
+            "estimated_tokens": 2577
+          },
+          {
+            "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+            "utf8_bytes": 12075,
+            "lines": 200,
+            "estimated_tokens": 4025
+          },
+          {
+            "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+            "utf8_bytes": 18026,
+            "lines": 399,
+            "estimated_tokens": 6009
+          }
+        ],
+        "utf8_bytes": 48414,
+        "estimated_lines": 872,
+        "policy_max_lines": 8192,
+        "policy_max_utf8_bytes": 524288,
+        "within_read_budget": true
+      },
+      "token": {
+        "estimated_tokens": 16138,
+        "policy_max_tokens": 131072,
+        "within_token_budget": true
+      }
+    },
+    "host_portability": {
+      "claude-code": "full",
+      "codex": "unsupported",
+      "cursor": "unsupported",
+      "kimi-code": "unsupported"
+    },
+    "hop": {
+      "protocol": "directed_projection_topology",
+      "entry_roots": [
+        "point:workflow.contract-vs-internals",
+        "point:workflow.pattern-pipeline",
+        "point:workflow.shape-tree"
+      ],
+      "authored_directed_diameter": 4,
+      "authored_directed_unreachable_pair_count": 0,
+      "authored_directed_unreachable_sample": [],
+      "projected_scc_count": 1,
+      "projected_directed_diameter": 3,
+      "projected_hosts": {
+        "claude-code": {
+          "covered": true,
+          "planner_ok": true,
+          "scc_count": 1,
+          "diameter": 3,
+          "h1_ok": true,
+          "h2_ok": true,
+          "unreachable": null
+        },
+        "codex": {
+          "covered": false,
+          "skipped": true
+        },
+        "cursor": {
+          "covered": false,
+          "skipped": true
+        },
+        "kimi-code": {
+          "covered": false,
+          "skipped": true
+        }
+      },
+      "projected_ok": true,
+      "undirected_entry_distance_max": 1,
+      "undirected_unreachable_from_entry_primary": [],
+      "directed_diameter": 3,
+      "directed_unreachable_pair_count": 0,
+      "directed_unreachable_sample": [],
+      "policy": {
+        "point_diameter_max": 3,
+        "entry_discovery_max": 3,
+        "critical_any_point_to_primary_max": 2
+      }
+    },
+    "graph_metrics": {
+      "module_count": 3,
+      "point_count": 43,
+      "internal_edge_count": 84,
+      "external_edge_count": 0
+    },
+    "admission_gates": {
+      "ok": true,
+      "module_count_matches_candidate": true,
+      "point_count_positive": true,
+      "trigger_job_coherence": true,
+      "ssot_closure": true,
+      "internal_cohesion": true,
+      "external_cut": true,
+      "overlap_within_budget": true,
+      "hop": true,
+      "read_budget": true,
+      "token_budget": true,
+      "four_host_denominator": true,
+      "host_portability": true
+    }
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/SKILL.md"
+      },
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "golden.analysis.authoring-workflows"
+      }
+    ]
+  }
+}

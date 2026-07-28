@@ -1,0 +1,78 @@
+{
+  "schema": "cc-master/skill-knowledge-behavior-cases/v1",
+  "split": "train",
+  "cases": [
+    {
+      "id": "train-authoring-loop-budget",
+      "prompt": "一个自动修复 workflow 不能用固定轮数，也不能无限重试；它要在总预算耗尽时停止。请定位定义这种控制流的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:workflow.pattern-loop-budget",
+        "module_id": "module:workflow.pattern-catalog",
+        "owner_skill": "skill:authoring-workflows"
+      }
+    },
+    {
+      "id": "train-devloop-plateau",
+      "prompt": "一个开发任务连续几轮只在同一路径上微调，测量值不再改善。请定位说明何时应停止深挖并重启探索的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:devloop.plateau-restart",
+        "module_id": "module:devloop.core",
+        "owner_skill": "skill:dev-as-ml-loop"
+      }
+    },
+    {
+      "id": "train-distill-evidence",
+      "prompt": "复盘只提供了一个局部失败样本，但维护者想把它泛化成跨项目规则。请定位约束证据忠实性与收窄方式的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:distill.evidence-fidelity",
+        "module_id": "module:distill.evidence",
+        "owner_skill": "skill:distilling-lessons-into-assets"
+      }
+    },
+    {
+      "id": "train-craft-constraint-parity",
+      "prompt": "测试替身接受了真实后端会拒绝的数据，因此单测全绿但生产失败。请定位规定测试替身必须复制真实约束的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:tdd.constraint-parity",
+        "module_id": "module:craft.test-first",
+        "owner_skill": "skill:engineering-with-craft"
+      }
+    },
+    {
+      "id": "train-master-terminal",
+      "prompt": "后台 worker 已进入 terminal 状态并自报成功，父任务准备直接标 done。请定位说明为什么运行终态不等于任务完成的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:verification.terminal-is-not-done",
+        "module_id": "module:verification.endpoint",
+        "owner_skill": "skill:master-orchestrator-guide"
+      }
+    },
+    {
+      "id": "train-pacing-two-axes",
+      "prompt": "一个 board 在同池建议中应当让行，但当前账号的绝对配额窗口仍有大量余量。请定位要求不要混淆相对同池分配与绝对 usage 轴的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:pacing.pool-vs-usage",
+        "module_id": "module:pacing.pool",
+        "owner_skill": "skill:pacing-and-estimation"
+      }
+    },
+    {
+      "id": "train-slicing-vertical",
+      "prompt": "团队准备先分别完成 schema、API、UI 三个横向层，最后才集成。请定位要求改成端到端纵切的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:slicing.vertical-rule",
+        "module_id": "module:slicing.vertical",
+        "owner_skill": "skill:slicing-goals-into-dags"
+      }
+    },
+    {
+      "id": "train-ccm-status",
+      "prompt": "维护者想把 board task 的 status 当普通字段直接赋值。请定位说明 status 必须通过状态机 verb 转移的唯一权威知识点，并给出原文证据。",
+      "expected": {
+        "point_id": "point:ccm.status-state-machine",
+        "module_id": "module:ccm.mind-model",
+        "owner_skill": "skill:using-ccm"
+      }
+    }
+  ]
+}

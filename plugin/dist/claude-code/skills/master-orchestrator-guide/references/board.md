@@ -27,6 +27,8 @@
 
 ## 关键决策
 
+<a id="ccm-k-point-board-waist-and-write"></a>
+<!-- ccm:k:start point:board.waist-and-write -->
 - **名字**：`board`。**单一真相源。** **可配置的 home + 每编排一份唯一命名的 board 文件。** home 取 `$CC_MASTER_HOME`（默认 `$HOME/.cc_master/`，全局、harness-neutral）；board 集中落 `<home>/boards/`，每场编排拿到自己那份可按时间排序的文件 `<UTC-timestamp>-<pid>.board.json`（如 `20260605T101821Z-54324.board.json`），这样多场并发编排永不相撞；旧 per-repo board 在 bootstrap 时自动迁入（迁移来源由 host adapter 决定）。bootstrap hook 负责创建该文件、并注入它的精确路径；**哪个 board 是你的，由你自己认领**——compaction 之后，靠列出 home 的 `boards/` 并匹配 `goal` 把它重新找出来。全局 home 在 repo 外天然不入版本控制（in-repo 仍 gitignored）。
 - **存储 = 单一真相源的 board 文件（每编排一份命名文件）**：**board 变更只走 `ccm` 命令**——`ccm` 是唯一写入关卡（持锁 / 落盘前校验不变式 / 守状态机 / 盖 derived 字段；怎么用见 `using-ccm`）。**直接 file-edit（`Write` / `Edit` / `sed` / `echo` / `cat >`）会被 board-guard PreToolUse hook 拦**（手改绕过写关卡、静默腐蚀 deps 图 / 状态机 / 窄腰）；markdown 视图按需生成。校验这次写盘合不合契约的**机械关卡就是 `ccm`**（写时即校验，有 hard error 直接拒绝落盘）；PostToolUse lint hook 只作事后 backstop——见下方「board lint」段。
 
@@ -58,8 +60,16 @@
 
 ---
 
+<!-- ccm:k:end point:board.waist-and-write -->
+<!-- ccm:k:nav:start point:board.waist-and-write -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
+<!-- ccm:k:nav:end -->
 ## Supersession —— 显式状态，非隐式 GC
 
+<a id="ccm-k-point-board-audit-and-graph"></a>
+<!-- ccm:k:start point:board.audit-and-graph -->
 一个节点被重新定位（re-altitude）、或被一个上游变更顶替时，体现为一个**显式 board 状态**（`escalated` / `stale`），而不是隐式的垃圾回收。被顶替的节点带着它被设的状态留在 board 上，好让历史可审计。
 
 ---
@@ -97,8 +107,16 @@ lint 守「board 写得对不对」；**图分析**则在 board 写对之后回�
 
 ---
 
+<!-- ccm:k:end point:board.audit-and-graph -->
+<!-- ccm:k:nav:start point:board.audit-and-graph -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
+<!-- ccm:k:nav:end -->
 ## `owner.heartbeat` —— resume 探测信号
 
+<a id="ccm-k-point-board-resume-and-interview"></a>
+<!-- ccm:k:start point:board.resume-and-interview -->
 `owner.heartbeat` 一直是 pinned 的 waist 字段，但早先它没有读者也没有固定写者。resume 探测给了它首个用途：
 
 - **resume 探测读它**——`as-master-orchestrator --resume` 时 bootstrap 在重盖前读 TARGET 板的 `owner.heartbeat`（连同文件 mtime）判断「这板是否看起来仍有活 session」，新鲜则先警告、要 `--force-takeover` 二次确认（接管安全闸）。
@@ -140,8 +158,16 @@ lint 守「board 写得对不对」；**图分析**则在 board 写对之后回�
 
 ---
 
+<!-- ccm:k:end point:board.resume-and-interview -->
+<!-- ccm:k:nav:start point:board.resume-and-interview -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
+<!-- ccm:k:nav:end -->
 ## 示例（worked board 全字段样例）
 
+<a id="ccm-k-point-board-worked-example"></a>
+<!-- ccm:k:start point:board.worked-example -->
 ```json
 {
   "schema": "cc-master/v2",
@@ -169,3 +195,27 @@ lint 守「board 写得对不对」；**图分析**则在 board 写对之后回�
   ]
 }
 ```
+<!-- ccm:k:end point:board.worked-example -->
+<!-- ccm:k:nav:start point:board.worked-example -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:state.board](./board.md#ccm-k-module-state-board)
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Board 长程状态纪律
+
+<a id="ccm-k-module-state-board"></a>
+
+把 board 作为跨 compaction/session 的单一真相源，并守住窄腰、审计、续跑与采访协议。
+
+## Member points
+
+- [审计、lint 与图 advisory](./board.md#ccm-k-point-board-audit-and-graph)
+- [续跑信号与采访协议](./board.md#ccm-k-point-board-resume-and-interview)
+- [窄腰与读写纪律](./board.md#ccm-k-point-board-waist-and-write)
+- [Worked board 全字段样例](./board.md#ccm-k-point-board-worked-example)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

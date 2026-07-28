@@ -69,6 +69,7 @@ cd "${REPO_ROOT}"
 WITH_ACT=0
 WITH_SEA_LINUX=0
 SKIP_SEA=0
+PLUGIN_MANIFEST="${CCM_TRUSTED_RELEASE_MANIFEST:-}"
 for arg in "$@"; do
   case "${arg}" in
     --with-act) WITH_ACT=1 ;;
@@ -204,7 +205,12 @@ plugin_stage() {
   command -v claude >/dev/null 2>&1 || die "需要 claude CLI（plugin validate）"
   command -v unzip >/dev/null 2>&1 || die "需要 unzip"
 
-  local zip; zip="$(bash scripts/package-plugin.sh 2>/dev/null)" || die "package-plugin.sh 失败"
+  [ -n "${PLUGIN_MANIFEST}" ] || die "STAGE 2 需要 CCM_TRUSTED_RELEASE_MANIFEST（已验证、保留 mode 的 immutable release-input.json）"
+  [ -f "${PLUGIN_MANIFEST}" ] || die "trusted plugin manifest 不存在：${PLUGIN_MANIFEST}"
+  local upload_set; upload_set="$(bash scripts/package-plugin.sh \
+    --manifest "${PLUGIN_MANIFEST}" --out-dir "${WORK}/plugins" 2>/dev/null)" \
+    || die "package-plugin.sh 失败"
+  local zip; zip="$(printf '%s\n' "${upload_set}" | grep 'cc-master-plugin-claude-code-.*\\.zip$' | head -n 1)"
   [ -f "${zip}" ] || die "zip 产物不存在：${zip}"
   ok "打包：${zip} ($(du -h "${zip}" | cut -f1))"
   local manifest; manifest="$(dirname "${zip}")/SHA256SUMS"

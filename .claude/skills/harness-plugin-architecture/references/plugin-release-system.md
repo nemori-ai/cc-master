@@ -10,7 +10,10 @@ plugin/dist/<host>/ # generated installable adapter
 release artifact    # zip/tar/package/marketplace entry
 ```
 
-发布脚本必须从 `plugin/dist/<host>` 打包，而不是从 `plugin/src` 打包。`plugin/src` 里有 design、eval、strategy、manifest contract 等维护材料，不应全部进入用户安装包。
+发布输入必须是 Trusted Projection Transaction 已提交的 host artifact，以及绑定它的
+publish receipt、verified snapshot attestation 与冻结 bundle plan。package 不从
+`plugin/src` 或未验证 live dist 自行发现文件；`plugin/src` 里的 knowledge、design、eval、
+strategy、manifest contract 等维护材料不进入用户安装包。
 
 ## CLI 与 plugin 的关系
 
@@ -56,16 +59,19 @@ Cursor 当前没有与 `claude plugin validate` 对等的官方 validator。其�
 bash scripts/sync-plugin-dist.sh --host cursor
 bash scripts/check-plugin-dist-sync.sh
 node --test tests/content/capability-host-coverage.test.mjs tests/content/structure.test.mjs
-bash scripts/package-plugin.sh --host cursor <tag>
 ```
 
 package 必须保留 `.cursor-plugin/plugin.json`、`commands/`、`skills/`、`rules/`、`hooks/` 与 launcher；
 能力等价仍由 Cursor hook / capability fixture 和真实 IDE probe 验收，不能用 package shape 替代。
+projection/validation 完成并发布 sealed host snapshot 后，另以
+`bash scripts/package-plugin.sh --manifest <trusted-release-input.json>` 消费四 host 的
+receipt/attestation/frozen bundle plan。
 
 ## Drift 防线
 
 - `dist` generated，不手改。
 - sync 脚本缺 strategy/meta 时 fail。
 - content tests 读 source 和 dist 的对应位置。
-- package 脚本先 sync 再打包。
-- release CI 跑 sync check，确认工作树无 dist drift。
+- source 与 trusted host plan 在 compiler 前冻结；sealed verified snapshot 是 publish 唯一权威。
+- package 脚本只消费 receipt/attestation/frozen bundle plan，绝不 sync 或重新 compile。
+- release CI 先在独立 projection 阶段完成 sync/verify/publish，再把已提交证据交给 package。

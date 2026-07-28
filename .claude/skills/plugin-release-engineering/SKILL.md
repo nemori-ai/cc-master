@@ -1,6 +1,6 @@
 ---
 name: plugin-release-engineering
-description: 当你要打包、分发、发布或审查 cc-master 的 CLI/plugin release 流程时使用；覆盖 source/dist/package 边界、host adapter artifacts、版本线、release checks 和 marketplace 元数据。
+description: '当你要打包、分发、发布或审查 cc-master 的 CLI/plugin release 流程时使用；覆盖 source/dist/package 边界、host adapter artifacts、版本线、release checks 和 marketplace 元数据。Do NOT use when 只查 skill knowledge graph 正式规范/CLI（→ design_docs/skill-knowledge-graph）。'
 ---
 
 # Plugin 发布工程

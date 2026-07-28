@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-authoring-workflows"></a>
 ---
 name: authoring-workflows
 description: '当你要调用 Workflow 工具，或要写 / 调试 / 启动一个 Claude Code dynamic-workflow 脚本时用——author / debug / launch a Claude Code dynamic-workflow script，当你要写 workflow 脚本时——哪怕你自觉已经懂这套 API。当你发现自己在猜 workflow 引擎的 determinism 或 resume 规则、没查 shape 就伸手够 parallel() / pipeline()、想手写一个 validation linter、或刚被 harness 报错正要 relaunch 时用。先查再猜，别等跑挂了才来。'
@@ -10,6 +11,8 @@ description: '当你要调用 Workflow 工具，或要写 / 调试 / 启动一�
 要守的纪律很少，就三条：**先问清自己到底需不需要 workflow、按 work 的形状选范式、照
 runtime 自己的 validation 契约来写——权威的闸是 harness，别去重新实现它。**
 
+<a id="ccm-k-point-workflow-admission"></a>
+<!-- ccm:k:start point:workflow.admission -->
 ## 1. 先问清自己——你究竟需不需要 workflow？
 
 workflow 是有开销的，只值得任务要协调**几十到几百个 agent**、且必须把中间结果挡在 context
@@ -17,6 +20,15 @@ workflow 是有开销的，只值得任务要协调**几十到几百个 agent**�
 `dispatch.md`（选择标准一节）过一遍——「该选 workflow 还是 subagent」是那里的判断标准单一
 持有，本节不复述。确认要上 workflow 之后，才往下走范式决策树。
 
+<!-- ccm:k:end point:workflow.admission -->
+<!-- ccm:k:nav:start point:workflow.admission -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.selection](./SKILL.md#ccm-k-module-workflow-selection)
+- [routes_to: Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.selection.admission-to-shape-tree -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-shape-tree"></a>
+<!-- ccm:k:start point:workflow.shape-tree -->
 ## 2. 范式决策树
 
 照 work 的**形状**选，不是凭口味。（完整语义见 `references/mechanism.md`；完整 pattern
@@ -47,6 +59,18 @@ workflow 是有开销的，只值得任务要协调**几十到几百个 agent**�
 > `assets/examples/` 里。当你的 work 套不进任何一个裸形状时，从最接近的那个组合 example
 > 起手。
 
+<!-- ccm:k:end point:workflow.shape-tree -->
+<!-- ccm:k:nav:start point:workflow.shape-tree -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.selection](./SKILL.md#ccm-k-module-workflow-selection)
+- [deepens_to: Workflow 准入](./SKILL.md#ccm-k-point-workflow-admission) <!-- ccm:k:edge edge:workflow.selection.shape-tree-to-admission -->
+- [routes_to: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.selection.to-runtime-contract -->
+- [deepens_to: Pipeline by default](./references/patterns.md#ccm-k-point-workflow-pattern-pipeline) <!-- ccm:k:edge edge:workflow.selection.to-pattern-catalog -->
+- [deepens_to: Workflow 资源路由](./SKILL.md#ccm-k-point-workflow-resource-index) <!-- ccm:k:edge edge:workflow.selection.shape-tree-to-resource-index -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-authoring-contract"></a>
+<!-- ccm:k:start point:workflow.authoring-contract -->
 ## 3. 写作流程——照 harness 契约起草，再 launch
 
 1. **起草**：从 `assets/templates/` 里的某个骨架（或 `assets/examples/` 里某个完整组合）
@@ -73,6 +97,15 @@ workflow 是有开销的，只值得任务要协调**几十到几百个 agent**�
 > （编排原则「信确定性 endpoint、不信 prose 自检」在这里由 harness 兑现——它*就是*那个
 > endpoint。）
 
+<!-- ccm:k:end point:workflow.authoring-contract -->
+<!-- ccm:k:nav:start point:workflow.authoring-contract -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.runtime-contract](./references/mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [routes_to: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals) <!-- ccm:k:edge edge:workflow.runtime-contract.authoring-contract-to-contract-vs-internals -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-workflow-resource-index"></a>
+<!-- ccm:k:start point:workflow.resource-index -->
 ## 4. Reference 索引——动手猜之前先读
 
 - **`references/mechanism.md`**——**对引擎下任何判断之前**先读它。已确认的契约 vs 内部
@@ -111,3 +144,36 @@ workflow 是有开销的，只值得任务要协调**几十到几百个 agent**�
 
 每个 bundled template 和 example 都是照 harness 契约写的，随便挑一个都是 known-good 的
 起点。
+<!-- ccm:k:end point:workflow.resource-index -->
+<!-- ccm:k:nav:start point:workflow.resource-index -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:workflow.selection](./SKILL.md#ccm-k-module-workflow-selection)
+- [routes_to: Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree) <!-- ccm:k:edge edge:workflow.selection.resource-index-to-shape-tree -->
+<!-- ccm:k:nav:end -->
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:workflow-authoring:
+- [Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree)
+- [Module module:workflow.pattern-catalog](./references/patterns.md#ccm-k-module-workflow-pattern-catalog)
+- [primary: Pipeline by default](./references/patterns.md#ccm-k-point-workflow-pattern-pipeline)
+- [Module module:workflow.runtime-contract](./references/mechanism.md#ccm-k-module-workflow-runtime-contract)
+- [primary: 契约与内部机制分界](./references/mechanism.md#ccm-k-point-workflow-contract-vs-internals)
+- [Module module:workflow.selection](./SKILL.md#ccm-k-module-workflow-selection)
+<!-- ccm:k:entry-pin:end -->
+
+<!-- ccm:k:generated -->
+## Workflow 准入与形状选择
+
+<a id="ccm-k-module-workflow-selection"></a>
+
+先判断是否值得 Workflow，再按 work 形状选择控制流并定位 known-good 资源。
+
+## Member points
+
+- [Workflow 准入](./SKILL.md#ccm-k-point-workflow-admission)
+- [Workflow 资源路由](./SKILL.md#ccm-k-point-workflow-resource-index)
+- [Workflow 形状决策树](./SKILL.md#ccm-k-point-workflow-shape-tree)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

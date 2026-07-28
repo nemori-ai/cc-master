@@ -13,6 +13,28 @@ owns its own J, fixtures, and assertions. The Skill B
 (`authoring-workflows`) Track B design is
 `authoring-workflows-track-b.md`.
 
+## Public evidence contract
+
+`design_docs/eval/` 是公开、可审计的 **decision-grade evidence** 层，不是每次模型运行的完整
+实验工作台。进 Git 的资产必须能帮助 reviewer 复现合同、理解裁决，或比较一个稳定的
+before/after 结论：
+
+- objective、assertions、rubric 与环境/provenance manifest；
+- train/holdout fixtures 与 canonical prompts；
+- 聚合结果、方差、关键失败样本与 judge disagreement；
+- 经裁剪、脱敏且对结论不可替代的最小 transcript excerpt。
+
+本地执行耗材留在 `.runs/`（或工具生成的 `runs/`、`raw/`、`transcripts/`、`outputs/`、
+`tmp/`）中；逐轮 `.log`、`stderr.txt`、`timing.json`、raw JSON/JSONL 与 trace 由本目录
+[`.gitignore`](.gitignore) 排除。若一份原始输出值得长期保留，先把它蒸馏为上面的公开资产：
+
+1. 只保留支撑判决的最小证据，不提交重复 run 与已被 supersede 的中间尝试；
+2. 路径改为 repo-relative，去掉本机 home、session/auth/cookie/token 与用户私有输入；
+3. 在聚合结果或 manifest 中记录模型/工具版本、日期、fixture 与证据指针。
+
+`.gitignore` 不会自动移除已 tracked 的历史文件；以后触碰旧 workspace 时按本合同渐进收敛，
+不要把旧先例当成继续提交 raw exhaust 的授权。
+
 ## What it does
 
 For each `{query, should_trigger}` pair, the harness creates a throwaway command

@@ -6,25 +6,21 @@ import test from 'node:test';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const read = (relative) => readFileSync(path.join(ROOT, relative), 'utf8');
 
-test('kimi package validation is closed over every load-bearing manifest surface', () => {
-  const manifest = JSON.parse(read('plugin/dist/kimi-code/kimi.plugin.json'));
-  assert.ok(Array.isArray(manifest.hooks) && manifest.hooks.length > 0, 'kimi manifest must register hooks');
-  assert.ok(
-    manifest.hooks.every(({ command }) => typeof command === 'string' && command.includes('/hooks/')),
-    'each kimi hook command must resolve through the packaged hooks tree',
-  );
-
+test('package exposes the normal four-host flow and keeps manifest packaging compatible', () => {
   const packageScript = read('scripts/package-plugin.sh');
-  assert.match(
-    packageScript,
-    /\[ -d "\$\{pkg\}\/hooks" \] \|\| die "缺 hooks\/——kimi\.plugin\.json 已注册运行时 hooks，不能发布悬空命令"/u,
-  );
-  assert.match(packageScript, /command\.matchAll\(\/\\\$KIMI_PLUGIN_ROOT/u);
-  assert.match(packageScript, /existsSync\(join\(process\.env\.KIMI_PACKAGE_ROOT, relative\)\)/u);
+  assert.match(packageScript, /--host claude-code/u);
+  assert.match(packageScript, /--all-hosts/u);
+  assert.match(packageScript, /sync-plugin-dist\.sh --host/u);
+  assert.match(packageScript, /package_one kimi-code/u);
+  assert.match(packageScript, /--manifest 需要一个非空路径/u);
+  assert.match(packageScript, /trusted-release-bundle\.mjs/u);
+  assert.doesNotMatch(packageScript, /include_dirs=.*\bknowledge\b/u);
+  assert.match(packageScript, /package staging 中禁止 knowledge\//u);
 
   const workflow = read('.github/workflows/plugin-release.yml');
-  const kimiValidation = workflow.split('- name: Validate kimi-code packaged adapter')[1] ?? '';
-  assert.match(kimiValidation, /test -d "\$\{DEST\}\/cc-master\/hooks"/u);
+  assert.match(workflow, /Download attested immutable release inputs/u);
+  assert.match(workflow, /release-attestation\.json|cc-master-plugin-\$\{\{/u);
+  assert.doesNotMatch(workflow, /softprops\/action-gh-release|tags:\s*\n/u);
 });
 
 test('installer help and distribution map expose kimi-code as a first-class target', () => {

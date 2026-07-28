@@ -1,3 +1,4 @@
+<a id="ccm-k-skill-using-ccm"></a>
 ---
 name: using-ccm
 description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI —— 当你要用 ccm 操作 board、查询四 provider 统一 `model-policy show|advise`、写 cross-harness planning/routing 或读本 origin 的 usage/dispatch 操作面时。它一体两面:面1=ccm 命令与 board 写入关卡;面2=board 模型、O/T1/T2/T3 effect floor、candidate chain 与 fail-closed fallback 的字段取值。Triggers: 敲 ccm model-policy/task/board/account/jc/cadence/log/watchdog 命令、查跨 provider 候选、写 ample/tight chain、建板·加改任务·推进状态·查 DAG、录备号/换号、任何 board 写操作或 ccm exit 3。Do NOT use when 你在决定任务角色、最终 target、何时换号/停派或怎么拆 DAG（归 master-orchestrator-guide），或解释 model-policy/usage/estimate 事实与 advisory（归 pacing-and-estimation）。目标模型查询跨 provider 共享；account、usage signal 与实际 dispatch 仍按 origin/target surface 的可用命令执行。'
@@ -12,6 +13,8 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 ---
 
+<a id="ccm-k-point-ccm-when-to-open"></a>
+<!-- ccm:k:start point:ccm.when-to-open -->
 ## 何时翻开本 skill
 
 你要对 board 做**任何**读或写——建板、建立 / 确认 / 修订 Goal Contract、加 / 改任务、起跑 / 完成 / 阻塞、为 subagent 写多维 planning 画像与 cross-harness routing policy、声明 delivery target 与依赖资格、登记 / 探测派发出去的运行时 agent（凡派发皆登记）、查 ready 集 / DAG / 临界路径、记 judgment_call 或 log、开 / 收 cadence iteration、arm watchdog——就用 ccm,用法看这里。本文给的是**心智 + 纪律 + 热路径**,让你不必逐条 `--help` 也敲得对;深度按两面分进两个 reference,按问题选读:
@@ -19,8 +22,18 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 - **[references/command-catalog.md](references/command-catalog.md)**（面1·命令面）—— 全量命令 / flag / `--json` 输出形状。**「这条命令怎么敲、有哪些 flag」翻它。**
 - **[references/board-model-guide.md](references/board-model-guide.md)**（面2·模型与取值）—— board 领域概念（task 字段 / status 八态 / executor 五种 / judgment_call / cadence / parent / watchdog）解释 + 字段**什么时候设什么值**的取值判断（acceptance 怎么写好 / estimate 怎么估 / deps 怎么连 / executor 怎么选）+ 决策树 + footgun 深化。**「这个字段填什么、这个概念是什么、这个场景选哪个」翻它。**
 
+<!-- ccm:k:end point:ccm.when-to-open -->
+<!-- ccm:k:nav:start point:ccm.when-to-open -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.x.when-to-account -->
+- [next: ccm 是 board 写入关卡](./SKILL.md#ccm-k-point-ccm-write-gate) <!-- ccm:k:edge edge:ccm.when-to-write-gate -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-write-gate"></a>
+<!-- ccm:k:start point:ccm.write-gate -->
 ## 心智锚 1:ccm 是 board 的写入关卡,不是事后才跑的 lint
 
 每次动 board,**首选 ccm 命令**,而不是 `Write`/`Edit`/`sed` 直接改 board 的 JSON 文件。ccm 这一道写命令替你做四件手改做不到的事:
@@ -31,9 +44,18 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据（含 current `delivery` candidate/observations）归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact` / `review_verdict` / `delivery`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
 
 手改 JSON 把这四道全绕过。**别因为"就改一个字段、Write 更快"在 ccm 可用时绕开它**——那一下省的几秒,换来的是绕锁、跳校验、derived 字段失真。
-
+<!-- ccm:k:end point:ccm.write-gate -->
+<!-- ccm:k:nav:start point:ccm.write-gate -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path) <!-- ccm:k:edge edge:ccm.x.write-gate-single-path -->
+- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.write-gate-to-status -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-status-state-machine"></a>
+<!-- ccm:k:start point:ccm.status-state-machine -->
 ## 心智锚 2:board 是状态机,status 不是你赋值的字段 ★硬规则
 
 这是本 skill 最容易踩、也最不能踩的一条。**task 的 `status` 不是一个你 `--set` 赋值的普通字段——它是一台状态机的当前态,只能经生命周期 verb 转移。**
@@ -69,9 +91,25 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 | "status 不过是个字段,改字段的通用 idiom 就是 `set --status <值>`,赋值就行,不用懂状态机。" | ccm **故意**不给 status 一个通用 field-setter。赋值绕过转移闸、不盖 `started_at`/`finished_at`——所以 `--set status=…` 无论带不带 `tasks[]` 前缀都被 🔒 守门拒(exit 3)。verb 才是对的路:它校验转移合法 + 盖 derived 字段。 |
 | "我赶时间,`task update --status done` 一条搞定,省得 start 再 done 两步。" | `task update` 没有 `--status` flag(exit 2),`ready→done` 也非法(exit 3)——这条"省一步"两次都会失败,反而更慢。`start` 再 `done` 才是真正的两步到位。 |
 | "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 只给非 native-active 的真异常态留逃生口、会记 log；重跑 stale/failed/escalated 有 `task retry`，native-active projection 则在 mutation boundary 明确拒绝 `--force`。正常完成用它跳过 `in_flight`，等于亲手制造一个没 `started_at` 的 "done"——你在伪造审计轨迹。 |
-
+<!-- ccm:k:end point:ccm.status-state-machine -->
+<!-- ccm:k:nav:start point:ccm.status-state-machine -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [routes_to: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.entryfan.ccm.account-pool-model -->
+- [routes_to: artifact/verified 真完成](./references/board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:ccm.entryfan.ccm.board.artifact-verified -->
+- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.entryfan.ccm.board.status-semantics -->
+- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.task -->
+- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.status-ops-task-cmd -->
+- [routes_to: namespace usage](./references/command-catalog.md#ccm-k-point-ccm-cmd-usage) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.usage -->
+- [routes_to: namespace watchdog](./references/command-catalog.md#ccm-k-point-ccm-cmd-watchdog) <!-- ccm:k:edge edge:ccm.entryfan.ccm.cmd.watchdog -->
+- [next: 三档字段操作规则](./SKILL.md#ccm-k-point-ccm-field-tiers) <!-- ccm:k:edge edge:ccm.status-to-tiers -->
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.entryfan.ccm.footgun-table -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-field-tiers"></a>
+<!-- ccm:k:start point:ccm.field-tiers -->
 ## 心智锚 3:三档字段 —— 🔒 走专属命令,✎ 默认 `--set` 但可有专属写口
 
 board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不变式 / 状态机——实时真相用 `ccm <ns> --help`。每字段属哪档 + 怎么取值的操作视图见 [references/board-model-guide.md](references/board-model-guide.md) §A;这里只给**操作规则**):
@@ -81,9 +119,18 @@ board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不
 - **👁 observed**:`scheduling.wip_limit`、`watchdog`、`wip_limit` 等——hook 有则用、缺则降级,走各自具名 flag。
 
 一句话:**改 🔒 找专属命令;改普通 task ✎ 用 `task update <id> --set field=…`(裸 path 即本 task),改普通板级 ✎ 用 `board update --set`;delivery 合约字段例外走具名 domain verb;拿不准先看对应 `--help`。**
-
+<!-- ccm:k:end point:ccm.field-tiers -->
+<!-- ccm:k:nav:start point:ccm.field-tiers -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [deepens_to: board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path) <!-- ccm:k:edge edge:ccm.tiers-to-single-path -->
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.ret.pointccm.field-tiers.pri -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-single-write-path"></a>
+<!-- ccm:k:start point:ccm.single-write-path -->
 ## 心智锚 4:ccm 是 board 变更的唯一写路径 —— 不降级手改
 
 board 变更**只走 `ccm`**,没有 `Write`/`Edit`/`sed` 的降级退路——两道机制把这条钉死:
@@ -92,15 +139,31 @@ board 变更**只走 `ccm`**,没有 `Write`/`Edit`/`sed` 的降级退路——�
 - **board-guard**:直接 file-edit 目标 board（`Write`/`Edit`/`MultiEdit`，或 `Bash` 用 `sed`/`echo`/`tee`/`cat >` 手改）会被 PreToolUse hook **当场 deny**。手改绕过写关卡会静默腐蚀 deps 图 / 状态机 / 窄腰——机制层直接不给你这条路。
 
 **万一 `ccm` 跑起来这一下不响应**(装了但瞬态抽风):**暂停 board 变更、先修 `ccm`**——**绝不**退回手改 JSON 顶上去。运行时 hook(board-lint / usage-pacing)对这种瞬态各自优雅降级(静默不 block),但**你自己的 board 写永远等 `ccm` 恢复**,不自己动手。
-
+<!-- ccm:k:end point:ccm.single-write-path -->
+<!-- ccm:k:nav:start point:ccm.single-write-path -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [contrasts_with: planning/routing 是 opt-in 合同](./SKILL.md#ccm-k-point-ccm-planning-opt-in) <!-- ccm:k:edge edge:ccm.single-path-to-planning -->
+<!-- ccm:k:nav:end -->
+<a id="ccm-k-point-ccm-planning-opt-in"></a>
+<!-- ccm:k:start point:ccm.planning-opt-in -->
 ## 心智锚 5：planning / routing 是 opt-in board 合同，不是自动派发器
 
 要让一个近期 `subagent` 节点的复杂度、能力要求、模型候选、充足 / 紧张额度链和 fallback 在 handoff / resume 后仍可重建，用 `ccm/task-planning/v1` + `ccm/agent-routing/v1` 成对记录；精确字段、准备顺序与 dedicated writer 见 [references/board-model-guide.md](references/board-model-guide.md) §C.5，命令见 [references/command-catalog.md](references/command-catalog.md) 的 `board enable-contract`、`task set-planning`、`task set-routing`、`task route-bind`。
 
 这套合同当前只拥有 **planning / ledger / activation**：`set-routing` 不选中 candidate、不 spawn，`enable-contract` 不派发，`route-bind` 也只消费调用方已经取得的 opaque running-handle claim。显式 `ccm worker help/run` raw wrapper 已可用，但不会自动写 `routing.selected` / `attempts`，也不会自动 route 或 fallback；只用同步 raw wrapper 时，不要为了“记录得更完整”强启一个当前拿不到 running handle 的合同。缺少合同的 legacy board / task 保持原行为。
-
+<!-- ccm:k:end point:ccm.planning-opt-in -->
+<!-- ccm:k:nav:start point:ccm.planning-opt-in -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.planning-to-status -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-hotpath-flows"></a>
+<!-- ccm:k:start point:ccm.hotpath-flows -->
 ## 热路径速查(canonical flows)
 
 ```bash
@@ -150,9 +213,19 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 ```
 
 全量命令、每个 flag、`--json` 输出形状 → [references/command-catalog.md](references/command-catalog.md)。
-
+<!-- ccm:k:end point:ccm.hotpath-flows -->
+<!-- ccm:k:nav:start point:ccm.hotpath-flows -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.hotpath-footgun](./SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [operationalizes: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.hotpath-ops-task-cmd -->
+- [next: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.hotpath-to-footgun -->
+- [requires: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.hotpath-to-status -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-footgun-table"></a>
+<!-- ccm:k:start point:ccm.footgun-table -->
 ## footgun 速查(踩过就记住)
 
 | 现象 | 真相 / 怎么做 |
@@ -180,15 +253,33 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 | 想用 `--set-json` 手拼 `agents` 段 / 手改 agent 状态 | agent 生命周期走专属 verb:`agent create/bind/link/terminal/probe`——bind 无真实 handle 证据被拒(exit 3)、状态转移有校验、link 幂等、probe 字段由 ccm 落盘;通用 setter 手拼会把这些全绕过。 |
 | 收割完 agent 产出、roster 却还满是 `running` | 收割 / 端点验收掉 agent 产出后要显式 `ccm agent terminal <id> --outcome "..."` 收口——「凡派发皆登记」的对称另一半是「凡收割皆收口」。`agent probe` 只判死活、**永不 →terminal**;不收口 = 永久 `running` 僵尸污染 recon 的 in_flight/phantom 判定(`agent terminal ≠ task done` 只挡正向,不豁免这条反向闭环)。 |
 | 以为批量 `agent terminal` 要一个个小心防锁竞态 | 顺序 bash 背靠背跑多条 `ccm agent terminal`(已知 id)**无 race**——每条各抢一次 O_EXCL board 锁·天然串行。别 `&` 后台并行 ccm 写(争锁 exit 4)。真正要定序的是**单 agent 的 create→bind→link 三连**(bind/link 吃 create 返回的 id·靠数据依赖定序),不是「所有 agent 操作都必须逐个」。 |
-
+<!-- ccm:k:end point:ccm.footgun-table -->
+<!-- ccm:k:nav:start point:ccm.footgun-table -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.hotpath-footgun](./SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [deepens_to: Exit code 速记（指针）](./SKILL.md#ccm-k-point-ccm-exit-codes) <!-- ccm:k:edge edge:ccm.footgun-to-exit -->
+- [routes_to: 深度指针路由](./SKILL.md#ccm-k-point-ccm-pointers-routing) <!-- ccm:k:edge edge:ccm.footgun-to-pointers -->
+- [routes_to: status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine) <!-- ccm:k:edge edge:ccm.footgun-to-status -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-exit-codes"></a>
+<!-- ccm:k:start point:ccm.exit-codes -->
 ## Exit code 速记
 
 `0` 成功 · `2` 用法错 · `3` 校验拒绝 · `4` 锁超时 · `5` 无 active board · `7` 授权拒绝（`account switch` 被 `autonomous_account_switch:deny` 拦下，或 `dependency waive` 缺显式 `--user-authorized`）。exit 2/3 时先读 stderr。
-
+<!-- ccm:k:end point:ccm.exit-codes -->
+<!-- ccm:k:nav:start point:ccm.exit-codes -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.hotpath-footgun](./SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.ret.pointccm.exit-codes.pri -->
+<!-- ccm:k:nav:end -->
 ---
 
+<a id="ccm-k-point-ccm-pointers-routing"></a>
+<!-- ccm:k:start point:ccm.pointers-routing -->
 ## Pointers
 
 - [references/command-catalog.md](references/command-catalog.md) —— 全量命令面:15 个 namespace（board/task/log/jc/cadence/watchdog/baseline/policy/peers/usage/estimate/account/statusline/harness/upgrade）每条命令的签名 / positional / flag 表 / 例子 / `--json` 输出形状。其中 `harness`（本机 supported harness inventory）、`upgrade`（自升级 ccm 二进制 + 插件）/ `statusline`（self-contained 状态行）是非 board 操作。
@@ -197,3 +288,66 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 - **master-orchestrator-guide** —— 决策层:该编排什么、怎么拆 DAG、何时阻塞等用户、何时换号。本 skill 是它的"手怎么动"。注:board 协议的权威定义在 `ccm` 引擎(enums / 字段元数据 / 不变式 / 状态机);本 skill 只给操作视图、不复述权威定义。
 - **authoring-workflows** —— 在 workflow 脚本里编排并行时怎么写(那是脚本 DSL,不是 ccm CLI)。
 - 实时真相永远以 `ccm <namespace> <cmd> --help` 为准——本文与 catalog 是地图,`--help` 是当前领土。
+<!-- ccm:k:end point:ccm.pointers-routing -->
+<!-- ccm:k:nav:start point:ccm.pointers-routing -->
+Knowledge navigation:
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:ccm.hotpath-footgun](./SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.x.pointers-to-board-status -->
+- [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.x.pointers-to-cmd-task -->
+- [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.ret.pointccm.pointers-routing.pri -->
+<!-- ccm:k:nav:end -->
+<!-- ccm:k:entry-pin:start -->
+Knowledge entry pins for entry:using-ccm:
+- [status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [Module module:ccm.account-pool](./references/account-pool.md#ccm-k-module-ccm-account-pool)
+- [primary: 号池模型（指针 vs token）](./references/account-pool.md#ccm-k-point-ccm-account-pool-model)
+- [Module module:ccm.board-model.contracts](./references/board-model-guide.md#ccm-k-module-ccm-board-model-contracts)
+- [primary: artifact/verified 真完成](./references/board-model-guide.md#ccm-k-point-ccm-board-artifact-verified)
+- [Module module:ccm.board-model.lifecycle](./references/board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
+- [primary: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics)
+- [Module module:ccm.commands.core](./references/command-catalog.md#ccm-k-module-ccm-commands-core)
+- [primary: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task)
+- [Module module:ccm.commands.extended](./references/command-catalog.md#ccm-k-module-ccm-commands-extended)
+- [Module module:ccm.commands.scheduling](./references/command-catalog.md#ccm-k-module-ccm-commands-scheduling)
+- [Module module:ccm.hotpath-footgun](./SKILL.md#ccm-k-module-ccm-hotpath-footgun)
+- [primary: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
+- [Module module:ccm.mind-model](./SKILL.md#ccm-k-module-ccm-mind-model)
+<!-- ccm:k:entry-pin:end -->
+
+<!-- ccm:k:generated -->
+## 热路径与 footgun
+
+<a id="ccm-k-module-ccm-hotpath-footgun"></a>
+
+用最短热路径与踩坑表把心智锚落到可执行流程，并路由到深度 reference。
+
+## Member points
+
+- [Exit code 速记（指针）](./SKILL.md#ccm-k-point-ccm-exit-codes)
+- [footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table)
+- [热路径 canonical flows](./SKILL.md#ccm-k-point-ccm-hotpath-flows)
+- [深度指针路由](./SKILL.md#ccm-k-point-ccm-pointers-routing)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## ccm 心智锚与协议职责
+
+<a id="ccm-k-module-ccm-mind-model"></a>
+
+建立 using-ccm 的稳定操作心智：写入关卡、status 状态机、字段三档、唯一写路径、planning opt-in。
+
+## Member points
+
+- [三档字段操作规则](./SKILL.md#ccm-k-point-ccm-field-tiers)
+- [planning/routing 是 opt-in 合同](./SKILL.md#ccm-k-point-ccm-planning-opt-in)
+- [board 变更唯一写路径](./SKILL.md#ccm-k-point-ccm-single-write-path)
+- [status 是状态机不是赋值字段](./SKILL.md#ccm-k-point-ccm-status-state-machine)
+- [何时翻开 using-ccm](./SKILL.md#ccm-k-point-ccm-when-to-open)
+- [ccm 是 board 写入关卡](./SKILL.md#ccm-k-point-ccm-write-gate)
+
+## Back to atlas
+
+- [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

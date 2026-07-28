@@ -48,7 +48,7 @@ skill 改动的「变好了」从口头声明变成可复现的证据链（Track
 |------|--------|-----------|
 | 写 / 改一个 skill 的 **body**（craft 诊断、命名锚、流程骨架、纪律段怎么写、pressure baseline） | **`cc-master-skillsmith`** | 本 skill 度量 body，不生产 body。generator≠judge：造与评分离。 |
 | 决定一个 skill **该不该建** / 该是 skill 还是 reference / 一组 skill 的边界与重叠（portfolio 准入） | **`curating-skill-portfolios`** | 本 skill 假设 skill 已存在且值得度量；「值不值得存在」是上游问题。 |
-| 给本仓搭带自动搜索 + 多候选 filter 的优化引擎 / 多维优化前沿 / 统计显著性预检 / 多字段裁决 schema / 自动 holdout-gap 检测 | **不做（红线：照搬过度工程）** | 本仓 2+1 体量用不上那套重型引擎；只借思想，落在 prose + 现有脚本。 |
+| 给本仓搭带自动搜索 + 多候选 filter 的优化引擎 / 多维优化前沿 / 统计显著性预检 / 多字段裁决 schema / 自动 holdout-gap 检测 | **不做（红线：照搬过度工程）** | 本仓小 portfolio 体量用不上那套重型引擎；只借思想，落在 prose + 现有脚本。 |
 | 往 `hooks/` 塞依赖 `uv`/`claude`/`codex` 的 eval 脚本 | **不做（红线 1 / ADR-006：hooks 只 bash+node/JS）** | 这些脚本要 `uv`/python/`claude`/`codex`（不随 Claude Code 保证存在），hook 容不下。新工具只进 `scripts/`。 |
 
 ### 4.3 Boundary heuristic（一句话判定法）

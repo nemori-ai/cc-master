@@ -5,6 +5,8 @@
 > [using-ccm 主动查询合同](../../using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实)；
 > 是否派发交回 `master-orchestrator-guide`。
 
+<a id="ccm-k-point-pacing-selected-target-facts"></a>
+<!-- ccm:k:start point:pacing.selected-target-facts -->
 把每份 envelope 绑定到 **selected target**，不要绑定到当前 origin：
 
 1. **Surface**：读取精确的 surface id、kind、binary/auth provenance 与 freshness。
@@ -26,3 +28,27 @@
 
 目标 agent command 的真实 help 与调用语法只查 `using-ccm`。本页不复制 provider CLI flags、model
 catalog 或 model/effort 参数，也不把易腐的 provider 命令面改写成 ccm 标准参数。
+<!-- ccm:k:end point:pacing.selected-target-facts -->
+<!-- ccm:k:nav:start point:pacing.selected-target-facts -->
+Knowledge navigation:
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:pacing.target-facts](./cross-harness-target-facts.md#ccm-k-module-pacing-target-facts)
+- [routes_to: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.target-to-global -->
+- [requires: 先全局再下钻](./usage-signals.md#ccm-k-point-pacing-machine-wide-first) <!-- ccm:k:edge edge:pacing.target-to-signals -->
+- [deepens_to: 模型档位事实三层](./model-tiers.md#ccm-k-point-pacing-model-tier-facts) <!-- ccm:k:edge edge:pacing.target-to-model -->
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## 跨 harness 目标事实
+
+<a id="ccm-k-module-pacing-target-facts"></a>
+
+按 selected target 绑定 surface/model/quota/binding，输出 eligible/insufficient。
+
+## Member points
+
+- [selected target 事实绑定](./cross-harness-target-facts.md#ccm-k-point-pacing-selected-target-facts)
+
+## Back to atlas
+
+- [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)

@@ -19,6 +19,8 @@
 
 ## 一条不可换序的路由链
 
+<a id="ccm-k-point-routing-ordered-chain"></a>
+<!-- ccm:k:start point:routing.ordered-chain -->
 你每次派发都按同一顺序写出八段证据：
 
 ```text
@@ -32,7 +34,18 @@ task shape
   → endpoint verification
 ```
 
-这不是可交换的清单。routing record 的输出字段也必须保持这一次序；即使 effect floor 的判断依据来自 task shape，也不得把 `effect_floor` 提前到 `target_surface` 之前。`target_surface` 在这里先声明精确执行面，不等于先按品牌 / 型号替 floor 做决定；后一个 `effect_floor` 仍只由任务形状与风险推出。`effect_floor` 必须写出档位，以及仅由任务形状、风险与错误代价推出该档位的理由；只写 `T1` 之类的标签不算完成，也不得用某个 target 的品牌、容量或偏好倒推理由。先看品牌再猜任务档，会让偏好替代能力门；先排名再做资格核验，会把 `candidate` 偷换成可派发 target；先写 `in_flight` 再找 handle，会制造幽灵任务；把 agent terminal 当 task done，会绕过验收。任一承重证据是 unknown、stale、conflicting 或 deny，就停在对应硬门，不用感觉补值。
+这不是可交换的清单。routing record 的输出字段也必须保持这一次序；即使 effect floor 的判断依据来自 task shape，也不得把 `effect_floor` 提前到 `target_surface` 之前。`target_surface` 在这里先声明精确执行面，不等于先按品牌 / 型号替 floor 做决定；后一个 `effect_floor` 仍只由任务形状与风险推出。`effect_floor` 必须写出档位，以及仅由任务形状、风险与错误代价推出该档位的理由；只写 `T1` 之类的标签不算完成，也不得用某个 target 的品牌、容量或偏好倒推理由。先看品牌再猜任务档，会让偏好替代能力门；先排名再做资格核验，会把 `candidate` 偷换成可派发 target；先写 `in_flight` 再找 handle，会制造幽灵任务；
+<a id="ccm-k-point-verification-terminal-summary"></a>
+<!-- ccm:k:start point:verification.terminal-summary -->
+把 agent terminal 当 task done，会绕过验收。
+<!-- ccm:k:end point:verification.terminal-summary -->
+<!-- ccm:k:nav:start point:verification.terminal-summary -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:verification.endpoint](./worker-routing.md#ccm-k-module-verification-endpoint)
+- [Canonical: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+<!-- ccm:k:nav:end -->
+任一承重证据是 unknown、stale、conflicting 或 deny，就停在对应硬门，不用感觉补值。
 
 你的 routing record 至少保留这些字段，字段怎么写入 board 则只查 `using-ccm`：
 
@@ -46,9 +59,19 @@ ranked_fallback: <qualified same-floor chain + rationale>
 runtime_handle: <real recon-able handle>
 endpoint_verdict: <artifact + checks + acceptance evidence>
 ```
-
+<!-- ccm:k:end point:routing.ordered-chain -->
+<!-- ccm:k:nav:start point:routing.ordered-chain -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+- [deepens_to: executor 不等于 target surface](./worker-routing.md#ccm-k-point-routing-executor-vs-target) <!-- ccm:k:edge edge:routing.chain-to-executor -->
+- [next: 拿到真实 handle 才算派发](./worker-routing.md#ccm-k-point-routing-handle-gate) <!-- ccm:k:edge edge:routing.chain-to-handle -->
+- [requires: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:routing.chain-to-terminal -->
+<!-- ccm:k:nav:end -->
 ## 任务形状决定 executor
 
+<a id="ccm-k-point-routing-task-shape"></a>
+<!-- ccm:k:start point:routing.task-shape -->
 先看责任与控制形状，再看数量。五个 executor 是跨 compaction 的规划语义：
 
 | 任务形状 | executor | 你要守的边界 |
@@ -63,24 +86,48 @@ endpoint_verdict: <artifact + checks + acceptance evidence>
 
 派 dev worker 的 handoff 至少给齐：objective（含 acceptance / non-goals）、measurement、artifact、constraints、stop-or-restart、所需 skill pointers。非原子或不能一次验收的节点，再给一份已认可 spec，或先派 scoping；不要把未决架构偷偷交给实现 worker 猜。
 
+<!-- ccm:k:end point:routing.task-shape -->
+<!-- ccm:k:nav:start point:routing.task-shape -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+<!-- ccm:k:nav:end -->
 ## executor 不等于 target surface
 
+<a id="ccm-k-point-routing-executor-vs-target"></a>
+<!-- ccm:k:start point:routing.executor-vs-target -->
 `executor` 回答「谁以什么责任形状执行」，`target surface` 回答「在哪个可调用面真正启动」。它们正交：`subagent` 不等于当前 origin 的 subagent，`workflow` 也不等于某个固定工具名。当前 origin 只是指挥台，不是 worker pool 边界。
 
 从全机 inventory 中选精确 `harness + surface`，先确认它确实可调用、能返回可 recon 的 handle、对目标 workspace 有所需权限，再比较任务适配度与容量。此 host 当前能用于发车或追踪的机制包括：Codex subagent / 后台 terminal session / Codex cloud task / 外部 scheduler 或 CI job / Codex app thread automation。目标 CLI 的真实调用形状只看本次解析出的 [using-ccm worker help](../../using-ccm/references/command-catalog.md#worker-help)；不要凭记忆复制 provider flags，也不要把 `ccm` 当成 model / effort 参数翻译层。
 
 如果 worker 要写文件，派前还必须给它一棵独立工作树的绝对路径并验证写权限；多个并行 writer 不共享同一路径。跨 harness 的同步 wrapper 要放进当前 origin 可追踪的后台 terminal / shell / session，真正的后台 handle 来自外层机制。
 
+<!-- ccm:k:end point:routing.executor-vs-target -->
+<!-- ccm:k:nav:start point:routing.executor-vs-target -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+<!-- ccm:k:nav:end -->
 ## workflow 是规划语义，不保证同名 runtime
 
+<a id="ccm-k-point-routing-workflow-boundary"></a>
+<!-- ccm:k:start point:routing.workflow-boundary -->
 `executor=workflow` 可以跨 host 保留：它表示一个节点拥有结构化多叶、fan-out / join 或 stage 化责任。它不自行承诺当前 host 存在名为 `Workflow` 的 runtime，也不授权你调用别的 host 的 API。
 
 当前 Codex adapter **不支持 Claude Code Workflow runtime**。你仍可用 `executor=workflow` 表达结构化多叶的 planning 责任，但发车时要把叶子映射成 Codex subagents、后台 terminal、cloud task 或独立 board tasks，并分别记录真实 handle；不要调用或声称调用 `Workflow`、`agent()`、`parallel()`、`pipeline()`。
 
 无论 host 怎样实现，最终都要落到真实可调用机制与真实 handle；只在计划里写了 `workflow`，不算发车。需要学习具体 workflow 脚本语法时才调用 `authoring-workflows`；若当前 adapter 明示 runtime unsupported，就按本节的 host-native 映射执行，不把脚本语义冒充可用工具。
 
+<!-- ccm:k:end point:routing.workflow-boundary -->
+<!-- ccm:k:nav:start point:routing.workflow-boundary -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+<!-- ccm:k:nav:end -->
 ## 确定 effect floor
 
+<a id="ccm-k-point-routing-qualification-and-fallback"></a>
+<!-- ccm:k:start point:routing.qualification-and-fallback -->
 先按任务的判断密度、风险与错误代价定最低 effect floor，再看具体型号。duration 与临界性影响成本和排期，不自动升档或降档；档位也不作“高档天然包含低档资格”的传递猜测。
 
 | 工作形态 | 最低 effect floor | 典型约束 |
@@ -116,22 +163,48 @@ effect floor 只定义门槛，不证明任何具体 target 已过门。对每�
 
 容量紧时先在同档换成本更低或余量更足的已认证 target，再降 WIP、推迟 high-float 工作、等待 reset 或缩 scope；不能直接降低原任务 floor。复杂性 / 风险 / duration 的深化判断与容量动作顺序见 [`model-allocation.md`](model-allocation.md#容量收紧时按顺序决策)。
 
+<!-- ccm:k:end point:routing.qualification-and-fallback -->
+<!-- ccm:k:nav:start point:routing.qualification-and-fallback -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+<!-- ccm:k:nav:end -->
 ## 拿到真实 handle 才算派发
 
+<a id="ccm-k-point-routing-handle-gate"></a>
+<!-- ccm:k:start point:routing.handle-gate -->
 你可以先登记一个 `starting` runtime actor，但只有真实机制成功返回可 recon handle 后，才能把它 bind 到 agent、link 到 task，再让普通 task 进入 `in_flight`。没有 handle 或 link 的 `in_flight` 是幽灵任务；spawn 失败要收掉 `starting` 登记。
 
 精确 command / field / status verb 只查 `using-ccm` skill 的 `references/command-catalog.md`，不要从本文复制一套命令表。派后立即在 routing record 留下 agent、task、attempt 的关联与 handle provenance；三者可关联，不能合并成一个状态。
 
+<!-- ccm:k:end point:routing.handle-gate -->
+<!-- ccm:k:nav:start point:routing.handle-gate -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+- [next: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:routing.handle-to-terminal -->
+<!-- ccm:k:nav:end -->
 ## 终端态之后做端点验收
 
+<a id="ccm-k-point-verification-terminal-is-not-done"></a>
+<!-- ccm:k:start point:verification.terminal-is-not-done -->
 runtime terminal 只说明 child process 或 agent 停了，不说明父 task 完成。runtime 一旦停止，无论 artifact 后续能否通过验收，都先终结 agent 登记（terminalize）并记录它的实际 outcome；不要让已停止的 runtime 因父 task 尚未验收而变成 zombie running agent。这个 runtime 生命周期更新不是 task verdict。
 
 然后你在自己的端点收割 artifact，并独立核对 diff、tests、acceptance、必要的全局 contract 与 content hash；高杠杆或 correctness-critical 结果再加异构族系第二视角。只有证据通过，才把 task 标成 done / verified。验收失败时 task 保持 active，再 retry 或 replan；也可按证据 supersede 或 surface，但不静默放行。
 
 external issue closed、CI green、空 review 与 worker 自报成功都只是验收输入。若仅需说明 terminal ≠ done 以及通过 / 失败时的 task 转移，本节已经足够，不得继续打开 `resume-verify.md`；只有要实际执行 artifact / diff / tests / hash / 异构第二视角的完整验收步骤时，才读 [`resume-verify.md`](resume-verify.md#3-端点验收--唯一可靠的正确性点)。
 
+<!-- ccm:k:end point:verification.terminal-is-not-done -->
+<!-- ccm:k:nav:start point:verification.terminal-is-not-done -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:verification.endpoint](./worker-routing.md#ccm-k-module-verification-endpoint)
+- [deepens_to: 端点验收 procedure](./resume-verify.md#ccm-k-point-verification-endpoint-procedure) <!-- ccm:k:edge edge:verification.principle-to-procedure -->
+<!-- ccm:k:nav:end -->
 ## 权威 owner 地图
 
+<a id="ccm-k-point-routing-owner-map"></a>
+<!-- ccm:k:start point:routing.owner-map -->
 每个承重不变量只有一个 owner；其它文档只留一句摘要和精确指针：
 
 | 关切 | 权威 owner | 何时再 drill |
@@ -142,3 +215,51 @@ external issue closed、CI green、空 review 与 worker 自报成功都只是�
 | 动态 provider / model / quota 事实、证据层级、freshness 与 selected-target binding | `pacing-and-estimation`；入口为 [pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md) | 读取或解释当前事实时；不要把 catalog 抄回这里 |
 | `ccm` flags、JSON、board 字段与生命周期 verb | `using-ccm` skill 的 `references/command-catalog.md` | 真正敲命令或写 board 时 |
 | artifact、diff、tests、hash 与异构第二视角 | [`resume-verify.md`](resume-verify.md) | 要实际执行端点验收步骤时；只解释 terminal ≠ done 不再 drill |
+<!-- ccm:k:end point:routing.owner-map -->
+<!-- ccm:k:nav:start point:routing.owner-map -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+<!-- ccm:k:nav:end -->
+
+<!-- ccm:k:generated -->
+## Worker 路由链
+
+<a id="ccm-k-module-routing-worker-chain"></a>
+
+按不可换序的八段链完成派发记录：任务形状 → executor → target → floor → qualification → fallback → handle → 端点验收。
+
+## Member points
+
+- [executor 不等于 target surface](./worker-routing.md#ccm-k-point-routing-executor-vs-target)
+- [拿到真实 handle 才算派发](./worker-routing.md#ccm-k-point-routing-handle-gate)
+- [不可换序的八段路由链](./worker-routing.md#ccm-k-point-routing-ordered-chain)
+- [路由承重 owner 地图](./worker-routing.md#ccm-k-point-routing-owner-map)
+- [effect floor、资格与同档 fallback](./worker-routing.md#ccm-k-point-routing-qualification-and-fallback)
+- [任务形状决定 executor](./worker-routing.md#ccm-k-point-routing-task-shape)
+- [workflow 规划语义边界](./worker-routing.md#ccm-k-point-routing-workflow-boundary)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+
+## 终端态与端点验收
+
+<a id="ccm-k-module-verification-endpoint"></a>
+
+在 worker/runtime 停止后，区分运行终态与父任务真完成，并在自己的端点独立验收。
+
+## Member points
+
+- [端点验收 procedure](./resume-verify.md#ccm-k-point-verification-endpoint-procedure)
+- [content hash 与 stale](./resume-verify.md#ccm-k-point-verification-hash-and-stale)
+- [异构族系第二视角](./resume-verify.md#ccm-k-point-verification-heterogeneous-review)
+- [Loop 收敛闸](./resume-verify.md#ccm-k-point-verification-loop-convergence)
+- [resume 接管基线](./resume-verify.md#ccm-k-point-verification-resume-takeover)
+- [runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+- [summary: routing 链中的 terminal 提醒](./worker-routing.md#ccm-k-point-verification-terminal-summary)
+- [canonicalize → runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
+
+## Back to atlas
+
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)

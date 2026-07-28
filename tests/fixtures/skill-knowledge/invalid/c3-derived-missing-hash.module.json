@@ -1,0 +1,236 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:verification.endpoint",
+  "owner_skill": "skill:master-orchestrator-guide",
+  "title": "终端态与端点验收",
+  "intent": "在 worker/runtime 停止后，区分运行终态与父任务真完成，并在自己的端点独立验收。",
+  "recognition_cues": [
+    "worker 或 workflow 报告 terminal",
+    "准备把 task 标成 done 或 verified",
+    "只有 CI green、external closed 或 worker 自报成功"
+  ],
+  "boundary": {
+    "includes": [
+      "terminal 与 task verdict 的分离",
+      "artifact、diff、tests、acceptance 与必要异构复核"
+    ],
+    "excludes": [
+      "如何切分任务 DAG",
+      "如何实现 worker 交付的代码"
+    ]
+  },
+  "access": {
+    "class": "critical",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:verification.terminal-is-not-done"
+    ],
+    "rationale": "误把 runtime terminal 当成 task done 会直接绕过产品的最终正确性门。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "migration",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md#终端态之后做端点验收"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.verification.endpoint"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:verification.terminal-is-not-done",
+      "title": "runtime terminal 不等于 task done",
+      "point_kind": "principle",
+      "summary": "运行时停止只终结 agent runtime；父任务只有独立验收通过后才能 done/verified。",
+      "recognition_cues": [
+        "child process 或 agent 已停止",
+        "准备根据 worker 自报更新 task verdict"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "marker": "point:verification.terminal-is-not-done",
+        "heading_hint": "终端态之后做端点验收"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.terminal-is-not-done"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md: runtime terminal 与 task verdict 分离"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.terminal-is-not-done"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:verification.endpoint-procedure",
+      "title": "端点验收 procedure",
+      "point_kind": "procedure",
+      "summary": "在自己的端点收割 artifact，核对 diff、tests、acceptance 与必要的异构第二视角。",
+      "recognition_cues": [
+        "要实际执行 artifact、diff、tests 或 hash 验收",
+        "高杠杆或 correctness-critical 结果需要第二视角"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "marker": "point:verification.endpoint-procedure",
+        "heading_hint": "端点验收——唯一可靠的正确性点"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:verification.endpoint-procedure",
+        "canonical": "point:verification.endpoint-procedure",
+        "review_policy": "review-on-canonical-change"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md: endpoint verification procedure"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.endpoint-procedure"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:verification.terminal-summary",
+      "title": "worker routing 中的 terminal 提醒",
+      "point_kind": "reference",
+      "summary": "在 routing 入口提醒 terminal 只是一条待验收信号。",
+      "recognition_cues": [
+        "只需要 routing record 中的简短 terminal 提醒"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "marker": "point:verification.terminal-summary",
+        "heading_hint": "Worker 路由"
+      },
+      "authority": {
+        "role": "summary",
+        "subject": "subject:verification.terminal-is-not-done",
+        "canonical": "point:verification.terminal-is-not-done",
+        "review_policy": "review-on-canonical-change",
+        "reviewed_canonical_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md: compact routing reminder"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "summary-directly-targets-canonical"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:verification.principle-to-procedure",
+      "type": "deepens_to",
+      "from": "point:verification.terminal-is-not-done",
+      "to": "point:verification.endpoint-procedure",
+      "when": [
+        "需要从原则进入实际 artifact、diff、tests、hash 验收步骤"
+      ],
+      "avoid_when": [
+        "只需判断 terminal 是否等于 done"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md direct link to resume-verify.md"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "final-host-link.edge.verification.principle-to-procedure"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:verification.procedure-to-principle",
+      "type": "routes_to",
+      "from": "point:verification.endpoint-procedure",
+      "to": "point:verification.terminal-is-not-done",
+      "when": [
+        "执行验收前需要复核 task verdict 的承重原则"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-23"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "module.verification.endpoint bidirectional runtime route"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "final-host-link.edge.verification.procedure-to-principle"
+          }
+        ]
+      }
+    }
+  ]
+}
