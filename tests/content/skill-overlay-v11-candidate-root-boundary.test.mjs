@@ -199,7 +199,16 @@ test('v11: legal direct sibling plugin/dist/<host>.write-<stamp> still passes', 
     });
     assert.equal(result.exitCode, 0, JSON.stringify(result.body?.diagnostics ?? result.body));
     assert.equal(result.body?.ok, true);
-    assert.ok(fs.existsSync(path.join(candidate, 'knowledge', 'atlas.md')));
+    // Compile emits atlas/module topology as a compiler-owned suffix inside the
+    // candidate's skill-local Markdown, not as a standalone `knowledge/` surface.
+    assert.match(
+      fs.readFileSync(path.join(candidate, 'skills', SKILL, 'SKILL.md'), 'utf8'),
+      /<!-- ccm:k:generated -->/,
+    );
+    assert.ok(
+      !fs.existsSync(path.join(candidate, 'knowledge')),
+      'repo-only knowledge must not appear in the candidate host tree either',
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

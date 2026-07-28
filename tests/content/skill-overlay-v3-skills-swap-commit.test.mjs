@@ -234,7 +234,12 @@ test('v3: normal skills-only sync leaves no write/bak residues', () => {
   }
 });
 
-test('v4: sync orchestration catch leaves collision backup byte-exact; cleans staging only', async () => {
+// The legacy skills-only `beforePublish` seam was removed when skills-only publishing was
+// folded into the trusted full-host path: `projectAndPublishSkillsSurface` now refuses the
+// seam outright and expands the request to `projectAndPublishHostSurface`. Host-level
+// collision/backup behaviour is covered by the v9 `publishHostTree` tests; what needs pinning
+// here is that the refusal happens *before* any publish work touches live.
+test('v4: skills-only legacy beforePublish seam is refused before any publish work', async () => {
   const { projectAndPublishSkillsSurface } = await import(
     '../../scripts/skill-knowledge/sync-skills-surface.mjs'
   );
@@ -253,57 +258,35 @@ test('v4: sync orchestration catch leaves collision backup byte-exact; cleans st
     const hostDist = path.join(root, `plugin/dist/${HOST}`);
     const live = path.join(hostDist, 'skills');
     const oldLiveDigest = closedSetTreeDigest(live);
-    const stamp = 'v4-collision-seam';
-    const backup = path.join(hostDist, `skills.bak-${stamp}`);
-    const collisionMarker = path.join(backup, 'collision-owned.txt');
-    const collisionBytes = 'collision-owner-payload\n';
+    const residuesBefore = listSwapResidues(hostDist);
+    const stamp = 'v4-legacy-seam';
 
-    let beforePublishSawPaths = null;
+    let seamRan = false;
     let thrown = null;
     try {
       projectAndPublishSkillsSurface({
         repoRoot: root,
         host: HOST,
         stamp,
-        beforePublish({ backupAbsolute, stagingAbsolute, liveAbsolute }) {
-          beforePublishSawPaths = {
-            backupAbsolute,
-            stagingAbsolute,
-            liveAbsolute,
-          };
-          // Plant same-name backup AFTER initial check, BEFORE publish (TOCTOU seam).
-          fs.mkdirSync(backupAbsolute, { recursive: true });
-          fs.writeFileSync(collisionMarker, collisionBytes);
+        beforePublish() {
+          seamRan = true;
         },
       });
     } catch (error) {
       thrown = error;
     }
 
-    assert.ok(thrown, 'publish must fail on backup name collision');
-    assert.match(String(thrown.message || thrown), /bak|collision|pre-?claim|exists/i);
-    assert.ok(beforePublishSawPaths, 'beforePublish seam must run on real orchestration path');
-    assert.equal(beforePublishSawPaths.backupAbsolute, backup);
-    assert.equal(beforePublishSawPaths.liveAbsolute, path.resolve(live));
+    assert.ok(thrown, 'legacy skills-only beforePublish seam must be refused');
+    assert.match(String(thrown.message || thrown), /beforePublish seam is unsupported/i);
+    assert.equal(seamRan, false, 'refusal must happen before the seam can run');
 
-    // Collision backup must remain byte-exact — outer catch must NOT remove it.
-    assert.ok(fs.existsSync(backup), 'wrapper catch must not delete unknown/collision backup');
-    assert.equal(fs.readFileSync(collisionMarker, 'utf8'), collisionBytes);
+    // A refused request must be inert: live byte-exact, no new staging/backup residues.
     assert.equal(closedSetTreeDigest(live), oldLiveDigest, 'old live must stay byte-exact');
-    assert.equal(fs.readFileSync(path.join(live, 'master-orchestrator-guide', 'SKILL.md'), 'utf8').length > 0, true);
-
-    // Staging created by this orchestration must be cleaned by the wrapper catch.
     assert.equal(
-      fs.existsSync(path.join(hostDist, `skills.write-${stamp}`)),
-      false,
-      'wrapper catch must clean its own staging',
+      fs.readFileSync(path.join(live, 'master-orchestrator-guide', 'SKILL.md'), 'utf8').length > 0,
+      true,
     );
-    assert.deepEqual(
-      listSwapResidues(hostDist).filter((name) => name.startsWith('skills.write-')),
-      [],
-    );
-    // Only the planted collision backup residue is expected.
-    assert.deepEqual(listSwapResidues(hostDist), [`skills.bak-${stamp}`]);
+    assert.deepEqual(listSwapResidues(hostDist), residuesBefore);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
