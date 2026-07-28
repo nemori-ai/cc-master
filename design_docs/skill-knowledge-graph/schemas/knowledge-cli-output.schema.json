@@ -764,6 +764,7 @@
                 "inventory_max_tokens",
                 "min_internal_cohesion",
                 "max_external_edge_count",
+                "external_edge_policy",
                 "max_overlap_shared_modules",
                 "require_ssot_closure",
                 "require_four_host_denominator",
@@ -781,6 +782,18 @@
                   "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)."
                 },
                 "max_external_edge_count": { "type": "integer", "minimum": 0 },
+                "external_edge_policy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["allowed_types"],
+                  "properties": {
+                    "allowed_types": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": { "enum": ["contrasts_with", "routes_to"] }
+                    }
+                  }
+                },
                 "max_overlap_shared_modules": {
                   "type": "integer",
                   "minimum": 0,

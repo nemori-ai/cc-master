@@ -207,8 +207,10 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 Knowledge navigation:
 - [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [routes_to: artifact/verified 真完成](../using-ccm/references/board-model-guide.md#ccm-k-point-ccm-board-artifact-verified) <!-- ccm:k:edge edge:devloop-converge-to-artifact-verified -->
 - [requires: 拟合意图非用例](./SKILL.md#ccm-k-point-devloop-fit-intent) <!-- ccm:k:edge edge:devloop.converge-to-fit -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.converge -->
+- [contrasts_with: runtime terminal 不等于 task done](../master-orchestrator-guide/references/worker-routing.md#ccm-k-point-verification-terminal-is-not-done) <!-- ccm:k:edge edge:devloop-converge-not-terminal-done -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-devloop-fit-intent"></a>
 <!-- ccm:k:start point:devloop.fit-intent -->
@@ -283,8 +285,12 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:devloop.core](./SKILL.md#ccm-k-module-devloop-core)
+- [contrasts_with: 每回合确定性决策程序](../master-orchestrator-guide/SKILL.md#ccm-k-point-control-decision-program) <!-- ccm:k:edge edge:devloop-taste-not-decision-program -->
+- [contrasts_with: 四理论共享脊椎](../engineering-with-craft/SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:devloop-taste-not-craft -->
 - [routes_to: 验收标准 = 目标函数](./SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.cycle-to-objective -->
 - [routes_to: 外层编排与内层下降](./SKILL.md#ccm-k-point-devloop-two-scale) <!-- ccm:k:edge edge:devloop.cycle-to-two-scale -->
+- [routes_to: SDD 适用性判断](../engineering-with-craft/references/sdd.md#ccm-k-point-sdd-admission) <!-- ccm:k:edge edge:devloop-taste-to-spec-admission -->
+- [contrasts_with: 切是高杠杆决策](../slicing-goals-into-dags/SKILL.md#ccm-k-point-slicing-why-cut) <!-- ccm:k:edge edge:devloop-taste-not-slicing -->
 <!-- ccm:k:nav:end -->
 ## Pointers
 

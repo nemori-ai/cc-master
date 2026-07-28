@@ -123,6 +123,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+- [routes_to: Workflow 准入](../../authoring-workflows/SKILL.md#ccm-k-point-workflow-admission) <!-- ccm:k:edge edge:routing-workflow-boundary-to-admission -->
 <!-- ccm:k:nav:end -->
 ## 确定 effect floor
 

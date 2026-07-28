@@ -36,7 +36,8 @@
     "module_count": 5,
     "point_count": 40,
     "internal_edge_count": 78,
-    "external_edge_count": 0
+    "external_edge_count": 9,
+    "external_nav_edge_count": 9
   },
   "verdict": "admit",
   "witness": {
@@ -235,7 +236,8 @@
       "module_count": 5,
       "point_count": 40,
       "internal_edge_count": 78,
-      "external_edge_count": 0
+      "external_edge_count": 9,
+      "external_nav_edge_count": 9
     },
     "admission_gates": {
       "ok": true,

@@ -226,6 +226,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:craft.test-first](./tdd.md#ccm-k-module-craft-test-first)
+- [contrasts_with: dev work 是优化过程](../../dev-as-ml-loop/SKILL.md#ccm-k-point-devloop-core-thesis) <!-- ccm:k:edge edge:tdd-loop-boundary-not-devloop -->
 - [routes_to: TDD 铁律](./tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.test-first.loop-boundary-to-iron-law -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-tdd-rationalizations"></a>

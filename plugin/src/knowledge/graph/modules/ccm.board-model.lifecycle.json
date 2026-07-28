@@ -748,6 +748,40 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:ccm-deps-linking-not-critical-path",
+      "type": "contrasts_with",
+      "from": "point:ccm.board.deps-linking",
+      "to": "point:scheduling.dag-and-critical-path",
+      "when": [
+        "要算哪条链最长、哪个任务先派最解锁下游"
+      ],
+      "avoid_when": [
+        "只是要把已经想清楚的依赖关系正确写进 board"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/references/board-model-guide.md：deps 图的排期与临界路径计算属于调度方法论，本文只给「怎么连对」"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-deps-linking-not-critical-path"
+          }
+        ]
+      }
     }
   ]
 }

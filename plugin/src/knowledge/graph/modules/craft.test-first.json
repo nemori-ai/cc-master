@@ -803,6 +803,40 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:tdd-loop-boundary-not-devloop",
+      "type": "contrasts_with",
+      "from": "point:tdd.loop-boundary",
+      "to": "point:devloop.core-thesis",
+      "when": [
+        "关心的是整个任务的优化循环形状与停机条件"
+      ],
+      "avoid_when": [
+        "关心的是红绿重构这一圈本身的纪律"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/references/tdd.md：本文是手艺的纪律，那份是循环的形状"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.tdd-loop-boundary-not-devloop"
+          }
+        ]
+      }
     }
   ]
 }

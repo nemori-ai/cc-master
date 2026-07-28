@@ -671,6 +671,7 @@ Knowledge navigation:
 - [Module module:ccm.board-model.lifecycle](./board-model-guide.md#ccm-k-module-ccm-board-model-lifecycle)
 - [next: blocked_on 怎么选](./board-model-guide.md#ccm-k-point-ccm-board-blocked-on) <!-- ccm:k:edge edge:ccm.board-core.5 -->
 - [routes_to: status 八态语义与转移判断](./board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.ret.pointccm.board.deps-linking.pri -->
+- [contrasts_with: DAG、临界路径与机器 graph](../../master-orchestrator-guide/references/decomposition.md#ccm-k-point-scheduling-dag-and-critical-path) <!-- ccm:k:edge edge:ccm-deps-linking-not-critical-path -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-ccm-board-blocked-on"></a>
 <!-- ccm:k:start point:ccm.board.blocked-on -->

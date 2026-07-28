@@ -27,6 +27,8 @@
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:capacity.account-switch](./cost-decisions.md#ccm-k-module-capacity-account-switch)
+- [routes_to: policy 硬闸 + vault/token-blind](../../using-ccm/references/account-pool.md#ccm-k-point-ccm-account-policy-vault) <!-- ccm:k:edge edge:account-switch-gate-to-policy-vault -->
+- [routes_to: 决策影响向量](../../pacing-and-estimation/references/pacing-levers.md#ccm-k-point-pacing-decision-vectors) <!-- ccm:k:edge edge:account-switch-gate-to-decision-vectors -->
 <!-- ccm:k:nav:end -->
 ## 编排决策序列（无重启形态，4 步）
 

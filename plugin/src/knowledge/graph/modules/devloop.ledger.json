@@ -545,6 +545,37 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:devloop-ledger-to-write-gate",
+      "type": "routes_to",
+      "from": "point:devloop.ledger-ccm",
+      "to": "point:ccm.write-gate",
+      "when": [
+        "要把优化目标、读数与停机条件变成 durable state"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/references/optimization-ledger.md：ccm 是写入关卡，不是事后文书工具"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-ledger-to-write-gate"
+          }
+        ]
+      }
     }
   ]
 }

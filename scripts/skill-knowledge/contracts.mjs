@@ -125,7 +125,12 @@ export const HARDENING_CONTRACT = Object.freeze({
       inventory_max_tokens: 131072,
       // edges/points; single-node candidates are vacuously 1.0 in the metric.
       min_internal_cohesion: 0.1,
+      // Cut coupling budget. Navigation/contrast types listed in
+      // external_edge_policy.allowed_types are exempt and counted separately;
+      // the default empty allowlist reproduces the pre-policy behaviour where
+      // every external edge counted as coupling.
       max_external_edge_count: 0,
+      external_edge_policy: Object.freeze({ allowed_types: Object.freeze([]) }),
       // Shared SSOT compositions may share modules up to this peer budget.
       max_overlap_shared_modules: 2,
       require_ssot_closure: true,

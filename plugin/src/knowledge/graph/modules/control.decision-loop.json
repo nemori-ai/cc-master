@@ -4,21 +4,51 @@
   "id": "module:control.decision-loop",
   "title": "总指挥决策循环",
   "intent": "维持 master orchestrator 身份、操作镜头与每回合决策程序，同时用渐进披露导航避免把 SKILL A 膨胀成全图目录。",
-  "recognition_cues": ["需要重建总指挥身份", "每回合收尾要重跑决策程序", "需要判断该 drill 哪个 owner"],
+  "recognition_cues": [
+    "需要重建总指挥身份",
+    "每回合收尾要重跑决策程序",
+    "需要判断该 drill 哪个 owner"
+  ],
   "boundary": {
-    "includes": ["身份与 mandate", "操作镜头与正向审美", "合理化守卫", "渐进披露地图", "确定性决策 loop"],
-    "excludes": ["各 reference 的深层机制", "ccm 命令语法"]
+    "includes": [
+      "身份与 mandate",
+      "操作镜头与正向审美",
+      "合理化守卫",
+      "渐进披露地图",
+      "确定性决策 loop"
+    ],
+    "excludes": [
+      "各 reference 的深层机制",
+      "ccm 命令语法"
+    ]
   },
   "access": {
     "class": "primary",
-    "relevant_entries": ["entry:master-orchestrator"],
-    "primary_points": ["point:control.decision-program"],
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:control.decision-program"
+    ],
     "rationale": "SKILL A 的常驻职责是维持身份与决策骨架；深层机制继续按需 drill。"
   },
-  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
   "admission": {
-    "evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"}],
-    "verifiers": [{"kind": "review", "ref": "k2-master-control-module-review"}]
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-master-control-module-review"
+      }
+    ]
   },
   "points": [
     {
@@ -26,78 +56,466 @@
       "title": "总指挥身份与 mandate",
       "point_kind": "principle",
       "summary": "把长程目标异步推进到真正验收，并守住 board 连续性、HITL 与指挥边界。",
-      "recognition_cues": ["compaction 后重建身份", "把 origin harness 误当 worker pool 边界"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.identity-mandate", "heading_hint": "身份：你是谁"},
-      "authority": {"role": "canonical", "subject": "subject:control.identity-mandate"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md identity section"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.identity"}]}
+      "recognition_cues": [
+        "compaction 后重建身份",
+        "把 origin harness 误当 worker pool 边界"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.identity-mandate",
+        "heading_hint": "身份：你是谁"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.identity-mandate"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md identity section"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.identity"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.role-consequences",
       "title": "纪律来自角色后果",
       "point_kind": "principle",
       "summary": "并行、预算、可信验收、HITL 与续跑纪律是总指挥角色的必然后果。",
-      "recognition_cues": ["把纪律误当任意规则", "需要解释 red line 的 why"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.role-consequences", "heading_hint": "这些纪律从哪来"},
-      "authority": {"role": "canonical", "subject": "subject:control.role-consequences"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md role consequences"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.consequences"}]}
+      "recognition_cues": [
+        "把纪律误当任意规则",
+        "需要解释 red line 的 why"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.role-consequences",
+        "heading_hint": "这些纪律从哪来"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.role-consequences"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md role consequences"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.consequences"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.operating-lenses",
       "title": "其余六个操作镜头",
       "point_kind": "decision_rule",
       "summary": "目标图、ready dataflow、主动等待、容量走廊、端点验收与异步 HITL 共同约束调度。",
-      "recognition_cues": ["需要快速重放七镜头", "等待或派发前做编排判断"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.operating-lenses", "heading_hint": "七镜头"},
-      "authority": {"role": "canonical", "subject": "subject:control.operating-lenses"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md lenses 2-7"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.lenses"}]}
+      "recognition_cues": [
+        "需要快速重放七镜头",
+        "等待或派发前做编排判断"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.operating-lenses",
+        "heading_hint": "七镜头"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.operating-lenses"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md lenses 2-7"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.lenses"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.good-orchestration",
       "title": "好编排的正向形状",
       "point_kind": "principle",
       "summary": "薄增量持续流动、临界链有活、每个 runtime 有 handle、每个 done 有端点证据。",
-      "recognition_cues": ["需要正向审美而非反例", "判断一场 orchestration 是否从容而不闲"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.good-orchestration", "heading_hint": "好编排长什么样"},
-      "authority": {"role": "canonical", "subject": "subject:control.good-orchestration"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md positive aesthetics"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.aesthetics"}]}
+      "recognition_cues": [
+        "需要正向审美而非反例",
+        "判断一场 orchestration 是否从容而不闲"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.good-orchestration",
+        "heading_hint": "好编排长什么样"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.good-orchestration"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md positive aesthetics"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.aesthetics"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.rationalization-guards",
       "title": "合理化表与红旗",
       "point_kind": "check",
       "summary": "抓住越权、假完成、幽灵 in_flight、fake busy 与无 ledger 收口等滑坡并重跑程序。",
-      "recognition_cues": ["正在为一次例外构建论证", "准备 Stop 却没有 step-6 ledger"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.rationalization-guards", "heading_hint": "Rationalization Table"},
-      "authority": {"role": "canonical", "subject": "subject:control.rationalization-guards"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md rationalization and red flags"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.guards"}]}
+      "recognition_cues": [
+        "正在为一次例外构建论证",
+        "准备 Stop 却没有 step-6 ledger"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.rationalization-guards",
+        "heading_hint": "Rationalization Table"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.rationalization-guards"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md rationalization and red flags"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.guards"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.navigation-map",
       "title": "渐进披露导航地图",
       "point_kind": "reference",
       "summary": "主 skill 只保留 owner 路由；具体机制命中触发条件后再打开兄弟 skill 或 reference。",
-      "recognition_cues": ["不知道该 drill 哪份 reference", "准备预加载全部专门知识"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.navigation-map", "heading_hint": "你的工具箱"},
-      "authority": {"role": "canonical", "subject": "subject:control.navigation-map"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md progressive disclosure map"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.navigation"}]}
+      "recognition_cues": [
+        "不知道该 drill 哪份 reference",
+        "准备预加载全部专门知识"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.navigation-map",
+        "heading_hint": "你的工具箱"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.navigation-map"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md progressive disclosure map"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.navigation"
+          }
+        ]
+      }
     },
     {
       "id": "point:control.decision-program",
       "title": "每回合确定性决策程序",
       "point_kind": "procedure",
       "summary": "reconcile、收割、验收、派 ready、准备 HITL、记账并仅在没有合法行动时等待。",
-      "recognition_cues": ["每回合收尾", "想等待或停止", "出现 idle-spinning 或 fake busy"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md", "marker": "point:control.decision-program", "heading_hint": "最高频行为 / 范式"},
-      "authority": {"role": "canonical", "subject": "subject:control.decision-program"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "SKILL.md section 4"}], "verifiers": [{"kind": "review", "ref": "k2.point.control.program"}]}
+      "recognition_cues": [
+        "每回合收尾",
+        "想等待或停止",
+        "出现 idle-spinning 或 fake busy"
+      ],
+      "binding": {
+        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "marker": "point:control.decision-program",
+        "heading_hint": "最高频行为 / 范式"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:control.decision-program"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "SKILL.md section 4"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.control.program"
+          }
+        ]
+      }
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "id": "edge:navigation-map-not-slicing",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:slicing.why-cut",
+      "when": [
+        "要把一个目标分解成 board 上的任务，分不清「切」与「排」谁先谁后"
+      ],
+      "avoid_when": [
+        "图已经切好，只剩排期与临界路径——那是本 skill 的活，别去翻切分方法论"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：把目标切成薄的纵向增量不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-slicing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:navigation-map-not-devloop",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:devloop.core-thesis",
+      "when": [
+        "要判断一个执行者该怎么迭代收敛，或要给它塑形 objective 与 restart 判据"
+      ],
+      "avoid_when": [
+        "你在决定派谁、什么时候派、并行几路——那是编排决策，不是执行循环"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：把一个已切好的任务优化到验收的执行循环形状不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-devloop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:navigation-map-not-craft",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "派发的任务涉及设计建模或写测试的手艺内容，需要判断做得好不好"
+      ],
+      "avoid_when": [
+        "你只是在排期或验收，不需要进到代码手艺那一层"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：领域、类、合约、测试本身怎么建得好的工程手艺内容不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-craft"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:navigation-map-not-pacing",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:pacing.decision-vectors",
+      "when": [
+        "拿到 usage 或 estimate 的 verdict，需要知道怎么读、各档相对成本是什么"
+      ],
+      "avoid_when": [
+        "已经读懂了 verdict，正在决定降档还是换号——出主意始终是你的活，别把决策推回消费手册"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：读只读 advisory 做配速与估算的消费机制不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-pacing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:navigation-map-not-ccm",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:ccm.when-to-open",
+      "when": [
+        "要敲一条具体命令、要知道某个字段填什么、撞了退出码不知道为什么"
+      ],
+      "avoid_when": [
+        "你在判断该不该改这个字段、这个值哪个更好——那是判断不是查表"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：用 ccm 读写 board 与操作号池的命令机制不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-ccm"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:navigation-map-not-workflow",
+      "type": "contrasts_with",
+      "from": "point:control.navigation-map",
+      "to": "point:workflow.authoring-contract",
+      "when": [
+        "已经决定这件事值得上 workflow，要动手写脚本"
+      ],
+      "avoid_when": [
+        "还在判断这件事值不值得上 workflow——那个准入判断先于写法"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md 「分工红线」一行：workflow 脚本内部怎么写不归本 skill"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.navigation-map-not-workflow"
+          }
+        ]
+      }
+    }
+  ]
 }

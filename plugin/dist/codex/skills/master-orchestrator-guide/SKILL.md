@@ -288,6 +288,11 @@ Codex 有内置 slash commands（如 `/status`、`/usage`、`/skills`、`/plugin
 Knowledge navigation:
 - [Knowledge atlas](./SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:control.decision-loop](./SKILL.md#ccm-k-module-control-decision-loop)
+- [contrasts_with: 何时翻开 using-ccm](../using-ccm/SKILL.md#ccm-k-point-ccm-when-to-open) <!-- ccm:k:edge edge:navigation-map-not-ccm -->
+- [contrasts_with: 四理论共享脊椎](../engineering-with-craft/SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:navigation-map-not-craft -->
+- [contrasts_with: dev work 是优化过程](../dev-as-ml-loop/SKILL.md#ccm-k-point-devloop-core-thesis) <!-- ccm:k:edge edge:navigation-map-not-devloop -->
+- [contrasts_with: 决策影响向量](../pacing-and-estimation/references/pacing-levers.md#ccm-k-point-pacing-decision-vectors) <!-- ccm:k:edge edge:navigation-map-not-pacing -->
+- [contrasts_with: 切是高杠杆决策](../slicing-goals-into-dags/SKILL.md#ccm-k-point-slicing-why-cut) <!-- ccm:k:edge edge:navigation-map-not-slicing -->
 <!-- ccm:k:nav:end -->
 ## ④ 最高频行为 / 范式：决策程序 + 操作指导
 

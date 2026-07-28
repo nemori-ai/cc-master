@@ -609,6 +609,37 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:pacing-estimate-verbs-to-cmd-estimate",
+      "type": "routes_to",
+      "from": "point:pacing.estimate-verbs",
+      "to": "point:ccm.cmd.estimate",
+      "when": [
+        "要实际敲出 estimate 的某个动词并读它的 JSON"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "pacing-and-estimation/canonical/references/estimation.md 的动词表"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.pacing-estimate-verbs-to-cmd-estimate"
+          }
+        ]
+      }
     }
   ]
 }

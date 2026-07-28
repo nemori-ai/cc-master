@@ -419,6 +419,74 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:ccm-pointers-not-decision-program",
+      "type": "contrasts_with",
+      "from": "point:ccm.pointers-routing",
+      "to": "point:control.decision-program",
+      "when": [
+        "要判断该编排什么、怎么拆 DAG、何时阻塞等用户、何时换号"
+      ],
+      "avoid_when": [
+        "已经定了要做什么，只差一条命令怎么敲"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/SKILL.md 指针段：决策层归总指挥，本 skill 是它的「手怎么动」"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-pointers-not-decision-program"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm-pointers-not-workflow-authoring",
+      "type": "contrasts_with",
+      "from": "point:ccm.pointers-routing",
+      "to": "point:workflow.authoring-contract",
+      "when": [
+        "要在 workflow 脚本里编排并行"
+      ],
+      "avoid_when": [
+        "要敲的是 CLI 命令，不是脚本 DSL"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/SKILL.md 指针段：脚本 DSL 不是 ccm CLI"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-pointers-not-workflow-authoring"
+          }
+        ]
+      }
     }
   ]
 }

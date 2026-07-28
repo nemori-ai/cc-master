@@ -169,6 +169,12 @@ function resolveAdmissionPolicy(portfolio) {
       authored.min_internal_cohesion ?? ADMISSION_DEFAULTS.min_internal_cohesion,
     max_external_edge_count:
       authored.max_external_edge_count ?? ADMISSION_DEFAULTS.max_external_edge_count,
+    external_edge_policy: {
+      allowed_types: [
+        ...(authored.external_edge_policy?.allowed_types ??
+          ADMISSION_DEFAULTS.external_edge_policy.allowed_types),
+      ].sort(),
+    },
     max_overlap_shared_modules:
       authored.max_overlap_shared_modules ?? ADMISSION_DEFAULTS.max_overlap_shared_modules,
     require_ssot_closure:
@@ -378,6 +384,7 @@ function readInventoryBudgets(repoRoot, composition) {
  * @param {{ graph: object, moduleIds: string[], composition: object|null, repoRoot?: string }} args
  */
 export function computeCandidateMetrics({ graph, moduleIds, composition, repoRoot = null }) {
+  const policy = resolveAdmissionPolicy(graph.portfolio);
   const moduleIdSet = new Set(moduleIds);
   const modules = (graph.modules ?? []).filter((module) => moduleIdSet.has(module.id));
   const points = (graph.points ?? []).filter((point) => moduleIdSet.has(point.module_id));
@@ -387,15 +394,22 @@ export function computeCandidateMetrics({ graph, moduleIds, composition, repoRoo
     (edge) => pointIdSet.has(edge.from) || pointIdSet.has(edge.to) || moduleIdSet.has(edge.module_id),
   );
 
+  // External edges whose type is on the allowlist express cross-skill navigation
+  // or contrast, not content dependency: they are counted separately and do not
+  // consume the cut-coupling budget. Every other external type still counts.
+  const navExternalTypes = new Set(policy?.external_edge_policy?.allowed_types ?? []);
   let internalEdgeCount = 0;
   let externalEdgeCount = 0;
+  let externalNavEdgeCount = 0;
   for (const edge of graph.edges ?? []) {
     const both = pointIdSet.has(edge.from) && pointIdSet.has(edge.to);
     if (both) internalEdgeCount += 1;
     else if (pointIdSet.has(edge.from) || pointIdSet.has(edge.to) || moduleIdSet.has(edge.module_id)) {
       externalEdgeCount += 1;
+      if (navExternalTypes.has(edge.type)) externalNavEdgeCount += 1;
     }
   }
+  const externalCutCoupling = externalEdgeCount - externalNavEdgeCount;
 
   const inventoryPointIds = new Set(
     (composition?.canonical_source_inventory ?? []).flatMap((entry) => entry.point_ids ?? []),
@@ -447,7 +461,6 @@ export function computeCandidateMetrics({ graph, moduleIds, composition, repoRoo
   const inventory = repoRoot
     ? readInventoryBudgets(repoRoot, composition)
     : { files: [], missing: ['<repoRoot missing>'], total: estimateBudget('') };
-  const policy = resolveAdmissionPolicy(graph.portfolio);
   const hop = computeHopWitness({
     modules,
     points,
@@ -500,6 +513,7 @@ export function computeCandidateMetrics({ graph, moduleIds, composition, repoRoo
     point_count: points.length,
     internal_edge_count: internalEdgeCount,
     external_edge_count: externalEdgeCount,
+    external_nav_edge_count: externalNavEdgeCount,
   };
 
   const witness_metrics = {
@@ -507,7 +521,7 @@ export function computeCandidateMetrics({ graph, moduleIds, composition, repoRoo
     candidate_points: pointIds,
     trigger_job_coherence: triggerJobCoherence,
     internal_cohesion: Number(internalCohesion.toFixed(6)),
-    external_cut_coupling: externalEdgeCount,
+    external_cut_coupling: externalCutCoupling,
     overlap_signature: overlapSignature,
     ssot_closure: ssotClosure,
     budgets,

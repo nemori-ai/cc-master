@@ -521,6 +521,40 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:ccm-account-vault-not-switch-decision",
+      "type": "contrasts_with",
+      "from": "point:ccm.account-policy-vault",
+      "to": "point:capacity.account-switch-gate",
+      "when": [
+        "要判断何时换号、谁来授权、能不能自己授权"
+      ],
+      "avoid_when": [
+        "只是要知道号池与凭证在机制上怎么存怎么切"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/references/account-pool.md：机制层只在 deny 时拦下，不替编排做「换不换」的决策"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-account-vault-not-switch-decision"
+          }
+        ]
+      }
     }
   ]
 }

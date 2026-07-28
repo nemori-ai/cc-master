@@ -296,6 +296,8 @@ Knowledge navigation:
 - [routes_to: status 八态语义与转移判断](./references/board-model-guide.md#ccm-k-point-ccm-board-status-semantics) <!-- ccm:k:edge edge:ccm.x.pointers-to-board-status -->
 - [routes_to: namespace task 命令面](./references/command-catalog.md#ccm-k-point-ccm-cmd-task) <!-- ccm:k:edge edge:ccm.x.pointers-to-cmd-task -->
 - [routes_to: footgun 速查表](./SKILL.md#ccm-k-point-ccm-footgun-table) <!-- ccm:k:edge edge:ccm.ret.pointccm.pointers-routing.pri -->
+- [contrasts_with: 每回合确定性决策程序](../master-orchestrator-guide/SKILL.md#ccm-k-point-control-decision-program) <!-- ccm:k:edge edge:ccm-pointers-not-decision-program -->
+- [contrasts_with: 起草与 launch 契约](../authoring-workflows/SKILL.md#ccm-k-point-workflow-authoring-contract) <!-- ccm:k:edge edge:ccm-pointers-not-workflow-authoring -->
 <!-- ccm:k:nav:end -->
 <!-- ccm:k:entry-pin:start -->
 Knowledge entry pins for entry:using-ccm:

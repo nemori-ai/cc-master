@@ -103,6 +103,7 @@ vault 路径必须在 gitignored 用户级区（`${CC_MASTER_HOME:-$HOME/.cc_mas
 Knowledge navigation:
 - [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:ccm.account-pool](./account-pool.md#ccm-k-module-ccm-account-pool)
+- [contrasts_with: 换号 lever 授权 gate](../../master-orchestrator-guide/references/cost-decisions.md#ccm-k-point-capacity-account-switch-gate) <!-- ccm:k:edge edge:ccm-account-vault-not-switch-decision -->
 - [routes_to: 号池模型（指针 vs token）](./account-pool.md#ccm-k-point-ccm-account-pool-model) <!-- ccm:k:edge edge:ccm.ret.pointccm.account-policy-vault.pri -->
 - [operationalizes: namespace account 命令面](./command-catalog.md#ccm-k-point-ccm-cmd-account) <!-- ccm:k:edge edge:ccm.account-policy-ops-cmd -->
 <!-- ccm:k:nav:end -->

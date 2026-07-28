@@ -895,6 +895,142 @@
           }
         ]
       }
+    },
+    {
+      "id": "edge:craft-spine-not-slicing",
+      "type": "contrasts_with",
+      "from": "point:craft.shared-spine",
+      "to": "point:slicing.why-cut",
+      "when": [
+        "要决定顶层怎么敏捷切"
+      ],
+      "avoid_when": [
+        "片已切好，问题是这段代码本身该怎么建"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md：五根同时管手艺与交付尺度，顶层怎么切归 slicing"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-spine-not-slicing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-spine-not-devloop",
+      "type": "contrasts_with",
+      "from": "point:craft.shared-spine",
+      "to": "point:devloop.core-thesis",
+      "when": [
+        "要决定任务内怎么迭代收敛"
+      ],
+      "avoid_when": [
+        "关心的是领域、类、合约、测试本身该长什么样"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 的交付尺度段：任务内迭代不归手艺内容"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-spine-not-devloop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-handoff-not-walking-skeleton",
+      "type": "contrasts_with",
+      "from": "point:craft.stage-handoff",
+      "to": "point:slicing.walking-skeleton",
+      "when": [
+        "要在顶层做敏捷迭代：纵切薄增量、走 walking skeleton、按 cadence 交付"
+      ],
+      "avoid_when": [
+        "关心的是片内三阶段之间怎么交接"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 三尺度段①：顶层敏捷迭代"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-handoff-not-walking-skeleton"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-handoff-not-devloop-iterate",
+      "type": "contrasts_with",
+      "from": "point:craft.stage-handoff",
+      "to": "point:devloop.iterate",
+      "when": [
+        "要在任务内反复迭代直到验收"
+      ],
+      "avoid_when": [
+        "关心的是 design 到 build 到 test 的阶段交接"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 三尺度段③：任务内迭代"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-handoff-not-devloop-iterate"
+          }
+        ]
+      }
     }
   ]
 }
