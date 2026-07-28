@@ -186,9 +186,15 @@ test('v10: controlled <host>.write-<stamp> candidate still passes full sync', ()
     assert.equal(first.status, 0, `${first.stdout}\n${first.stderr}`);
     const second = syncFull(root);
     assert.equal(second.status, 0, `${second.stdout}\n${second.stderr}`);
-    assert.ok(fs.existsSync(path.join(root, 'plugin/dist', HOST, 'knowledge', 'atlas.md')));
+    const skillMd = path.join(root, 'plugin/dist', HOST, 'skills', SKILL, 'SKILL.md');
+    assert.ok(fs.existsSync(skillMd));
+    // Atlas/module topology is emitted as a compiler-owned suffix inside accepted
+    // skill-local Markdown — never as a standalone `knowledge/` surface in the host
+    // tree (repo-only `knowledge/` must not enter host output).
+    assert.match(fs.readFileSync(skillMd, 'utf8'), /<!-- ccm:k:generated -->/);
     assert.ok(
-      fs.existsSync(path.join(root, 'plugin/dist', HOST, 'skills', SKILL, 'SKILL.md')),
+      !fs.existsSync(path.join(root, 'plugin/dist', HOST, 'knowledge')),
+      'repo-only knowledge must never be published into the host tree',
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

@@ -431,6 +431,7 @@ Generated runtime navigation surface. Prefer these links over prose mentions.
 - [命令面：jc/cadence/watchdog/agent](../using-ccm/references/command-catalog.md#ccm-k-module-ccm-commands-scheduling)
 - [热路径与 footgun](../using-ccm/SKILL.md#ccm-k-module-ccm-hotpath-footgun)
 - [ccm 心智锚与协议职责](../using-ccm/SKILL.md#ccm-k-module-ccm-mind-model)
+- [与用户共构未知](./references/user-unknowns.md#ccm-k-module-collab-unknowns)
 - [指挥不演奏](./SKILL.md#ccm-k-module-conduct-never-play)
 - [总指挥决策循环](./SKILL.md#ccm-k-module-control-decision-loop)
 - [异步完成与 HITL](./references/async-hitl.md#ccm-k-module-coordination-async-hitl)

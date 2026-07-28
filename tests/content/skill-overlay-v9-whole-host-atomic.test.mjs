@@ -112,10 +112,15 @@ test('v9: late graph failure keeps whole host closed-set byte-identical (no resi
     assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
     const live = hostLive(root);
     assert.ok(fs.existsSync(path.join(live, 'hooks')));
-    assert.ok(fs.existsSync(path.join(live, 'knowledge')));
+    assert.ok(fs.existsSync(path.join(live, 'skills')));
+    // `knowledge/` is repo-only authored source; it must never reach a published host tree.
+    assert.ok(
+      !fs.existsSync(path.join(live, 'knowledge')),
+      'repo-only knowledge must never be published into the host tree',
+    );
     const before = closedSetTreeDigest(live);
     const beforeHooks = closedSetTreeDigest(path.join(live, 'hooks'));
-    const beforeKnowledge = closedSetTreeDigest(path.join(live, 'knowledge'));
+    const beforeSkills = closedSetTreeDigest(path.join(live, 'skills'));
 
     fs.rmSync(path.join(root, 'plugin/src/knowledge/portfolio.json'));
 
@@ -127,9 +132,13 @@ test('v9: late graph failure keeps whole host closed-set byte-identical (no resi
       'live host closed-set digest must be unchanged after late compile failure',
     );
     assert.equal(closedSetTreeDigest(path.join(live, 'hooks')), beforeHooks);
-    assert.equal(closedSetTreeDigest(path.join(live, 'knowledge')), beforeKnowledge);
+    assert.equal(closedSetTreeDigest(path.join(live, 'skills')), beforeSkills);
     assert.ok(fs.existsSync(path.join(live, 'hooks')), 'hooks must not be deleted on failure');
-    assert.ok(fs.existsSync(path.join(live, 'knowledge')), 'knowledge must not be deleted on failure');
+    assert.ok(fs.existsSync(path.join(live, 'skills')), 'skills must not be deleted on failure');
+    assert.ok(
+      !fs.existsSync(path.join(live, 'knowledge')),
+      'repo-only knowledge must stay absent after a failed sync',
+    );
     assert.deepEqual(listHostResidues(path.join(root, 'plugin/dist')), []);
     assert.deepEqual(listResiduesUnder(live), []);
   } finally {

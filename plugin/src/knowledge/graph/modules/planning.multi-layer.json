@@ -53,7 +53,49 @@
       "authority": {"role": "canonical", "subject": "subject:multilayer.maintenance"},
       "lifecycle": {"state": "accepted", "since": "2026-07-24"},
       "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md maintenance"}], "verifiers": [{"kind": "review", "ref": "k2.point.multilayer.maintenance"}]}
+    },
+    {
+      "id": "point:multilayer.deviation-notes",
+      "title": "偏离留痕",
+      "point_kind": "procedure",
+      "summary": "够格的大节点在派发契约里加一条偏离记录要求，写清偏离什么、为什么、放弃了什么、要不要复核；留痕不能把该升级的语义变更变成既成事实。",
+      "recognition_cues": ["执行者在实现中撞上未预料的边界情形", "端点验收只看得到最终产物看不到路上的取舍", "想用留痕代替向用户升级"],
+      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.deviation-notes", "heading_hint": "偏离留痕"},
+      "authority": {"role": "canonical", "subject": "subject:multilayer.deviation-notes"},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 偏离留痕"}], "verifiers": [{"kind": "review", "ref": "issue-211.point.multilayer.deviation-notes"}]}
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "id": "edge:multilayer.handoff-to-deviation",
+      "type": "deepens_to",
+      "from": "point:multilayer.handoff-contract",
+      "to": "point:multilayer.deviation-notes",
+      "when": ["派发契约已成形，需要为大节点补上偏离记录这一条增项"],
+      "avoid_when": ["节点小而原子、一次端点验收即可判完"],
+      "path_role": "route",
+      "order": 1,
+      "runtime": {"enabled_by_default": true},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 派发契约再加一条"}],
+        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.multilayer.handoff-to-deviation"}]
+      }
+    },
+    {
+      "id": "edge:multilayer.deviation-to-admission",
+      "type": "routes_to",
+      "from": "point:multilayer.deviation-notes",
+      "to": "point:multilayer.admission-and-escalation",
+      "when": ["需要复核这个节点是否够格承担偏离记录的成本"],
+      "path_role": "support",
+      "runtime": {"enabled_by_default": true},
+      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "admission": {
+        "evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 只对够格的大节点生效"}],
+        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.multilayer.deviation-to-admission"}]
+      }
+    }
+  ]
 }

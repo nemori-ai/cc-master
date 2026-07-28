@@ -21,7 +21,8 @@
     {"id": "module:capacity.account-switch", "manifest": "plugin/src/knowledge/graph/modules/capacity.account-switch.json"},
     {"id": "module:continuity.handoff", "manifest": "plugin/src/knowledge/graph/modules/continuity.handoff.json"},
     {"id": "module:planning.multi-layer", "manifest": "plugin/src/knowledge/graph/modules/planning.multi-layer.json"},
-    {"id": "module:evidence.outside-in", "manifest": "plugin/src/knowledge/graph/modules/evidence.outside-in.json"}
+    {"id": "module:evidence.outside-in", "manifest": "plugin/src/knowledge/graph/modules/evidence.outside-in.json"},
+    {"id": "module:collab.unknowns", "manifest": "plugin/src/knowledge/graph/modules/collab.unknowns.json"}
     ]
   },
   "entry_modules": [
@@ -105,8 +106,8 @@
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md",
       "coverage": "full",
-      "point_ids": ["point:multilayer.admission-and-escalation", "point:multilayer.handoff-contract", "point:multilayer.maintenance", "point:multilayer.orthogonality"],
-      "reviewed_unbound_sha256": "8f6136c7fa48904ec5b0c40c095db0e258178b17aecb451861f7883acb5580b5"
+      "point_ids": ["point:multilayer.admission-and-escalation", "point:multilayer.deviation-notes", "point:multilayer.handoff-contract", "point:multilayer.maintenance", "point:multilayer.orthogonality"],
+      "reviewed_unbound_sha256": "35dec8db6e04bb695f188ad4084081d4a08807d52549929066f44a8ccc4629bc"
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md",
@@ -117,8 +118,14 @@
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
       "coverage": "full",
-      "point_ids": ["point:verification.endpoint-procedure", "point:verification.hash-and-stale", "point:verification.heterogeneous-review", "point:verification.loop-convergence", "point:verification.resume-takeover"],
-      "reviewed_unbound_sha256": "fac2c9db69bdb3f234c47345d958b08896016bcd34530b537ec11332d899e853"
+      "point_ids": ["point:verification.endpoint-procedure", "point:verification.hash-and-stale", "point:verification.heterogeneous-review", "point:verification.loop-convergence", "point:verification.resume-takeover", "point:verification.user-understanding"],
+      "reviewed_unbound_sha256": "af9dc4089121de668e3cd74aebe6b6e931e611bdc1e4d1d89c37b39816a7a648"
+    },
+    {
+      "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md",
+      "coverage": "full",
+      "point_ids": ["point:unknowns.artifact-over-prose", "point:unknowns.four-quadrants", "point:unknowns.frame-before-spec", "point:unknowns.interview-discipline", "point:unknowns.technique-routing"],
+      "reviewed_unbound_sha256": "b0ba3370ec0f0a163891cd316cd0312d8653e7a020b812f9e7197fbdc2d9cacc"
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
@@ -154,7 +161,8 @@
         "module:state.board",
         "module:capacity.delivery",
         "module:planning.multi-layer",
-        "module:evidence.outside-in"
+        "module:evidence.outside-in",
+        "module:collab.unknowns"
       ],
       "reason": "Codex adapter 明确排除 Claude 订阅账号切换锚与 handoff reference；其余模块完整投影。"
     },
@@ -173,7 +181,8 @@
         "module:state.board",
         "module:capacity.delivery",
         "module:planning.multi-layer",
-        "module:evidence.outside-in"
+        "module:evidence.outside-in",
+        "module:collab.unknowns"
       ],
       "reason": "Cursor adapter 明确排除 Claude 订阅账号切换锚与 handoff reference；其余模块完整投影。"
     },
@@ -193,7 +202,8 @@
         "module:capacity.delivery",
         "module:continuity.handoff",
         "module:planning.multi-layer",
-        "module:evidence.outside-in"
+        "module:evidence.outside-in",
+        "module:collab.unknowns"
       ],
       "reason": "kimi-code adapter 明确排除 Claude 订阅账号切换锚；其余模块完整投影。"
     }

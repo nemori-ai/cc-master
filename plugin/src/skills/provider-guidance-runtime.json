@@ -14,14 +14,15 @@
               "references/board.md": "e9cc454fcc05afc1a795556dc3e1644ce84c4072a8b33d8772073392d673c762",
               "references/cost-decisions.md": "3911ee5a88386113a0e5925c93bd39e1b238210fa63c05e30eac4e226523e553",
               "references/deadline-discipline.md": "9c8670b6b76864c441cbb78edeffa6559e4695bd098d8a78740ca447ff5a7364",
-              "references/decomposition.md": "7f0e63b408012c940d1c68148a8edc3b04ab948a5ad239f533314a6950985631",
+              "references/decomposition.md": "3c4d347860b94479cc9f59a518b954a800836c3314b3c294f4e697725ebe12c9",
               "references/dispatch.md": "6515175587f722ebaca9f3ccb17da6e00c82e9a4dc6313cdff3cbaeeb3585274",
               "references/goal-contract.md": "3f28a30a9d659ff4655b92b29493bdebfdf4da5e22a66bb782d3a6a3a5d8a452",
               "references/handoff.md": "ca37c440ac7afd44e8dfa5de83e95dec1fd2f9ebf63c5942921f84bca85a701a",
               "references/model-allocation.md": "97aec85766954aab9cfd6fc4903c8c209fa34281353073103fbc77eb120c8add",
-              "references/multi-layer-planning.md": "94a9e963875ee3ec43b9ae8b6e01d58b5ef5c52e00845f659ac6f1ca0c5bf7ae",
-              "references/outside-in.md": "cd8f9fc0b61665c70afa779a437326fe70c9c84a0c2f92edf4afed89e000968b",
-              "references/resume-verify.md": "46a5cd6a7c0ce3e8aab818d64fea62667a9cf005eb3b546584807919bf4d4922",
+              "references/multi-layer-planning.md": "96e1e1b9821f0c3e1fc2b8480c90c5ba867be1f3dbd6217064f1629d88d75f12",
+              "references/outside-in.md": "6c4c453e8dfadc3f720f72e3e293e53cfcaac12dadc0e3c10f7dab48d1a65eda",
+              "references/resume-verify.md": "bd511bc61485a23e1c777a5a7ea425c07c99c7df973da32de20615db6efe21f4",
+              "references/user-unknowns.md": "d75f61c48fb2752a3502b845c76c7b16b06adbdd35c0b7a863cf9372e34f549d",
               "references/worker-routing.md": "6eb2189bf246ed4b5135ef823cdd4784eff621bcd91db33bdb36cafd3d1c914b",
               "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
             }
@@ -29,20 +30,21 @@
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "91f2354ae48a54221d020861f4bf02107e3984f7426d6f6368c50c91aad87ca8",
+              "SKILL.md": "f3f16804a2fb05373abf9c95748a3f80d414cdc0955e09f63115aaaff9172445",
               "references/async-hitl.md": "2f934501d3d5847d5bbb919639964a342587f1a35a8fdd5bc2fc180af76f26f4",
               "references/board.md": "60aac93835449f65df5e3cf6072e79d9d1bedb995fa8be605b0819f446e98041",
               "references/cost-decisions.md": "b9899457be417ad1b9da869306db74d9f279460cf5435e14595868cb5af442f0",
               "references/deadline-discipline.md": "6da13d004321eaf32846741c7c2d93aa5f8b7f2899fb534b4b7bccae2a3497ea",
-              "references/decomposition.md": "65cbe0deae9b2cecf536d62c1fac5828a2437aec24aa9010cb161f6eee020133",
+              "references/decomposition.md": "8014904fe078b6d8814d16d30ecd6a67a64972c2b2b29d3724a4125199c3936d",
               "references/dispatch.md": "1e8df9ef9f91f196a1b84f595054e3a826e08ff78cead29b0774c8525d91d4c7",
               "references/goal-contract.md": "b62d33ad4f0d956ad7858d899c27ba60d406a992b384585ab47eb71b494dcdf2",
               "references/handoff.md": "34e17097c18fcd02b1fdac7f1f91fe9965dbbddd32e43fe267e700bcd26d844b",
               "references/model-allocation.md": "f338b4959d1300f1f8fda11e101a065cbdaae8d2c8ed3bfc6b49170f14805a89",
-              "references/multi-layer-planning.md": "098e9c23afc328a73a10abc66e7af35075e33d4d5ec99cb2438c82bc3e55a77d",
-              "references/outside-in.md": "ef787411521386adc476d32ce9e976108635f470d68ec86cf236fe3ee2c7ddac",
-              "references/resume-verify.md": "8e3e425e7db5c322ba557e654108eeaa9ce258a1104c008004fcca77c0f2d7b4",
-              "references/worker-routing.md": "7e6bbfcd1997297a528a5b84f101b1ba8152deae1b7faaf5c17fc206e3886a88",
+              "references/multi-layer-planning.md": "3be25a1e19fe22e3d89e69789c0a7db325dbcbbddbd850680292f739802360e6",
+              "references/outside-in.md": "2478ac0780c73b894ff9e102dccae25371f53930272a39f6d7a52c7c30c7b49f",
+              "references/resume-verify.md": "3a2a2e58a3a58cec3400ff2bc076ede9707d713fb895cd763723320262a5a254",
+              "references/user-unknowns.md": "e2a0e4eef3ad469aa865de3e347b53fbeb36eb450e9ae98ba38725ae769a95f4",
+              "references/worker-routing.md": "67cbfd1b39a096faa2c77e356d9a41b476cfe8224688d279274cb9afeaf9123e",
               "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
             }
           }
@@ -105,31 +107,33 @@
               "references/async-hitl.md": "41b42a8451d635d5ce71f67082ffb0fd1e225a4c787ff54625a30011ee6e7d0e",
               "references/board.md": "92cf15965c9f971fb653f6b9b1b6858219d2268d4773119d3dd860105663648d",
               "references/deadline-discipline.md": "9c8670b6b76864c441cbb78edeffa6559e4695bd098d8a78740ca447ff5a7364",
-              "references/decomposition.md": "5f39fe005e83947b1b67f02ca37cfc80fe6bc9da2f78720332e3e0cb29a9021a",
+              "references/decomposition.md": "ab5001ac1be1a47f654a8cc4f61f0a4f63e853dd2ff3a1eb1f4b2e435f927acb",
               "references/dispatch.md": "25c633ca99251ffc2a841b5d069f331c97ee164341af9792fea0701f47813a73",
               "references/goal-contract.md": "3f28a30a9d659ff4655b92b29493bdebfdf4da5e22a66bb782d3a6a3a5d8a452",
               "references/model-allocation.md": "97aec85766954aab9cfd6fc4903c8c209fa34281353073103fbc77eb120c8add",
-              "references/multi-layer-planning.md": "94a9e963875ee3ec43b9ae8b6e01d58b5ef5c52e00845f659ac6f1ca0c5bf7ae",
-              "references/outside-in.md": "cd8f9fc0b61665c70afa779a437326fe70c9c84a0c2f92edf4afed89e000968b",
-              "references/resume-verify.md": "71eba51f56db39a332e5016c7dddb9d370f8f487b9795b5547fb3d687f26ab29",
+              "references/multi-layer-planning.md": "96e1e1b9821f0c3e1fc2b8480c90c5ba867be1f3dbd6217064f1629d88d75f12",
+              "references/outside-in.md": "6c4c453e8dfadc3f720f72e3e293e53cfcaac12dadc0e3c10f7dab48d1a65eda",
+              "references/resume-verify.md": "2b8d633d1d2c6e065ef1cf6403802e7b72a22efb3d75f9a1815baf04fc1f8c9d",
+              "references/user-unknowns.md": "d75f61c48fb2752a3502b845c76c7b16b06adbdd35c0b7a863cf9372e34f549d",
               "references/worker-routing.md": "7d29f549d35d482283b0ffcf34784d41ba269d8086125fcfb9dc43d091dea5e7"
             }
           },
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "bb7204582859cfeb1ba1bdcd5176275120b71da7286014b3a11e56e4f9449a3b",
+              "SKILL.md": "dd1915b88f9516bd71f1f226f7e32de96fbcab6434dfc6414c705b8f549ed8a5",
               "references/async-hitl.md": "86b25f1cf97290114e61d2ad930ac1bc290974f6c1ed81932118d7fc0e2f4c5f",
               "references/board.md": "1efc183b0d6347ddd1c48f636b4fe26362f45e8579223667610630c304467c80",
               "references/deadline-discipline.md": "6da13d004321eaf32846741c7c2d93aa5f8b7f2899fb534b4b7bccae2a3497ea",
-              "references/decomposition.md": "c094db319e8bbfdf7e43f8973918e47a1b243013f03ce8ac3cf8dacaf9541603",
+              "references/decomposition.md": "a1a7570e462358adc2a1604e619fffe08394619a818978034275603f0182ad65",
               "references/dispatch.md": "cac98927c406d2b5321685c67294a1c528208445ca45a4293c892c3bc809c36d",
               "references/goal-contract.md": "b62d33ad4f0d956ad7858d899c27ba60d406a992b384585ab47eb71b494dcdf2",
               "references/model-allocation.md": "f338b4959d1300f1f8fda11e101a065cbdaae8d2c8ed3bfc6b49170f14805a89",
-              "references/multi-layer-planning.md": "098e9c23afc328a73a10abc66e7af35075e33d4d5ec99cb2438c82bc3e55a77d",
-              "references/outside-in.md": "ef787411521386adc476d32ce9e976108635f470d68ec86cf236fe3ee2c7ddac",
-              "references/resume-verify.md": "c28aae8a035c28146e8fc58d0fb6de3ede95a48fd08832726352f1ac3e9a75df",
-              "references/worker-routing.md": "eb7296e719a7010d5dc108205bf9f9afbb03a33dae7fbb246dca18e73c62b368"
+              "references/multi-layer-planning.md": "3be25a1e19fe22e3d89e69789c0a7db325dbcbbddbd850680292f739802360e6",
+              "references/outside-in.md": "2478ac0780c73b894ff9e102dccae25371f53930272a39f6d7a52c7c30c7b49f",
+              "references/resume-verify.md": "0d898dd2c0a0c02028f0195557c53ce1248e2d4640ae02276dcb09c29c925565",
+              "references/user-unknowns.md": "e2a0e4eef3ad469aa865de3e347b53fbeb36eb450e9ae98ba38725ae769a95f4",
+              "references/worker-routing.md": "7e6c8d3e91bceaff9d6919d48f0fbad525ef01f894d036426d0e670e564e891b"
             }
           }
         },
@@ -189,31 +193,33 @@
               "references/async-hitl.md": "650dde65568abd2a641d4acc7ff1a2ca588273df4cc4e59c84f1123a5ff9b381",
               "references/board.md": "9abf1f2f21dd9a8fc3a7c9c2d658cd11a78f5d7c767cd40851ecff2e75c0cc17",
               "references/deadline-discipline.md": "9c8670b6b76864c441cbb78edeffa6559e4695bd098d8a78740ca447ff5a7364",
-              "references/decomposition.md": "5f39fe005e83947b1b67f02ca37cfc80fe6bc9da2f78720332e3e0cb29a9021a",
+              "references/decomposition.md": "ab5001ac1be1a47f654a8cc4f61f0a4f63e853dd2ff3a1eb1f4b2e435f927acb",
               "references/dispatch.md": "8295b19ef99ee9058d508cdd904d09643dd99c8b7897905f69e70a31c7550dcf",
               "references/goal-contract.md": "3f28a30a9d659ff4655b92b29493bdebfdf4da5e22a66bb782d3a6a3a5d8a452",
               "references/model-allocation.md": "97aec85766954aab9cfd6fc4903c8c209fa34281353073103fbc77eb120c8add",
-              "references/multi-layer-planning.md": "94a9e963875ee3ec43b9ae8b6e01d58b5ef5c52e00845f659ac6f1ca0c5bf7ae",
-              "references/outside-in.md": "cd8f9fc0b61665c70afa779a437326fe70c9c84a0c2f92edf4afed89e000968b",
-              "references/resume-verify.md": "2f12bd39cd48a18566d0fc3ecc891b0542f3e65d5ea76f529961572035ddc29c",
+              "references/multi-layer-planning.md": "96e1e1b9821f0c3e1fc2b8480c90c5ba867be1f3dbd6217064f1629d88d75f12",
+              "references/outside-in.md": "6c4c453e8dfadc3f720f72e3e293e53cfcaac12dadc0e3c10f7dab48d1a65eda",
+              "references/resume-verify.md": "4bd9c56bac5d38d21ee173fcc57c42cf8ca64f9632f9d38f5b26c5a2946b9f82",
+              "references/user-unknowns.md": "d75f61c48fb2752a3502b845c76c7b16b06adbdd35c0b7a863cf9372e34f549d",
               "references/worker-routing.md": "0c952eddb87be423832454758fa2be9a9ad22c40e987a30c91e6b10e8ac99976"
             }
           },
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "710cac2b0238cc150275fe727598c4cf2a40ccb02938b3ab0f6ddd7a6f1fd809",
+              "SKILL.md": "8224ebf1a84d02b6930ae8d5ad15a17f5591efbdf3fa502450b89226e89a9dc3",
               "references/async-hitl.md": "c1ac9e171265af431bae949841be69712b582df4de5d274bd9277a86270276af",
               "references/board.md": "802a7fc9d24824a7ca927150b28da558e5d35326798be468b861f7b0f294a78e",
               "references/deadline-discipline.md": "6da13d004321eaf32846741c7c2d93aa5f8b7f2899fb534b4b7bccae2a3497ea",
-              "references/decomposition.md": "c094db319e8bbfdf7e43f8973918e47a1b243013f03ce8ac3cf8dacaf9541603",
+              "references/decomposition.md": "a1a7570e462358adc2a1604e619fffe08394619a818978034275603f0182ad65",
               "references/dispatch.md": "636360190566cb988772180f8f3ef040165a3f591c48dce7726d6dd56e213600",
               "references/goal-contract.md": "b62d33ad4f0d956ad7858d899c27ba60d406a992b384585ab47eb71b494dcdf2",
               "references/model-allocation.md": "f338b4959d1300f1f8fda11e101a065cbdaae8d2c8ed3bfc6b49170f14805a89",
-              "references/multi-layer-planning.md": "098e9c23afc328a73a10abc66e7af35075e33d4d5ec99cb2438c82bc3e55a77d",
-              "references/outside-in.md": "ef787411521386adc476d32ce9e976108635f470d68ec86cf236fe3ee2c7ddac",
-              "references/resume-verify.md": "d3111d4b446fd2410a259941691c5318370c5aae6c4b5293c35e2ec9e3405e34",
-              "references/worker-routing.md": "9fbbbac19ca5092ff337ffe4163fee0b175b50dab9b43552bcdfc56e3f702cc0"
+              "references/multi-layer-planning.md": "3be25a1e19fe22e3d89e69789c0a7db325dbcbbddbd850680292f739802360e6",
+              "references/outside-in.md": "2478ac0780c73b894ff9e102dccae25371f53930272a39f6d7a52c7c30c7b49f",
+              "references/resume-verify.md": "c49d518f6c78aa7478a98f30b85912303798fbc9de194c6025bb0f05e6746778",
+              "references/user-unknowns.md": "e2a0e4eef3ad469aa865de3e347b53fbeb36eb450e9ae98ba38725ae769a95f4",
+              "references/worker-routing.md": "542858d20c42631a4a2ae15c3b51fea5ae3c1ddd7442d9f6789c7c5c7cf95b2e"
             }
           }
         },
@@ -273,33 +279,35 @@
               "references/async-hitl.md": "91e785e4ab0f70aae3b4761d5cd87d699809129e74cdf9b631b4effe85af5d00",
               "references/board.md": "78d24f6708f9dab950bdca1de2d81ce4fd9c23f093ac6d40a30606a43b3ca525",
               "references/deadline-discipline.md": "9c8670b6b76864c441cbb78edeffa6559e4695bd098d8a78740ca447ff5a7364",
-              "references/decomposition.md": "5f39fe005e83947b1b67f02ca37cfc80fe6bc9da2f78720332e3e0cb29a9021a",
+              "references/decomposition.md": "ab5001ac1be1a47f654a8cc4f61f0a4f63e853dd2ff3a1eb1f4b2e435f927acb",
               "references/dispatch.md": "973e2e07a325c75f11105e5b6e17985f0faaacde3ba5fcb712d649dba16006f3",
               "references/goal-contract.md": "3f28a30a9d659ff4655b92b29493bdebfdf4da5e22a66bb782d3a6a3a5d8a452",
               "references/handoff.md": "ca37c440ac7afd44e8dfa5de83e95dec1fd2f9ebf63c5942921f84bca85a701a",
               "references/model-allocation.md": "97aec85766954aab9cfd6fc4903c8c209fa34281353073103fbc77eb120c8add",
-              "references/multi-layer-planning.md": "94a9e963875ee3ec43b9ae8b6e01d58b5ef5c52e00845f659ac6f1ca0c5bf7ae",
-              "references/outside-in.md": "cd8f9fc0b61665c70afa779a437326fe70c9c84a0c2f92edf4afed89e000968b",
-              "references/resume-verify.md": "f5d721d09baa7f05b42045c26b0033b4a303ae3bcac5c6228653882cad44f2d8",
+              "references/multi-layer-planning.md": "96e1e1b9821f0c3e1fc2b8480c90c5ba867be1f3dbd6217064f1629d88d75f12",
+              "references/outside-in.md": "6c4c453e8dfadc3f720f72e3e293e53cfcaac12dadc0e3c10f7dab48d1a65eda",
+              "references/resume-verify.md": "0b0a3bd661b870c1f2c6df771c472dd9399a9dc84f70e5afa433f216bf6266ba",
+              "references/user-unknowns.md": "d75f61c48fb2752a3502b845c76c7b16b06adbdd35c0b7a863cf9372e34f549d",
               "references/worker-routing.md": "6c03b02ea616c5ecde2e07c334e64b3f8f220a6e3cfd309fbe023264a15c5fa3"
             }
           },
           "accepted_final": {
             "schema": "cc-master.provider-guidance-runtime-manifest.v1",
             "files": {
-              "SKILL.md": "0778b5af5ebcd680c2a9032dac17ec5a6950f5921b15416cd2a891dcf3320764",
+              "SKILL.md": "46618fb17e59ba93d92cbb03cea8e48c8244bec54e09506bc3a2a0be3873a84d",
               "references/async-hitl.md": "8eead4719d605bf5c559cc50335e9134ec00d9defdeacfacfd11f9c045fc6d2d",
               "references/board.md": "e15aa52686ae5bfa1484a2184d5b093a944fd2f13e89ab470165eaf1ec54c115",
               "references/deadline-discipline.md": "6da13d004321eaf32846741c7c2d93aa5f8b7f2899fb534b4b7bccae2a3497ea",
-              "references/decomposition.md": "c094db319e8bbfdf7e43f8973918e47a1b243013f03ce8ac3cf8dacaf9541603",
+              "references/decomposition.md": "a1a7570e462358adc2a1604e619fffe08394619a818978034275603f0182ad65",
               "references/dispatch.md": "9ce2b7ffaf16f9144e01341653712b516607dc305ec321e712c241772874e5de",
               "references/goal-contract.md": "b62d33ad4f0d956ad7858d899c27ba60d406a992b384585ab47eb71b494dcdf2",
               "references/handoff.md": "34e17097c18fcd02b1fdac7f1f91fe9965dbbddd32e43fe267e700bcd26d844b",
               "references/model-allocation.md": "f338b4959d1300f1f8fda11e101a065cbdaae8d2c8ed3bfc6b49170f14805a89",
-              "references/multi-layer-planning.md": "098e9c23afc328a73a10abc66e7af35075e33d4d5ec99cb2438c82bc3e55a77d",
-              "references/outside-in.md": "ef787411521386adc476d32ce9e976108635f470d68ec86cf236fe3ee2c7ddac",
-              "references/resume-verify.md": "f9d735f5235eb3b284b306e2c002726f089062eb27952fc8a23e646b21b51dda",
-              "references/worker-routing.md": "460476278be09433904151c8e4bc072c9c2136a49e75b64da0e80ff43333de99"
+              "references/multi-layer-planning.md": "3be25a1e19fe22e3d89e69789c0a7db325dbcbbddbd850680292f739802360e6",
+              "references/outside-in.md": "2478ac0780c73b894ff9e102dccae25371f53930272a39f6d7a52c7c30c7b49f",
+              "references/resume-verify.md": "654e6824b8d0e692fc41e941a3df3f34d63bb6cede94fc1a7145b103155dd297",
+              "references/user-unknowns.md": "e2a0e4eef3ad469aa865de3e347b53fbeb36eb450e9ae98ba38725ae769a95f4",
+              "references/worker-routing.md": "5f1537d76bcdfac924f512797867bd23567ca44775da90f85427c6c26b6c1f65"
             }
           }
         },
