@@ -8,11 +8,18 @@ on:
   # 因这个 check 从不运行而永久 BLOCKED（required check 永不满足）。ccm 未变时
   # turbo/pnpm 缓存让 build/typecheck/lint/test 四步快速过，代价可接受。
   pull_request:
-  # push 仍按 paths 收窄：main 上非 ccm 改动无需重复跑 ccm CI（push 不是 PR merge 门）。
+  # push 只保留 main 的落地验证：feature branch 已由 pull_request 覆盖，release tag
+  # 指向的 commit 也已经过 PR/main 验证；不再为同一 SHA 重复分配 runner。
   push:
+    branches:
+      - 'main'
     paths:
       - 'ccm/**'
       - '.github/workflows/ccm-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ccm:

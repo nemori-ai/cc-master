@@ -10,10 +10,16 @@ on:
       - 'tests/scripts/test_install_integrity.sh'
       - '.github/workflows/installer-portability.yml'
   push:
+    branches:
+      - 'main'
     paths:
       - 'install.sh'
       - 'tests/scripts/test_install_integrity.sh'
       - '.github/workflows/installer-portability.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   transactional-publish:
