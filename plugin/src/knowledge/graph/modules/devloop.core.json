@@ -59,7 +59,7 @@
         "把开发当线性完工"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.core-thesis.md",
         "marker": "point:devloop.core-thesis",
         "heading_hint": "核心论题"
       },
@@ -96,7 +96,7 @@
         "acceptance 空"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.objective.md",
         "marker": "point:devloop.objective",
         "heading_hint": "心智锚 1"
       },
@@ -133,7 +133,7 @@
         "说不出 hypothesis"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.iterate.md",
         "marker": "point:devloop.iterate",
         "heading_hint": "心智锚 2"
       },
@@ -170,7 +170,7 @@
         "flaky 当梯度"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.instrument.md",
         "marker": "point:devloop.instrument",
         "heading_hint": "心智锚 3"
       },
@@ -206,7 +206,7 @@
         "一上来就精修未验证方案"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.explore-exploit.md",
         "marker": "point:devloop.explore-exploit",
         "heading_hint": "心智锚 4"
       },
@@ -243,7 +243,7 @@
         "补丁打补丁"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.plateau-restart.md",
         "marker": "point:devloop.plateau-restart",
         "heading_hint": "心智锚 5"
       },
@@ -280,7 +280,7 @@
         "验收已绿还继续镀金"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.converge.md",
         "marker": "point:devloop.converge",
         "heading_hint": "心智锚 6"
       },
@@ -316,7 +316,7 @@
         "特判让测试变绿"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.fit-intent.md",
         "marker": "point:devloop.fit-intent",
         "heading_hint": "心智锚 7"
       },
@@ -352,7 +352,7 @@
         "为复杂而复杂"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.regularize.md",
         "marker": "point:devloop.regularize",
         "heading_hint": "心智锚 8"
       },
@@ -389,7 +389,7 @@
         "需要一张循环图"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.taste-and-cycle.md",
         "marker": "point:devloop.taste-and-cycle",
         "heading_hint": "Taste / 一图流"
       },

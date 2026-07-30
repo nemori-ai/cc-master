@@ -30,6 +30,9 @@ const NAV_EDGE_TYPES = new Set([
 
 const HOSTS = new Set(HARDENING_CONTRACT.C9.hosts);
 
+/** Maintainer-side canonical prose root. Repo-only; never enters a host tree. */
+const POINTS_ROOT = 'plugin/src/knowledge/points';
+
 function displayPath(repoRoot, target) {
   const relative = path.relative(repoRoot, target);
   if (relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..') {
@@ -534,22 +537,70 @@ export function buildAndValidateGraph({
     }
   }
 
-  // Markdown bindings for points + global inventory marker uniqueness.
-  const globalMarkerIndex = new Map();
+  // Markers live in two namespaces with different rules.
+  //
+  //   mother files (plugin/src/knowledge/points/**) — the knowledge itself.
+  //     Exactly one marker pair per point, at binding.path. This is the SSOT.
+  //
+  //   skill articles — provenance anchors saying "this passage draws on that
+  //     point". Articles are written, not assembled, so anchors may repeat and
+  //     may overlap; what they must not do is name a point that does not exist.
+  const motherMarkerIndex = new Map();
+  for (const file of walkMarkdownFiles(path.join(repoRoot, POINTS_ROOT))) {
+    const relative = displayPath(repoRoot, file);
+    const markdown = readMarkdown(relative);
+    if (markdown.missing || !markdown.markers?.ok) continue;
+    for (const span of markdown.markers.spans) {
+      const list = motherMarkerIndex.get(span.point_id) ?? [];
+      list.push({ path: relative, start_line: span.start_line, end_line: span.end_line });
+      motherMarkerIndex.set(span.point_id, list);
+    }
+  }
+
+  const anchorIndex = new Map();
   for (const skillDoc of skills) {
     for (const entry of skillDoc.data.canonical_source_inventory ?? []) {
       const markdown = readMarkdown(entry.path);
       if (markdown.missing || !markdown.markers?.ok) continue;
       for (const span of markdown.markers.spans) {
-        const list = globalMarkerIndex.get(span.point_id) ?? [];
+        const list = anchorIndex.get(span.point_id) ?? [];
         list.push({
           path: entry.path,
           start_line: span.start_line,
           end_line: span.end_line,
         });
-        globalMarkerIndex.set(span.point_id, list);
+        anchorIndex.set(span.point_id, list);
       }
     }
+  }
+
+  // A point's home in a host tree is where its provenance anchor sits, not
+  // where its mother file sits — mother files are maintainer-only and never
+  // ship, so a reader following a nav link must land on the article passage
+  // that actually discusses the point.
+  for (const [anchoredPoint, sites] of anchorIndex.entries()) {
+    const point = pointById.get(anchoredPoint);
+    if (!point) continue;
+    const primary = [...sites].sort(
+      (left, right) =>
+        compareCodePoint(left.path, right.path) || left.start_line - right.start_line,
+    )[0];
+    point.anchor_path = primary.path;
+  }
+
+  for (const [anchoredPoint, sites] of [...anchorIndex.entries()].sort(([a], [b]) =>
+    compareCodePoint(a, b),
+  )) {
+    if (pointById.has(anchoredPoint)) continue;
+    pushError(diagnostics, {
+      code: 'SKG-ANCHOR-UNKNOWN-POINT',
+      message: `Skill article anchors a point that is not declared: ${anchoredPoint}`,
+      location: sites[0].path,
+      witness: { point: anchoredPoint, sites },
+      remediation:
+        'Declare the point in a module shard, or remove the stale provenance anchor from the article.',
+      exitCode: 4,
+    });
   }
 
   for (const [pointId, point] of [...pointById.entries()].sort(([a], [b]) =>
@@ -577,19 +628,19 @@ export function buildAndValidateGraph({
         exitCode: 3,
       });
     }
-    const globalSpans = globalMarkerIndex.get(pointId) ?? [];
-    if (globalSpans.length > 1 || (globalSpans.length === 1 && globalSpans[0].path !== binding.path)) {
+    const motherSpans = motherMarkerIndex.get(pointId) ?? [];
+    if (motherSpans.length !== 1 || motherSpans[0].path !== binding.path) {
       pushError(diagnostics, {
         code: 'SKG-MARKER-DUPLICATE-GLOBAL',
-        message: `Point marker is not uniquely bound across canonical inventory: ${pointId}`,
+        message: `Point canonical marker is not uniquely bound in the mother namespace: ${pointId}`,
         location: binding.path,
         witness: {
           point: pointId,
           binding_path: binding.path,
-          spans: globalSpans,
+          spans: motherSpans,
         },
         remediation:
-          'Keep exactly one ccm:k marker pair per point id across the full canonical inventory, matching binding.path.',
+          'Keep exactly one ccm:k marker pair per point id under plugin/src/knowledge/points/, matching binding.path.',
         exitCode: 4,
       });
     }
@@ -627,6 +678,63 @@ export function buildAndValidateGraph({
     }
     spanByPoint.set(pointId, { ...span, path: binding.path });
     spanHashes[pointId] = hashMarkdownSpan(span.content);
+  }
+
+  // Article ⟷ mother reconciliation (two-way review-on-change).
+  //
+  // Once the article stops being a byte copy of the point, "they still agree"
+  // is no longer free — nothing else in the pipeline would notice the article
+  // saying one thing while the knowledge says another. Both sides are hashed so
+  // that an edit on either side reopens the question.
+  for (const skillDoc of skills) {
+    for (const entry of skillDoc.data.canonical_source_inventory ?? []) {
+      const markdown = readMarkdown(entry.path);
+      if (markdown.missing || !markdown.markers?.ok) continue;
+      const anchored = new Map();
+      for (const span of markdown.markers.spans) {
+        const list = anchored.get(span.point_id) ?? [];
+        list.push(span.content);
+        anchored.set(span.point_id, list);
+      }
+      const recorded = new Map(
+        (entry.reconciliations ?? []).map((item) => [item.point, item]),
+      );
+      for (const [anchoredPoint, passages] of [...anchored.entries()].sort(([a], [b]) =>
+        compareCodePoint(a, b),
+      )) {
+        if (!pointById.has(anchoredPoint)) continue; // already reported as unknown anchor
+        const passageHash = hashMarkdownSpan(passages.join('\n'));
+        const pointHash = spanHashes[anchoredPoint];
+        const record = recorded.get(anchoredPoint);
+        if (!record) {
+          pushError(diagnostics, {
+            code: 'SKG-RECONCILIATION-MISSING',
+            message: `Article passage has no reconciliation record: ${anchoredPoint} in ${entry.path}`,
+            location: entry.path,
+            witness: { point: anchoredPoint, path: entry.path },
+            remediation:
+              'Read the passage against its mother file; if they agree, record both hashes under canonical_source_inventory[].reconciliations.',
+            exitCode: 4,
+          });
+          continue;
+        }
+        if (record.point_sha256 !== pointHash || record.passage_sha256 !== passageHash) {
+          pushError(diagnostics, {
+            code: 'SKG-RECONCILIATION-STALE',
+            message: `Article passage and its point drifted apart since last review: ${anchoredPoint} in ${entry.path}`,
+            location: entry.path,
+            witness: {
+              point: anchoredPoint,
+              point_sha256: { recorded: record.point_sha256, actual: pointHash ?? null },
+              passage_sha256: { recorded: record.passage_sha256, actual: passageHash },
+            },
+            remediation:
+              'Re-read the passage against the mother file; once they agree again, refresh both hashes.',
+            exitCode: 4,
+          });
+        }
+      }
+    }
   }
 
   // Derived authority freshness (C3 / K-I19).

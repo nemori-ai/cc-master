@@ -766,6 +766,27 @@
         "reviewed_unbound_sha256": {
           "$ref": "#/$defs/sha256"
         },
+        "reconciliations": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Pure facts only: which point this file's prose draws on, and the two hashes checked to agree. No prose, no justification, no per-consumer bookkeeping — the article is written, not clipped from the point, so there is nothing here to explain. Either hash changing invalidates the record.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["point", "point_sha256", "passage_sha256"],
+            "properties": {
+              "point": { "$ref": "#/$defs/pointId" },
+              "point_sha256": {
+                "$ref": "#/$defs/sha256",
+                "description": "Hash of the point's authoritative span in its mother file."
+              },
+              "passage_sha256": {
+                "$ref": "#/$defs/sha256",
+                "description": "Hash of every passage in this file anchored to that point, concatenated in document order."
+              }
+            }
+          }
+        },
         "unresolved_coverage_debt": {
           "type": "array",
           "items": {

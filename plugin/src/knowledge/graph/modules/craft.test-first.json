@@ -58,7 +58,7 @@
         "需要完成证据闸"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.completion-gate.md",
         "marker": "point:tdd.completion-gate",
         "heading_hint": "完成证据闸"
       },
@@ -94,7 +94,7 @@
         "需要Constraint parity"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.constraint-parity.md",
         "marker": "point:tdd.constraint-parity",
         "heading_hint": "Constraint parity"
       },
@@ -130,7 +130,7 @@
         "需要测试困难是设计反馈"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.design-feedback.md",
         "marker": "point:tdd.design-feedback",
         "heading_hint": "测试困难是设计反馈"
       },
@@ -166,7 +166,7 @@
         "需要TDD 铁律"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.iron-law.md",
         "marker": "point:tdd.iron-law",
         "heading_hint": "TDD 铁律"
       },
@@ -202,7 +202,7 @@
         "需要TDD 与执行循环边界"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.loop-boundary.md",
         "marker": "point:tdd.loop-boundary",
         "heading_hint": "TDD 与执行循环边界"
       },
@@ -238,7 +238,7 @@
         "需要TDD 合理化与红旗"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.rationalizations.md",
         "marker": "point:tdd.rationalizations",
         "heading_hint": "TDD 合理化与红旗"
       },
@@ -274,7 +274,7 @@
         "需要验证 RED 原因"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.red-evidence.md",
         "marker": "point:tdd.red-evidence",
         "heading_hint": "验证 RED 原因"
       },
@@ -310,7 +310,7 @@
         "需要红绿重构循环"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
+        "path": "plugin/src/knowledge/points/tdd.red-green-loop.md",
         "marker": "point:tdd.red-green-loop",
         "heading_hint": "红绿重构循环"
       },

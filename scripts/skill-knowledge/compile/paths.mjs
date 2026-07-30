@@ -17,6 +17,18 @@ export function canonicalBindingToDistPath(host, bindingPath) {
 }
 
 /**
+ * Where a point lives in a host tree.
+ *
+ * `binding.path` addresses the mother file, which is maintainer-only and never
+ * ships; the shippable location is the article passage carrying the point's
+ * provenance anchor (`anchor_path`, derived at graph build). Falls back to the
+ * binding for points not yet anchored anywhere.
+ */
+export function pointHostSourcePath(point) {
+  return point?.anchor_path ?? point?.binding?.path ?? null;
+}
+
+/**
  * Map an authored entry surface source_file to its projected host path.
  */
 export function entrySurfaceToDistPath(host, sourceFile) {

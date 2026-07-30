@@ -56,7 +56,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.cross-harness-facts.md",
         "marker": "point:ccm.cmd.cross-harness-facts",
         "heading_hint": "跨 harness"
       },
@@ -93,7 +93,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.worker-quota.md",
         "marker": "point:ccm.cmd.worker-quota",
         "heading_hint": "namespace worker"
       },
@@ -130,7 +130,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.capability-deps.md",
         "marker": "point:ccm.cmd.capability-deps",
         "heading_hint": "namespace capability"
       },
@@ -167,7 +167,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.peers-coord.md",
         "marker": "point:ccm.cmd.peers-coord",
         "heading_hint": "namespace peers"
       },
@@ -204,7 +204,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.usage.md",
         "marker": "point:ccm.cmd.usage",
         "heading_hint": "namespace usage"
       },
@@ -241,7 +241,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.ops-surfaces.md",
         "marker": "point:ccm.cmd.ops-surfaces",
         "heading_hint": "namespace status-report"
       },
@@ -278,7 +278,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.estimate.md",
         "marker": "point:ccm.cmd.estimate",
         "heading_hint": "namespace estimate"
       },
@@ -315,7 +315,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.calibration.md",
         "marker": "point:ccm.cmd.calibration",
         "heading_hint": "namespace calibration"
       },
@@ -352,7 +352,7 @@
         "advisory/ops namespace"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.misc-ns.md",
         "marker": "point:ccm.cmd.misc-ns",
         "heading_hint": "namespace statusline"
       },

@@ -1,0 +1,40 @@
+---
+point: outside.evidence-levels
+---
+
+## 权威陈述
+
+<!-- ccm:k:start point:outside.evidence-levels -->
+你已经有两根检查轴，本文是正交的第三根，与它们**协作但不复述**：
+
+- **goal 对齐**（`references/goal-contract.md` 的 Goal Trace Test / Delta Classifier）——问「这项工作还追溯得到既定 goal 吗」，管**内部一致性**。
+- **端点验收**（`references/resume-verify.md`）——问「这个已完成的产物对不对」，管**成品正确性**。
+- **outside-in（本文）**——问「你据以行动的承重假设，接触过外部现实吗？哪项外部事实能推翻它」，管**假设的外部有效性**。
+
+命门：**你可以每条 Trace Test 全绿、每道端点验收全过，仍在闭门造车**——因为被追溯、被验收的那个方案，原点就建在一个从没人向外核实过的假设上。一个管「有没有偏离 goal」，一个管「成品对不对」，本文管「原点真不真」。
+
+**与「发现未知」的分界**：上面三根轴处理的都是**已经被表述出来**的东西——一个追溯得到的目标、一个可验收的产物、一个能被证伪的假设。**一个假设得先被说出口，本文才够得着它。** 那些还没被表述出来的（用户显然到不会写下来的偏好、他压根没想到的方向），归 `references/user-unknowns.md`——它管发现，本文管校准，两段接力，不重叠。别把它那套四类未知塞进下面的证据分级里，也别拿证据分级当发现手法。
+
+## 命门：内部共识不是外部验证
+
+最危险的时刻，是几股内部信号叠在一起、看起来像「已经被验证过」：三个 subagent 独立调研还都对上了、方案读起来很顺、你已经沉进去很久。**内部一致不是外部证据**——三份报告一致，往往是同一个未验证前提被复制了三次（相关失败），不是三条独立证据链收敛。「同族复读不算第二视角」这条在假设层同构成立：换个 subagent 再读一遍同一批材料，复现的是同一个盲区，不是校准。
+
+这个念头恰恰在负载下最容易蒸发：跨 compaction、context 饱和、赶窗口时，「我哪个承重假设只由内部推断支撑」压根不在场。所以它值得成为一条**一等检查项**（决策程序里与 Goal Trace Test 同拍的那一问），而不是每次在压力下临时重新推导——负载越重，越推不出来。
+
+## 组件 A — 证据五分级 + 怎么落 board
+
+给「不把内部共识冒充验证」一把可操作的尺。五级，各有操作化落点——**全部复用既有柔性字段，绝不新增顶层字段**：
+
+| 证据级 | 是什么 | 怎么落 board |
+|---|---|---|
+| **已知事实** | 仓库 / 运行时 / 权威源可复核 | `ccm log add "<事实>" --kind finding --detail "<来源>"`，需要时 `--ref code:/abs` |
+| **agent 推断** | 你或 subagent 推理得出、无外部接地——**危险级** | 先 `ccm log add "<推断内容>·无外部接地" --kind note` 记下这个推断本身；只有当你**决定基于它推进**——这是一个你已做的判断，不是待验证队列——才追加 `ccm jc add "决定基于假设 X 推进 Y" --category <architecture\|drift\|spec-impl-misalignment\|other 按内容择一；单选枚举，不可斜杠组合> --severity <按风险>`（落 `pending_review`） |
+| **待验证假设** | 明知是猜、待测，**尚未决定要不要基于它行动** | `ccm log add "假设 X 未验证" --kind note` ＋ 一个真实校准节点（`ccm task add <id> --title "用 X 手段验假设 Y"`，靠 deps 自动门控）——**不占用 jc**：jc 只留给「已做判断」，见上一行 |
+| **用户决策** | 只有用户能拍 | `ccm task block <id> --on user --decision @file` 带一份采访包（见 `references/async-hitl.md`） |
+| **外部证据** | 已对现实校准 | `ccm log add … --kind finding --ref web:/issue:/doc:`；若它证实或证伪了一条**已做判断**的 jc → `ccm jc resolve <J> --status upheld`（证实）/ `overturned`（证伪） |
+
+**jc 只记「已做判断」，不记「待验证假设」本身**——这是与「自驱决策记录不是待办队列」这条既有纪律保持一致的关键分界：一个假设本身待验证时，落点是 `log add`（note/finding）+ 一个真实校准 task；只有当你已经**决定**基于这个假设推进（哪怕假设还没验证），那个「决定推进」的判断才落一条 `pending_review` 的 jc——它的 `pending_review → upheld / overturned` 生命周期追踪的是**这个决定事后被证实还是被证伪**，不是假设本身的待办占位。外部证据证实决定所依赖的假设 → `upheld`，证伪它 → `overturned`（并按组件 E 判是否触发 amendment）。log / task / jc 三者都持久、扛 compaction——把关键证据、未决假设、下一验证点、以及已做判断留在这里，compaction 后新一轮的你（或接手的 session）读 board 就能继续对齐。
+
+**绝不为此新增 `board.assumptions` 之类顶层字段**——`log` + `jc` + `references` 已足够，新增字段是 scope creep、还会逼近 hook 依赖的窄腰。字段怎么填、会撞哪条校验规则，见 `using-ccm`。
+
+<!-- ccm:k:end point:outside.evidence-levels -->

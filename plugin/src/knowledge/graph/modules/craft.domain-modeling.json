@@ -58,7 +58,7 @@
         "需要DDD 准入问题"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.admission-question.md",
         "marker": "point:ddd.admission-question",
         "heading_hint": "DDD 准入问题"
       },
@@ -94,7 +94,7 @@
         "需要Aggregate 与不变式所有权"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.aggregate-ownership.md",
         "marker": "point:ddd.aggregate-ownership",
         "heading_hint": "Aggregate 与不变式所有权"
       },
@@ -130,7 +130,7 @@
         "需要应用层推导"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.application-derivation.md",
         "marker": "point:ddd.application-derivation",
         "heading_hint": "应用层推导"
       },
@@ -166,7 +166,7 @@
         "需要设计阶段焦点"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.design-focus.md",
         "marker": "point:ddd.design-focus",
         "heading_hint": "设计阶段焦点"
       },
@@ -202,7 +202,7 @@
         "需要DDD 反模式雷达"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.failure-radar.md",
         "marker": "point:ddd.failure-radar",
         "heading_hint": "DDD 反模式雷达"
       },
@@ -238,7 +238,7 @@
         "需要DDD 红线"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.red-lines.md",
         "marker": "point:ddd.red-lines",
         "heading_hint": "DDD 红线"
       },
@@ -274,7 +274,7 @@
         "需要战略边界与语言"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
+        "path": "plugin/src/knowledge/points/ddd.strategic-boundaries.md",
         "marker": "point:ddd.strategic-boundaries",
         "heading_hint": "战略边界与语言"
       },

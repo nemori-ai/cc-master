@@ -7,6 +7,7 @@ import {
 import { estimateBudget } from '../hash.mjs';
 import {
   canonicalBindingToDistPath,
+  pointHostSourcePath,
   entrySurfaceToDistPath,
   moduleAnchorId,
   posixRelative,
@@ -375,7 +376,7 @@ function replaceManagedKnowledgeTree(repoRoot, managedRootRelative, knowledgeArt
 }
 
 function pointDistPath(host, point) {
-  return canonicalBindingToDistPath(host, point.binding.path);
+  return canonicalBindingToDistPath(host, pointHostSourcePath(point));
 }
 
 function linkLine(label, fromFile, toFile, fragment) {

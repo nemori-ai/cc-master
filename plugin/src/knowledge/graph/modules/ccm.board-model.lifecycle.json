@@ -58,7 +58,7 @@
         "能不能 --set"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.task-fields.md",
         "marker": "point:ccm.board.task-fields",
         "heading_hint": "A. task 字段"
       },
@@ -95,7 +95,7 @@
         "uncertain vs blocked"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.status-semantics.md",
         "marker": "point:ccm.board.status-semantics",
         "heading_hint": "B. status 八态"
       },
@@ -132,7 +132,7 @@
         "executor 决策树"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.executor-choice.md",
         "marker": "point:ccm.board.executor-choice",
         "heading_hint": "C. executor"
       },
@@ -169,7 +169,7 @@
         "验收条件怎么写"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.acceptance.md",
         "marker": "point:ccm.board.acceptance",
         "heading_hint": "D. acceptance"
       },
@@ -206,7 +206,7 @@
         "estimate 单位"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.estimate-judgment.md",
         "marker": "point:ccm.board.estimate-judgment",
         "heading_hint": "E. estimate"
       },
@@ -243,7 +243,7 @@
         "review-gate deps"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.deps-linking.md",
         "marker": "point:ccm.board.deps-linking",
         "heading_hint": "F. deps"
       },
@@ -280,7 +280,7 @@
         "decision_package"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.blocked-on.md",
         "marker": "point:ccm.board.blocked-on",
         "heading_hint": "G. blocked_on"
       },

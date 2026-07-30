@@ -45,7 +45,69 @@
         "point:devloop.two-scale",
         "point:devloop.ml-components"
       ],
-      "reviewed_unbound_sha256": "56fc6d32588c364a9c4791ef6caa4879e23a5cc02baa7532c87d20341c26d9a4"
+      "reviewed_unbound_sha256": "56fc6d32588c364a9c4791ef6caa4879e23a5cc02baa7532c87d20341c26d9a4",
+      "reconciliations": [
+        {
+          "point": "point:devloop.converge",
+          "point_sha256": "4af66f5dfd94555eada068d818cb5c6493c371f1903933768d25256820f85ed1",
+          "passage_sha256": "4af66f5dfd94555eada068d818cb5c6493c371f1903933768d25256820f85ed1"
+        },
+        {
+          "point": "point:devloop.core-thesis",
+          "point_sha256": "1fa440b475f2611565ed5111d0b68e5cc5cf09377ffe48a651e68ab336c8c068",
+          "passage_sha256": "1fa440b475f2611565ed5111d0b68e5cc5cf09377ffe48a651e68ab336c8c068"
+        },
+        {
+          "point": "point:devloop.explore-exploit",
+          "point_sha256": "7ec7e6a28cadb42075cfeda8627b817535abf32ab75b67fb21af17d73686e202",
+          "passage_sha256": "7ec7e6a28cadb42075cfeda8627b817535abf32ab75b67fb21af17d73686e202"
+        },
+        {
+          "point": "point:devloop.fit-intent",
+          "point_sha256": "29299e7d8d671bd613bdba3d9b1e762460966ea4a34ec7c5507eca1614e276ea",
+          "passage_sha256": "29299e7d8d671bd613bdba3d9b1e762460966ea4a34ec7c5507eca1614e276ea"
+        },
+        {
+          "point": "point:devloop.instrument",
+          "point_sha256": "16f86f5536958fb327f81a88d045987011a93084a967b79bf947a17105f58c22",
+          "passage_sha256": "16f86f5536958fb327f81a88d045987011a93084a967b79bf947a17105f58c22"
+        },
+        {
+          "point": "point:devloop.iterate",
+          "point_sha256": "129df6b4437bef5e41351962de9cdc5956ce55ac75a4bb6cf8e24dad15b9cd7c",
+          "passage_sha256": "129df6b4437bef5e41351962de9cdc5956ce55ac75a4bb6cf8e24dad15b9cd7c"
+        },
+        {
+          "point": "point:devloop.ml-components",
+          "point_sha256": "ece81ea6439213e512198889f2a71dd45d61316c86154a2af801ce48707f4815",
+          "passage_sha256": "ece81ea6439213e512198889f2a71dd45d61316c86154a2af801ce48707f4815"
+        },
+        {
+          "point": "point:devloop.objective",
+          "point_sha256": "ff603f7df1c8573aa4a45613901624395aa57c0dc3e5e7e923a0ac40c79928c9",
+          "passage_sha256": "ff603f7df1c8573aa4a45613901624395aa57c0dc3e5e7e923a0ac40c79928c9"
+        },
+        {
+          "point": "point:devloop.plateau-restart",
+          "point_sha256": "21f1a98f187ca8d3e6cd1152c80f192ed5b4d0537a061df36d0810021d711c5f",
+          "passage_sha256": "21f1a98f187ca8d3e6cd1152c80f192ed5b4d0537a061df36d0810021d711c5f"
+        },
+        {
+          "point": "point:devloop.regularize",
+          "point_sha256": "e26edb41d39bcaccb6fe9c9da2d3275f28d6b10c9a7a1e028478644e7182029a",
+          "passage_sha256": "e26edb41d39bcaccb6fe9c9da2d3275f28d6b10c9a7a1e028478644e7182029a"
+        },
+        {
+          "point": "point:devloop.taste-and-cycle",
+          "point_sha256": "dfbb9088c7b079dc3797098683ce94221566dae44033cb3987d7209b696e784f",
+          "passage_sha256": "dfbb9088c7b079dc3797098683ce94221566dae44033cb3987d7209b696e784f"
+        },
+        {
+          "point": "point:devloop.two-scale",
+          "point_sha256": "c76090ab90432a015c6723d880d9fae0d2a06ebb90a1bf6ab218ceee9e604634",
+          "passage_sha256": "c76090ab90432a015c6723d880d9fae0d2a06ebb90a1bf6ab218ceee9e604634"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
@@ -57,7 +119,34 @@
         "point:devloop.ledger-handoff",
         "point:devloop.ledger-antipatterns"
       ],
-      "reviewed_unbound_sha256": "6ee8eaf451996e851cff24374ee5e6974c1347adc4a94002963a8016dfd69d8b"
+      "reviewed_unbound_sha256": "6ee8eaf451996e851cff24374ee5e6974c1347adc4a94002963a8016dfd69d8b",
+      "reconciliations": [
+        {
+          "point": "point:devloop.ledger-antipatterns",
+          "point_sha256": "115c4429653176c10aeef4b7c16e65bd6e47a556d8e87bc4a4f8047369a7aa15",
+          "passage_sha256": "115c4429653176c10aeef4b7c16e65bd6e47a556d8e87bc4a4f8047369a7aa15"
+        },
+        {
+          "point": "point:devloop.ledger-ccm",
+          "point_sha256": "8fbb566c779a5771cfd107655f5494786d15643b82471a9b553e2190f7a909b6",
+          "passage_sha256": "8fbb566c779a5771cfd107655f5494786d15643b82471a9b553e2190f7a909b6"
+        },
+        {
+          "point": "point:devloop.ledger-handoff",
+          "point_sha256": "43f0232a213e956ca8537e56b34339c70c07bcce46ff3f2ec9c391d45c4fdc01",
+          "passage_sha256": "43f0232a213e956ca8537e56b34339c70c07bcce46ff3f2ec9c391d45c4fdc01"
+        },
+        {
+          "point": "point:devloop.ledger-what",
+          "point_sha256": "b6cde0b0d9c8f7cb7f85897967604ea386b75b060cdf5dad8d149ca3a7fe6808",
+          "passage_sha256": "b6cde0b0d9c8f7cb7f85897967604ea386b75b060cdf5dad8d149ca3a7fe6808"
+        },
+        {
+          "point": "point:devloop.ledger-when",
+          "point_sha256": "cfb5564e5aa6ce62a5c8fb852da56ab588c0d932593706ee696dea1e544a4980",
+          "passage_sha256": "cfb5564e5aa6ce62a5c8fb852da56ab588c0d932593706ee696dea1e544a4980"
+        }
+      ]
     }
   ],
   "host_coverage": [

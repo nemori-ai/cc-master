@@ -54,7 +54,7 @@
         "脑中只有先 schema/API/UI"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
+        "path": "plugin/src/knowledge/points/slicing.example-contrast.md",
         "marker": "point:slicing.example-contrast",
         "heading_hint": "横切 vs 纵切"
       },

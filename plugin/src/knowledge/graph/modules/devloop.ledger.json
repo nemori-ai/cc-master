@@ -60,7 +60,7 @@
         "长程任务不写 board"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "path": "plugin/src/knowledge/points/devloop.ledger-when.md",
         "marker": "point:devloop.ledger-when",
         "heading_hint": "什么时候必须写 ledger"
       },
@@ -96,7 +96,7 @@
         "把全部测试输出贴进 log"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "path": "plugin/src/knowledge/points/devloop.ledger-what.md",
         "marker": "point:devloop.ledger-what",
         "heading_hint": "写什么"
       },
@@ -132,7 +132,7 @@
         "把 ccm 当事后文书"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "path": "plugin/src/knowledge/points/devloop.ledger-ccm.md",
         "marker": "point:devloop.ledger-ccm",
         "heading_hint": "用 ccm 管住优化目标"
       },
@@ -168,7 +168,7 @@
         "等 compact 前再总结"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "path": "plugin/src/knowledge/points/devloop.ledger-handoff.md",
         "marker": "point:devloop.ledger-handoff",
         "heading_hint": "continuous handoff"
       },
@@ -204,7 +204,7 @@
         "board 有任务状态就够了"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/references/optimization-ledger.md",
+        "path": "plugin/src/knowledge/points/devloop.ledger-antipatterns.md",
         "marker": "point:devloop.ledger-antipatterns",
         "heading_hint": "anti-patterns"
       },

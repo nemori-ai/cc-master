@@ -57,7 +57,7 @@
         "证据忠实"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.evidence-hard-line.md",
         "marker": "point:distill.evidence-hard-line",
         "heading_hint": "唯一硬约束"
       },
@@ -97,7 +97,7 @@
         "弱证据"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/evidence-fidelity.md",
+        "path": "plugin/src/knowledge/points/distill.evidence-fidelity.md",
         "marker": "point:distill.evidence-fidelity",
         "heading_hint": "泛化 vs 收窄"
       },

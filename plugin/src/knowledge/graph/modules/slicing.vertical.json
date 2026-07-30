@@ -57,7 +57,7 @@
         "横切图算临界路径"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.why-cut.md",
         "marker": "point:slicing.why-cut",
         "heading_hint": "为什么这一刀最值钱"
       },
@@ -94,7 +94,7 @@
         "纵切 vs 横切"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.vertical-rule.md",
         "marker": "point:slicing.vertical-rule",
         "heading_hint": "心智锚 1"
       },

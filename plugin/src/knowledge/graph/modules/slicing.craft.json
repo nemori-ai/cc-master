@@ -58,7 +58,7 @@
         "一次定全地基"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.walking-skeleton.md",
         "marker": "point:slicing.walking-skeleton",
         "heading_hint": "心智锚 2"
       },
@@ -95,7 +95,7 @@
         "大爆炸节点"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.grain.md",
         "marker": "point:slicing.grain",
         "heading_hint": "心智锚 3"
       },
@@ -131,7 +131,7 @@
         "先做哪片"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.value-risk.md",
         "marker": "point:slicing.value-risk",
         "heading_hint": "心智锚 4"
       },
@@ -167,7 +167,7 @@
         "怎么写进 board"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.board-landing.md",
         "marker": "point:slicing.board-landing",
         "heading_hint": "落到 board"
       },
@@ -203,7 +203,7 @@
         "对照切坏了没有"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.antipatterns.md",
         "marker": "point:slicing.antipatterns",
         "heading_hint": "anti-pattern"
       },

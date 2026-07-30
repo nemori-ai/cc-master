@@ -8,38 +8,38 @@
   "intent": "用 ccm CLI 正确读写 board：稳定心智 + 命令面机械事实 + board 模型判断 + 号池机制。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:ccm.mind-model",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.mind-model.json"
-    },
-    {
-      "id": "module:ccm.hotpath-footgun",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.hotpath-footgun.json"
-    },
-    {
-      "id": "module:ccm.board-model.lifecycle",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.board-model.lifecycle.json"
-    },
-    {
-      "id": "module:ccm.board-model.contracts",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.board-model.contracts.json"
-    },
-    {
-      "id": "module:ccm.commands.core",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.core.json"
-    },
-    {
-      "id": "module:ccm.commands.scheduling",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.scheduling.json"
-    },
-    {
-      "id": "module:ccm.commands.extended",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.extended.json"
-    },
-    {
-      "id": "module:ccm.account-pool",
-      "manifest": "plugin/src/knowledge/graph/modules/ccm.account-pool.json"
-    }
+      {
+        "id": "module:ccm.mind-model",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.mind-model.json"
+      },
+      {
+        "id": "module:ccm.hotpath-footgun",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.hotpath-footgun.json"
+      },
+      {
+        "id": "module:ccm.board-model.lifecycle",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.board-model.lifecycle.json"
+      },
+      {
+        "id": "module:ccm.board-model.contracts",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.board-model.contracts.json"
+      },
+      {
+        "id": "module:ccm.commands.core",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.core.json"
+      },
+      {
+        "id": "module:ccm.commands.scheduling",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.scheduling.json"
+      },
+      {
+        "id": "module:ccm.commands.extended",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.commands.extended.json"
+      },
+      {
+        "id": "module:ccm.account-pool",
+        "manifest": "plugin/src/knowledge/graph/modules/ccm.account-pool.json"
+      }
     ]
   },
   "entry_modules": [
@@ -62,7 +62,29 @@
         "point:ccm.account-pool-model",
         "point:ccm.account-select-method"
       ],
-      "reviewed_unbound_sha256": "448721c7cb9c24e70d129bd4a800ad23cd3e20ee62bd12f9ea06b5f882ba9598"
+      "reviewed_unbound_sha256": "448721c7cb9c24e70d129bd4a800ad23cd3e20ee62bd12f9ea06b5f882ba9598",
+      "reconciliations": [
+        {
+          "point": "point:ccm.account-enroll-why",
+          "point_sha256": "140bc3ce1f12b99ad9c1491f19b6e654b6c1ee7b4049107468781d53a19c52cb",
+          "passage_sha256": "140bc3ce1f12b99ad9c1491f19b6e654b6c1ee7b4049107468781d53a19c52cb"
+        },
+        {
+          "point": "point:ccm.account-policy-vault",
+          "point_sha256": "6589ae8a8e69598245754883a5aec588009f5d161f814aa1c5ebd72b5608bb48",
+          "passage_sha256": "6589ae8a8e69598245754883a5aec588009f5d161f814aa1c5ebd72b5608bb48"
+        },
+        {
+          "point": "point:ccm.account-pool-model",
+          "point_sha256": "abfad345f758245ecd556d8ec922729aae6a5c2afef99fec63d2fa889a9072e1",
+          "passage_sha256": "abfad345f758245ecd556d8ec922729aae6a5c2afef99fec63d2fa889a9072e1"
+        },
+        {
+          "point": "point:ccm.account-select-method",
+          "point_sha256": "074ce1179980098cd916b418b46e3d4c0950ef0b9d644e9d3a7c25a25f6c9caa",
+          "passage_sha256": "074ce1179980098cd916b418b46e3d4c0950ef0b9d644e9d3a7c25a25f6c9caa"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
@@ -86,7 +108,94 @@
         "point:ccm.board.validation-rules",
         "point:ccm.board.watchdog"
       ],
-      "reviewed_unbound_sha256": "b5833a36421416dd51bf92d283c5718da08926cf7bfddfa1f92b7d7e32d929b7"
+      "reviewed_unbound_sha256": "b5833a36421416dd51bf92d283c5718da08926cf7bfddfa1f92b7d7e32d929b7",
+      "reconciliations": [
+        {
+          "point": "point:ccm.board.acceptance",
+          "point_sha256": "4c334ab5f2a8284fe9049dcf0e815f292b5d569b9ff4ebfe46f6a58cfb02fe3a",
+          "passage_sha256": "4c334ab5f2a8284fe9049dcf0e815f292b5d569b9ff4ebfe46f6a58cfb02fe3a"
+        },
+        {
+          "point": "point:ccm.board.agents-registry",
+          "point_sha256": "7474006c33b9781e4bfc0611544ed3cc3e34a266d970e2409c5ef437835b8a82",
+          "passage_sha256": "7474006c33b9781e4bfc0611544ed3cc3e34a266d970e2409c5ef437835b8a82"
+        },
+        {
+          "point": "point:ccm.board.antipatterns",
+          "point_sha256": "bada937040db5f561e58dc0273de74ae603ed9ef709723f8f9213657cfca81be",
+          "passage_sha256": "bada937040db5f561e58dc0273de74ae603ed9ef709723f8f9213657cfca81be"
+        },
+        {
+          "point": "point:ccm.board.artifact-verified",
+          "point_sha256": "dff530359a40fe45d99c8f0df9aa551f9a2f7dbc01ab837c6bed5804917f302c",
+          "passage_sha256": "dff530359a40fe45d99c8f0df9aa551f9a2f7dbc01ab837c6bed5804917f302c"
+        },
+        {
+          "point": "point:ccm.board.blocked-on",
+          "point_sha256": "52f67e93da6c115dafb8d24d9ffb45cd5ecb1dee672537b48e6d07ca32f66f88",
+          "passage_sha256": "52f67e93da6c115dafb8d24d9ffb45cd5ecb1dee672537b48e6d07ca32f66f88"
+        },
+        {
+          "point": "point:ccm.board.cadence",
+          "point_sha256": "8a5c8a44a8fb9f998d5cb0c8e21d983775ab6b3c7db581879435372825b76fb9",
+          "passage_sha256": "8a5c8a44a8fb9f998d5cb0c8e21d983775ab6b3c7db581879435372825b76fb9"
+        },
+        {
+          "point": "point:ccm.board.deadline-ddl",
+          "point_sha256": "86cac802bbfcc813f684bc618a5ee7979d7ee8fcaa87ae38fb5e7398e79a4f07",
+          "passage_sha256": "86cac802bbfcc813f684bc618a5ee7979d7ee8fcaa87ae38fb5e7398e79a4f07"
+        },
+        {
+          "point": "point:ccm.board.deps-linking",
+          "point_sha256": "6dbf9707ff8e0090eb210f3fb7c039b741d332d27e39cc813d1f3233adbae032",
+          "passage_sha256": "6dbf9707ff8e0090eb210f3fb7c039b741d332d27e39cc813d1f3233adbae032"
+        },
+        {
+          "point": "point:ccm.board.estimate-judgment",
+          "point_sha256": "cd153a2ec93da248d65db30354f9eb843d6bb55aedd2dc60a07c71c8addca9fe",
+          "passage_sha256": "cd153a2ec93da248d65db30354f9eb843d6bb55aedd2dc60a07c71c8addca9fe"
+        },
+        {
+          "point": "point:ccm.board.executor-choice",
+          "point_sha256": "5896e12c0e9c1c123311eb078eec0723d4fd3dc5fc4e1305a4a45e90ae18a5f0",
+          "passage_sha256": "5896e12c0e9c1c123311eb078eec0723d4fd3dc5fc4e1305a4a45e90ae18a5f0"
+        },
+        {
+          "point": "point:ccm.board.jc-judgment",
+          "point_sha256": "93f7e7fc2f85cbbb22f9d518a39b2acc0de6df9c007256472a9c5e5bdaa35878",
+          "passage_sha256": "93f7e7fc2f85cbbb22f9d518a39b2acc0de6df9c007256472a9c5e5bdaa35878"
+        },
+        {
+          "point": "point:ccm.board.parent-owner",
+          "point_sha256": "5bd5c2bb5b663b92de56132fe47c1caa39f6c9490a8675abea6ef69e1c0eaa31",
+          "passage_sha256": "5bd5c2bb5b663b92de56132fe47c1caa39f6c9490a8675abea6ef69e1c0eaa31"
+        },
+        {
+          "point": "point:ccm.board.planning-routing",
+          "point_sha256": "3ebc898718211151573069d6557e8d736a139c2139ef26dd646fedf43a903bbb",
+          "passage_sha256": "3ebc898718211151573069d6557e8d736a139c2139ef26dd646fedf43a903bbb"
+        },
+        {
+          "point": "point:ccm.board.status-semantics",
+          "point_sha256": "727739ae10adacdc95e31b0253014323fc7aa17874ec5c2317390b15ec3d7696",
+          "passage_sha256": "727739ae10adacdc95e31b0253014323fc7aa17874ec5c2317390b15ec3d7696"
+        },
+        {
+          "point": "point:ccm.board.task-fields",
+          "point_sha256": "ae2f7470a99549ede6aceeafc09625b303b0c948694ea3cff281c068138e11ec",
+          "passage_sha256": "ae2f7470a99549ede6aceeafc09625b303b0c948694ea3cff281c068138e11ec"
+        },
+        {
+          "point": "point:ccm.board.validation-rules",
+          "point_sha256": "b5e30c14d719c9394fcbe0314c6d9d6838148cd3dc41872fa4f60079be3abc71",
+          "passage_sha256": "b5e30c14d719c9394fcbe0314c6d9d6838148cd3dc41872fa4f60079be3abc71"
+        },
+        {
+          "point": "point:ccm.board.watchdog",
+          "point_sha256": "eac85d0c2fafa710fae279c31380e5bc2432c6a1738803e5e0c19c0e88ab9a7e",
+          "passage_sha256": "eac85d0c2fafa710fae279c31380e5bc2432c6a1738803e5e0c19c0e88ab9a7e"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
@@ -114,7 +223,114 @@
         "point:ccm.cmd.watchdog",
         "point:ccm.cmd.worker-quota"
       ],
-      "reviewed_unbound_sha256": "ce8903c651ef1b739da24a11c216cabc099b115e87aa6b4399de1c2f2c380a10"
+      "reviewed_unbound_sha256": "ce8903c651ef1b739da24a11c216cabc099b115e87aa6b4399de1c2f2c380a10",
+      "reconciliations": [
+        {
+          "point": "point:ccm.cmd.account",
+          "point_sha256": "90e664aa78ec7d526ac09b8de4c36216f4b8c3219505f0f4f3af9887515a9a50",
+          "passage_sha256": "90e664aa78ec7d526ac09b8de4c36216f4b8c3219505f0f4f3af9887515a9a50"
+        },
+        {
+          "point": "point:ccm.cmd.agent",
+          "point_sha256": "fe0ee7492fe4c8083e8f142b723e7932f8952d14d20f0465239be54961f4c72f",
+          "passage_sha256": "fe0ee7492fe4c8083e8f142b723e7932f8952d14d20f0465239be54961f4c72f"
+        },
+        {
+          "point": "point:ccm.cmd.baseline",
+          "point_sha256": "545dab300c0f152f697e15fd05545d14b87631511f97518fa13167ac474b7903",
+          "passage_sha256": "545dab300c0f152f697e15fd05545d14b87631511f97518fa13167ac474b7903"
+        },
+        {
+          "point": "point:ccm.cmd.board",
+          "point_sha256": "30bf76e9f038f28980b90987733e715b4263cd3b3257ddf3e4cc20cdc5c59c12",
+          "passage_sha256": "30bf76e9f038f28980b90987733e715b4263cd3b3257ddf3e4cc20cdc5c59c12"
+        },
+        {
+          "point": "point:ccm.cmd.cadence",
+          "point_sha256": "705d26611f430c333cadc462b8c82f9cb4ac5d369c6c60d7e121145802fb9dd8",
+          "passage_sha256": "705d26611f430c333cadc462b8c82f9cb4ac5d369c6c60d7e121145802fb9dd8"
+        },
+        {
+          "point": "point:ccm.cmd.calibration",
+          "point_sha256": "bf2fd71a1d82288d4014409e76fde07f35eed439316f0e42f94d24ac265521a5",
+          "passage_sha256": "bf2fd71a1d82288d4014409e76fde07f35eed439316f0e42f94d24ac265521a5"
+        },
+        {
+          "point": "point:ccm.cmd.capability-deps",
+          "point_sha256": "da9fb3d41252c2e509bf7558209e19387ccdff3a0127299d6ace061e0b179478",
+          "passage_sha256": "da9fb3d41252c2e509bf7558209e19387ccdff3a0127299d6ace061e0b179478"
+        },
+        {
+          "point": "point:ccm.cmd.cross-harness-facts",
+          "point_sha256": "58bc8a1cb575f119ed5ac5872871514fa94648e5f179e76ce23e19413893f42b",
+          "passage_sha256": "58bc8a1cb575f119ed5ac5872871514fa94648e5f179e76ce23e19413893f42b"
+        },
+        {
+          "point": "point:ccm.cmd.estimate",
+          "point_sha256": "dbb9742a2e0b9e22196e7d3d9993ac2a34614a7347150f51b174797e660004be",
+          "passage_sha256": "dbb9742a2e0b9e22196e7d3d9993ac2a34614a7347150f51b174797e660004be"
+        },
+        {
+          "point": "point:ccm.cmd.goal",
+          "point_sha256": "22e8f1525411ef90c5e16d21634eb355369e2c30c2bd648dcb18733070be60db",
+          "passage_sha256": "22e8f1525411ef90c5e16d21634eb355369e2c30c2bd648dcb18733070be60db"
+        },
+        {
+          "point": "point:ccm.cmd.jc",
+          "point_sha256": "597f98c8590a273f545492dfa052861ef74b6f7db8431b7df4f155e99381525a",
+          "passage_sha256": "597f98c8590a273f545492dfa052861ef74b6f7db8431b7df4f155e99381525a"
+        },
+        {
+          "point": "point:ccm.cmd.json-shape",
+          "point_sha256": "2a48914f9b2fe8071127911148c0d506552ed859c3634028d3c5f9c09bf88221",
+          "passage_sha256": "2a48914f9b2fe8071127911148c0d506552ed859c3634028d3c5f9c09bf88221"
+        },
+        {
+          "point": "point:ccm.cmd.log",
+          "point_sha256": "58d1552d666f387495254cfc30f4e46b163bd6d62b1cfa19246c1fb4995679c6",
+          "passage_sha256": "58d1552d666f387495254cfc30f4e46b163bd6d62b1cfa19246c1fb4995679c6"
+        },
+        {
+          "point": "point:ccm.cmd.misc-ns",
+          "point_sha256": "783fb525d8e02a8a2316bac42a04d20166163879ad3c386fbfe69e2af07870a9",
+          "passage_sha256": "783fb525d8e02a8a2316bac42a04d20166163879ad3c386fbfe69e2af07870a9"
+        },
+        {
+          "point": "point:ccm.cmd.ops-surfaces",
+          "point_sha256": "5879013b6cabdcd562a472d2bcd2635db089e61a50e4c3e75fb8cf1acd620ef6",
+          "passage_sha256": "5879013b6cabdcd562a472d2bcd2635db089e61a50e4c3e75fb8cf1acd620ef6"
+        },
+        {
+          "point": "point:ccm.cmd.overview",
+          "point_sha256": "3b1de7d2658a64aed41ed12b9791390553b782f67f5293e01296ba4a59ddf6d8",
+          "passage_sha256": "3b1de7d2658a64aed41ed12b9791390553b782f67f5293e01296ba4a59ddf6d8"
+        },
+        {
+          "point": "point:ccm.cmd.peers-coord",
+          "point_sha256": "92c39e236ab374b54eade3de5af7a8311b68862f2651b9bc8d68738eb8e04a74",
+          "passage_sha256": "92c39e236ab374b54eade3de5af7a8311b68862f2651b9bc8d68738eb8e04a74"
+        },
+        {
+          "point": "point:ccm.cmd.task",
+          "point_sha256": "c274c39f0fdaf61cecd8eb34a4f6d2be09876d40a20a8c6ce7a875303385c996",
+          "passage_sha256": "c274c39f0fdaf61cecd8eb34a4f6d2be09876d40a20a8c6ce7a875303385c996"
+        },
+        {
+          "point": "point:ccm.cmd.usage",
+          "point_sha256": "c876a3c6c4dc7166d33f0fa567ecd5e24432b150d5b27d47f0cc5bd9556fb3c2",
+          "passage_sha256": "c876a3c6c4dc7166d33f0fa567ecd5e24432b150d5b27d47f0cc5bd9556fb3c2"
+        },
+        {
+          "point": "point:ccm.cmd.watchdog",
+          "point_sha256": "a8d9a606320ea839c811bbece3dc1cbdff7bcfe69e44927ba14d4338ebfbeb8c",
+          "passage_sha256": "a8d9a606320ea839c811bbece3dc1cbdff7bcfe69e44927ba14d4338ebfbeb8c"
+        },
+        {
+          "point": "point:ccm.cmd.worker-quota",
+          "point_sha256": "51d4bddfd3106906b367472e58dbc3e6ed20a69dc0aea3759d0bd94268580a22",
+          "passage_sha256": "51d4bddfd3106906b367472e58dbc3e6ed20a69dc0aea3759d0bd94268580a22"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
@@ -131,7 +347,59 @@
         "point:ccm.when-to-open",
         "point:ccm.write-gate"
       ],
-      "reviewed_unbound_sha256": "4910ace21c1702000128a8b5f62573e0d2e74eb9ff490473cec9b16d9790a863"
+      "reviewed_unbound_sha256": "4910ace21c1702000128a8b5f62573e0d2e74eb9ff490473cec9b16d9790a863",
+      "reconciliations": [
+        {
+          "point": "point:ccm.exit-codes",
+          "point_sha256": "7400cee0d1c50f355585275c9f09aed89d45ba4de6228ebc2022424233eefaef",
+          "passage_sha256": "7400cee0d1c50f355585275c9f09aed89d45ba4de6228ebc2022424233eefaef"
+        },
+        {
+          "point": "point:ccm.field-tiers",
+          "point_sha256": "920f14043bec020a3f85ee057d28fec7f78d7ae2f0e6387b029dafc8107d5cf3",
+          "passage_sha256": "920f14043bec020a3f85ee057d28fec7f78d7ae2f0e6387b029dafc8107d5cf3"
+        },
+        {
+          "point": "point:ccm.footgun-table",
+          "point_sha256": "9ea554150b7fe2310a5876e7aa3561c5f1eb7a3b36f14dae14be56714f5c17e8",
+          "passage_sha256": "9ea554150b7fe2310a5876e7aa3561c5f1eb7a3b36f14dae14be56714f5c17e8"
+        },
+        {
+          "point": "point:ccm.hotpath-flows",
+          "point_sha256": "c84a16b8ce76d8e85f7d1ad644261fa7c0ffc3b3dbd2c021fa97f088365bb4fd",
+          "passage_sha256": "c84a16b8ce76d8e85f7d1ad644261fa7c0ffc3b3dbd2c021fa97f088365bb4fd"
+        },
+        {
+          "point": "point:ccm.planning-opt-in",
+          "point_sha256": "218ae73c76976fdb714152078c4cfd05c36d869f7942e8f0ed1bdbe0af2af7e6",
+          "passage_sha256": "218ae73c76976fdb714152078c4cfd05c36d869f7942e8f0ed1bdbe0af2af7e6"
+        },
+        {
+          "point": "point:ccm.pointers-routing",
+          "point_sha256": "0d2387e8b5af5c6f81e39d65f7ae4b0acf7770bb4c598495fe4ac390a9ce57f1",
+          "passage_sha256": "0d2387e8b5af5c6f81e39d65f7ae4b0acf7770bb4c598495fe4ac390a9ce57f1"
+        },
+        {
+          "point": "point:ccm.single-write-path",
+          "point_sha256": "564c9d05ce1c7920adc04db71ada7915be45525b915d1967422248f2741367f6",
+          "passage_sha256": "564c9d05ce1c7920adc04db71ada7915be45525b915d1967422248f2741367f6"
+        },
+        {
+          "point": "point:ccm.status-state-machine",
+          "point_sha256": "c85c3493f6114fe24ee7a705e5f6b38e82c780710745c39e134c1a3160c4a438",
+          "passage_sha256": "c85c3493f6114fe24ee7a705e5f6b38e82c780710745c39e134c1a3160c4a438"
+        },
+        {
+          "point": "point:ccm.when-to-open",
+          "point_sha256": "d70c71cc2c8176816b68e86f783068002fcb99f875e939add0c8b430a3416b01",
+          "passage_sha256": "d70c71cc2c8176816b68e86f783068002fcb99f875e939add0c8b430a3416b01"
+        },
+        {
+          "point": "point:ccm.write-gate",
+          "point_sha256": "ee3721b72aaa24def907d819726296d744372f22b8bfa2a7df8d69df82a22384",
+          "passage_sha256": "ee3721b72aaa24def907d819726296d744372f22b8bfa2a7df8d69df82a22384"
+        }
+      ]
     }
   ],
   "host_coverage": [

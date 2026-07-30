@@ -58,7 +58,7 @@
         "准备根据 worker 自报更新 task verdict"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/verification.terminal-is-not-done.md",
         "marker": "point:verification.terminal-is-not-done",
         "heading_hint": "终端态之后做端点验收"
       },
@@ -94,7 +94,7 @@
         "要实际执行 artifact、diff、tests 或 hash 验收"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.endpoint-procedure.md",
         "marker": "point:verification.endpoint-procedure",
         "heading_hint": "端点验收——唯一可靠的正确性点"
       },
@@ -130,7 +130,7 @@
         "只需 routing record 中的简短 terminal 提醒"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/verification.terminal-summary.md",
         "marker": "point:verification.terminal-summary",
         "heading_hint": "一条不可换序的路由链"
       },
@@ -165,17 +165,36 @@
       "title": "content hash 与 stale",
       "point_kind": "procedure",
       "summary": "用 action-key 式 content hash 判断可复用结果，并在依赖变化时显式标 stale。",
-      "recognition_cues": ["resume 时判断能否跳过", "上游 artifact 发生变化"],
+      "recognition_cues": [
+        "resume 时判断能否跳过",
+        "上游 artifact 发生变化"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.hash-and-stale.md",
         "marker": "point:verification.hash-and-stale",
         "heading_hint": "content-hash 续跑"
       },
-      "authority": {"role": "canonical", "subject": "subject:verification.hash-and-stale"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.hash-and-stale"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md hash/stale"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.verification.hash"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md hash/stale"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.verification.hash"
+          }
+        ]
       }
     },
     {
@@ -183,17 +202,36 @@
       "title": "resume 接管基线",
       "point_kind": "procedure",
       "summary": "先进入 board worktree、核对干净基线，再 probe/attach/验收或重派孤儿 runtime。",
-      "recognition_cues": ["新 session 接管旧 board", "存在 orphaned in_flight"],
+      "recognition_cues": [
+        "新 session 接管旧 board",
+        "存在 orphaned in_flight"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.resume-takeover.md",
         "marker": "point:verification.resume-takeover",
         "heading_hint": "resume 第 0 步"
       },
-      "authority": {"role": "canonical", "subject": "subject:verification.resume-takeover"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.resume-takeover"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md takeover"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.verification.takeover"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md takeover"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.verification.takeover"
+          }
+        ]
       }
     },
     {
@@ -201,17 +239,36 @@
       "title": "异构族系第二视角",
       "point_kind": "procedure",
       "summary": "对高杠杆或临界 correctness-critical 结果换模型族复核，并逐条 reconcile finding。",
-      "recognition_cues": ["高杠杆裁决", "临界 correctness-critical done"],
+      "recognition_cues": [
+        "高杠杆裁决",
+        "临界 correctness-critical done"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.heterogeneous-review.md",
         "marker": "point:verification.heterogeneous-review",
         "heading_hint": "异构族系第二视角"
       },
-      "authority": {"role": "canonical", "subject": "subject:verification.heterogeneous-review"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.heterogeneous-review"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md heterogeneous review"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.verification.heterogeneous"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md heterogeneous review"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.verification.heterogeneous"
+          }
+        ]
       }
     },
     {
@@ -219,17 +276,36 @@
       "title": "Loop 收敛闸",
       "point_kind": "decision_rule",
       "summary": "只在 FinalResponse 与带诊断 Replan 之间做结构化选择，并设置 max-rounds 与 dedup。",
-      "recognition_cues": ["执行图依赖未知中间结果", "review loop 可能无界"],
+      "recognition_cues": [
+        "执行图依赖未知中间结果",
+        "review loop 可能无界"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.loop-convergence.md",
         "marker": "point:verification.loop-convergence",
         "heading_hint": "Loop 收敛"
       },
-      "authority": {"role": "canonical", "subject": "subject:verification.loop-convergence"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.loop-convergence"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md convergence"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.verification.convergence"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md convergence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.verification.convergence"
+          }
+        ]
       }
     },
     {
@@ -237,17 +313,37 @@
       "title": "用户理解校验",
       "point_kind": "check",
       "summary": "按风险给理解材料并对高风险变化校验用户是否真的读懂，低风险不加仪式；它不替代端点验收，也不是事后追认授权的通道。",
-      "recognition_cues": ["交付时只给了 diff 与 gate 结果", "在实现中替用户拍了本该他拍的板", "想用一句可以吗收尾"],
+      "recognition_cues": [
+        "交付时只给了 diff 与 gate 结果",
+        "在实现中替用户拍了本该他拍的板",
+        "想用一句可以吗收尾"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+        "path": "plugin/src/knowledge/points/verification.user-understanding.md",
         "marker": "point:verification.user-understanding",
         "heading_hint": "用户理解校验"
       },
-      "authority": {"role": "canonical", "subject": "subject:verification.user-understanding"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:verification.user-understanding"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md 用户理解校验"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.verification.user-understanding"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md 用户理解校验"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.verification.user-understanding"
+          }
+        ]
       }
     }
   ],
@@ -323,15 +419,34 @@
       "type": "next",
       "from": "point:verification.endpoint-procedure",
       "to": "point:verification.user-understanding",
-      "when": ["产物已通过自己的端点验收，需要判断用户是否也理解了变化"],
-      "avoid_when": ["低风险可逆且没有替用户做过判断"],
+      "when": [
+        "产物已通过自己的端点验收，需要判断用户是否也理解了变化"
+      ],
+      "avoid_when": [
+        "低风险可逆且没有替用户做过判断"
+      ],
       "path_role": "next",
       "order": 1,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "resume-verify.md 验收的另一侧对象"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.verification.procedure-to-understanding"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "resume-verify.md 验收的另一侧对象"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.verification.procedure-to-understanding"
+          }
+        ]
       }
     },
     {
@@ -339,13 +454,30 @@
       "type": "routes_to",
       "from": "point:verification.user-understanding",
       "to": "point:verification.endpoint-procedure",
-      "when": ["需要复核理解校验不能替代自己的端点验收"],
+      "when": [
+        "需要复核理解校验不能替代自己的端点验收"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "design", "ref": "module.verification.endpoint bidirectional route"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.verification.understanding-to-procedure"}]
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "module.verification.endpoint bidirectional route"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.verification.understanding-to-procedure"
+          }
+        ]
       }
     }
   ]

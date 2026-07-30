@@ -56,7 +56,7 @@
         "得进 skill 才够重"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.landing-preview.md",
         "marker": "point:distill.landing-preview",
         "heading_hint": "落地手艺与反模式"
       },
@@ -95,7 +95,7 @@
         "怎么写进资产"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
+        "path": "plugin/src/knowledge/points/distill.landing-craft.md",
         "marker": "point:distill.landing-craft",
         "heading_hint": "纪律文档/skill/workflow/subagent"
       },
@@ -131,7 +131,7 @@
         "合理化落地选择"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
+        "path": "plugin/src/knowledge/points/distill.landing-rationalization.md",
         "marker": "point:distill.landing-rationalization",
         "heading_hint": "Rationalization Table"
       },

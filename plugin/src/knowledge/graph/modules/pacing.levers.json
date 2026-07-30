@@ -56,7 +56,7 @@
         "额度空闲就加速"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
+        "path": "plugin/src/knowledge/points/pacing.upper-bound-only.md",
         "marker": "point:pacing.upper-bound-only",
         "heading_hint": "只在上界收紧"
       },
@@ -92,7 +92,7 @@
         "throttle 后改什么"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
+        "path": "plugin/src/knowledge/points/pacing.decision-vectors.md",
         "marker": "point:pacing.decision-vectors",
         "heading_hint": "影响向量"
       },

@@ -61,7 +61,7 @@
         "把 origin harness 误当 worker pool 边界"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.identity-mandate.md",
         "marker": "point:control.identity-mandate",
         "heading_hint": "身份：你是谁"
       },
@@ -98,7 +98,7 @@
         "需要解释 red line 的 why"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.role-consequences.md",
         "marker": "point:control.role-consequences",
         "heading_hint": "这些纪律从哪来"
       },
@@ -135,7 +135,7 @@
         "等待或派发前做编排判断"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.operating-lenses.md",
         "marker": "point:control.operating-lenses",
         "heading_hint": "七镜头"
       },
@@ -172,7 +172,7 @@
         "判断一场 orchestration 是否从容而不闲"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.good-orchestration.md",
         "marker": "point:control.good-orchestration",
         "heading_hint": "好编排长什么样"
       },
@@ -209,7 +209,7 @@
         "准备 Stop 却没有 step-6 ledger"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.rationalization-guards.md",
         "marker": "point:control.rationalization-guards",
         "heading_hint": "Rationalization Table"
       },
@@ -246,7 +246,7 @@
         "准备预加载全部专门知识"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.navigation-map.md",
         "marker": "point:control.navigation-map",
         "heading_hint": "你的工具箱"
       },
@@ -284,7 +284,7 @@
         "出现 idle-spinning 或 fake busy"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/control.decision-program.md",
         "marker": "point:control.decision-program",
         "heading_hint": "最高频行为 / 范式"
       },

@@ -55,7 +55,7 @@
         "这条经验该进哪种资产"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.taxonomy-quick.md",
         "marker": "point:distill.taxonomy-quick",
         "heading_hint": "四类资产判据速查"
       },
@@ -94,7 +94,7 @@
         "资产类型定义"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/asset-taxonomy.md",
+        "path": "plugin/src/knowledge/points/distill.taxonomy.md",
         "marker": "point:distill.taxonomy",
         "heading_hint": "四类资产"
       },

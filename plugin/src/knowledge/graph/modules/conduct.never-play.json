@@ -59,7 +59,7 @@
         "镜头 1 指挥不演奏"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/conduct.never-play.md",
         "marker": "point:conduct.never-play",
         "heading_hint": "七镜头"
       },
@@ -96,7 +96,7 @@
         "想把含糊默许当批准"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/conduct.red-lines.md",
         "marker": "point:conduct.red-lines",
         "heading_hint": "红线（Red lines）"
       },
@@ -133,7 +133,7 @@
         "想给滑坡命名"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/conduct.deserting-podium.md",
         "marker": "point:conduct.deserting-podium",
         "heading_hint": "坏编排有一个名字：离席"
       },

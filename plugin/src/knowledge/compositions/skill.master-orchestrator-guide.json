@@ -8,21 +8,66 @@
   "intent": "让主会话 agent 对长程目标做调度、收割、端点验收、replan 与收口。",
   "consumes": {
     "modules": [
-    {"id": "module:verification.endpoint", "manifest": "plugin/src/knowledge/graph/modules/verification.endpoint.json"},
-    {"id": "module:conduct.never-play", "manifest": "plugin/src/knowledge/graph/modules/conduct.never-play.json"},
-    {"id": "module:routing.worker-chain", "manifest": "plugin/src/knowledge/graph/modules/routing.worker-chain.json"},
-    {"id": "module:control.decision-loop", "manifest": "plugin/src/knowledge/graph/modules/control.decision-loop.json"},
-    {"id": "module:goal.contract", "manifest": "plugin/src/knowledge/graph/modules/goal.contract.json"},
-    {"id": "module:scheduling.dependency-dag", "manifest": "plugin/src/knowledge/graph/modules/scheduling.dependency-dag.json"},
-    {"id": "module:dispatch.parallel-mechanisms", "manifest": "plugin/src/knowledge/graph/modules/dispatch.parallel-mechanisms.json"},
-    {"id": "module:coordination.async-hitl", "manifest": "plugin/src/knowledge/graph/modules/coordination.async-hitl.json"},
-    {"id": "module:state.board", "manifest": "plugin/src/knowledge/graph/modules/state.board.json"},
-    {"id": "module:capacity.delivery", "manifest": "plugin/src/knowledge/graph/modules/capacity.delivery.json"},
-    {"id": "module:capacity.account-switch", "manifest": "plugin/src/knowledge/graph/modules/capacity.account-switch.json"},
-    {"id": "module:continuity.handoff", "manifest": "plugin/src/knowledge/graph/modules/continuity.handoff.json"},
-    {"id": "module:planning.multi-layer", "manifest": "plugin/src/knowledge/graph/modules/planning.multi-layer.json"},
-    {"id": "module:evidence.outside-in", "manifest": "plugin/src/knowledge/graph/modules/evidence.outside-in.json"},
-    {"id": "module:collab.unknowns", "manifest": "plugin/src/knowledge/graph/modules/collab.unknowns.json"}
+      {
+        "id": "module:verification.endpoint",
+        "manifest": "plugin/src/knowledge/graph/modules/verification.endpoint.json"
+      },
+      {
+        "id": "module:conduct.never-play",
+        "manifest": "plugin/src/knowledge/graph/modules/conduct.never-play.json"
+      },
+      {
+        "id": "module:routing.worker-chain",
+        "manifest": "plugin/src/knowledge/graph/modules/routing.worker-chain.json"
+      },
+      {
+        "id": "module:control.decision-loop",
+        "manifest": "plugin/src/knowledge/graph/modules/control.decision-loop.json"
+      },
+      {
+        "id": "module:goal.contract",
+        "manifest": "plugin/src/knowledge/graph/modules/goal.contract.json"
+      },
+      {
+        "id": "module:scheduling.dependency-dag",
+        "manifest": "plugin/src/knowledge/graph/modules/scheduling.dependency-dag.json"
+      },
+      {
+        "id": "module:dispatch.parallel-mechanisms",
+        "manifest": "plugin/src/knowledge/graph/modules/dispatch.parallel-mechanisms.json"
+      },
+      {
+        "id": "module:coordination.async-hitl",
+        "manifest": "plugin/src/knowledge/graph/modules/coordination.async-hitl.json"
+      },
+      {
+        "id": "module:state.board",
+        "manifest": "plugin/src/knowledge/graph/modules/state.board.json"
+      },
+      {
+        "id": "module:capacity.delivery",
+        "manifest": "plugin/src/knowledge/graph/modules/capacity.delivery.json"
+      },
+      {
+        "id": "module:capacity.account-switch",
+        "manifest": "plugin/src/knowledge/graph/modules/capacity.account-switch.json"
+      },
+      {
+        "id": "module:continuity.handoff",
+        "manifest": "plugin/src/knowledge/graph/modules/continuity.handoff.json"
+      },
+      {
+        "id": "module:planning.multi-layer",
+        "manifest": "plugin/src/knowledge/graph/modules/planning.multi-layer.json"
+      },
+      {
+        "id": "module:evidence.outside-in",
+        "manifest": "plugin/src/knowledge/graph/modules/evidence.outside-in.json"
+      },
+      {
+        "id": "module:collab.unknowns",
+        "manifest": "plugin/src/knowledge/graph/modules/collab.unknowns.json"
+      }
     ]
   },
   "entry_modules": [
@@ -47,85 +92,470 @@
         "point:control.rationalization-guards",
         "point:control.role-consequences"
       ],
-      "reviewed_unbound_sha256": "997077657b0425430bfd8c73aea07b3d43f6f6a33332e2416e42411be86aa57c"
+      "reviewed_unbound_sha256": "997077657b0425430bfd8c73aea07b3d43f6f6a33332e2416e42411be86aa57c",
+      "reconciliations": [
+        {
+          "point": "point:conduct.deserting-podium",
+          "point_sha256": "37cd1230138af5500ef298fda1d7700a388f51947cd5c27e86b3f733510cc23d",
+          "passage_sha256": "37cd1230138af5500ef298fda1d7700a388f51947cd5c27e86b3f733510cc23d"
+        },
+        {
+          "point": "point:conduct.never-play",
+          "point_sha256": "2b604e69304c884ea228914e89fb99e201c67fc52ebb8152655c3f788e3c7298",
+          "passage_sha256": "2b604e69304c884ea228914e89fb99e201c67fc52ebb8152655c3f788e3c7298"
+        },
+        {
+          "point": "point:conduct.red-lines",
+          "point_sha256": "7fe70f6223bd66cf0c54aa65d68518b848c868f962575310e488b93b3e533a71",
+          "passage_sha256": "7fe70f6223bd66cf0c54aa65d68518b848c868f962575310e488b93b3e533a71"
+        },
+        {
+          "point": "point:control.decision-program",
+          "point_sha256": "1639a3167706e60442d98c744a819174721a2be6328be3d8bc1e0d010be91d03",
+          "passage_sha256": "1639a3167706e60442d98c744a819174721a2be6328be3d8bc1e0d010be91d03"
+        },
+        {
+          "point": "point:control.good-orchestration",
+          "point_sha256": "a9ee9674060be2bfa10833d4dd11d357cd0d81560b46add47cfa072027fc5d16",
+          "passage_sha256": "a9ee9674060be2bfa10833d4dd11d357cd0d81560b46add47cfa072027fc5d16"
+        },
+        {
+          "point": "point:control.identity-mandate",
+          "point_sha256": "bd72d6e78d28a0ea3d5b3cb6399f5bfe6a35eb6e51cfd015d400ed19db65eaa6",
+          "passage_sha256": "bd72d6e78d28a0ea3d5b3cb6399f5bfe6a35eb6e51cfd015d400ed19db65eaa6"
+        },
+        {
+          "point": "point:control.navigation-map",
+          "point_sha256": "6d84015d15f56d529f2b6a0c00236f4d4abffd5d8df40b629f761461bae8c2ea",
+          "passage_sha256": "6d84015d15f56d529f2b6a0c00236f4d4abffd5d8df40b629f761461bae8c2ea"
+        },
+        {
+          "point": "point:control.operating-lenses",
+          "point_sha256": "aec7e52443d110f84380611bfc5670cca3537dc0c3b9710dd315d53f18efe060",
+          "passage_sha256": "aec7e52443d110f84380611bfc5670cca3537dc0c3b9710dd315d53f18efe060"
+        },
+        {
+          "point": "point:control.rationalization-guards",
+          "point_sha256": "d59e6d3191ca334694d29a274e348aa98cd60498e2d098a4557a1ec27d257e81",
+          "passage_sha256": "d59e6d3191ca334694d29a274e348aa98cd60498e2d098a4557a1ec27d257e81"
+        },
+        {
+          "point": "point:control.role-consequences",
+          "point_sha256": "d1009f9d284ce5a4af0c27c016db10b4150f24dd94a7cd1c3973055d118b2930",
+          "passage_sha256": "d1009f9d284ce5a4af0c27c016db10b4150f24dd94a7cd1c3973055d118b2930"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
       "coverage": "full",
-      "point_ids": ["point:hitl.decision-package", "point:hitl.inflight-and-user", "point:hitl.step6-ledger", "point:hitl.watchdog"],
-      "reviewed_unbound_sha256": "a751b4208b5b85430976ed4fa66016707ac9a4c613b8d72e48ef546b30289d39"
+      "point_ids": [
+        "point:hitl.decision-package",
+        "point:hitl.inflight-and-user",
+        "point:hitl.step6-ledger",
+        "point:hitl.watchdog"
+      ],
+      "reviewed_unbound_sha256": "a751b4208b5b85430976ed4fa66016707ac9a4c613b8d72e48ef546b30289d39",
+      "reconciliations": [
+        {
+          "point": "point:hitl.decision-package",
+          "point_sha256": "7bc3da8f3bc778fc811654079c66313f4c826b3798b0297ef66cfa0f381ca75c",
+          "passage_sha256": "7bc3da8f3bc778fc811654079c66313f4c826b3798b0297ef66cfa0f381ca75c"
+        },
+        {
+          "point": "point:hitl.inflight-and-user",
+          "point_sha256": "dd54a04752ab8cff1f44d889a8fff5cd587480543de10840f435eadac6e047e8",
+          "passage_sha256": "dd54a04752ab8cff1f44d889a8fff5cd587480543de10840f435eadac6e047e8"
+        },
+        {
+          "point": "point:hitl.step6-ledger",
+          "point_sha256": "0e2bde179bc8bcf3ae481eacec9a9ab3ef4a4850aa08d8b29c9c9133919b930d",
+          "passage_sha256": "0e2bde179bc8bcf3ae481eacec9a9ab3ef4a4850aa08d8b29c9c9133919b930d"
+        },
+        {
+          "point": "point:hitl.watchdog",
+          "point_sha256": "5b0d4ae0476fc1aeb86870a098834e63cf534533c6cb7a75cf95bf3393688a04",
+          "passage_sha256": "5b0d4ae0476fc1aeb86870a098834e63cf534533c6cb7a75cf95bf3393688a04"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
       "coverage": "full",
-      "point_ids": ["point:board.audit-and-graph", "point:board.resume-and-interview", "point:board.waist-and-write", "point:board.worked-example"],
-      "reviewed_unbound_sha256": "8ffe7fc18aded3e1ba729b015b836870a5353482324f2041cfb4f3334c660af7"
+      "point_ids": [
+        "point:board.audit-and-graph",
+        "point:board.resume-and-interview",
+        "point:board.waist-and-write",
+        "point:board.worked-example"
+      ],
+      "reviewed_unbound_sha256": "8ffe7fc18aded3e1ba729b015b836870a5353482324f2041cfb4f3334c660af7",
+      "reconciliations": [
+        {
+          "point": "point:board.audit-and-graph",
+          "point_sha256": "4b659402493db5708ee42851287cce0542e616addab26165b419f897665a7df0",
+          "passage_sha256": "4b659402493db5708ee42851287cce0542e616addab26165b419f897665a7df0"
+        },
+        {
+          "point": "point:board.resume-and-interview",
+          "point_sha256": "ed482bf54c28629ab58ca43973870434214a51c106258f10c7430d0e9a8786c3",
+          "passage_sha256": "ed482bf54c28629ab58ca43973870434214a51c106258f10c7430d0e9a8786c3"
+        },
+        {
+          "point": "point:board.waist-and-write",
+          "point_sha256": "ed528f4f666eef86a1f7d37f25197e3f699476ca532ee961953b3aa38d428397",
+          "passage_sha256": "ed528f4f666eef86a1f7d37f25197e3f699476ca532ee961953b3aa38d428397"
+        },
+        {
+          "point": "point:board.worked-example",
+          "point_sha256": "a640ae070d906e02aa96dc53f823fb38d31f4369d6cfe05c558b275be25416ec",
+          "passage_sha256": "a640ae070d906e02aa96dc53f823fb38d31f4369d6cfe05c558b275be25416ec"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
       "coverage": "full",
-      "point_ids": ["point:capacity.account-switch-gate", "point:capacity.account-switch-sequence"],
-      "reviewed_unbound_sha256": "e3e9d36894d77e6be4e9b1dd06d455b97e1f64a4f721a7dcad4ff8298d08dc22"
+      "point_ids": [
+        "point:capacity.account-switch-gate",
+        "point:capacity.account-switch-sequence"
+      ],
+      "reviewed_unbound_sha256": "e3e9d36894d77e6be4e9b1dd06d455b97e1f64a4f721a7dcad4ff8298d08dc22",
+      "reconciliations": [
+        {
+          "point": "point:capacity.account-switch-gate",
+          "point_sha256": "a99d548f6e10f07f7613dd00fc1ea4d08db39d8a88c482806737ee1d05781761",
+          "passage_sha256": "a99d548f6e10f07f7613dd00fc1ea4d08db39d8a88c482806737ee1d05781761"
+        },
+        {
+          "point": "point:capacity.account-switch-sequence",
+          "point_sha256": "cc068755b0c712c725a7fee46aa3e54e15a21a72fbdab3b13531c63eb35b21c2",
+          "passage_sha256": "cc068755b0c712c725a7fee46aa3e54e15a21a72fbdab3b13531c63eb35b21c2"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md",
       "coverage": "full",
-      "point_ids": ["point:deadline.constraint-axes", "point:deadline.guards-and-boundary", "point:deadline.nine-disciplines"],
-      "reviewed_unbound_sha256": "fdbfc84464c6c48e199761014353a7c0494c7bd147fdec3368a483f80a133d0b"
+      "point_ids": [
+        "point:deadline.constraint-axes",
+        "point:deadline.guards-and-boundary",
+        "point:deadline.nine-disciplines"
+      ],
+      "reviewed_unbound_sha256": "fdbfc84464c6c48e199761014353a7c0494c7bd147fdec3368a483f80a133d0b",
+      "reconciliations": [
+        {
+          "point": "point:deadline.constraint-axes",
+          "point_sha256": "36dd25d0ff24cff8c435efa336aa317d490fed5c3c6db94e9ad14c90d7af567b",
+          "passage_sha256": "36dd25d0ff24cff8c435efa336aa317d490fed5c3c6db94e9ad14c90d7af567b"
+        },
+        {
+          "point": "point:deadline.guards-and-boundary",
+          "point_sha256": "6982575500ffeb0626489b32ba3047ab2fdbe898578884eab75001d851a2d6e2",
+          "passage_sha256": "6982575500ffeb0626489b32ba3047ab2fdbe898578884eab75001d851a2d6e2"
+        },
+        {
+          "point": "point:deadline.nine-disciplines",
+          "point_sha256": "1a8ba458f7545e44226cc745a1b6bb6aa79e5582e5b3e3330c17a64c2639981c",
+          "passage_sha256": "1a8ba458f7545e44226cc745a1b6bb6aa79e5582e5b3e3330c17a64c2639981c"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md",
       "coverage": "full",
-      "point_ids": ["point:scheduling.dag-and-critical-path", "point:scheduling.node-contract", "point:scheduling.parallelism-and-granularity"],
-      "reviewed_unbound_sha256": "98f69319e66b10a780ef4c5cd20ce6a97ea11b456bcc2fc259c31c82674193b4"
+      "point_ids": [
+        "point:scheduling.dag-and-critical-path",
+        "point:scheduling.node-contract",
+        "point:scheduling.parallelism-and-granularity"
+      ],
+      "reviewed_unbound_sha256": "98f69319e66b10a780ef4c5cd20ce6a97ea11b456bcc2fc259c31c82674193b4",
+      "reconciliations": [
+        {
+          "point": "point:scheduling.dag-and-critical-path",
+          "point_sha256": "10db4cf4619d64f78357a0ef7953ac707ab8e6e466765b86f170b579eb0c266a",
+          "passage_sha256": "10db4cf4619d64f78357a0ef7953ac707ab8e6e466765b86f170b579eb0c266a"
+        },
+        {
+          "point": "point:scheduling.node-contract",
+          "point_sha256": "95d7604f0e0445d56ad42cdfc54b3eb4e8f244ea65a631fa2f026bf6449d262a",
+          "passage_sha256": "95d7604f0e0445d56ad42cdfc54b3eb4e8f244ea65a631fa2f026bf6449d262a"
+        },
+        {
+          "point": "point:scheduling.parallelism-and-granularity",
+          "point_sha256": "1586eadaf88fa3499b98e1c0a7039487d101f57116f2eb237ab47449f0b81b2c",
+          "passage_sha256": "1586eadaf88fa3499b98e1c0a7039487d101f57116f2eb237ab47449f0b81b2c"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
       "coverage": "full",
-      "point_ids": ["point:dispatch.dataflow-and-mechanisms", "point:dispatch.hygiene-and-liveness", "point:dispatch.routing-and-isolation", "point:dispatch.workflow-and-escalation"],
-      "reviewed_unbound_sha256": "fb1cfa59ba8ef1a1960b704e5c8f17245a95c068213e51152803a71db88c1a3c"
+      "point_ids": [
+        "point:dispatch.dataflow-and-mechanisms",
+        "point:dispatch.hygiene-and-liveness",
+        "point:dispatch.routing-and-isolation",
+        "point:dispatch.workflow-and-escalation"
+      ],
+      "reviewed_unbound_sha256": "fb1cfa59ba8ef1a1960b704e5c8f17245a95c068213e51152803a71db88c1a3c",
+      "reconciliations": [
+        {
+          "point": "point:dispatch.dataflow-and-mechanisms",
+          "point_sha256": "c41eedb23b1fae8ea7f4645111bc3fa65c3f76ff35329e225f7e16fee3164de5",
+          "passage_sha256": "c41eedb23b1fae8ea7f4645111bc3fa65c3f76ff35329e225f7e16fee3164de5"
+        },
+        {
+          "point": "point:dispatch.hygiene-and-liveness",
+          "point_sha256": "2399611aaea7c0b1361b2d1dfdb23189d8e04f96ab29600a36810a3671eabbdd",
+          "passage_sha256": "2399611aaea7c0b1361b2d1dfdb23189d8e04f96ab29600a36810a3671eabbdd"
+        },
+        {
+          "point": "point:dispatch.routing-and-isolation",
+          "point_sha256": "334a6a8fc89a4c835f3ee275d06f8f52444289db79d8753d07f05291c897007b",
+          "passage_sha256": "334a6a8fc89a4c835f3ee275d06f8f52444289db79d8753d07f05291c897007b"
+        },
+        {
+          "point": "point:dispatch.workflow-and-escalation",
+          "point_sha256": "b133f3bd94acc9c0c61b03517dfdfe92ccb02ee450790f6ce1e2c67e8d815055",
+          "passage_sha256": "b133f3bd94acc9c0c61b03517dfdfe92ccb02ee450790f6ce1e2c67e8d815055"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md",
       "coverage": "full",
-      "point_ids": ["point:goal.alignment-checkpoints", "point:goal.deadline-and-brief", "point:goal.fresh-contract", "point:goal.trace-and-delta"],
-      "reviewed_unbound_sha256": "536f84408b31b0173cf103a6fc3ad97ce6b8e53d2c19f648241070df81f233dc"
+      "point_ids": [
+        "point:goal.alignment-checkpoints",
+        "point:goal.deadline-and-brief",
+        "point:goal.fresh-contract",
+        "point:goal.trace-and-delta"
+      ],
+      "reviewed_unbound_sha256": "536f84408b31b0173cf103a6fc3ad97ce6b8e53d2c19f648241070df81f233dc",
+      "reconciliations": [
+        {
+          "point": "point:goal.alignment-checkpoints",
+          "point_sha256": "fb6e41fa73ea1b57eb5894249bee1a74d45a82fa15efb62c1ee9fe9c23094e6e",
+          "passage_sha256": "fb6e41fa73ea1b57eb5894249bee1a74d45a82fa15efb62c1ee9fe9c23094e6e"
+        },
+        {
+          "point": "point:goal.deadline-and-brief",
+          "point_sha256": "2768623410baaceec13ba1f2be3088ddd9b4ba762a07010d2991fea19024f0bd",
+          "passage_sha256": "2768623410baaceec13ba1f2be3088ddd9b4ba762a07010d2991fea19024f0bd"
+        },
+        {
+          "point": "point:goal.fresh-contract",
+          "point_sha256": "0a29fa63046a55f8b621625f22954e4ee82fda801e695eaaf4f6e6f46702cabf",
+          "passage_sha256": "0a29fa63046a55f8b621625f22954e4ee82fda801e695eaaf4f6e6f46702cabf"
+        },
+        {
+          "point": "point:goal.trace-and-delta",
+          "point_sha256": "f6dafffb1d2496630aca4a1e6ed7b277f37b7ae9c0846c6dcae66f2d5ff8970d",
+          "passage_sha256": "f6dafffb1d2496630aca4a1e6ed7b277f37b7ae9c0846c6dcae66f2d5ff8970d"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/handoff.md",
       "coverage": "full",
-      "point_ids": ["point:handoff.judgment-template", "point:handoff.procedure-and-drain", "point:handoff.rationale-and-guards"],
-      "reviewed_unbound_sha256": "bf9f827aaf3482217f9b48a953f907a34848bf35455534c38e9636cf7b250095"
+      "point_ids": [
+        "point:handoff.judgment-template",
+        "point:handoff.procedure-and-drain",
+        "point:handoff.rationale-and-guards"
+      ],
+      "reviewed_unbound_sha256": "bf9f827aaf3482217f9b48a953f907a34848bf35455534c38e9636cf7b250095",
+      "reconciliations": [
+        {
+          "point": "point:handoff.judgment-template",
+          "point_sha256": "8aa30a71c627dcc0f20ed8695790fe8a2f8c2267d84f6457046a3d5d787c2cdd",
+          "passage_sha256": "8aa30a71c627dcc0f20ed8695790fe8a2f8c2267d84f6457046a3d5d787c2cdd"
+        },
+        {
+          "point": "point:handoff.procedure-and-drain",
+          "point_sha256": "208fe268874f6233bf131c5f15b54b9933fd66303f108b6a9457ca1bfbba080a",
+          "passage_sha256": "208fe268874f6233bf131c5f15b54b9933fd66303f108b6a9457ca1bfbba080a"
+        },
+        {
+          "point": "point:handoff.rationale-and-guards",
+          "point_sha256": "3fc2bcafff2cee86161d462b65de5a1f71a5cdee63fe07365931469b237cad83",
+          "passage_sha256": "3fc2bcafff2cee86161d462b65de5a1f71a5cdee63fe07365931469b237cad83"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md",
       "coverage": "full",
-      "point_ids": ["point:capacity.ranking-and-contraction", "point:capacity.task-first-allocation"],
-      "reviewed_unbound_sha256": "b7e32b39f3f0f334b221a5cf751087d3dfd47548ea19843f29df5e224fa26c10"
+      "point_ids": [
+        "point:capacity.ranking-and-contraction",
+        "point:capacity.task-first-allocation"
+      ],
+      "reviewed_unbound_sha256": "b7e32b39f3f0f334b221a5cf751087d3dfd47548ea19843f29df5e224fa26c10",
+      "reconciliations": [
+        {
+          "point": "point:capacity.ranking-and-contraction",
+          "point_sha256": "4009c45dbcfd236ff5a9bedccce3f31f943758f0508507cda3a095c88080864f",
+          "passage_sha256": "4009c45dbcfd236ff5a9bedccce3f31f943758f0508507cda3a095c88080864f"
+        },
+        {
+          "point": "point:capacity.task-first-allocation",
+          "point_sha256": "b48890860b17d330078c81fdb275ca44488cdd23a897ca28f25ee7889569180d",
+          "passage_sha256": "b48890860b17d330078c81fdb275ca44488cdd23a897ca28f25ee7889569180d"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md",
       "coverage": "full",
-      "point_ids": ["point:multilayer.admission-and-escalation", "point:multilayer.deviation-notes", "point:multilayer.handoff-contract", "point:multilayer.maintenance", "point:multilayer.orthogonality"],
-      "reviewed_unbound_sha256": "35dec8db6e04bb695f188ad4084081d4a08807d52549929066f44a8ccc4629bc"
+      "point_ids": [
+        "point:multilayer.admission-and-escalation",
+        "point:multilayer.deviation-notes",
+        "point:multilayer.handoff-contract",
+        "point:multilayer.maintenance",
+        "point:multilayer.orthogonality"
+      ],
+      "reviewed_unbound_sha256": "35dec8db6e04bb695f188ad4084081d4a08807d52549929066f44a8ccc4629bc",
+      "reconciliations": [
+        {
+          "point": "point:multilayer.admission-and-escalation",
+          "point_sha256": "6a0d6c6f296ecfac8ddd84be1c068a8413d566723da3de6d747c011bcb6bae12",
+          "passage_sha256": "6a0d6c6f296ecfac8ddd84be1c068a8413d566723da3de6d747c011bcb6bae12"
+        },
+        {
+          "point": "point:multilayer.deviation-notes",
+          "point_sha256": "207079a7b20bbc4e9e75fd6ed8b91582c0636a6b648187cef1326a93f6460e33",
+          "passage_sha256": "207079a7b20bbc4e9e75fd6ed8b91582c0636a6b648187cef1326a93f6460e33"
+        },
+        {
+          "point": "point:multilayer.handoff-contract",
+          "point_sha256": "953a6eebda189e1e9776f97b498cbddd4e6daaa4628978a6d3d0c30fad313210",
+          "passage_sha256": "953a6eebda189e1e9776f97b498cbddd4e6daaa4628978a6d3d0c30fad313210"
+        },
+        {
+          "point": "point:multilayer.maintenance",
+          "point_sha256": "9893f0ee0a366c64e704fc76022ccbcf3586602c0792a647ede41278ec338322",
+          "passage_sha256": "9893f0ee0a366c64e704fc76022ccbcf3586602c0792a647ede41278ec338322"
+        },
+        {
+          "point": "point:multilayer.orthogonality",
+          "point_sha256": "d20c9293ba23341e0748dc1b980935f0916914b61682b8fa6b964b67502eb73b",
+          "passage_sha256": "d20c9293ba23341e0748dc1b980935f0916914b61682b8fa6b964b67502eb73b"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/outside-in.md",
       "coverage": "full",
-      "point_ids": ["point:outside.evidence-levels", "point:outside.falsification-and-calibration", "point:outside.low-risk-exception", "point:outside.unknown-and-amendment"],
-      "reviewed_unbound_sha256": "c2adad55829560d8da3d66df0e2c1e411672dfee83e41ec61074abb82d638938"
+      "point_ids": [
+        "point:outside.evidence-levels",
+        "point:outside.falsification-and-calibration",
+        "point:outside.low-risk-exception",
+        "point:outside.unknown-and-amendment"
+      ],
+      "reviewed_unbound_sha256": "c2adad55829560d8da3d66df0e2c1e411672dfee83e41ec61074abb82d638938",
+      "reconciliations": [
+        {
+          "point": "point:outside.evidence-levels",
+          "point_sha256": "898baf9a49512b59640e37478b8e5653e4b7599d570346ead89c9398cfbef647",
+          "passage_sha256": "898baf9a49512b59640e37478b8e5653e4b7599d570346ead89c9398cfbef647"
+        },
+        {
+          "point": "point:outside.falsification-and-calibration",
+          "point_sha256": "6ed2116beb3a2df973b92f846d7bfb2b563d5572fc26305429a36a8a63082dba",
+          "passage_sha256": "6ed2116beb3a2df973b92f846d7bfb2b563d5572fc26305429a36a8a63082dba"
+        },
+        {
+          "point": "point:outside.low-risk-exception",
+          "point_sha256": "babfd409c71257d5469d2244ca94d98057de807cd657bba36a5b83db123a0595",
+          "passage_sha256": "babfd409c71257d5469d2244ca94d98057de807cd657bba36a5b83db123a0595"
+        },
+        {
+          "point": "point:outside.unknown-and-amendment",
+          "point_sha256": "af81f1c544cfc856d6485cb642b83e0cb10c7003229d98d56947e332fa8eeaf5",
+          "passage_sha256": "af81f1c544cfc856d6485cb642b83e0cb10c7003229d98d56947e332fa8eeaf5"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
       "coverage": "full",
-      "point_ids": ["point:verification.endpoint-procedure", "point:verification.hash-and-stale", "point:verification.heterogeneous-review", "point:verification.loop-convergence", "point:verification.resume-takeover", "point:verification.user-understanding"],
-      "reviewed_unbound_sha256": "af9dc4089121de668e3cd74aebe6b6e931e611bdc1e4d1d89c37b39816a7a648"
+      "point_ids": [
+        "point:verification.endpoint-procedure",
+        "point:verification.hash-and-stale",
+        "point:verification.heterogeneous-review",
+        "point:verification.loop-convergence",
+        "point:verification.resume-takeover",
+        "point:verification.user-understanding"
+      ],
+      "reviewed_unbound_sha256": "af9dc4089121de668e3cd74aebe6b6e931e611bdc1e4d1d89c37b39816a7a648",
+      "reconciliations": [
+        {
+          "point": "point:verification.endpoint-procedure",
+          "point_sha256": "d93608acb806296c775e12ed63a79f51341033547b91f9c303736104f1b76bf7",
+          "passage_sha256": "d93608acb806296c775e12ed63a79f51341033547b91f9c303736104f1b76bf7"
+        },
+        {
+          "point": "point:verification.hash-and-stale",
+          "point_sha256": "c1fa2fb3906e018f238cc8dd8ba45ed4268955a61eff9268b298ebdfdf414f9c",
+          "passage_sha256": "c1fa2fb3906e018f238cc8dd8ba45ed4268955a61eff9268b298ebdfdf414f9c"
+        },
+        {
+          "point": "point:verification.heterogeneous-review",
+          "point_sha256": "9972cc6b282b38160078066ca224a81bfbe181bea001c722b7097670582bff5a",
+          "passage_sha256": "9972cc6b282b38160078066ca224a81bfbe181bea001c722b7097670582bff5a"
+        },
+        {
+          "point": "point:verification.loop-convergence",
+          "point_sha256": "655185d3be6f2825631338093887ac47a770ed6e684535e05ec14dbf201f6b6e",
+          "passage_sha256": "655185d3be6f2825631338093887ac47a770ed6e684535e05ec14dbf201f6b6e"
+        },
+        {
+          "point": "point:verification.resume-takeover",
+          "point_sha256": "ee157728e5695b32c6d0c68c526a4c31e374f8c82c68965ded7846e428e6229a",
+          "passage_sha256": "ee157728e5695b32c6d0c68c526a4c31e374f8c82c68965ded7846e428e6229a"
+        },
+        {
+          "point": "point:verification.user-understanding",
+          "point_sha256": "2a9c5f418ef4fddc7558f4f85f7b6d33b1d4da4fafde45eb316690bb4903fbc0",
+          "passage_sha256": "2a9c5f418ef4fddc7558f4f85f7b6d33b1d4da4fafde45eb316690bb4903fbc0"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md",
       "coverage": "full",
-      "point_ids": ["point:unknowns.artifact-over-prose", "point:unknowns.four-quadrants", "point:unknowns.frame-before-spec", "point:unknowns.interview-discipline", "point:unknowns.technique-routing"],
-      "reviewed_unbound_sha256": "b0ba3370ec0f0a163891cd316cd0312d8653e7a020b812f9e7197fbdc2d9cacc"
+      "point_ids": [
+        "point:unknowns.artifact-over-prose",
+        "point:unknowns.four-quadrants",
+        "point:unknowns.frame-before-spec",
+        "point:unknowns.interview-discipline",
+        "point:unknowns.technique-routing"
+      ],
+      "reviewed_unbound_sha256": "b0ba3370ec0f0a163891cd316cd0312d8653e7a020b812f9e7197fbdc2d9cacc",
+      "reconciliations": [
+        {
+          "point": "point:unknowns.artifact-over-prose",
+          "point_sha256": "849351ba5d94f9bcd4fa5fcc2a13d5325a82923a1a1cd4a66e55683bd61c61ef",
+          "passage_sha256": "849351ba5d94f9bcd4fa5fcc2a13d5325a82923a1a1cd4a66e55683bd61c61ef"
+        },
+        {
+          "point": "point:unknowns.four-quadrants",
+          "point_sha256": "e86d36f8b38771ea0ad7bee026f648dd1d148d4d1d4b8cab798c034be9206392",
+          "passage_sha256": "e86d36f8b38771ea0ad7bee026f648dd1d148d4d1d4b8cab798c034be9206392"
+        },
+        {
+          "point": "point:unknowns.frame-before-spec",
+          "point_sha256": "be7802755c04d2c71471083a3a3ab452b17426c19b0881da7801554e1d0372c6",
+          "passage_sha256": "be7802755c04d2c71471083a3a3ab452b17426c19b0881da7801554e1d0372c6"
+        },
+        {
+          "point": "point:unknowns.interview-discipline",
+          "point_sha256": "13ca2f07775a74f7e01485b4d9f52a82e1ce30cb2618bfcee5e65484afe5b540",
+          "passage_sha256": "13ca2f07775a74f7e01485b4d9f52a82e1ce30cb2618bfcee5e65484afe5b540"
+        },
+        {
+          "point": "point:unknowns.technique-routing",
+          "point_sha256": "9393da804517d568f2edc8d43d1c018c6719e3b00b3b8c9973671b01f04a098e",
+          "passage_sha256": "9393da804517d568f2edc8d43d1c018c6719e3b00b3b8c9973671b01f04a098e"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
@@ -141,11 +571,61 @@
         "point:verification.terminal-is-not-done",
         "point:verification.terminal-summary"
       ],
-      "reviewed_unbound_sha256": "98503f154ad0ebab4bde68e8b1817fa0ae8598dc164cd25b83069508a1112eb9"
+      "reviewed_unbound_sha256": "98503f154ad0ebab4bde68e8b1817fa0ae8598dc164cd25b83069508a1112eb9",
+      "reconciliations": [
+        {
+          "point": "point:routing.executor-vs-target",
+          "point_sha256": "f0e3d728dde2091c3ae2cd589885c395aa92b0619a3547de53cc683a1b7bdb09",
+          "passage_sha256": "f0e3d728dde2091c3ae2cd589885c395aa92b0619a3547de53cc683a1b7bdb09"
+        },
+        {
+          "point": "point:routing.handle-gate",
+          "point_sha256": "49d076e4c9b0d7e48b74ff96f1a2c6cd9ed169a990df7327e525d51ed45b586f",
+          "passage_sha256": "49d076e4c9b0d7e48b74ff96f1a2c6cd9ed169a990df7327e525d51ed45b586f"
+        },
+        {
+          "point": "point:routing.ordered-chain",
+          "point_sha256": "1ee45ade16b4eeaa9d6a6ef28b75441b758aec70b5e20bf00ad30c0bdd1bc538",
+          "passage_sha256": "6c60a51d92ba009544c8f5a11aa94b8715476b90816298943564eb3c61c4f019"
+        },
+        {
+          "point": "point:routing.owner-map",
+          "point_sha256": "d97d5a92f92cdd27c7dd0c8bce2306d25b7a884d9d701b681107bf3afa33c49a",
+          "passage_sha256": "d97d5a92f92cdd27c7dd0c8bce2306d25b7a884d9d701b681107bf3afa33c49a"
+        },
+        {
+          "point": "point:routing.qualification-and-fallback",
+          "point_sha256": "12d3e0a58738c4fc028c82e525c77e0056fa3acbcb768a114b20644fb985ba4d",
+          "passage_sha256": "12d3e0a58738c4fc028c82e525c77e0056fa3acbcb768a114b20644fb985ba4d"
+        },
+        {
+          "point": "point:routing.task-shape",
+          "point_sha256": "77d71aab6088fbb3200004a986f52a285c54c2ff09b16bda481735351f134937",
+          "passage_sha256": "77d71aab6088fbb3200004a986f52a285c54c2ff09b16bda481735351f134937"
+        },
+        {
+          "point": "point:routing.workflow-boundary",
+          "point_sha256": "9453245d9338732a5d33a5a2399231d3d7bb1761d529a44955d6ef3f5de08284",
+          "passage_sha256": "9453245d9338732a5d33a5a2399231d3d7bb1761d529a44955d6ef3f5de08284"
+        },
+        {
+          "point": "point:verification.terminal-is-not-done",
+          "point_sha256": "b7507884395e50b3e78e19e8e1a253ecd8c48c30a3fec7260be1261bd248d4fe",
+          "passage_sha256": "b7507884395e50b3e78e19e8e1a253ecd8c48c30a3fec7260be1261bd248d4fe"
+        },
+        {
+          "point": "point:verification.terminal-summary",
+          "point_sha256": "54be3843604bcec9ee4102752b3075a9dabd34a0b223a54f985f133da7c30df7",
+          "passage_sha256": "54be3843604bcec9ee4102752b3075a9dabd34a0b223a54f985f133da7c30df7"
+        }
+      ]
     }
   ],
   "host_coverage": [
-    {"host": "claude-code", "state": "full"},
+    {
+      "host": "claude-code",
+      "state": "full"
+    },
     {
       "host": "codex",
       "state": "partial",
@@ -209,9 +689,22 @@
     }
   ],
   "analysis_ref": "analysis:candidate.master-orchestrator-guide",
-  "lifecycle": {"state": "accepted", "since": "2026-07-23"},
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-23"
+  },
   "admission": {
-    "evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"}],
-    "verifiers": [{"kind": "review", "ref": "accepted-skill-admission-k2-full-inventory"}]
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "accepted-skill-admission-k2-full-inventory"
+      }
+    ]
   }
 }

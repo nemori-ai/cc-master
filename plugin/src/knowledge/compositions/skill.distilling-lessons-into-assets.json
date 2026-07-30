@@ -8,22 +8,22 @@
   "intent": "判断候选经验该落成纪律文档/skill/workflow/subagent，并以证据忠实性落地。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:distill.routing",
-      "manifest": "plugin/src/knowledge/graph/modules/distill.routing.json"
-    },
-    {
-      "id": "module:distill.taxonomy",
-      "manifest": "plugin/src/knowledge/graph/modules/distill.taxonomy.json"
-    },
-    {
-      "id": "module:distill.landing",
-      "manifest": "plugin/src/knowledge/graph/modules/distill.landing.json"
-    },
-    {
-      "id": "module:distill.evidence",
-      "manifest": "plugin/src/knowledge/graph/modules/distill.evidence.json"
-    }
+      {
+        "id": "module:distill.routing",
+        "manifest": "plugin/src/knowledge/graph/modules/distill.routing.json"
+      },
+      {
+        "id": "module:distill.taxonomy",
+        "manifest": "plugin/src/knowledge/graph/modules/distill.taxonomy.json"
+      },
+      {
+        "id": "module:distill.landing",
+        "manifest": "plugin/src/knowledge/graph/modules/distill.landing.json"
+      },
+      {
+        "id": "module:distill.evidence",
+        "manifest": "plugin/src/knowledge/graph/modules/distill.evidence.json"
+      }
     ]
   },
   "entry_modules": [
@@ -41,7 +41,34 @@
         "point:distill.landing-preview",
         "point:distill.boundary"
       ],
-      "reviewed_unbound_sha256": "84ed39afac9973d1dc13d3ccac2d2cd3fd009d85a961b0d11384a2e76f10d478"
+      "reviewed_unbound_sha256": "84ed39afac9973d1dc13d3ccac2d2cd3fd009d85a961b0d11384a2e76f10d478",
+      "reconciliations": [
+        {
+          "point": "point:distill.boundary",
+          "point_sha256": "39ceb19771c999f4bb29da17810dc8cb5c837b80da5f15bdec998233a9e6425f",
+          "passage_sha256": "39ceb19771c999f4bb29da17810dc8cb5c837b80da5f15bdec998233a9e6425f"
+        },
+        {
+          "point": "point:distill.evidence-hard-line",
+          "point_sha256": "3dcf65fbd31b37756981fb61422e7cfcbedbacb53c5a287b2fc74ca887a85013",
+          "passage_sha256": "3dcf65fbd31b37756981fb61422e7cfcbedbacb53c5a287b2fc74ca887a85013"
+        },
+        {
+          "point": "point:distill.landing-preview",
+          "point_sha256": "591229eff05c53bd46bddb421b9b782e3fbde149ff45575bbe77727b965f767d",
+          "passage_sha256": "591229eff05c53bd46bddb421b9b782e3fbde149ff45575bbe77727b965f767d"
+        },
+        {
+          "point": "point:distill.routing-overview",
+          "point_sha256": "26d60157c8ff8fb2091bafbb8ca5242398428f2425afdf3534c052e203c0fdd5",
+          "passage_sha256": "26d60157c8ff8fb2091bafbb8ca5242398428f2425afdf3534c052e203c0fdd5"
+        },
+        {
+          "point": "point:distill.taxonomy-quick",
+          "point_sha256": "4cb80f0e90ce2fa1c3db524d63576c61c17298512bee0bc94aa79ba741f8c20d",
+          "passage_sha256": "4cb80f0e90ce2fa1c3db524d63576c61c17298512bee0bc94aa79ba741f8c20d"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
@@ -51,7 +78,24 @@
         "point:distill.dual-dest",
         "point:distill.fallback-no-drop"
       ],
-      "reviewed_unbound_sha256": "34893a76dbc322bcc277c2ac2601d11e411c4b3fbb88546f91cd83a556d30229"
+      "reviewed_unbound_sha256": "34893a76dbc322bcc277c2ac2601d11e411c4b3fbb88546f91cd83a556d30229",
+      "reconciliations": [
+        {
+          "point": "point:distill.dual-dest",
+          "point_sha256": "d4c3a5d16db8c18b49348b1b888e18197c43423f60dc4cbd94ad1d0798ae2b73",
+          "passage_sha256": "d4c3a5d16db8c18b49348b1b888e18197c43423f60dc4cbd94ad1d0798ae2b73"
+        },
+        {
+          "point": "point:distill.fallback-no-drop",
+          "point_sha256": "a514170b923345f5701e33e57a19d0a3c8a466fbaf1670fdb75cf81edaa91529",
+          "passage_sha256": "a514170b923345f5701e33e57a19d0a3c8a466fbaf1670fdb75cf81edaa91529"
+        },
+        {
+          "point": "point:distill.routing-tree",
+          "point_sha256": "d0ab35a69b39765ef40562795a0cf3d94cc72aa586804d1a2aabedb7f1b8000f",
+          "passage_sha256": "d0ab35a69b39765ef40562795a0cf3d94cc72aa586804d1a2aabedb7f1b8000f"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/asset-taxonomy.md",
@@ -59,7 +103,14 @@
       "point_ids": [
         "point:distill.taxonomy"
       ],
-      "reviewed_unbound_sha256": "af22b1867a75cb2b1b3bbbb346ebe00d133cac381deba2f4265f4ac7e8003ab1"
+      "reviewed_unbound_sha256": "af22b1867a75cb2b1b3bbbb346ebe00d133cac381deba2f4265f4ac7e8003ab1",
+      "reconciliations": [
+        {
+          "point": "point:distill.taxonomy",
+          "point_sha256": "1d759439d83d6e4fcf6b20996067c7ef7c8b2030789fc71be6c701a16d19f9c2",
+          "passage_sha256": "1d759439d83d6e4fcf6b20996067c7ef7c8b2030789fc71be6c701a16d19f9c2"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/landing-craft-by-asset-type.md",
@@ -68,7 +119,19 @@
         "point:distill.landing-craft",
         "point:distill.landing-rationalization"
       ],
-      "reviewed_unbound_sha256": "d35c38c34202782ba3ab6db02eee0718fa457a2d64b522042118ac43afccf937"
+      "reviewed_unbound_sha256": "d35c38c34202782ba3ab6db02eee0718fa457a2d64b522042118ac43afccf937",
+      "reconciliations": [
+        {
+          "point": "point:distill.landing-craft",
+          "point_sha256": "a0ca9181bd466f457a3df927caad52c5b4a32200d79b82e45c22db9fcabbac8a",
+          "passage_sha256": "a0ca9181bd466f457a3df927caad52c5b4a32200d79b82e45c22db9fcabbac8a"
+        },
+        {
+          "point": "point:distill.landing-rationalization",
+          "point_sha256": "c7b10e30d779875ae071d5ace752f685bbc306a75b9e2baa03499d12f2aa84fb",
+          "passage_sha256": "c7b10e30d779875ae071d5ace752f685bbc306a75b9e2baa03499d12f2aa84fb"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/evidence-fidelity.md",
@@ -76,7 +139,14 @@
       "point_ids": [
         "point:distill.evidence-fidelity"
       ],
-      "reviewed_unbound_sha256": "48a9ee095cdc71efb427ce44a10b4e84f1f391ce313d0d2bbcbba8c2c81c83dc"
+      "reviewed_unbound_sha256": "48a9ee095cdc71efb427ce44a10b4e84f1f391ce313d0d2bbcbba8c2c81c83dc",
+      "reconciliations": [
+        {
+          "point": "point:distill.evidence-fidelity",
+          "point_sha256": "23fa4f982e338b906ac557aa20bf5405f57067887f464463086a18a4dd869963",
+          "passage_sha256": "23fa4f982e338b906ac557aa20bf5405f57067887f464463086a18a4dd869963"
+        }
+      ]
     }
   ],
   "host_coverage": [

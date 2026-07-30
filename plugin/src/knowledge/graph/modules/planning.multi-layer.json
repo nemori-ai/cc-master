@@ -4,66 +4,234 @@
   "id": "module:planning.multi-layer",
   "title": "项目内多层 planning",
   "intent": "当一个 board 节点内部本身是复杂规划问题时，保持 board 与被编排项目 planning 层正交。",
-  "recognition_cues": ["一个节点内部是复杂 sub-DAG", "项目已有 planning 规范", "考虑把内部计划炸成顶层任务"],
-  "boundary": {"includes": ["两层正交", "handoff contract", "admission", "escalation 边界", "维护责任"], "excludes": ["cc-master 自身 plan", "顶层目标切分方法"]},
-  "access": {"class": "on_demand", "relevant_entries": [], "primary_points": [], "rationale": "仅当单个 board 节点内部本身是复杂规划问题时 drill。"},
-  "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-  "admission": {"evidence": [{"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md"}], "verifiers": [{"kind": "review", "ref": "k2-master-multilayer-review"}]},
+  "recognition_cues": [
+    "一个节点内部是复杂 sub-DAG",
+    "项目已有 planning 规范",
+    "考虑把内部计划炸成顶层任务"
+  ],
+  "boundary": {
+    "includes": [
+      "两层正交",
+      "handoff contract",
+      "admission",
+      "escalation 边界",
+      "维护责任"
+    ],
+    "excludes": [
+      "cc-master 自身 plan",
+      "顶层目标切分方法"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [],
+    "primary_points": [],
+    "rationale": "仅当单个 board 节点内部本身是复杂规划问题时 drill。"
+  },
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-24"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "k2-master-multilayer-review"
+      }
+    ]
+  },
   "points": [
     {
       "id": "point:multilayer.orthogonality",
       "title": "Board 与项目 planning 正交",
       "point_kind": "principle",
       "summary": "board 管跨节点编排，项目 planning 文档管单节点内部纵深，不互相替代。",
-      "recognition_cues": ["想把项目内部计划写进 board", "把 cc-master 自身误当被编排项目"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.orthogonality", "heading_hint": "两层正交"},
-      "authority": {"role": "canonical", "subject": "subject:multilayer.orthogonality"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md orthogonality"}], "verifiers": [{"kind": "review", "ref": "k2.point.multilayer.orthogonality"}]}
+      "recognition_cues": [
+        "想把项目内部计划写进 board",
+        "把 cc-master 自身误当被编排项目"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/multilayer.orthogonality.md",
+        "marker": "point:multilayer.orthogonality",
+        "heading_hint": "两层正交"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:multilayer.orthogonality"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md orthogonality"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.multilayer.orthogonality"
+          }
+        ]
+      }
     },
     {
       "id": "point:multilayer.handoff-contract",
       "title": "项目 planning handoff contract",
       "point_kind": "procedure",
       "summary": "派发时要求 worker 发现并遵循项目 planning 规范，返回计划位置与进度证据。",
-      "recognition_cues": ["派一个复杂节点", "项目可能有自己的 plan 约定"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.handoff-contract", "heading_hint": "派发契约"},
-      "authority": {"role": "canonical", "subject": "subject:multilayer.handoff-contract"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md contract"}], "verifiers": [{"kind": "review", "ref": "k2.point.multilayer.contract"}]}
+      "recognition_cues": [
+        "派一个复杂节点",
+        "项目可能有自己的 plan 约定"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/multilayer.handoff-contract.md",
+        "marker": "point:multilayer.handoff-contract",
+        "heading_hint": "派发契约"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:multilayer.handoff-contract"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.multilayer.contract"
+          }
+        ]
+      }
     },
     {
       "id": "point:multilayer.admission-and-escalation",
       "title": "多层 planning 准入与 escalation 边界",
       "point_kind": "decision_rule",
       "summary": "只让足够复杂且内部耦合的节点使用项目层；跨节点依赖或 owner 变化才升级到顶层。",
-      "recognition_cues": ["判断节点是否值得单独 plan", "内部发现要不要顶层 replan"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.admission-and-escalation", "heading_hint": "识别启发"},
-      "authority": {"role": "canonical", "subject": "subject:multilayer.admission-and-escalation"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md admission/escalation"}], "verifiers": [{"kind": "review", "ref": "k2.point.multilayer.admission"}]}
+      "recognition_cues": [
+        "判断节点是否值得单独 plan",
+        "内部发现要不要顶层 replan"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/multilayer.admission-and-escalation.md",
+        "marker": "point:multilayer.admission-and-escalation",
+        "heading_hint": "识别启发"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:multilayer.admission-and-escalation"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md admission/escalation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.multilayer.admission"
+          }
+        ]
+      }
     },
     {
       "id": "point:multilayer.maintenance",
       "title": "计划文档维护责任",
       "point_kind": "boundary",
       "summary": "执行者维护项目计划，orchestrator 只追踪位置与证据；项目计划不替代端点验收。",
-      "recognition_cues": ["需要决定谁维护内部计划", "想用计划文档替代验收"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.maintenance", "heading_hint": "计划文档维护"},
-      "authority": {"role": "canonical", "subject": "subject:multilayer.maintenance"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md maintenance"}], "verifiers": [{"kind": "review", "ref": "k2.point.multilayer.maintenance"}]}
+      "recognition_cues": [
+        "需要决定谁维护内部计划",
+        "想用计划文档替代验收"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/multilayer.maintenance.md",
+        "marker": "point:multilayer.maintenance",
+        "heading_hint": "计划文档维护"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:multilayer.maintenance"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md maintenance"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.multilayer.maintenance"
+          }
+        ]
+      }
     },
     {
       "id": "point:multilayer.deviation-notes",
       "title": "偏离留痕",
       "point_kind": "procedure",
       "summary": "够格的大节点在派发契约里加一条偏离记录要求，写清偏离什么、为什么、放弃了什么、要不要复核；留痕不能把该升级的语义变更变成既成事实。",
-      "recognition_cues": ["执行者在实现中撞上未预料的边界情形", "端点验收只看得到最终产物看不到路上的取舍", "想用留痕代替向用户升级"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/multi-layer-planning.md", "marker": "point:multilayer.deviation-notes", "heading_hint": "偏离留痕"},
-      "authority": {"role": "canonical", "subject": "subject:multilayer.deviation-notes"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
-      "admission": {"evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 偏离留痕"}], "verifiers": [{"kind": "review", "ref": "issue-211.point.multilayer.deviation-notes"}]}
+      "recognition_cues": [
+        "执行者在实现中撞上未预料的边界情形",
+        "端点验收只看得到最终产物看不到路上的取舍",
+        "想用留痕代替向用户升级"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/multilayer.deviation-notes.md",
+        "marker": "point:multilayer.deviation-notes",
+        "heading_hint": "偏离留痕"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:multilayer.deviation-notes"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md 偏离留痕"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.multilayer.deviation-notes"
+          }
+        ]
+      }
     }
   ],
   "edges": [
@@ -72,15 +240,34 @@
       "type": "deepens_to",
       "from": "point:multilayer.handoff-contract",
       "to": "point:multilayer.deviation-notes",
-      "when": ["派发契约已成形，需要为大节点补上偏离记录这一条增项"],
-      "avoid_when": ["节点小而原子、一次端点验收即可判完"],
+      "when": [
+        "派发契约已成形，需要为大节点补上偏离记录这一条增项"
+      ],
+      "avoid_when": [
+        "节点小而原子、一次端点验收即可判完"
+      ],
       "path_role": "route",
       "order": 1,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 派发契约再加一条"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.multilayer.handoff-to-deviation"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md 派发契约再加一条"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.multilayer.handoff-to-deviation"
+          }
+        ]
       }
     },
     {
@@ -88,13 +275,30 @@
       "type": "routes_to",
       "from": "point:multilayer.deviation-notes",
       "to": "point:multilayer.admission-and-escalation",
-      "when": ["需要复核这个节点是否够格承担偏离记录的成本"],
+      "when": [
+        "需要复核这个节点是否够格承担偏离记录的成本"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "multi-layer-planning.md 只对够格的大节点生效"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.multilayer.deviation-to-admission"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "multi-layer-planning.md 只对够格的大节点生效"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.multilayer.deviation-to-admission"
+          }
+        ]
       }
     }
   ]

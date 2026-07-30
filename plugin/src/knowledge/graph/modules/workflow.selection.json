@@ -57,7 +57,7 @@
         "需要Workflow 准入"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/workflow.admission.md",
         "marker": "point:workflow.admission",
         "heading_hint": "Workflow 准入"
       },
@@ -93,7 +93,7 @@
         "需要Workflow 形状决策树"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/workflow.shape-tree.md",
         "marker": "point:workflow.shape-tree",
         "heading_hint": "Workflow 形状决策树"
       },
@@ -129,7 +129,7 @@
         "需要Workflow 资源路由"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/workflow.resource-index.md",
         "marker": "point:workflow.resource-index",
         "heading_hint": "Workflow 资源路由"
       },

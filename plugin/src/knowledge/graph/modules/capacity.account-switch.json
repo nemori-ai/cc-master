@@ -55,7 +55,7 @@
         "selected target hard boundary"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
+        "path": "plugin/src/knowledge/points/capacity.account-switch-gate.md",
         "marker": "point:capacity.account-switch-gate",
         "heading_hint": "换号 lever"
       },
@@ -91,7 +91,7 @@
         "换号已获明确授权"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
+        "path": "plugin/src/knowledge/points/capacity.account-switch-sequence.md",
         "marker": "point:capacity.account-switch-sequence",
         "heading_hint": "编排决策序列"
       },

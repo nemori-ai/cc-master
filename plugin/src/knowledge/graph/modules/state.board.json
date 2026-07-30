@@ -57,7 +57,7 @@
         "准备改 hook-dependent 字段"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+        "path": "plugin/src/knowledge/points/board.waist-and-write.md",
         "marker": "point:board.waist-and-write",
         "heading_hint": "关键决策"
       },
@@ -94,7 +94,7 @@
         "需要临界路径 advisory"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+        "path": "plugin/src/knowledge/points/board.audit-and-graph.md",
         "marker": "point:board.audit-and-graph",
         "heading_hint": "Supersession"
       },
@@ -131,7 +131,7 @@
         "用户决策需要结构化依据"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+        "path": "plugin/src/knowledge/points/board.resume-and-interview.md",
         "marker": "point:board.resume-and-interview",
         "heading_hint": "owner.heartbeat"
       },
@@ -167,7 +167,7 @@
         "需要对照完整 board 样例"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/board.md",
+        "path": "plugin/src/knowledge/points/board.worked-example.md",
         "marker": "point:board.worked-example",
         "heading_hint": "示例"
       },

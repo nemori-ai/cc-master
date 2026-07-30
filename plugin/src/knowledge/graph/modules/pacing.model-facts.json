@@ -55,7 +55,7 @@
         "相对成本"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md",
+        "path": "plugin/src/knowledge/points/pacing.model-tier-facts.md",
         "marker": "point:pacing.model-tier-facts",
         "heading_hint": "模型档位"
       },

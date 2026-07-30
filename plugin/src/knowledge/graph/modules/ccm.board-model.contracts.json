@@ -61,7 +61,7 @@
         "route-bind"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.planning-routing.md",
         "marker": "point:ccm.board.planning-routing",
         "heading_hint": "C.5"
       },
@@ -98,7 +98,7 @@
         "凡派发皆登记"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.agents-registry.md",
         "marker": "point:ccm.board.agents-registry",
         "heading_hint": "C.6"
       },
@@ -135,7 +135,7 @@
         "自驱决策记录"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.jc-judgment.md",
         "marker": "point:ccm.board.jc-judgment",
         "heading_hint": "H. jc"
       },
@@ -172,7 +172,7 @@
         "overbooked warn"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.cadence.md",
         "marker": "point:ccm.board.cadence",
         "heading_hint": "I. cadence"
       },
@@ -209,7 +209,7 @@
         "依赖连叶节点"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.parent-owner.md",
         "marker": "point:ccm.board.parent-owner",
         "heading_hint": "J. parent"
       },
@@ -246,7 +246,7 @@
         "disarm 两件套"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.watchdog.md",
         "marker": "point:ccm.board.watchdog",
         "heading_hint": "K. watchdog"
       },
@@ -283,7 +283,7 @@
         "true-done"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.artifact-verified.md",
         "marker": "point:ccm.board.artifact-verified",
         "heading_hint": "L. artifact"
       },
@@ -320,7 +320,7 @@
         "裸 path 错落"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.antipatterns.md",
         "marker": "point:ccm.board.antipatterns",
         "heading_hint": "M. 反模式"
       },
@@ -357,7 +357,7 @@
         "FMT-TIME"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.validation-rules.md",
         "marker": "point:ccm.board.validation-rules",
         "heading_hint": "N. 校验规则"
       },
@@ -394,7 +394,7 @@
         "confirm-none"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.deadline-ddl.md",
         "marker": "point:ccm.board.deadline-ddl",
         "heading_hint": "O. DDL"
       },

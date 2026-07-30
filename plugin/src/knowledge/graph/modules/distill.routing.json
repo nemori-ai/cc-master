@@ -60,7 +60,7 @@
         "三问"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.routing-overview.md",
         "marker": "point:distill.routing-overview",
         "heading_hint": "归宿判断决策树"
       },
@@ -99,7 +99,7 @@
         "是不是该用本 skill"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.boundary.md",
         "marker": "point:distill.boundary",
         "heading_hint": "边界"
       },
@@ -135,7 +135,7 @@
         "完整决策树"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.routing-tree.md",
         "marker": "point:distill.routing-tree",
         "heading_hint": "顶层三问"
       },
@@ -171,7 +171,7 @@
         "既是事实又是判断力"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.dual-dest.md",
         "marker": "point:distill.dual-dest",
         "heading_hint": "二义性"
       },
@@ -208,7 +208,7 @@
         "没地方放"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.fallback-no-drop.md",
         "marker": "point:distill.fallback-no-drop",
         "heading_hint": "兜底"
       },

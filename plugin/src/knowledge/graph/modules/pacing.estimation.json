@@ -62,7 +62,7 @@
         "查 EVM"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "path": "plugin/src/knowledge/points/pacing.estimate-verbs.md",
         "marker": "point:pacing.estimate-verbs",
         "heading_hint": "6 个 verb"
       },
@@ -98,7 +98,7 @@
         "板上有 deadline"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "path": "plugin/src/knowledge/points/pacing.deadline-risk.md",
         "marker": "point:pacing.deadline-risk",
         "heading_hint": "deadline-risk"
       },
@@ -134,7 +134,7 @@
         "evm 不可用"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "path": "plugin/src/knowledge/points/pacing.baseline-precondition.md",
         "marker": "point:pacing.baseline-precondition",
         "heading_hint": "baseline"
       },
@@ -171,7 +171,7 @@
         "信不信 ETA"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "path": "plugin/src/knowledge/points/pacing.honest-fields.md",
         "marker": "point:pacing.honest-fields",
         "heading_hint": "诚实字段"
       },
@@ -207,7 +207,7 @@
         "配额不够装完活"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
+        "path": "plugin/src/knowledge/points/pacing.usage-estimate-tension.md",
         "marker": "point:pacing.usage-estimate-tension",
         "heading_hint": "usage ⊗ estimate"
       },

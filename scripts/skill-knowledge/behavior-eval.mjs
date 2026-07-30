@@ -517,7 +517,7 @@ export function gradeBehaviorRun({
   const moduleCorrect = response.module_id === expected.module_id;
   const quote =
     typeof response.evidence_quote === 'string' ? response.evidence_quote.trim() : '';
-  const expectedSurface = surfaceBindingPath(point.binding.path);
+  const expectedSurface = surfaceBindingPath(point.anchor_path ?? point.binding.path);
   const evidenceGrounded =
     pointHit &&
     ownerCorrect &&

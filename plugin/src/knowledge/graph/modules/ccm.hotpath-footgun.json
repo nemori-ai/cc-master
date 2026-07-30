@@ -61,7 +61,7 @@
         "block 等用户"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.hotpath-flows.md",
         "marker": "point:ccm.hotpath-flows",
         "heading_hint": "热路径速查"
       },
@@ -99,7 +99,7 @@
         "retry 后旧 artifact"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.footgun-table.md",
         "marker": "point:ccm.footgun-table",
         "heading_hint": "footgun 速查"
       },
@@ -136,7 +136,7 @@
         "不知道失败码含义"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.exit-codes.md",
         "marker": "point:ccm.exit-codes",
         "heading_hint": "Exit code 速记"
       },
@@ -173,7 +173,7 @@
         "与编排 skill 边界"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.pointers-routing.md",
         "marker": "point:ccm.pointers-routing",
         "heading_hint": "Pointers"
       },

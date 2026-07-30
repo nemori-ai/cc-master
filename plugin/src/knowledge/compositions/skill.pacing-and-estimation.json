@@ -8,30 +8,30 @@
   "intent": "消费 ccm 只读 advisory：配额信号、单侧 levers、池感知、估算与模型事实；ccm 出 verdict，编排决策另归。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:pacing.signals",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.signals.json"
-    },
-    {
-      "id": "module:pacing.target-facts",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.target-facts.json"
-    },
-    {
-      "id": "module:pacing.levers",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.levers.json"
-    },
-    {
-      "id": "module:pacing.pool",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.pool.json"
-    },
-    {
-      "id": "module:pacing.estimation",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.estimation.json"
-    },
-    {
-      "id": "module:pacing.model-facts",
-      "manifest": "plugin/src/knowledge/graph/modules/pacing.model-facts.json"
-    }
+      {
+        "id": "module:pacing.signals",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.signals.json"
+      },
+      {
+        "id": "module:pacing.target-facts",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.target-facts.json"
+      },
+      {
+        "id": "module:pacing.levers",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.levers.json"
+      },
+      {
+        "id": "module:pacing.pool",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.pool.json"
+      },
+      {
+        "id": "module:pacing.estimation",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.estimation.json"
+      },
+      {
+        "id": "module:pacing.model-facts",
+        "manifest": "plugin/src/knowledge/graph/modules/pacing.model-facts.json"
+      }
     ]
   },
   "entry_modules": [
@@ -59,7 +59,29 @@
         "point:pacing.window-contracts",
         "point:pacing.signal-ceiling"
       ],
-      "reviewed_unbound_sha256": "5362b3227be06d9065c2836ca13564983d5a151a6b8837fb613d0adce69f9523"
+      "reviewed_unbound_sha256": "5362b3227be06d9065c2836ca13564983d5a151a6b8837fb613d0adce69f9523",
+      "reconciliations": [
+        {
+          "point": "point:pacing.machine-wide-first",
+          "point_sha256": "994aa1b391f1a5c483bb9f9feffcff0342a291dd6ec884dc3f1d6fe7f6389248",
+          "passage_sha256": "994aa1b391f1a5c483bb9f9feffcff0342a291dd6ec884dc3f1d6fe7f6389248"
+        },
+        {
+          "point": "point:pacing.refresh-hint",
+          "point_sha256": "2b5a883cd4d703cf3c0ce3b44771f9c9fad3fb592ba940d88f7c696bf7cdf8ed",
+          "passage_sha256": "2b5a883cd4d703cf3c0ce3b44771f9c9fad3fb592ba940d88f7c696bf7cdf8ed"
+        },
+        {
+          "point": "point:pacing.signal-ceiling",
+          "point_sha256": "be5a4adfa8deb4376ab513982736d65500bbb7375e91e18742241bc941d62f6e",
+          "passage_sha256": "be5a4adfa8deb4376ab513982736d65500bbb7375e91e18742241bc941d62f6e"
+        },
+        {
+          "point": "point:pacing.window-contracts",
+          "point_sha256": "06b76c0ba5d667f7fd5e110aa27d1e16b263e0c42304d4e9ba47a85c6a2cba92",
+          "passage_sha256": "06b76c0ba5d667f7fd5e110aa27d1e16b263e0c42304d4e9ba47a85c6a2cba92"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md",
@@ -67,7 +89,14 @@
       "point_ids": [
         "point:pacing.selected-target-facts"
       ],
-      "reviewed_unbound_sha256": "a3013275078a8a741ff0689938666dd8c723de8e58b56ff101f1ddc8b0f56b69"
+      "reviewed_unbound_sha256": "a3013275078a8a741ff0689938666dd8c723de8e58b56ff101f1ddc8b0f56b69",
+      "reconciliations": [
+        {
+          "point": "point:pacing.selected-target-facts",
+          "point_sha256": "e417f1a97de257837d5c8f92b323e716e398ddd48d615c81a84d88680b93e56e",
+          "passage_sha256": "e417f1a97de257837d5c8f92b323e716e398ddd48d615c81a84d88680b93e56e"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
@@ -76,7 +105,19 @@
         "point:pacing.upper-bound-only",
         "point:pacing.decision-vectors"
       ],
-      "reviewed_unbound_sha256": "8693393130e538cb16f5532a6461cdc4f7f819607290cc3a2509b713c7b909ce"
+      "reviewed_unbound_sha256": "8693393130e538cb16f5532a6461cdc4f7f819607290cc3a2509b713c7b909ce",
+      "reconciliations": [
+        {
+          "point": "point:pacing.decision-vectors",
+          "point_sha256": "5611d76d9fb5eb4bbf058acc132a697e1f1aff8bee92e85739afc203952dd42f",
+          "passage_sha256": "5611d76d9fb5eb4bbf058acc132a697e1f1aff8bee92e85739afc203952dd42f"
+        },
+        {
+          "point": "point:pacing.upper-bound-only",
+          "point_sha256": "3a935a4ffa3375f6dff507cecfa090b6d47d3e7a6cfc6033d6db7a012a183a82",
+          "passage_sha256": "3a935a4ffa3375f6dff507cecfa090b6d47d3e7a6cfc6033d6db7a012a183a82"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
@@ -86,7 +127,24 @@
         "point:pacing.pool-vs-usage",
         "point:pacing.pool-rationalization"
       ],
-      "reviewed_unbound_sha256": "aa35483896eb5c7835dab7718d0295f33f5ecfe2e2f863f67389095bd67ba6f4"
+      "reviewed_unbound_sha256": "aa35483896eb5c7835dab7718d0295f33f5ecfe2e2f863f67389095bd67ba6f4",
+      "reconciliations": [
+        {
+          "point": "point:pacing.own-row",
+          "point_sha256": "b2fa85c399ba5f054d8d19d0ab6fe38288bcfacc3a2580ef57e81f9569e35a2e",
+          "passage_sha256": "b2fa85c399ba5f054d8d19d0ab6fe38288bcfacc3a2580ef57e81f9569e35a2e"
+        },
+        {
+          "point": "point:pacing.pool-rationalization",
+          "point_sha256": "e0c925d149ae3c4b913593db12ffd5101c0c3d884348b4513539dda23b0ce7f0",
+          "passage_sha256": "e0c925d149ae3c4b913593db12ffd5101c0c3d884348b4513539dda23b0ce7f0"
+        },
+        {
+          "point": "point:pacing.pool-vs-usage",
+          "point_sha256": "a7fa59c3ee883c99ad74ca172374ef5262540ec6cf4d2306e8c29a78b8d4c3ae",
+          "passage_sha256": "a7fa59c3ee883c99ad74ca172374ef5262540ec6cf4d2306e8c29a78b8d4c3ae"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
@@ -98,7 +156,34 @@
         "point:pacing.honest-fields",
         "point:pacing.usage-estimate-tension"
       ],
-      "reviewed_unbound_sha256": "ba51ef8bbaa9b886febe3ff021194c91f61b4665824f462726c52069e1c6420f"
+      "reviewed_unbound_sha256": "ba51ef8bbaa9b886febe3ff021194c91f61b4665824f462726c52069e1c6420f",
+      "reconciliations": [
+        {
+          "point": "point:pacing.baseline-precondition",
+          "point_sha256": "9804786e34d4f856b11fe105dc5a513080cfab53555ad4fb1253c455eedc698f",
+          "passage_sha256": "9804786e34d4f856b11fe105dc5a513080cfab53555ad4fb1253c455eedc698f"
+        },
+        {
+          "point": "point:pacing.deadline-risk",
+          "point_sha256": "62ef0a6e08d3a9c42535437fefb92bc600fc839d1cc575fddcb17096ab7893ae",
+          "passage_sha256": "62ef0a6e08d3a9c42535437fefb92bc600fc839d1cc575fddcb17096ab7893ae"
+        },
+        {
+          "point": "point:pacing.estimate-verbs",
+          "point_sha256": "7529b01fe67e7d44f6344a7f25f4b8b72511cde9b7da4da3a3d9dba5aa2807ad",
+          "passage_sha256": "7529b01fe67e7d44f6344a7f25f4b8b72511cde9b7da4da3a3d9dba5aa2807ad"
+        },
+        {
+          "point": "point:pacing.honest-fields",
+          "point_sha256": "299e2aba55311f582f069f6eb25b35e41b2277fe93e5809fa1e73399c5acb676",
+          "passage_sha256": "299e2aba55311f582f069f6eb25b35e41b2277fe93e5809fa1e73399c5acb676"
+        },
+        {
+          "point": "point:pacing.usage-estimate-tension",
+          "point_sha256": "f71627ec085081eba14ca794a16731117ced4f796e88220d24a1c954cd3c684d",
+          "passage_sha256": "f71627ec085081eba14ca794a16731117ced4f796e88220d24a1c954cd3c684d"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md",
@@ -106,7 +191,14 @@
       "point_ids": [
         "point:pacing.model-tier-facts"
       ],
-      "reviewed_unbound_sha256": "ed07adebf0107d4f114a12d53448a802c7f95fe2cff0b22d3c02017b6c6e487d"
+      "reviewed_unbound_sha256": "ed07adebf0107d4f114a12d53448a802c7f95fe2cff0b22d3c02017b6c6e487d",
+      "reconciliations": [
+        {
+          "point": "point:pacing.model-tier-facts",
+          "point_sha256": "37c8128d55c921a12dc145243566fb0b4a7de64bb96a1cb5ab029062ae5a8f40",
+          "passage_sha256": "37c8128d55c921a12dc145243566fb0b4a7de64bb96a1cb5ab029062ae5a8f40"
+        }
+      ]
     }
   ],
   "host_coverage": [

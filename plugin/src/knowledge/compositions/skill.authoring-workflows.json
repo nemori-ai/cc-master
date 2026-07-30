@@ -8,18 +8,18 @@
   "intent": "让 workflow 作者做准入、形状选择并按 Claude Code Workflow runtime 契约起草和修复脚本。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:workflow.selection",
-      "manifest": "plugin/src/knowledge/graph/modules/workflow.selection.json"
-    },
-    {
-      "id": "module:workflow.runtime-contract",
-      "manifest": "plugin/src/knowledge/graph/modules/workflow.runtime-contract.json"
-    },
-    {
-      "id": "module:workflow.pattern-catalog",
-      "manifest": "plugin/src/knowledge/graph/modules/workflow.pattern-catalog.json"
-    }
+      {
+        "id": "module:workflow.selection",
+        "manifest": "plugin/src/knowledge/graph/modules/workflow.selection.json"
+      },
+      {
+        "id": "module:workflow.runtime-contract",
+        "manifest": "plugin/src/knowledge/graph/modules/workflow.runtime-contract.json"
+      },
+      {
+        "id": "module:workflow.pattern-catalog",
+        "manifest": "plugin/src/knowledge/graph/modules/workflow.pattern-catalog.json"
+      }
     ]
   },
   "entry_modules": [
@@ -47,7 +47,29 @@
         "point:workflow.resource-index",
         "point:workflow.shape-tree"
       ],
-      "reviewed_unbound_sha256": "ed5d55163efd3f750c5b951b994d056e765bc0eae95fce57b3d06893c6bf691e"
+      "reviewed_unbound_sha256": "ed5d55163efd3f750c5b951b994d056e765bc0eae95fce57b3d06893c6bf691e",
+      "reconciliations": [
+        {
+          "point": "point:workflow.admission",
+          "point_sha256": "5c44386f769bf5d9229c1fa65c9b7f40a8210d2154a38472ce77cba31da4cbbd",
+          "passage_sha256": "5c44386f769bf5d9229c1fa65c9b7f40a8210d2154a38472ce77cba31da4cbbd"
+        },
+        {
+          "point": "point:workflow.authoring-contract",
+          "point_sha256": "d9a5f4388239abf863bef552397fba81a898db3a2608b2c39e8f4aae3d451c94",
+          "passage_sha256": "d9a5f4388239abf863bef552397fba81a898db3a2608b2c39e8f4aae3d451c94"
+        },
+        {
+          "point": "point:workflow.resource-index",
+          "point_sha256": "b8e71e1217985e46b3d61e5f3a9b2314973201e38a34d47acb105dd5dd8d8634",
+          "passage_sha256": "b8e71e1217985e46b3d61e5f3a9b2314973201e38a34d47acb105dd5dd8d8634"
+        },
+        {
+          "point": "point:workflow.shape-tree",
+          "point_sha256": "e888917036c4b47adefec333cd0f5d7517a9a7563670160f8d2ce7b2842bd92a",
+          "passage_sha256": "e888917036c4b47adefec333cd0f5d7517a9a7563670160f8d2ce7b2842bd92a"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
@@ -65,7 +87,64 @@
         "point:workflow.api-pipeline",
         "point:workflow.api-progress"
       ],
-      "reviewed_unbound_sha256": "03daa420cb2390d50a9e9be0e3e8f5c448d0b7a5f9f6d10caa0fc61f625b807f"
+      "reviewed_unbound_sha256": "03daa420cb2390d50a9e9be0e3e8f5c448d0b7a5f9f6d10caa0fc61f625b807f",
+      "reconciliations": [
+        {
+          "point": "point:workflow.api-agent",
+          "point_sha256": "99a126cee9031ae1db699010a412becae8c49e774432916cd0a9a51f931fffb0",
+          "passage_sha256": "99a126cee9031ae1db699010a412becae8c49e774432916cd0a9a51f931fffb0"
+        },
+        {
+          "point": "point:workflow.api-args",
+          "point_sha256": "e2aa820daa21e85f608c39786eae0de18fa84e57a23f92febcc474522fb4acb4",
+          "passage_sha256": "e2aa820daa21e85f608c39786eae0de18fa84e57a23f92febcc474522fb4acb4"
+        },
+        {
+          "point": "point:workflow.api-budget",
+          "point_sha256": "afc8b3154d02ed5e847d3e4f6b2929032b7b09f295bd27ebee52c2d67cc81a48",
+          "passage_sha256": "afc8b3154d02ed5e847d3e4f6b2929032b7b09f295bd27ebee52c2d67cc81a48"
+        },
+        {
+          "point": "point:workflow.api-cache-key",
+          "point_sha256": "7aea26de0f5f6c663de5557c70d808098556027028d828386c31af22d84ade5d",
+          "passage_sha256": "7aea26de0f5f6c663de5557c70d808098556027028d828386c31af22d84ade5d"
+        },
+        {
+          "point": "point:workflow.api-caps",
+          "point_sha256": "089c11945529627cdbda7a04b30adeb6082fcc661d4a148389da032460b1cc17",
+          "passage_sha256": "089c11945529627cdbda7a04b30adeb6082fcc661d4a148389da032460b1cc17"
+        },
+        {
+          "point": "point:workflow.api-composition",
+          "point_sha256": "d4571083e160b12142af3817da23e7da1c1e0ea271f9ce0fc644252ea5b6fcb9",
+          "passage_sha256": "d4571083e160b12142af3817da23e7da1c1e0ea271f9ce0fc644252ea5b6fcb9"
+        },
+        {
+          "point": "point:workflow.api-failure",
+          "point_sha256": "cab8b6ce562ed7d4c0c29622064b2327217ee4a11cc13beecc09db3fa2b6e585",
+          "passage_sha256": "cab8b6ce562ed7d4c0c29622064b2327217ee4a11cc13beecc09db3fa2b6e585"
+        },
+        {
+          "point": "point:workflow.api-meta",
+          "point_sha256": "1146c878cd4ff1d9bf95f0cf4f5d9bb2de8b7804c4c2a746afd3f8c2bc4f9a0c",
+          "passage_sha256": "1146c878cd4ff1d9bf95f0cf4f5d9bb2de8b7804c4c2a746afd3f8c2bc4f9a0c"
+        },
+        {
+          "point": "point:workflow.api-parallel",
+          "point_sha256": "b617d39219522c1ee280fdeba005284c91a727cc4f6d3b08de88158e4a816b77",
+          "passage_sha256": "b617d39219522c1ee280fdeba005284c91a727cc4f6d3b08de88158e4a816b77"
+        },
+        {
+          "point": "point:workflow.api-pipeline",
+          "point_sha256": "be68896a3b05b288033f8ba971e47f250710d62bb0a20557f54234536849de44",
+          "passage_sha256": "be68896a3b05b288033f8ba971e47f250710d62bb0a20557f54234536849de44"
+        },
+        {
+          "point": "point:workflow.api-progress",
+          "point_sha256": "81592de63712ea353274d64519b022bdf024fefd6295c882bf671530dde815ee",
+          "passage_sha256": "81592de63712ea353274d64519b022bdf024fefd6295c882bf671530dde815ee"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
@@ -80,7 +159,49 @@
         "point:workflow.resource-caps",
         "point:workflow.resume-prefix"
       ],
-      "reviewed_unbound_sha256": "9405318d00add78de8e14bfa02233d8a2bce8d6fc4e4f10f8fee050e222d0fc2"
+      "reviewed_unbound_sha256": "9405318d00add78de8e14bfa02233d8a2bce8d6fc4e4f10f8fee050e222d0fc2",
+      "reconciliations": [
+        {
+          "point": "point:workflow.background-contract",
+          "point_sha256": "d193f6f7d9574ac0aae824c195760049986cd7949b979a309e652f400eb3122e",
+          "passage_sha256": "d193f6f7d9574ac0aae824c195760049986cd7949b979a309e652f400eb3122e"
+        },
+        {
+          "point": "point:workflow.barrier-vs-streaming",
+          "point_sha256": "6b84e4a20815ccc25d15941c1b948f3b84d58ee8568fa88acc8631bf4f605d6a",
+          "passage_sha256": "6b84e4a20815ccc25d15941c1b948f3b84d58ee8568fa88acc8631bf4f605d6a"
+        },
+        {
+          "point": "point:workflow.contract-vs-internals",
+          "point_sha256": "03d3cb215536f03fa0e98e6302125a70bbe00924e474928b921b6553aa52ba45",
+          "passage_sha256": "03d3cb215536f03fa0e98e6302125a70bbe00924e474928b921b6553aa52ba45"
+        },
+        {
+          "point": "point:workflow.determinism",
+          "point_sha256": "349863dd23ecc0210ef19be7fe69276e7124a85ac63e7cb5ee42f6a1f8443d72",
+          "passage_sha256": "349863dd23ecc0210ef19be7fe69276e7124a85ac63e7cb5ee42f6a1f8443d72"
+        },
+        {
+          "point": "point:workflow.execution-model",
+          "point_sha256": "79590df56c8be56f2a6ab25ea00ba73bad68cb47bce9538d51db16321cb991f2",
+          "passage_sha256": "79590df56c8be56f2a6ab25ea00ba73bad68cb47bce9538d51db16321cb991f2"
+        },
+        {
+          "point": "point:workflow.primitive-model",
+          "point_sha256": "58d9ad7efa6229fe251bdad65b6534b8d674b3f5dec0f6bbbe54c23ce37e8aae",
+          "passage_sha256": "58d9ad7efa6229fe251bdad65b6534b8d674b3f5dec0f6bbbe54c23ce37e8aae"
+        },
+        {
+          "point": "point:workflow.resource-caps",
+          "point_sha256": "d5135338278518c68885ac75264df4cd5d8724eeee5731f7b70efb6d636a6b53",
+          "passage_sha256": "d5135338278518c68885ac75264df4cd5d8724eeee5731f7b70efb6d636a6b53"
+        },
+        {
+          "point": "point:workflow.resume-prefix",
+          "point_sha256": "58aab9f40de73e0a66757872caf6f5f895de6b81f873a77c39a7e0fd80e4110f",
+          "passage_sha256": "58aab9f40de73e0a66757872caf6f5f895de6b81f873a77c39a7e0fd80e4110f"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
@@ -107,7 +228,109 @@
         "point:workflow.pattern-test-repair",
         "point:workflow.pattern-tournament"
       ],
-      "reviewed_unbound_sha256": "eaa80821a9c505a3adca2183811c6ce124ded451609d8f7a5319a247cb27fba9"
+      "reviewed_unbound_sha256": "eaa80821a9c505a3adca2183811c6ce124ded451609d8f7a5319a247cb27fba9",
+      "reconciliations": [
+        {
+          "point": "point:workflow.pattern-adversarial-verify",
+          "point_sha256": "888deb8d28131b7d423d5261ed21805658bd5e4e17b61da43fbb462345caad76",
+          "passage_sha256": "888deb8d28131b7d423d5261ed21805658bd5e4e17b61da43fbb462345caad76"
+        },
+        {
+          "point": "point:workflow.pattern-bug-hunt",
+          "point_sha256": "34ca5cec378f05661013ab4c78c233ee8cd9d9d2000708c4e869203e6ebb36f0",
+          "passage_sha256": "34ca5cec378f05661013ab4c78c233ee8cd9d9d2000708c4e869203e6ebb36f0"
+        },
+        {
+          "point": "point:workflow.pattern-completeness-critic",
+          "point_sha256": "cfe658f9ce3c23c9bf4778093d0440cbab834278d49daef2770e295237a8c79e",
+          "passage_sha256": "cfe658f9ce3c23c9bf4778093d0440cbab834278d49daef2770e295237a8c79e"
+        },
+        {
+          "point": "point:workflow.pattern-dep-upgrade",
+          "point_sha256": "7bb17497ed22517947edba5710d4dcf1af6b0031fefc257801fe4354f4048012",
+          "passage_sha256": "7bb17497ed22517947edba5710d4dcf1af6b0031fefc257801fe4354f4048012"
+        },
+        {
+          "point": "point:workflow.pattern-fan-out",
+          "point_sha256": "948fbf4699dab6bf02af64b7084070703d17a26e31539e094cc11e662d1c46cd",
+          "passage_sha256": "948fbf4699dab6bf02af64b7084070703d17a26e31539e094cc11e662d1c46cd"
+        },
+        {
+          "point": "point:workflow.pattern-judge-panel",
+          "point_sha256": "7a576d774495759074f0f28c4668d942be3449797fcf28174c221d78621a868c",
+          "passage_sha256": "7a576d774495759074f0f28c4668d942be3449797fcf28174c221d78621a868c"
+        },
+        {
+          "point": "point:workflow.pattern-loop-budget",
+          "point_sha256": "f571d8f66a77d38873e735dcf32cd2b0e009350fffb842d58ec31b0507e3833b",
+          "passage_sha256": "f571d8f66a77d38873e735dcf32cd2b0e009350fffb842d58ec31b0507e3833b"
+        },
+        {
+          "point": "point:workflow.pattern-loop-count",
+          "point_sha256": "0d3199df4974e782616785d683ce2b2a978f351901363bc4dc8e8485f0b7cb15",
+          "passage_sha256": "0d3199df4974e782616785d683ce2b2a978f351901363bc4dc8e8485f0b7cb15"
+        },
+        {
+          "point": "point:workflow.pattern-loop-dry",
+          "point_sha256": "66e11b748b862cf4a8ebb35ed76ed4fae57134d6ac1404ef673989fc5e98db7d",
+          "passage_sha256": "66e11b748b862cf4a8ebb35ed76ed4fae57134d6ac1404ef673989fc5e98db7d"
+        },
+        {
+          "point": "point:workflow.pattern-migration",
+          "point_sha256": "2a956c894cf7501dfefabe93600231e601c4b77f08bd1304cc408e46697dde08",
+          "passage_sha256": "2a956c894cf7501dfefabe93600231e601c4b77f08bd1304cc408e46697dde08"
+        },
+        {
+          "point": "point:workflow.pattern-multimodal-sweep",
+          "point_sha256": "8b377c6c59234b0455500c84d668690e469195b575d96e0ec11ccece509b6913",
+          "passage_sha256": "8b377c6c59234b0455500c84d668690e469195b575d96e0ec11ccece509b6913"
+        },
+        {
+          "point": "point:workflow.pattern-nested-composition",
+          "point_sha256": "fc18cf5c4df863d31a522d94d08383e5528bbaadd9801ce65000febb41a05bd2",
+          "passage_sha256": "fc18cf5c4df863d31a522d94d08383e5528bbaadd9801ce65000febb41a05bd2"
+        },
+        {
+          "point": "point:workflow.pattern-perspective-verify",
+          "point_sha256": "df4a7002e4811dea9ae8188fe130bd0287eee5e50a8c1204fa00432acbed500f",
+          "passage_sha256": "df4a7002e4811dea9ae8188fe130bd0287eee5e50a8c1204fa00432acbed500f"
+        },
+        {
+          "point": "point:workflow.pattern-pipeline",
+          "point_sha256": "2db281d1a13997d38e8a9c007e1b4c896740cc0a04d37cd43c314ab3dca1de05",
+          "passage_sha256": "2db281d1a13997d38e8a9c007e1b4c896740cc0a04d37cd43c314ab3dca1de05"
+        },
+        {
+          "point": "point:workflow.pattern-pr-triage",
+          "point_sha256": "20024a27f06e673a32ddf48697da01d0d501ebd0fed48f5f489d0da9d947167d",
+          "passage_sha256": "20024a27f06e673a32ddf48697da01d0d501ebd0fed48f5f489d0da9d947167d"
+        },
+        {
+          "point": "point:workflow.pattern-scout-fanout",
+          "point_sha256": "2bf8b8f26866738715ba984cde18662ec911c14ac7cfb786b1f07c5e26dd3a3e",
+          "passage_sha256": "2bf8b8f26866738715ba984cde18662ec911c14ac7cfb786b1f07c5e26dd3a3e"
+        },
+        {
+          "point": "point:workflow.pattern-self-repair",
+          "point_sha256": "3e69eac6f87b39324aeb9ae27b5e704dbead129dc73a0e476d9a32930845e2e1",
+          "passage_sha256": "3e69eac6f87b39324aeb9ae27b5e704dbead129dc73a0e476d9a32930845e2e1"
+        },
+        {
+          "point": "point:workflow.pattern-staged-escalation",
+          "point_sha256": "f1172b2424b867ac3d0af931edea64b43ab9a9aa526c9bc865a6ee2b5fee96a4",
+          "passage_sha256": "f1172b2424b867ac3d0af931edea64b43ab9a9aa526c9bc865a6ee2b5fee96a4"
+        },
+        {
+          "point": "point:workflow.pattern-test-repair",
+          "point_sha256": "aeca350ae084cfdb6b5823bd766f694dcfbcdcbb969007fd63f17f07ac6ab066",
+          "passage_sha256": "aeca350ae084cfdb6b5823bd766f694dcfbcdcbb969007fd63f17f07ac6ab066"
+        },
+        {
+          "point": "point:workflow.pattern-tournament",
+          "point_sha256": "6531540a95209484150ac822ae620c451839e35d58755bad4f063fafc64822b2",
+          "passage_sha256": "6531540a95209484150ac822ae620c451839e35d58755bad4f063fafc64822b2"
+        }
+      ]
     }
   ],
   "host_coverage": [

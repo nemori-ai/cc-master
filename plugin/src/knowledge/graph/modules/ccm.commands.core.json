@@ -58,7 +58,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.overview.md",
         "marker": "point:ccm.cmd.overview",
         "heading_hint": "顶层结构"
       },
@@ -96,7 +96,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.board.md",
         "marker": "point:ccm.cmd.board",
         "heading_hint": "namespace board"
       },
@@ -134,7 +134,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.goal.md",
         "marker": "point:ccm.cmd.goal",
         "heading_hint": "namespace goal"
       },
@@ -172,7 +172,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.task.md",
         "marker": "point:ccm.cmd.task",
         "heading_hint": "namespace task"
       },
@@ -210,7 +210,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.log.md",
         "marker": "point:ccm.cmd.log",
         "heading_hint": "namespace log"
       },
@@ -248,7 +248,7 @@
         "有哪些 flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.json-shape.md",
         "marker": "point:ccm.cmd.json-shape",
         "heading_hint": "--json 输出形状"
       },

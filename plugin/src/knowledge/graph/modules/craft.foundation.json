@@ -57,7 +57,7 @@
         "需要组合优于包装"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.composition-over-wrapper.md",
         "marker": "point:craft.composition-over-wrapper",
         "heading_hint": "组合优于包装"
       },
@@ -93,7 +93,7 @@
         "需要契约即 SSOT"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.contract-ssot.md",
         "marker": "point:craft.contract-ssot",
         "heading_hint": "契约即 SSOT"
       },
@@ -129,7 +129,7 @@
         "需要证据优于声称"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.evidence-over-claim.md",
         "marker": "point:craft.evidence-over-claim",
         "heading_hint": "证据优于声称"
       },
@@ -165,7 +165,7 @@
         "需要不变式即锚"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.invariant-anchor.md",
         "marker": "point:craft.invariant-anchor",
         "heading_hint": "不变式即锚"
       },
@@ -201,7 +201,7 @@
         "需要分层思维"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.layered-thinking.md",
         "marker": "point:craft.layered-thinking",
         "heading_hint": "分层思维"
       },
@@ -237,7 +237,7 @@
         "需要工程共享红线"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.red-lines.md",
         "marker": "point:craft.red-lines",
         "heading_hint": "工程共享红线"
       },
@@ -273,7 +273,7 @@
         "需要四理论共享脊椎"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.shared-spine.md",
         "marker": "point:craft.shared-spine",
         "heading_hint": "四理论共享脊椎"
       },
@@ -309,7 +309,7 @@
         "需要四理论阶段接力"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.stage-handoff.md",
         "marker": "point:craft.stage-handoff",
         "heading_hint": "四理论阶段接力"
       },

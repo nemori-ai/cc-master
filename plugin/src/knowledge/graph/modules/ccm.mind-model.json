@@ -59,7 +59,7 @@
         "不知道该翻 catalog 还是 model guide"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.when-to-open.md",
         "marker": "point:ccm.when-to-open",
         "heading_hint": "何时翻开本 skill"
       },
@@ -96,7 +96,7 @@
         "绕开 ccm 改一个字段"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.write-gate.md",
         "marker": "point:ccm.write-gate",
         "heading_hint": "心智锚 1"
       },
@@ -134,7 +134,7 @@
         "task update --status"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.status-state-machine.md",
         "marker": "point:ccm.status-state-machine",
         "heading_hint": "心智锚 2"
       },
@@ -172,7 +172,7 @@
         "delivery_contract"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.field-tiers.md",
         "marker": "point:ccm.field-tiers",
         "heading_hint": "心智锚 3"
       },
@@ -210,7 +210,7 @@
         "board-guard deny"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.single-write-path.md",
         "marker": "point:ccm.single-write-path",
         "heading_hint": "心智锚 4"
       },
@@ -248,7 +248,7 @@
         "route-bind"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/ccm.planning-opt-in.md",
         "marker": "point:ccm.planning-opt-in",
         "heading_hint": "心智锚 5"
       },

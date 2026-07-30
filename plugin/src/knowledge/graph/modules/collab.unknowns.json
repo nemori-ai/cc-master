@@ -4,10 +4,26 @@
   "id": "module:collab.unknowns",
   "title": "与用户共构未知",
   "intent": "在目标模糊或地形不熟时，按未知的类型选择发现手法，把用户说不出口和压根没想到的东西挖出来，同时不对低风险可逆工作增加协作仪式。",
-  "recognition_cues": ["用户给的是猜出来的方案而不是真实痛点", "对将要动的模块不熟、连该问什么都不知道", "用户说不清想要什么但看到就认得", "用户答不出什么样算好"],
+  "recognition_cues": [
+    "用户给的是猜出来的方案而不是真实痛点",
+    "对将要动的模块不熟、连该问什么都不知道",
+    "用户说不清想要什么但看到就认得",
+    "用户答不出什么样算好"
+  ],
   "boundary": {
-    "includes": ["四类未知的分派轴", "扫描/造物/提问/建框架的手法选择", "提问排序与停止判据", "具体物优于散文描述"],
-    "excludes": ["已表述假设的证据强度与证伪校准", "采访包的容器结构与时效校验", "目标成形检查表", "执行中的偏离留痕与验收后的理解校验", "同域其他协作主题（期望管理、讲解与教学）"]
+    "includes": [
+      "四类未知的分派轴",
+      "扫描/造物/提问/建框架的手法选择",
+      "提问排序与停止判据",
+      "具体物优于散文描述"
+    ],
+    "excludes": [
+      "已表述假设的证据强度与证伪校准",
+      "采访包的容器结构与时效校验",
+      "目标成形检查表",
+      "执行中的偏离留痕与验收后的理解校验",
+      "同域其他协作主题（期望管理、讲解与教学）"
+    ]
   },
   "access": {
     "class": "on_demand",
@@ -15,13 +31,28 @@
     "primary_points": [],
     "rationale": "只在目标模糊、地形不熟或用户偏好说不出口时 drill；四类未知齐备时不应触发。"
   },
-  "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+  "lifecycle": {
+    "state": "accepted",
+    "since": "2026-07-28"
+  },
   "admission": {
     "evidence": [
-      {"kind": "canonical-prose", "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md"},
-      {"kind": "research", "ref": "issue-211 source material: field guide on finding your unknowns", "note": "四象限与手法分派来自外部实践，经边界对账后只吸收 harness-neutral 部分"}
+      {
+        "kind": "canonical-prose",
+        "ref": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md"
+      },
+      {
+        "kind": "research",
+        "ref": "issue-211 source material: field guide on finding your unknowns",
+        "note": "四象限与手法分派来自外部实践，经边界对账后只吸收 harness-neutral 部分"
+      }
     ],
-    "verifiers": [{"kind": "review", "ref": "issue-211.module.collab.unknowns"}]
+    "verifiers": [
+      {
+        "kind": "review",
+        "ref": "issue-211.module.collab.unknowns"
+      }
+    ]
   },
   "points": [
     {
@@ -29,13 +60,37 @@
       "title": "四类未知与地图/地形差",
       "point_kind": "principle",
       "summary": "表示不是工作本身，二者之差即未知；模型越强这个差越危险，四类未知是你的内部分派轴而非对用户的话术。",
-      "recognition_cues": ["推进得异常顺畅却说不出验证过什么", "需要判断当前缺的是哪一类未知", "想对用户使用未知分类术语"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md", "marker": "point:unknowns.four-quadrants", "heading_hint": "地图不是那片地"},
-      "authority": {"role": "canonical", "subject": "subject:unknowns.four-quadrants"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "recognition_cues": [
+        "推进得异常顺畅却说不出验证过什么",
+        "需要判断当前缺的是哪一类未知",
+        "想对用户使用未知分类术语"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/unknowns.four-quadrants.md",
+        "marker": "point:unknowns.four-quadrants",
+        "heading_hint": "地图不是那片地"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:unknowns.four-quadrants"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 地图不是那片地"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.unknowns.four-quadrants"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 地图不是那片地"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.unknowns.four-quadrants"
+          }
+        ]
       }
     },
     {
@@ -43,13 +98,37 @@
       "title": "按未知类型分派发现手法",
       "point_kind": "decision_rule",
       "summary": "扫描地形治未知的未知、造多方向的物治未知的已知、提问治已知的未知；四类都不缺就直接推进不加仪式。",
-      "recognition_cues": ["不确定该扫描、造物还是直接问", "想对一个可逆小改增加访谈或原型", "需要对用户说明接下来要做什么"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md", "marker": "point:unknowns.technique-routing", "heading_hint": "按未知的类型选手法，不是走一套通用流程"},
-      "authority": {"role": "canonical", "subject": "subject:unknowns.technique-routing"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "recognition_cues": [
+        "不确定该扫描、造物还是直接问",
+        "想对一个可逆小改增加访谈或原型",
+        "需要对用户说明接下来要做什么"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/unknowns.technique-routing.md",
+        "marker": "point:unknowns.technique-routing",
+        "heading_hint": "按未知的类型选手法，不是走一套通用流程"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:unknowns.technique-routing"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 手法分派与用户侧措辞"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.unknowns.technique-routing"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 手法分派与用户侧措辞"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.unknowns.technique-routing"
+          }
+        ]
       }
     },
     {
@@ -57,13 +136,37 @@
       "title": "提问纪律与停止判据",
       "point_kind": "procedure",
       "summary": "一次一个问题，按会不会改变架构、数据模型、流程、范围或验收排序，每答一次重选下一问；剩余未知不再改变方案形状就停。",
-      "recognition_cues": ["准备向用户提问", "想一次抛出多个问题", "不知道还该不该继续问"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md", "marker": "point:unknowns.interview-discipline", "heading_hint": "提问纪律：一次一个，按会不会改方案排序"},
-      "authority": {"role": "canonical", "subject": "subject:unknowns.interview-discipline"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "recognition_cues": [
+        "准备向用户提问",
+        "想一次抛出多个问题",
+        "不知道还该不该继续问"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/unknowns.interview-discipline.md",
+        "marker": "point:unknowns.interview-discipline",
+        "heading_hint": "提问纪律：一次一个，按会不会改方案排序"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:unknowns.interview-discipline"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 提问纪律"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.unknowns.interview-discipline"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 提问纪律"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.unknowns.interview-discipline"
+          }
+        ]
       }
     },
     {
@@ -71,13 +174,37 @@
       "title": "用户没有判断框架时先建框架",
       "point_kind": "decision_rule",
       "summary": "用户答不出什么样算好时，先讲清取舍轴并给对照实例帮他定位，绝不反复把需求抛回给一个还没有判断框架的人。",
-      "recognition_cues": ["用户在这个领域缺乏经验", "反复追问却拿不到有效答案", "想索要一份并不存在的完整规格"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md", "marker": "point:unknowns.frame-before-spec", "heading_hint": "用户没有判断框架时：先建框架，别索要 spec"},
-      "authority": {"role": "canonical", "subject": "subject:unknowns.frame-before-spec"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "recognition_cues": [
+        "用户在这个领域缺乏经验",
+        "反复追问却拿不到有效答案",
+        "想索要一份并不存在的完整规格"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/unknowns.frame-before-spec.md",
+        "marker": "point:unknowns.frame-before-spec",
+        "heading_hint": "用户没有判断框架时：先建框架，别索要 spec"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:unknowns.frame-before-spec"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 先建框架"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.unknowns.frame-before-spec"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 先建框架"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.unknowns.frame-before-spec"
+          }
+        ]
       }
     },
     {
@@ -85,13 +212,37 @@
       "title": "具体物优于散文描述",
       "point_kind": "principle",
       "summary": "给能被指着说不对的具体物而不是描述，向用户与向执行者都适用；载体按 host 实际能力选，底线是真实代码加可跑样例。",
-      "recognition_cues": ["准备用一段文字描述想要的效果", "要给执行者写验收标准", "不确定当前 host 支持什么形式的参照物"],
-      "binding": {"path": "plugin/src/skills/master-orchestrator-guide/canonical/references/user-unknowns.md", "marker": "point:unknowns.artifact-over-prose", "heading_hint": "能给具体物就别给描述"},
-      "authority": {"role": "canonical", "subject": "subject:unknowns.artifact-over-prose"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "recognition_cues": [
+        "准备用一段文字描述想要的效果",
+        "要给执行者写验收标准",
+        "不确定当前 host 支持什么形式的参照物"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/unknowns.artifact-over-prose.md",
+        "marker": "point:unknowns.artifact-over-prose",
+        "heading_hint": "能给具体物就别给描述"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:unknowns.artifact-over-prose"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 具体物优于散文"}],
-        "verifiers": [{"kind": "review", "ref": "issue-211.point.unknowns.artifact-over-prose"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 具体物优于散文"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "issue-211.point.unknowns.artifact-over-prose"
+          }
+        ]
       }
     }
   ],
@@ -101,14 +252,31 @@
       "type": "deepens_to",
       "from": "point:unknowns.four-quadrants",
       "to": "point:unknowns.technique-routing",
-      "when": ["判定缺哪类未知后需要选具体手法"],
+      "when": [
+        "判定缺哪类未知后需要选具体手法"
+      ],
       "path_role": "route",
       "order": 1,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 分派轴接手法"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.quadrants-to-routing"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 分派轴接手法"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.quadrants-to-routing"
+          }
+        ]
       }
     },
     {
@@ -116,13 +284,30 @@
       "type": "routes_to",
       "from": "point:unknowns.technique-routing",
       "to": "point:unknowns.four-quadrants",
-      "when": ["选手法前需要复核当前属于哪类未知"],
+      "when": [
+        "选手法前需要复核当前属于哪类未知"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "design", "ref": "module.collab.unknowns bidirectional route"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.routing-to-quadrants"}]
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "module.collab.unknowns bidirectional route"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.routing-to-quadrants"
+          }
+        ]
       }
     },
     {
@@ -130,14 +315,31 @@
       "type": "deepens_to",
       "from": "point:unknowns.technique-routing",
       "to": "point:unknowns.interview-discipline",
-      "when": ["分派结果是开口问已知的未知"],
+      "when": [
+        "分派结果是开口问已知的未知"
+      ],
       "path_role": "route",
       "order": 1,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 手法分派指向提问纪律"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.routing-to-interview"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 手法分派指向提问纪律"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.routing-to-interview"
+          }
+        ]
       }
     },
     {
@@ -145,13 +347,30 @@
       "type": "routes_to",
       "from": "point:unknowns.interview-discipline",
       "to": "point:unknowns.four-quadrants",
-      "when": ["每轮回答后重新判定剩余未知的类型"],
+      "when": [
+        "每轮回答后重新判定剩余未知的类型"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 每答一次更新剩余未知"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.interview-to-quadrants"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 每答一次更新剩余未知"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.interview-to-quadrants"
+          }
+        ]
       }
     },
     {
@@ -159,14 +378,31 @@
       "type": "deepens_to",
       "from": "point:unknowns.technique-routing",
       "to": "point:unknowns.frame-before-spec",
-      "when": ["分派结果是用户连什么叫好都还没有"],
+      "when": [
+        "分派结果是用户连什么叫好都还没有"
+      ],
       "path_role": "route",
       "order": 2,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 手法分派指向建框架"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.routing-to-frame"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 手法分派指向建框架"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.routing-to-frame"
+          }
+        ]
       }
     },
     {
@@ -174,13 +410,30 @@
       "type": "routes_to",
       "from": "point:unknowns.frame-before-spec",
       "to": "point:unknowns.four-quadrants",
-      "when": ["建立框架后重新判定剩余未知的类型"],
+      "when": [
+        "建立框架后重新判定剩余未知的类型"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "design", "ref": "module.collab.unknowns bidirectional route"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.frame-to-quadrants"}]
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "module.collab.unknowns bidirectional route"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.frame-to-quadrants"
+          }
+        ]
       }
     },
     {
@@ -188,15 +441,34 @@
       "type": "next",
       "from": "point:unknowns.frame-before-spec",
       "to": "point:unknowns.interview-discipline",
-      "when": ["用户已在取舍轴上定位，可以进入提问"],
-      "avoid_when": ["用户仍答不出什么样算好"],
+      "when": [
+        "用户已在取舍轴上定位，可以进入提问"
+      ],
+      "avoid_when": [
+        "用户仍答不出什么样算好"
+      ],
       "path_role": "next",
       "order": 1,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 定位完才有能力回答后面的问题"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.frame-to-interview"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 定位完才有能力回答后面的问题"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.frame-to-interview"
+          }
+        ]
       }
     },
     {
@@ -204,14 +476,31 @@
       "type": "deepens_to",
       "from": "point:unknowns.technique-routing",
       "to": "point:unknowns.artifact-over-prose",
-      "when": ["分派结果是造物让用户反应，需要决定给什么物"],
+      "when": [
+        "分派结果是造物让用户反应，需要决定给什么物"
+      ],
       "path_role": "route",
       "order": 3,
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 手法分派指向具体物"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.routing-to-artifact"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 手法分派指向具体物"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.routing-to-artifact"
+          }
+        ]
       }
     },
     {
@@ -219,13 +508,30 @@
       "type": "routes_to",
       "from": "point:unknowns.artifact-over-prose",
       "to": "point:unknowns.four-quadrants",
-      "when": ["用户对具体物反应后重新判定剩余未知的类型"],
+      "when": [
+        "用户对具体物反应后重新判定剩余未知的类型"
+      ],
       "path_role": "support",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "design", "ref": "module.collab.unknowns bidirectional route"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.artifact-to-quadrants"}]
+        "evidence": [
+          {
+            "kind": "design",
+            "ref": "module.collab.unknowns bidirectional route"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.artifact-to-quadrants"
+          }
+        ]
       }
     },
     {
@@ -233,13 +539,30 @@
       "type": "contrasts_with",
       "from": "point:unknowns.four-quadrants",
       "to": "point:outside.evidence-levels",
-      "when": ["需要区分知晓状态轴与证据强度轴，避免把两套分类混用"],
+      "when": [
+        "需要区分知晓状态轴与证据强度轴，避免把两套分类混用"
+      ],
       "path_role": "contrast",
-      "runtime": {"enabled_by_default": true},
-      "lifecycle": {"state": "accepted", "since": "2026-07-28"},
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "user-unknowns.md 与 outside-in.md 互相声明的分界"}],
-        "verifiers": [{"kind": "projection", "ref": "authored-nav.edge.unknowns.quadrants-to-evidence-levels"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "user-unknowns.md 与 outside-in.md 互相声明的分界"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.edge.unknowns.quadrants-to-evidence-levels"
+          }
+        ]
       }
     }
   ]

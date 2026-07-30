@@ -56,7 +56,7 @@
         "handoff 写成 work order"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.two-scale.md",
         "marker": "point:devloop.two-scale",
         "heading_hint": "两尺度"
       },
@@ -92,7 +92,7 @@
         "只问谁来写代码"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.ml-components.md",
         "marker": "point:devloop.ml-components",
         "heading_hint": "subagents as ML components"
       },
