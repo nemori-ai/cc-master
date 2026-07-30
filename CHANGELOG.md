@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   count; at 46 modules it had roughly 11 tokens of headroom and any new module
   overflowed it.
 
+### Fixed
+
+- `ccm monitor` machine-wide Codex quota polling now owns the app-server process
+  group and waits for launcher close plus full tree disappearance before
+  publishing a result. Timeout and error paths escalate from `SIGTERM` to
+  `SIGKILL`, preventing one unreaped `MainThread` zombie from accumulating per
+  monitor tick.
+
 ## [0.22.0] — 2026-07-23
 
 > **Noncommercial license boundary release** — the first cc-master plugin

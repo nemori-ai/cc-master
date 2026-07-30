@@ -8,6 +8,12 @@ import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_thread
 import type { UsagePoolSignal, UsageSignal, WindowSignal } from '@ccm/engine';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const WORKER_STARTUP_ALLOWANCE_MS = 1_000;
+const TERMINATION_GRACE_MS = 100;
+// Caller-side observation budget after escalation. A timed-out Worker remains unref'ed so it can
+// still own and reap the child instead of recreating the zombie leak this boundary prevents.
+const REAP_TIMEOUT_MS = 1_000;
+const REAP_POLL_MS = 5;
 
 interface RateLimitWindow {
   usedPercent?: unknown;
@@ -41,6 +47,7 @@ export function readCodexUsageSignal(
   const flag = new Int32Array(sab);
   const { port1, port2 } = new MessageChannel();
   let worker: Worker | null = null;
+  let workerChildReaped = false;
   try {
     worker = new Worker(WORKER_SOURCE, {
       eval: true,
@@ -48,22 +55,37 @@ export function readCodexUsageSignal(
         codexBin,
         env,
         timeoutMs,
+        terminationGraceMs: TERMINATION_GRACE_MS,
+        reapPollMs: REAP_POLL_MS,
         sab,
         port: port2,
       },
       transferList: [port2],
     });
-    Atomics.wait(flag, 0, 0, timeoutMs + 1000);
+    const waitResult = Atomics.wait(
+      flag,
+      0,
+      0,
+      timeoutMs + WORKER_STARTUP_ALLOWANCE_MS + TERMINATION_GRACE_MS + REAP_TIMEOUT_MS,
+    );
+    if (waitResult === 'timed-out') return null;
     const msg = receiveMessageOnPort(port1)?.message as
-      | { ok?: boolean; result?: unknown }
+      | { ok?: boolean; reaped?: boolean; result?: unknown }
       | undefined;
+    if (msg?.reaped !== true) return null;
+    workerChildReaped = true;
     if (!msg?.ok) return null;
     return normalizeCodexRateLimits(msg.result);
   } catch {
     return null;
   } finally {
     try {
-      worker?.terminate();
+      if (workerChildReaped) {
+        void worker?.terminate();
+      } else {
+        // terminate() before child `close` discards libuv's wait/reap handle. Let cleanup finish.
+        worker?.unref();
+      }
     } catch {
       /* ignore */
     }
@@ -78,31 +100,135 @@ const { workerData } = await import('node:worker_threads');
 
 const flag = new Int32Array(workerData.sab);
 const port = workerData.port;
-let done = false;
+const ownsProcessGroup = process.platform !== 'win32';
+let child = null;
+let terminalPayload = null;
+let cleanupStarted = false;
+let launcherClosed = false;
+let treeGone = false;
+let published = false;
 let buffer = '';
+let responseTimer = null;
+let terminationTimer = null;
+let reapPollTimer = null;
 
-function finish(payload) {
-  if (done) return;
-  done = true;
-  try { port.postMessage(payload); } catch {}
+// Publishing the RPC payload and reaping the owned process tree are separate phases. The parent
+// receives no terminal message until both launcher close and complete tree disappearance hold.
+function clearTimer(timer) {
+  if (timer) clearTimeout(timer);
+}
+
+function processMissing(error) {
+  return error && typeof error === 'object' && error.code === 'ESRCH';
+}
+
+function observeTreeGone() {
+  if (treeGone) return true;
+  if (!child || !Number.isSafeInteger(child.pid) || child.pid <= 0) {
+    treeGone = launcherClosed;
+    return treeGone;
+  }
+  if (!ownsProcessGroup) {
+    treeGone = launcherClosed;
+    return treeGone;
+  }
+  try {
+    process.kill(-child.pid, 0);
+    return false;
+  } catch (error) {
+    if (processMissing(error)) treeGone = true;
+    return treeGone;
+  }
+}
+
+function signalOwnedTree(signal) {
+  if (!child || !Number.isSafeInteger(child.pid) || child.pid <= 0) {
+    treeGone = launcherClosed;
+    return false;
+  }
+  try {
+    if (ownsProcessGroup) {
+      process.kill(-child.pid, signal);
+      return true;
+    }
+    const signaled = child.kill(signal);
+    if (!signaled && launcherClosed) treeGone = true;
+    return signaled;
+  } catch (error) {
+    if (processMissing(error)) treeGone = true;
+    return false;
+  }
+}
+
+function publishReaped() {
+  if (published || !terminalPayload) return;
+  published = true;
+  clearTimer(responseTimer);
+  clearTimer(terminationTimer);
+  clearTimer(reapPollTimer);
+  try { port.postMessage({ ...terminalPayload, reaped: true }); } catch {}
   Atomics.store(flag, 0, 1);
   Atomics.notify(flag, 0);
-  try { child.stdin.end(); } catch {}
-  try { child.kill(); } catch {}
+  try { port.close(); } catch {}
+}
+
+function maybePublishReaped() {
+  if (!cleanupStarted || !launcherClosed || !observeTreeGone()) return false;
+  publishReaped();
+  return true;
+}
+
+function pollForReap() {
+  if (published || maybePublishReaped()) return;
+  clearTimer(reapPollTimer);
+  reapPollTimer = setTimeout(pollForReap, workerData.reapPollMs);
+}
+
+function requestFinish(payload) {
+  if (cleanupStarted) return;
+  cleanupStarted = true;
+  terminalPayload = payload;
+  clearTimer(responseTimer);
+  responseTimer = null;
+  try { child?.stdin.end(); } catch {}
+  signalOwnedTree('SIGTERM');
+  terminationTimer = setTimeout(() => {
+    if (published || maybePublishReaped()) return;
+    signalOwnedTree('SIGKILL');
+    maybePublishReaped();
+  }, workerData.terminationGraceMs);
+  pollForReap();
 }
 
 function write(msg) {
-  try { child.stdin.write(JSON.stringify(msg) + '\\n'); } catch { finish({ ok: false }); }
+  try { child.stdin.write(JSON.stringify(msg) + '\\n'); } catch { requestFinish({ ok: false }); }
 }
 
-const child = spawn(workerData.codexBin, ['app-server', '--stdio'], {
-  env: { ...process.env, ...workerData.env },
-  stdio: ['pipe', 'pipe', 'ignore'],
-});
+try {
+  child = spawn(workerData.codexBin, ['app-server', '--stdio'], {
+    detached: ownsProcessGroup,
+    env: { ...process.env, ...workerData.env },
+    stdio: ['pipe', 'pipe', 'ignore'],
+  });
+} catch {
+  launcherClosed = true;
+  treeGone = true;
+  requestFinish({ ok: false });
+}
 
-const timer = setTimeout(() => finish({ ok: false }), workerData.timeoutMs);
-child.once('error', () => finish({ ok: false }));
-child.once('exit', () => finish({ ok: false }));
+if (!child) {
+  maybePublishReaped();
+  return;
+}
+
+responseTimer = setTimeout(() => requestFinish({ ok: false }), workerData.timeoutMs);
+child.once('error', () => requestFinish({ ok: false }));
+child.once('exit', () => requestFinish({ ok: false }));
+child.once('close', () => {
+  launcherClosed = true;
+  if (!cleanupStarted) requestFinish({ ok: false });
+  maybePublishReaped();
+});
 child.stdout.on('data', (chunk) => {
   buffer += chunk.toString('utf8');
   let nl = buffer.indexOf('\\n');
@@ -123,8 +249,7 @@ function handleLine(line) {
     return;
   }
   if (msg.id === 6) {
-    clearTimeout(timer);
-    finish(msg.error ? { ok: false } : { ok: true, result: msg.result });
+    requestFinish(msg.error ? { ok: false } : { ok: true, result: msg.result });
   }
 }
 
