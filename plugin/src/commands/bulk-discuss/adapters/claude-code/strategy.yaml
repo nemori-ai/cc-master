@@ -1,0 +1,10 @@
+host: claude-code
+command: bulk-discuss
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/bulk-discuss.md
+notes:
+  - Runs inside the master orchestrator's own session; no sidecar, no board file writes.
+  - Board discovery is delegated to ccm global flags (--board / --home) rather than re-implemented.

@@ -192,6 +192,7 @@ cc-master:as-master-orchestrator <你的目标>
 - **Status** — `ccm status-report show`。生成 CLI 和 web viewer 共用的 JSON-backed board 状态报告。
 - **View** — `ccm web-viewer open`。在浏览器里把实时计划打开成只读图；生命周期命令是 `ccm web-viewer start/open/status/stop/restart`（默认系统分配端口；服务已 wanted 时 `ccm upgrade` 后会自动 reconcile）。
 - **Discuss** — Claude Code：`/cc-master:discuss <决定>`；Cursor：`/discuss <决定>`；Codex：`$cc-master-discuss <决定>`；kimi-code：`cc-master:discuss <决定>`。当有决定等你拍板时使用。
+- **Bulk discuss** — Claude Code：`/cc-master:bulk-discuss`；Cursor：`/bulk-discuss`；Codex：`$cc-master-bulk-discuss`；kimi-code：`cc-master:bulk-discuss`。在编排者自己的会话里，把**所有**等你拍板的决定一口气过完：每一件都用人话讲清背景（不甩裸节点 id），并给出可挑的选项卡片。答案先攒着，最后汇总给你过目，再一次性消化进 board。只想知道积了几件就加 `--list-only`。
 - **Stop** — Claude Code：`/cc-master:stop`；Codex：`$cc-master-stop`；Cursor：`/cc-master-stop`（Cursor 内置 `/stop` 与此无关）；kimi-code：`cc-master:stop`（namespaced，不与任何内置命令冲突）。收尾并归档 board，以后可以继续 resume。
 - **Handoff** — Claude Code：`/cc-master:handoff-to-new-session`；Codex：`$cc-master-handoff-to-new-session`；Cursor：`/handoff-to-new-session`；kimi-code：`cc-master:handoff-to-new-session`。在换新会话前交接。
 - **Retro** — Claude Code：`/cc-master:retro`；Codex：`$cc-master-retro`；Cursor：`/retro`；kimi-code：`cc-master:retro`。对进行中或已归档的 board 做一次只读复盘，把经验写进被编排项目自己（不写 board、不碰 GitHub）。
