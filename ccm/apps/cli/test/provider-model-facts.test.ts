@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { PROVIDER_MODEL_FACTS_REGISTRY } from '../src/provider-model-facts.js';
 import { run } from '../src/router.js';
 
-function query(provider: string, asOf = '2026-07-22T07:46:31Z') {
+/**
+ * Read the snapshot at the instant it was observed. Pinning a literal date here
+ * means every facts refresh makes the new observation look like the future, so
+ * the tests would report 'future-invalid' instead of exercising freshness.
+ */
+const CLAUDE_SNAPSHOT = PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'] as {
+  observed_at: string;
+  valid_until: string;
+};
+const OBSERVED_AT: string = CLAUDE_SNAPSHOT.observed_at;
+/** An instant past the snapshot's own validity window. */
+const PAST_EXPIRY: string = new Date(
+  Date.parse(CLAUDE_SNAPSHOT.valid_until) + 86_400_000,
+).toISOString();
+
+function query(provider: string, asOf = OBSERVED_AT) {
   const out: string[] = [];
   const err: string[] = [];
   const code = run(['provider', 'facts', provider, '--as-of', asOf, '--json'], {
@@ -49,7 +65,7 @@ test('Claude facts are fresh, provenance-complete, and account-scope honest', ()
     note: 'Claude API public token pricing; Claude Code plan billing and live quota remain separate',
   });
   assert.ok(fable.source_refs.includes('anthropic-fable-5-capabilities'));
-  assert.equal(facts.revision, '2026-07-22.1');
+  assert.equal(facts.revision, '2026-07-30.1');
   assert.notEqual(fable.availability.account_scope, 'global');
 });
 
@@ -165,7 +181,7 @@ test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', 
   assert.ok(facts.unknown.includes('kimi_k3_effective_kimi_code_default_reasoning_effort'));
   assert.ok(!facts.unknown.includes('kimi_k3_open_weights'));
   assert.ok(facts.unknown.includes('kimi_code_cli_headless_quota_signal'));
-  assert.equal(facts.revision, '2026-07-22.1');
+  assert.equal(facts.revision, '2026-07-30.1');
   // Official Moonshot K3 launch-blog limitations must surface on the K3 fact note.
   const k3Note = byId.get('kimi-k3').pricing.note;
   assert.ok(
@@ -195,7 +211,7 @@ test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', 
 });
 
 test('expired snapshots remain observable but fail closed for automatic selection', () => {
-  const facts = query('claude-code', '2026-07-30T00:00:00Z').value.data;
+  const facts = query('claude-code', PAST_EXPIRY).value.data;
   assert.equal(facts.freshness, 'hard-stale');
   assert.equal(facts.catalog_eligible_for_admission_check, false);
   assert.equal(facts.eligible_for_automatic_selection, false);
@@ -204,10 +220,10 @@ test('expired snapshots remain observable but fail closed for automatic selectio
 
 test('registry validation rejects freshness and provenance hostile mutants', async () => {
   const module = await import('../src/provider-model-facts.js');
-  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-22.2');
+  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-30.1');
   assert.equal(
     module.PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'].revision,
-    '2026-07-22.1',
+    '2026-07-30.1',
   );
   const valid = structuredClone(module.PROVIDER_MODEL_FACTS_REGISTRY);
   const cases: Array<[string, (registry: any) => void, RegExp]> = [
@@ -221,7 +237,11 @@ test('registry validation rejects freshness and provenance hostile mutants', asy
     [
       'future observation',
       (registry) => {
-        registry.providers['claude-code'].observed_at = '2026-07-23T00:00:00Z';
+        // Relative to the snapshot's own observation instant, not a literal date:
+        // a fixed one stops being 'the future' the moment facts are refreshed.
+        registry.providers['claude-code'].observed_at = new Date(
+          Date.parse(OBSERVED_AT) + 86_400_000,
+        ).toISOString();
       },
       /future/u,
     ],
@@ -258,7 +278,7 @@ test('registry validation rejects freshness and provenance hostile mutants', asy
     mutate(registry);
     assert.throws(
       () =>
-        module.validateProviderModelFactsRegistry(registry, '2026-07-22T07:46:31Z', {
+        module.validateProviderModelFactsRegistry(registry, OBSERVED_AT, {
           requireFresh: true,
         }),
       pattern,

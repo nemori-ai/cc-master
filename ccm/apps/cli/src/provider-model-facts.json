@@ -6,12 +6,8 @@
       "schema": "ccm/provider-model-facts/v1",
       "provider": "claude-code",
       "revision": "2026-07-30.1",
-      "supported_surfaces": [
-        "claude-code-cli"
-      ],
-      "supported_client_versions": [
-        "current"
-      ],
+      "supported_surfaces": ["claude-code-cli"],
+      "supported_client_versions": ["current"],
       "source": [
         {
           "id": "anthropic-models-overview",
@@ -43,10 +39,7 @@
       "valid_until": "2026-08-06T05:30:00Z",
       "account_scope": "public catalog; live account entitlement separate",
       "confidence": "official-published-snapshot",
-      "unknown": [
-        "live_account_model_entitlement",
-        "live_account_quota"
-      ],
+      "unknown": ["live_account_model_entitlement", "live_account_quota"],
       "models": [
         {
           "model_id": "claude-opus-5",
@@ -65,13 +58,8 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "anthropic-models-overview",
-            "anthropic-opus"
-          ],
-          "supersedes": [
-            "claude-opus-4-8"
-          ]
+          "source_refs": ["anthropic-models-overview", "anthropic-opus"],
+          "supersedes": ["claude-opus-4-8"]
         },
         {
           "model_id": "claude-sonnet-5",
@@ -90,13 +78,8 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "anthropic-models-overview",
-            "anthropic-sonnet-5"
-          ],
-          "supersedes": [
-            "claude-sonnet-4-6"
-          ]
+          "source_refs": ["anthropic-models-overview", "anthropic-sonnet-5"],
+          "supersedes": ["claude-sonnet-4-6"]
         },
         {
           "model_id": "claude-fable-5",
@@ -139,9 +122,7 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "anthropic-models-overview"
-          ],
+          "source_refs": ["anthropic-models-overview"],
           "supersedes": []
         }
       ]
@@ -150,12 +131,8 @@
       "schema": "ccm/provider-model-facts/v1",
       "provider": "codex",
       "revision": "2026-07-30.1",
-      "supported_surfaces": [
-        "codex-cli"
-      ],
-      "supported_client_versions": [
-        "current"
-      ],
+      "supported_surfaces": ["codex-cli"],
+      "supported_client_versions": ["current"],
       "source": [
         {
           "id": "openai-api-pricing",
@@ -197,12 +174,8 @@
             "swe_bench_pro_pct": 62.7,
             "terminal_bench_2_1_pct": 84.7
           },
-          "selectors": [
-            "gpt-5.6-luna"
-          ],
-          "source_refs": [
-            "openai-api-pricing"
-          ],
+          "selectors": ["gpt-5.6-luna"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         },
         {
@@ -224,12 +197,8 @@
             "swe_bench_pro_pct": 63.4,
             "terminal_bench_2_1_pct": 87.4
           },
-          "selectors": [
-            "gpt-5.6-terra"
-          ],
-          "source_refs": [
-            "openai-api-pricing"
-          ],
+          "selectors": ["gpt-5.6-terra"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         },
         {
@@ -251,12 +220,8 @@
             "swe_bench_pro_pct": 64.6,
             "terminal_bench_2_1_pct": 88.8
           },
-          "selectors": [
-            "gpt-5.6-sol"
-          ],
-          "source_refs": [
-            "openai-api-pricing"
-          ],
+          "selectors": ["gpt-5.6-sol"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         }
       ]
@@ -265,13 +230,8 @@
       "schema": "ccm/provider-model-facts/v1",
       "provider": "cursor",
       "revision": "2026-07-30.1",
-      "supported_surfaces": [
-        "cursor-agent-cli",
-        "cursor-ide"
-      ],
-      "supported_client_versions": [
-        "current"
-      ],
+      "supported_surfaces": ["cursor-agent-cli", "cursor-ide"],
+      "supported_client_versions": ["current"],
       "source": [
         {
           "id": "cursor-models-pricing",
@@ -329,12 +289,8 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "cursor-models-pricing"
-          ],
-          "supersedes": [
-            "cursor-auto"
-          ]
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": ["cursor-auto"]
         },
         {
           "model_id": "cursor-auto-balance",
@@ -349,9 +305,7 @@
           "pricing": null,
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "cursor-models-pricing"
-          ],
+          "source_refs": ["cursor-models-pricing"],
           "supersedes": []
         },
         {
@@ -367,9 +321,7 @@
           "pricing": null,
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "cursor-models-pricing"
-          ],
+          "source_refs": ["cursor-models-pricing"],
           "supersedes": []
         },
         {
@@ -396,10 +348,7 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "cursor-models-pricing",
-            "cursor-composer-2-5"
-          ],
+          "source_refs": ["cursor-models-pricing", "cursor-composer-2-5"],
           "supersedes": []
         },
         {
@@ -426,10 +375,7 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": [
-            "cursor-models-pricing",
-            "cursor-grok-4-5"
-          ],
+          "source_refs": ["cursor-models-pricing", "cursor-grok-4-5"],
           "supersedes": []
         }
       ]
@@ -438,12 +384,8 @@
       "schema": "ccm/provider-model-facts/v1",
       "provider": "kimi-code",
       "revision": "2026-07-30.1",
-      "supported_surfaces": [
-        "kimi-code-cli"
-      ],
-      "supported_client_versions": [
-        "current"
-      ],
+      "supported_surfaces": ["kimi-code-cli"],
+      "supported_client_versions": ["current"],
       "source": [
         {
           "id": "moonshot-kimi-k3-pricing",
@@ -492,11 +434,7 @@
           "model_id": "kimi-k3",
           "display_name": "Kimi K3",
           "tier": "frontier",
-          "reasoning_efforts": [
-            "low",
-            "high",
-            "max"
-          ],
+          "reasoning_efforts": ["low", "high", "max"],
           "relative_output_cost": null,
           "availability": {
             "state": "published",
@@ -509,9 +447,7 @@
             "note": "cache-hit input $0.30/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; 1M context; reasoning_effort supports low/high/max; the Kimi API pricing page documents API default max, while the current Kimi Code model page documents default high, so the effective Kimi Code default is not inferred; official Limitations (moonshot-kimi-k3-blog): (1) trained in preserved-thinking-history mode, so generation quality can become highly unstable if the agent harness drops historical thinking content or if a session is switched to K3 mid-stream from another model — run K3 in a verified-compatible harness (Kimi Code) on a fresh session and never a mid-session model switch; (2) tuned for long-horizon tasks and over-proactive under ambiguity, so on minor issues or ambiguous intent it may make unexpected decisions on the user's behalf — set explicit behavioral boundaries in the system prompt or AGENTS.md when tight guardrails are required; (3) noticeable user-experience gap vs Claude Fable 5 and GPT-5.6 Sol; vendor-published benchmarks are not imported into this registry and independent cross-vendor verification remains unknown"
           },
           "benchmarks": null,
-          "selectors": [
-            "kimi-code/k3"
-          ],
+          "selectors": ["kimi-code/k3"],
           "source_refs": [
             "moonshot-kimi-k3-pricing",
             "moonshot-kimi-k3-blog",
@@ -536,10 +472,7 @@
             "note": "cache-hit input $0.19/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; thinking required (no non-thinking mode); 256K context; vendor-published benchmarks are not imported into this registry and independent cross-vendor comparability remains unknown"
           },
           "benchmarks": null,
-          "selectors": [
-            "kimi-code/kimi-for-coding",
-            "kimi-code/kimi-for-coding-highspeed"
-          ],
+          "selectors": ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"],
           "source_refs": [
             "moonshot-kimi-k27-code-pricing",
             "moonshot-kimi-k27-code-card",

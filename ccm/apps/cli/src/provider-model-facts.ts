@@ -14,10 +14,15 @@ export interface ProviderModelFactsRegistry {
 export const PROVIDER_MODEL_FACTS_REGISTRY = rawRegistry as unknown as ProviderModelFactsRegistry;
 
 const PROVIDERS = ['claude-code', 'codex', 'cursor', 'kimi-code'] as const;
+// First-party publication hosts only. A marketing page and a docs site are both
+// official when the vendor serves them; what this set excludes is aggregators and
+// resellers, whose numbers can differ from the vendor's own list price.
 const OFFICIAL_HOSTS = new Set([
   'anthropic.com',
   'www.anthropic.com',
+  'platform.claude.com', // docs.claude.com redirects here
   'openai.com',
+  'developers.openai.com', // OpenAI's own API reference, including the price list
   'cursor.com',
   'platform.kimi.ai',
   'kimi.com',
