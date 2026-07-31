@@ -446,6 +446,11 @@ export function runExplain({ repoRoot, source = DEFAULT_SOURCE_ROOT, target }) {
       module: point.module_id,
       authority: point.authority,
       binding: point.binding,
+      // `binding` names the mother file the knowledge is authored in; `anchor_path`
+      // names the article that carries a passage drawn from it. Before the prose
+      // moved out of the articles these were the same file, so explain only had to
+      // report one. Report both, or the maintainer loses the shipped location.
+      anchor_path: point.anchor_path ?? null,
       recognition_cues: [...(point.recognition_cues ?? [])],
       inbound,
       outbound,

@@ -14,6 +14,12 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 
+import {
+  liveAdmissionPolicy,
+  pruneDanglingNavEdges,
+  rederiveSubsetAnalyses,
+} from './helpers/skill-knowledge-subset-fixture.mjs';
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(import.meta.url);
 const validateSource = require('../../scripts/skill-knowledge/validators/validate-source.cjs');
@@ -164,8 +170,12 @@ function withUsingCcmTempSource(callback) {
         module_max_tokens: 1200,
         point_nav_max_lines: 4,
       },
+      // Judge the subset by the live rules, not the conservative defaults a
+      // synthetic portfolio would otherwise inherit.
+      candidate_admission: liveAdmissionPolicy(repoRoot),
       rollout: 'K2',
     };
+    pruneDanglingNavEdges(path.join(dir, 'graph/modules'));
     fs.writeFileSync(path.join(dir, 'portfolio.json'), `${JSON.stringify(portfolio, null, 2)}\n`);
 
     return callback(dir);
@@ -255,6 +265,7 @@ test('SKG-K2-USING-CCM-02: schema + markers + unbound hashes + unique canonical 
   }
 
   await withUsingCcmTempSource(async (sourceRoot) => {
+    await rederiveSubsetAnalyses({ repoRoot, sourceRoot });
     const built = buildAndValidateGraph({ repoRoot, sourceRoot });
     const errors = built.diagnostics.filter((item) => item.severity === 'error');
     assert.equal(errors.length, 0, JSON.stringify(errors.slice(0, 5), null, 2));
@@ -275,6 +286,17 @@ test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit',
     byModule.set(mod.id, mod);
   }
 
+  // What this boundary is about is where the *prose* sits: CLI facts belong in
+  // the command catalog, judgment belongs elsewhere. Since the point text moved
+  // into its own mother file, `binding.path` names the knowledge source, not the
+  // article — the composition inventory is now the authored record of which
+  // article carries which point, so that is what the placement rule reads.
+  const articleOf = new Map();
+  for (const entry of skill.canonical_source_inventory ?? []) {
+    for (const pointId of entry.point_ids ?? []) articleOf.set(pointId, entry.path);
+  }
+  const inCatalog = (point) => (articleOf.get(point.id) ?? '').endsWith('command-catalog.md');
+
   const cliModules = [
     'module:ccm.commands.core',
     'module:ccm.commands.scheduling',
@@ -284,7 +306,7 @@ test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit',
     const mod = byModule.get(id);
     assert.ok(mod, id);
     assert.equal(
-      mod.points.every((point) => point.binding.path.endsWith('command-catalog.md')),
+      mod.points.every(inCatalog),
       true,
       `${id} must bind CLI facts to command-catalog`,
     );
@@ -306,7 +328,7 @@ test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit',
     const mod = byModule.get(id);
     assert.ok(mod, id);
     assert.equal(
-      mod.points.some((point) => !point.binding.path.endsWith('command-catalog.md')),
+      mod.points.some((point) => !inCatalog(point)),
       true,
       `${id} must own judgment prose outside command-catalog`,
     );
@@ -315,9 +337,9 @@ test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit',
   const account = byModule.get('module:ccm.account-pool');
   const accountCmd = account.points.find((point) => point.id === 'point:ccm.cmd.account');
   assert.ok(accountCmd);
-  assert.equal(accountCmd.binding.path.endsWith('command-catalog.md'), true);
+  assert.equal(inCatalog(accountCmd), true);
   assert.equal(
-    account.points.filter((point) => point.binding.path.endsWith('account-pool.md')).length,
+    account.points.filter((point) => (articleOf.get(point.id) ?? '').endsWith('account-pool.md')).length,
     4,
   );
 });
@@ -325,6 +347,7 @@ test('SKG-K2-USING-CCM-03: CLI-fact vs judgment authority boundary is explicit',
 test('SKG-K2-USING-CCM-04: authored hop budget to critical primary + entry fan-out', async () => {
   const { buildAndValidateGraph, shortestPath } = await loadGraphTools();
   await withUsingCcmTempSource(async (sourceRoot) => {
+    await rederiveSubsetAnalyses({ repoRoot, sourceRoot });
     const built = buildAndValidateGraph({ repoRoot, sourceRoot });
     assert.equal(built.ok, true);
 
@@ -398,8 +421,14 @@ test('SKG-K2-USING-CCM-06: adapter-excluded canonical points cannot be claimed h
 
   const accountPoolModule = modules.find((mod) => mod.id === 'module:ccm.account-pool');
   assert.ok(accountPoolModule);
+  // Which article carries a point's prose is recorded in the composition inventory;
+  // `binding.path` now names the mother file the prose was written from.
+  const articleOf = new Map();
+  for (const entry of skill.canonical_source_inventory ?? []) {
+    for (const pointId of entry.point_ids ?? []) articleOf.set(pointId, entry.path);
+  }
   const accountPoolPoints = accountPoolModule.points.filter((point) =>
-    point.binding.path.endsWith('/references/account-pool.md'),
+    (articleOf.get(point.id) ?? '').endsWith('/references/account-pool.md'),
   );
   assert.equal(accountPoolPoints.length, 4);
 
@@ -446,12 +475,15 @@ test('SKG-K2-USING-CCM-06: adapter-excluded canonical points cannot be claimed h
       `${host} partial reason must mention account-pool / account_switch`,
     );
 
-    // Modules that bind accepted points into an excluded canonical file are uncovered.
+    // Modules whose accepted points are written into an excluded canonical file are
+    // uncovered on that host. The article a point is written into comes from the
+    // composition inventory; `binding.path` names its mother file.
     const uncoveredByExclude = modules
       .filter((mod) =>
-        mod.points.some((point) =>
-          excluded.some((rel) => point.binding.path.endsWith(`/${rel}`) || point.binding.path.endsWith(rel)),
-        ),
+        mod.points.some((point) => {
+          const article = articleOf.get(point.id) ?? '';
+          return excluded.some((rel) => article.endsWith(`/${rel}`) || article.endsWith(rel));
+        }),
       )
       .map((mod) => mod.id);
     assert.ok(uncoveredByExclude.includes('module:ccm.account-pool'));

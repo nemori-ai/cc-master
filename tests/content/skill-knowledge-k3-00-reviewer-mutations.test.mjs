@@ -468,8 +468,10 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
       point_kind: 'principle',
       summary: id,
       recognition_cues: [id],
+      // The knowledge is authored in its mother file; the skill article only
+      // carries a provenance anchor to it.
       binding: {
-        path: `plugin/src/skills/${skill}/canonical/SKILL.md`,
+        path: `plugin/src/knowledge/points/${id.replace(/^point:/, '')}.md`,
         marker: id,
       },
       // subjectId = subject:<slug>; never prefix with point: (pattern forbids ':')
@@ -526,6 +528,19 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
       ['shared-a', 'point:shared.a'],
       ['shared-b', 'point:shared.b'],
     ]) {
+      // Mother file: exactly one marker pair per point, under knowledge/points/.
+      const mother = path.join(tmp, `plugin/src/knowledge/points/${pointId.replace(/^point:/, '')}.md`);
+      fs.mkdirSync(path.dirname(mother), { recursive: true });
+      fs.writeFileSync(
+        mother,
+        [
+          `<!-- ccm:k:start ${pointId} -->`,
+          pointId,
+          `<!-- ccm:k:end ${pointId} -->`,
+          '',
+        ].join('\n'),
+      );
+      // Article: the shipped passage, anchored to that point.
       const md = path.join(tmp, `plugin/src/skills/${skill}/canonical/SKILL.md`);
       fs.mkdirSync(path.dirname(md), { recursive: true });
       fs.writeFileSync(
@@ -538,6 +553,21 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
         ].join('\n'),
       );
     }
+
+    const { hashMarkdownSpan } = await import('../../scripts/skill-knowledge/hash.mjs');
+    const { extractMarkers } = await import('../../scripts/skill-knowledge/markers.mjs');
+    // Derive the span hash from the file that was just written; hand-forging the
+    // span content guesses at the extractor's boundaries and drifts silently.
+    const fixtureSpanSha = (pointId) => {
+      const mother = path.join(
+        tmp,
+        `plugin/src/knowledge/points/${pointId.replace(/^point:/, '')}.md`,
+      );
+      const markers = extractMarkers(fs.readFileSync(mother, 'utf8'));
+      const span = markers.spans.find((item) => item.point_id === pointId);
+      assert.ok(span, `fixture mother file has no span for ${pointId}`);
+      return hashMarkdownSpan(span.content);
+    };
 
     const mkComposition = (skill, pointId) => ({
       schema_version: 'cc-master/skill-knowledge-source/v1alpha1',
@@ -562,6 +592,16 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
           coverage: 'full',
           point_ids: [pointId],
           reviewed_unbound_sha256: emptyUnbound,
+          // Article and mother are byte-identical in this fixture, so the two
+          // hashes agree; the record still has to exist for the passage to count
+          // as reviewed against its source.
+          reconciliations: [
+            {
+              point: pointId,
+              point_sha256: fixtureSpanSha(pointId),
+              passage_sha256: fixtureSpanSha(pointId),
+            },
+          ],
         },
       ],
       host_coverage: hosts,

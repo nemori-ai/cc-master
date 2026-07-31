@@ -101,13 +101,30 @@ test('each R17 P1 hostile guidance mutant is rejected before its tree is publish
   }
 });
 
+/**
+ * An instant after every observation in the live facts snapshot has aged out.
+ * Derived rather than hardcoded: a fixed date only expresses "past expiry" until
+ * the next facts refresh moves the window past it, and then the invariant stops
+ * being tested without anyone noticing.
+ */
+const afterEveryFactExpires = () => {
+  const facts = JSON.parse(
+    readFileSync(join(ROOT, 'ccm/apps/cli/src/provider-model-facts.json'), 'utf8'),
+  );
+  const horizons = Object.values(facts.providers ?? {})
+    .map((snapshot) => Date.parse(snapshot.valid_until))
+    .filter((value) => Number.isFinite(value));
+  assert.ok(horizons.length > 0, 'facts snapshot must declare valid_until per provider');
+  return new Date(Math.max(...horizons) + 24 * 60 * 60 * 1000).toISOString();
+};
+
 test('projection rejects missing, future, expired, superseded and falsely-global facts', () => {
   assert.throws(
     () =>
       guidanceAttestation.loadProviderGuidanceRegistry(
         join(ROOT, 'plugin/src/skills/provider-guidance-runtime.json'),
         ROOT,
-        '2026-07-30T00:00:00Z',
+        afterEveryFactExpires(),
       ),
     /stale|expired/iu,
     'a snapshot that was fresh at manifest creation must still fail a later projection',

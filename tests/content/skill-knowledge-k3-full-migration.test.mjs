@@ -27,7 +27,7 @@ function jsonFiles(relative) {
     .sort();
 }
 
-test('SKG-K3-01A-01: graph-only source has the frozen 46/249/404 inventory and eight artifact pairs', () => {
+test('SKG-K3-01A-01: graph-only source has the frozen 47/250/429 inventory and eight artifact pairs', () => {
   assert.equal(
     fs.existsSync(path.join(knowledgeRoot, 'skills')),
     false,
@@ -37,13 +37,13 @@ test('SKG-K3-01A-01: graph-only source has the frozen 46/249/404 inventory and e
   const moduleFiles = jsonFiles('plugin/src/knowledge/graph/modules');
   const compositionFiles = jsonFiles('plugin/src/knowledge/compositions');
   const analysisFiles = jsonFiles('plugin/src/knowledge/analyses');
-  assert.equal(moduleFiles.length, 46);
+  assert.equal(moduleFiles.length, 47);
   assert.equal(compositionFiles.length, 8);
   assert.equal(analysisFiles.length, 8);
 
   const modules = moduleFiles.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
-  assert.equal(modules.reduce((count, module) => count + module.points.length, 0), 249);
-  assert.equal(modules.reduce((count, module) => count + module.edges.length, 0), 404);
+  assert.equal(modules.reduce((count, module) => count + module.points.length, 0), 250);
+  assert.equal(modules.reduce((count, module) => count + module.edges.length, 0), 429);
   for (const module of modules) {
     assert.equal(
       Object.prototype.hasOwnProperty.call(module, 'owner_skill'),
@@ -117,9 +117,9 @@ test('SKG-K3-01A-03: every runtime skill is an accepted, recomputable compositio
       skill: 8,
       composition: 8,
       candidate_analysis: 8,
-      module: 46,
-      point: 249,
-      edge: 404,
+      module: 47,
+      point: 250,
+      edge: 429,
       entry: 8,
       change: 0,
     },

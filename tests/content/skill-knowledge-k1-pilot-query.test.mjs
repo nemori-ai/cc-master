@@ -215,8 +215,14 @@ test('SKG-PILOT-03: explain returns authority/binding/witness for points and fai
   assert.equal(explained.result_kind, 'explain');
   assert.equal(explained.entity.kind, 'point');
   assert.equal(explained.entity.authority.role, 'canonical');
+  // Two locations, two meanings: the knowledge is authored in its mother file,
+  // and a passage drawn from it is carried by the shipped article.
   assert.equal(
     explained.entity.binding.path,
+    'plugin/src/knowledge/points/conduct.never-play.md',
+  );
+  assert.equal(
+    explained.entity.anchor_path,
     'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md',
   );
   assert.ok(explained.entity.witness.span_sha256);

@@ -175,7 +175,21 @@ for (const target of targets) {
       canonicalBySubject.set(point.authority.subject, point.id);
     }
 
+    // A skill is closed over its *content*, not over its routing. Cross-skill
+    // nav edges (contrast / route-to) are how a reader is pointed at a
+    // neighbouring skill, so their far end lives outside this shard by design;
+    // the portfolio exempts exactly those types from the cut-coupling budget.
+    // Any other type leaving the shard means real content lives elsewhere,
+    // which is what this closure check is for.
+    const NAV_TYPES = new Set(['contrasts_with', 'routes_to']);
     for (const edge of edges.values()) {
+      if (NAV_TYPES.has(edge.type) && !(points.has(edge.from) && points.has(edge.to))) {
+        assert.ok(
+          points.has(edge.from) || points.has(edge.to),
+          `nav edge touches neither end of this skill: ${edge.id}`,
+        );
+        continue;
+      }
       assert.ok(points.has(edge.from), `edge source missing: ${edge.id}`);
       assert.ok(points.has(edge.to), `edge target missing: ${edge.id}`);
       assert.equal(edge.runtime.enabled_by_default, true);

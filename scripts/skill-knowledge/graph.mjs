@@ -213,6 +213,15 @@ export function buildAndValidateGraph({
         // Draft/reject/reference compositions stay loadable but never become skill views.
         continue;
       }
+      // Hand over the analysis document this build already loaded. Without it the
+      // analyzer falls back to reading `<repoRoot>/plugin/src/knowledge/analyses`,
+      // which is the wrong file whenever the graph was built from another source
+      // root: the real portfolio's numbers then get judged against a subset's, and
+      // no amount of correcting the subset can ever satisfy the comparison. On the
+      // real tree the two paths name the same file, so the substitution was silent.
+      const analysisDoc = analyses.find(
+        (item) => item.data?.id === composition.analysis_ref,
+      );
       const analysis = analyzeAgainstGraph({
         repoRoot,
         graph: provisionalGraph,
@@ -221,6 +230,9 @@ export function buildAndValidateGraph({
         analysisId: composition.analysis_ref,
         compositionId: composition.id,
         composition,
+        ...(analysisDoc
+          ? { authoredAnalysis: { doc: analysisDoc.data, path: analysisDoc.path } }
+          : {}),
       });
       if (!analysis.ok || analysis.verdict !== 'admit') {
         // Portfolio-referenced compositions that fail admit are hard errors.
