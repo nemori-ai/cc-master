@@ -59,7 +59,7 @@
         "读配额从哪开始"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "path": "plugin/src/knowledge/points/pacing.machine-wide-first.md",
         "marker": "point:pacing.machine-wide-first",
         "heading_hint": "先全局，再下钻"
       },
@@ -96,7 +96,7 @@
         "refresh_hint"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "path": "plugin/src/knowledge/points/pacing.refresh-hint.md",
         "marker": "point:pacing.refresh-hint",
         "heading_hint": "refresh_hint"
       },
@@ -133,7 +133,7 @@
         "Cursor 两池"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "path": "plugin/src/knowledge/points/pacing.window-contracts.md",
         "marker": "point:pacing.window-contracts",
         "heading_hint": "四类 harness"
       },
@@ -169,7 +169,7 @@
         "想精确收敛 used%"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md",
+        "path": "plugin/src/knowledge/points/pacing.signal-ceiling.md",
         "marker": "point:pacing.signal-ceiling",
         "heading_hint": "信号源与诚实天花板"
       },

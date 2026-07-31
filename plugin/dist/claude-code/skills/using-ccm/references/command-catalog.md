@@ -228,7 +228,7 @@ ccm <alias> [args] [flags]
 | `cadence` | 节奏 / iteration 收口 |
 | `watchdog` | 自我唤醒 watchdog |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
-| `policy` | board 级自主权限开关；`autonomous_account_switch` 用户所有、绝不自授权 |
+| `policy` | 用户对后台自动换号的开关；`autonomous_account_switch` 用户所有、绝不自授权 |
 | `agent` | Agent Registry：board ✎ `agents[]` 运行时 agent 登记簿——登记 / 交 handle 证据 / 关联 task / 收口 / 活性探测 / 只读花名册；**登记 / 探测 / 读取 noun，无任何 spawn/route/dispatch 语义**（dispatch 归 `worker`） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
 | `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，运行 deterministic pool arbiter |
@@ -239,7 +239,7 @@ ccm <alias> [args] [flags]
 | `services` | home 常驻服务 reconcile：ccm 二进制替换后按 wanted 语义重启 monitor / web-viewer |
 | `runtime` | cross-harness worker runtime 的 immutable image supply chain：stage / activate / assurance-tiered resolve+invoke / doctor / rollback（非 board 操作） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
-| `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind；`switch` 受 board.policy `autonomous_account_switch` 门控）。 |
+| `account` | 账号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind；`switch` 受 board.policy `autonomous_account_switch` 门控）。只在用户直接命令你做账号操作时敲——换哪份配额不是编排器的决策。 |
 | `statusline` | self-contained status line：渲染单行状态行（ctx/5h/7d）+ 装/卸 `settings.json`（非 board 操作；`install`/`uninstall` 写全局 Claude Code hooks）。 |
 | `harness` | 本机 supported harness inventory：探测安装状态 / 当前选择 / install-upgrade 能力矩阵 |
 | `attempt` | cross-harness managed worker 的本地 write-set 预检：安全解析隔离 worktree + lease，编译最小授权根；当前不启动 worker |
@@ -1983,7 +1983,7 @@ ccm baseline reset [flags]
 
 ## namespace policy
 
-`board.policy.autonomous_account_switch` 是用户所有的 `allow | deny` 权限闸。`ccm policy show --json` 只读原值与 effective；`ccm policy set --autonomous-account-switch=allow|deny --user-authorized` 写入并记审计。agent 绝不自行添加 `--user-authorized`，也不把缺省 `allow` 当成应当换号的指令。
+`board.policy.autonomous_account_switch` 是**用户对「后台容量层能不能自动替这块看板换号」的开关**（`allow | deny`，缺省 `allow`），不是给编排 agent 放权的开关。`ccm policy show --json` 只读原值与 effective；`ccm policy set --autonomous-account-switch=allow|deny --user-authorized` 写入并记审计。agent 绝不自行添加 `--user-authorized`，也绝不把缺省 `allow` 读成「我可以自己切号」。
 
 ### policy show
 
@@ -3127,7 +3127,9 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.account -->
 ## namespace account
 
-换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-$HOME/.cc_master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。概念叙事见 [references/account-pool.md](references/account-pool.md)；**换号决策**归 `master-orchestrator-guide`。
+账号池机制（token-blind 录号 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-$HOME/.cc_master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。切号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。概念叙事见 [references/account-pool.md](references/account-pool.md)。
+
+**这套命令面只在用户直接命令你做账号操作时敲。** 当前用哪份配额由后台容量管控层在整机范围统一决定，不是编排器的决策——配额边界上编排侧该守什么，见 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/cost-decisions.md`。
 
 `account add/refresh/delete/list/switch` 是 Claude Code credential backend 的操作面；录号 / refresh 的前提是用户当前正登录在目标号。`switch` 先过 board-policy 硬闸，`deny` → exit 7，放行后选号、续期、覆写官方共享凭证并翻 registry `active`。
 
@@ -3591,7 +3593,7 @@ wakeup，再带 `--job-id <handle>` 重新 arm。legacy `wakeup` 对象也按同
 
 ### policy show / set
 
-`ccm policy show --json` 的 `data` 包含 `{policy,effective}`；`ccm policy set ... --json` 返回写入后的 policy。决策层只读 `.data.effective.autonomous_account_switch`，agent 不自授权。
+`ccm policy show --json` 的 `data` 包含 `{policy,effective}`；`ccm policy set ... --json` 返回写入后的 policy。`.data.effective.autonomous_account_switch` 说的是**后台自动换号在这块板上是否放行**，不是 agent 的换号许可；agent 不自授权。
 
 ```json
 { "policy": { "autonomous_account_switch": "deny" }, "effective": { "autonomous_account_switch": "deny" } }

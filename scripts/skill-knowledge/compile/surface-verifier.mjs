@@ -17,6 +17,7 @@ import {
 import { compareCodePoint } from '../hash.mjs';
 import {
   canonicalBindingToDistPath,
+  pointHostSourcePath,
   entrySurfaceToDistPath,
   moduleAnchorId,
 } from './paths.mjs';
@@ -655,7 +656,7 @@ function resolveTargetNode(host, relativePath, fragment, graph) {
         }),
       };
     }
-    const expected = canonicalBindingToDistPath(host, matchedPoint.binding.path);
+    const expected = canonicalBindingToDistPath(host, pointHostSourcePath(matchedPoint));
     if (!expected || expected !== fullPath) {
       return {
         diagnostic: diagnostic({
@@ -670,7 +671,7 @@ function resolveTargetNode(host, relativePath, fragment, graph) {
             expected_path: expected,
           },
           remediation:
-            'Keep point anchors and inbound links on canonicalBindingToDistPath(host, point.binding.path).',
+            'Keep point anchors and inbound links on canonicalBindingToDistPath(host, pointHostSourcePath(point)).',
         }),
       };
     }
@@ -786,7 +787,7 @@ function resolveSourceNode(host, relativePath, markdown, linkIndex, graph) {
           }),
         };
       }
-      const expected = canonicalBindingToDistPath(host, point.binding.path);
+      const expected = canonicalBindingToDistPath(host, pointHostSourcePath(point));
       if (!expected || expected !== fullPath) {
         return {
           diagnostic: diagnostic({
@@ -800,7 +801,7 @@ function resolveSourceNode(host, relativePath, markdown, linkIndex, graph) {
               expected_path: expected,
             },
             remediation:
-              'Keep point nav blocks on canonicalBindingToDistPath(host, point.binding.path).',
+              'Keep point nav blocks on canonicalBindingToDistPath(host, pointHostSourcePath(point)).',
           }),
         };
       }
@@ -909,7 +910,7 @@ function validateAnchorPlacements({
     if (placement) files.add(distPathToHostRelative(host, placement.path));
   }
   for (const point of graph.points) {
-    const expected = canonicalBindingToDistPath(host, point.binding.path);
+    const expected = canonicalBindingToDistPath(host, pointHostSourcePath(point));
     if (expected) files.add(distPathToHostRelative(host, expected));
   }
 
@@ -937,7 +938,7 @@ function validateAnchorPlacements({
           );
           continue;
         }
-        const expected = canonicalBindingToDistPath(host, point.binding.path);
+        const expected = canonicalBindingToDistPath(host, pointHostSourcePath(point));
         if (expected !== fullPath) {
           diagnostics.push(
             diagnostic({
@@ -952,7 +953,7 @@ function validateAnchorPlacements({
                 expected_path: expected,
               },
               remediation:
-                'Emit point anchors only at canonicalBindingToDistPath(host, point.binding.path).',
+                'Emit point anchors only at canonicalBindingToDistPath(host, pointHostSourcePath(point)).',
             }),
           );
         }

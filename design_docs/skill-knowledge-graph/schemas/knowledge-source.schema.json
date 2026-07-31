@@ -550,7 +550,23 @@
         },
         "max_external_edge_count": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Max external edges counted as cut coupling. Edge types listed in external_edge_policy.allowed_types are exempt from this count."
+        },
+        "external_edge_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed_types"],
+          "description": "External edges (exactly one endpoint inside the candidate) whose type is allowed here express cross-skill navigation or contrast, not content dependency; they are exempt from max_external_edge_count. Every other external edge type still counts as cut coupling, which keeps SSOT closure intact.",
+          "properties": {
+            "allowed_types": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": ["contrasts_with", "routes_to"]
+              }
+            }
+          }
         },
         "max_overlap_shared_modules": {
           "type": "integer",
@@ -749,6 +765,27 @@
         },
         "reviewed_unbound_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "reconciliations": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Pure facts only: which point this file's prose draws on, and the two hashes checked to agree. No prose, no justification, no per-consumer bookkeeping — the article is written, not clipped from the point, so there is nothing here to explain. Either hash changing invalidates the record.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["point", "point_sha256", "passage_sha256"],
+            "properties": {
+              "point": { "$ref": "#/$defs/pointId" },
+              "point_sha256": {
+                "$ref": "#/$defs/sha256",
+                "description": "Hash of the point's authoritative span in its mother file."
+              },
+              "passage_sha256": {
+                "$ref": "#/$defs/sha256",
+                "description": "Hash of every passage in this file anchored to that point, concatenated in document order."
+              }
+            }
+          }
         },
         "unresolved_coverage_debt": {
           "type": "array",
@@ -1373,7 +1410,13 @@
             },
             "external_edge_count": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "All edges with exactly one endpoint inside the candidate, regardless of type."
+            },
+            "external_nav_edge_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Subset of external_edge_count whose type is on external_edge_policy.allowed_types. Cut coupling is external_edge_count minus this."
             }
           }
         },

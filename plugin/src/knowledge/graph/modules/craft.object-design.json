@@ -58,7 +58,7 @@
         "需要抽象成本审计"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.abstraction-cost.md",
         "marker": "point:oop.abstraction-cost",
         "heading_hint": "抽象成本审计"
       },
@@ -94,7 +94,7 @@
         "需要组合优于继承"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.composition-over-inheritance.md",
         "marker": "point:oop.composition-over-inheritance",
         "heading_hint": "组合优于继承"
       },
@@ -130,7 +130,7 @@
         "需要封装即词汇"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.encapsulation-vocabulary.md",
         "marker": "point:oop.encapsulation-vocabulary",
         "heading_hint": "封装即词汇"
       },
@@ -166,7 +166,7 @@
         "需要OOP 反模式雷达"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.failure-radar.md",
         "marker": "point:oop.failure-radar",
         "heading_hint": "OOP 反模式雷达"
       },
@@ -202,7 +202,7 @@
         "需要OOP 四柱"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.four-pillars.md",
         "marker": "point:oop.four-pillars",
         "heading_hint": "OOP 四柱"
       },
@@ -238,7 +238,7 @@
         "需要OOP 红线"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.red-lines.md",
         "marker": "point:oop.red-lines",
         "heading_hint": "OOP 红线"
       },
@@ -274,7 +274,7 @@
         "需要OOP 与共享根接缝"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.shared-root-links.md",
         "marker": "point:oop.shared-root-links",
         "heading_hint": "OOP 与共享根接缝"
       },
@@ -310,7 +310,7 @@
         "需要SOLID 判断法"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
+        "path": "plugin/src/knowledge/points/oop.solid-judgment.md",
         "marker": "point:oop.solid-judgment",
         "heading_hint": "SOLID 判断法"
       },

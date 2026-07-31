@@ -58,7 +58,7 @@
         "需要SDD 适用性判断"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.admission.md",
         "marker": "point:sdd.admission",
         "heading_hint": "SDD 适用性判断"
       },
@@ -94,7 +94,7 @@
         "需要Spec、实现与测试对齐"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.alignment.md",
         "marker": "point:sdd.alignment",
         "heading_hint": "Spec、实现与测试对齐"
       },
@@ -130,7 +130,7 @@
         "需要先改 spec 的变更顺序"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.change-order.md",
         "marker": "point:sdd.change-order",
         "heading_hint": "先改 spec 的变更顺序"
       },
@@ -166,7 +166,7 @@
         "需要Spec 先于实现"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.core-belief.md",
         "marker": "point:sdd.core-belief",
         "heading_hint": "Spec 先于实现"
       },
@@ -202,7 +202,7 @@
         "需要Spec 漂移红线"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.drift-red-line.md",
         "marker": "point:sdd.drift-red-line",
         "heading_hint": "Spec 漂移红线"
       },
@@ -238,7 +238,7 @@
         "需要实现前 Spec 硬闸"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.implementation-gate.md",
         "marker": "point:sdd.implementation-gate",
         "heading_hint": "实现前 Spec 硬闸"
       },
@@ -274,7 +274,7 @@
         "需要SDD 当代实践锚"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.practice-anchors.md",
         "marker": "point:sdd.practice-anchors",
         "heading_hint": "SDD 当代实践锚"
       },
@@ -310,7 +310,7 @@
         "需要Spec 的职责边界"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.spec-boundary.md",
         "marker": "point:sdd.spec-boundary",
         "heading_hint": "Spec 的职责边界"
       },
@@ -346,7 +346,7 @@
         "需要SDD 与 DDD/OOP/TDD 接力"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
+        "path": "plugin/src/knowledge/points/sdd.theory-handoff.md",
         "marker": "point:sdd.theory-handoff",
         "heading_hint": "SDD 与 DDD/OOP/TDD 接力"
       },

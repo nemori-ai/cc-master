@@ -53,7 +53,7 @@ cc-master 把这些全接管了，像个真正会算账的项目负责人那样�
 - **🌐 把整台机器当成 worker pool。** 总指挥不受当前 origin harness 限制：它可以查看本机 Claude Code、Codex、Cursor IDE、Cursor Agent、kimi-code 的独立 surface，读取目标 CLI 的真实 help，再通过 `ccm worker` 显式启动一个 session-bound worker。最终选择和结果验收仍由 origin session 负责。
 - **🔮 开工前就告诉你啥时候完。** 它跑几千次模拟，给你一个**概率**："五成把握周三完、九成把握周五完"，还点出哪个环节最可能拖后腿。这本来是项目经理拿 Excel 算半天的活，现在一条命令、几十毫秒。
 - **💰 让预算决策可见。** 全机缓存 posture 与 selected-target usage advice 帮它决定配速；missing、stale、unknown 仍保持未知。花费权限或余量不清楚时，应当减速或询问，而不是编造确定性。
-- **⚡ 管理限制，而不是无视限制。** Claude Code 只有在既存 policy 或用户明确授权下才可以换号。Codex 只把 7d 当 hard window（rolling 24h 只是 advisory）；Cursor 按订阅 **billing period** 配速；ccm 则读取 kimi-code managed endpoint 的 rolling 5h/7d 用量窗口。Codex、Cursor 和 kimi-code 都不会自动换号。
+- **⚡ 管理限制，而不是无视限制。** 在 Claude Code 上，换号由 cc-master 依既存 policy 在后台统一决定，或由你明确下令执行——总指挥自己不会、也不该给自己这项权限。Codex 只把 7d 当 hard window（rolling 24h 只是 advisory）；Cursor 按订阅 **billing period** 配速；ccm 则读取 kimi-code managed endpoint 的 rolling 5h/7d 用量窗口。Codex、Cursor 和 kimi-code 都不会自动换号。
 - **🧠 留下一本持久账。** board 会跨 context reset 和显式 session handoff 保留 goal revision、tasks、decisions 与已登记 runtime agents。resume 仍需按实时证据重新对账；持久化不代表每个子进程都能跨 session 存活。
 - **🙋 只在真正重要的事上问你。** 小决定它自己拿主意；只有"这事得你拍板"的，它才停下来、把来龙去脉讲清楚、等你一句话。
 - **🏁 它有明确的完成闸。** 收尾前会对当前 Goal Contract revision 逐条检查：每件事真做完了吗、该问你的都问了吗、后台有没有悄悄挂掉？worker terminal 只是证据，不会自动等于父任务验收通过。

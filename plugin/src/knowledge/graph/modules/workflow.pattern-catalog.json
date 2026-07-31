@@ -57,7 +57,7 @@
         "需要Adversarial verify"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-adversarial-verify.md",
         "marker": "point:workflow.pattern-adversarial-verify",
         "heading_hint": "Adversarial verify"
       },
@@ -93,7 +93,7 @@
         "需要Bug hunt loop"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-bug-hunt.md",
         "marker": "point:workflow.pattern-bug-hunt",
         "heading_hint": "Bug hunt loop"
       },
@@ -129,7 +129,7 @@
         "需要Completeness critic"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-completeness-critic.md",
         "marker": "point:workflow.pattern-completeness-critic",
         "heading_hint": "Completeness critic"
       },
@@ -165,7 +165,7 @@
         "需要Dependency upgrade sweep"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-dep-upgrade.md",
         "marker": "point:workflow.pattern-dep-upgrade",
         "heading_hint": "Dependency upgrade sweep"
       },
@@ -201,7 +201,7 @@
         "需要Fan-out + synthesize"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-fan-out.md",
         "marker": "point:workflow.pattern-fan-out",
         "heading_hint": "Fan-out + synthesize"
       },
@@ -237,7 +237,7 @@
         "需要Judge panel"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-judge-panel.md",
         "marker": "point:workflow.pattern-judge-panel",
         "heading_hint": "Judge panel"
       },
@@ -273,7 +273,7 @@
         "需要Loop until budget"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-loop-budget.md",
         "marker": "point:workflow.pattern-loop-budget",
         "heading_hint": "Loop until budget"
       },
@@ -309,7 +309,7 @@
         "需要Loop until count"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-loop-count.md",
         "marker": "point:workflow.pattern-loop-count",
         "heading_hint": "Loop until count"
       },
@@ -345,7 +345,7 @@
         "需要Loop until dry"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-loop-dry.md",
         "marker": "point:workflow.pattern-loop-dry",
         "heading_hint": "Loop until dry"
       },
@@ -381,7 +381,7 @@
         "需要Discover-transform-verify 迁移"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-migration.md",
         "marker": "point:workflow.pattern-migration",
         "heading_hint": "Discover-transform-verify 迁移"
       },
@@ -417,7 +417,7 @@
         "需要Multi-modal sweep"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-multimodal-sweep.md",
         "marker": "point:workflow.pattern-multimodal-sweep",
         "heading_hint": "Multi-modal sweep"
       },
@@ -453,7 +453,7 @@
         "需要Nested workflow composition"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-nested-composition.md",
         "marker": "point:workflow.pattern-nested-composition",
         "heading_hint": "Nested workflow composition"
       },
@@ -489,7 +489,7 @@
         "需要Perspective-diverse verify"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-perspective-verify.md",
         "marker": "point:workflow.pattern-perspective-verify",
         "heading_hint": "Perspective-diverse verify"
       },
@@ -525,7 +525,7 @@
         "需要Pipeline by default"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-pipeline.md",
         "marker": "point:workflow.pattern-pipeline",
         "heading_hint": "Pipeline by default"
       },
@@ -561,7 +561,7 @@
         "需要PR/issue triage"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-pr-triage.md",
         "marker": "point:workflow.pattern-pr-triage",
         "heading_hint": "PR/issue triage"
       },
@@ -597,7 +597,7 @@
         "需要Scout then fan-out"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-scout-fanout.md",
         "marker": "point:workflow.pattern-scout-fanout",
         "heading_hint": "Scout then fan-out"
       },
@@ -633,7 +633,7 @@
         "需要Self-repair loop"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-self-repair.md",
         "marker": "point:workflow.pattern-self-repair",
         "heading_hint": "Self-repair loop"
       },
@@ -669,7 +669,7 @@
         "需要Staged escalation"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-staged-escalation.md",
         "marker": "point:workflow.pattern-staged-escalation",
         "heading_hint": "Staged escalation"
       },
@@ -705,7 +705,7 @@
         "需要Test generation and repair"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-test-repair.md",
         "marker": "point:workflow.pattern-test-repair",
         "heading_hint": "Test generation and repair"
       },
@@ -741,7 +741,7 @@
         "需要Tournament bracket"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/patterns.md",
+        "path": "plugin/src/knowledge/points/workflow.pattern-tournament.md",
         "marker": "point:workflow.pattern-tournament",
         "heading_hint": "Tournament bracket"
       },

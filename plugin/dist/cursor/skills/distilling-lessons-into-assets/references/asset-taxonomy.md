@@ -84,8 +84,6 @@ Knowledge navigation:
 ## Member points
 
 - [四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
-- [summary: 四类资产判据速查](../SKILL.md#ccm-k-point-distill-taxonomy-quick)
-- [canonicalize → 四类资产定义与判据](./asset-taxonomy.md#ccm-k-point-distill-taxonomy)
 
 ## Back to atlas
 

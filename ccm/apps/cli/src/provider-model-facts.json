@@ -1,18 +1,28 @@
 {
   "schema": "ccm/provider-model-facts-registry/v1",
-  "revision": "2026-07-22.2",
+  "revision": "2026-07-30.1",
   "providers": {
     "claude-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "claude-code",
-      "revision": "2026-07-22.1",
+      "revision": "2026-07-30.1",
       "supported_surfaces": ["claude-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
         {
+          "id": "anthropic-models-overview",
+          "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+          "retrieved_at": "2026-07-30T05:30:00Z"
+        },
+        {
+          "id": "anthropic-opus",
+          "url": "https://www.anthropic.com/claude/opus",
+          "retrieved_at": "2026-07-30T05:30:00Z"
+        },
+        {
           "id": "anthropic-sonnet-5",
           "url": "https://www.anthropic.com/news/claude-sonnet-5",
-          "retrieved_at": "2026-07-22T06:45:36Z"
+          "retrieved_at": "2026-07-30T05:30:00Z"
         },
         {
           "id": "anthropic-fable-5",
@@ -23,23 +33,34 @@
           "id": "anthropic-fable-5-capabilities",
           "url": "https://www.anthropic.com/claude/fable",
           "retrieved_at": "2026-07-22T06:45:36Z"
-        },
-        {
-          "id": "anthropic-opus",
-          "url": "https://www.anthropic.com/claude/opus",
-          "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-22T06:45:36Z",
-      "valid_until": "2026-07-29T06:45:36Z",
+      "observed_at": "2026-07-30T05:30:00Z",
+      "valid_until": "2026-08-06T05:30:00Z",
       "account_scope": "public catalog; live account entitlement separate",
       "confidence": "official-published-snapshot",
-      "unknown": [
-        "live_account_model_entitlement",
-        "live_account_quota",
-        "current_haiku_generation"
-      ],
+      "unknown": ["live_account_model_entitlement", "live_account_quota"],
       "models": [
+        {
+          "model_id": "claude-opus-5",
+          "display_name": "Opus 5",
+          "tier": "frontier",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live account entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 5,
+            "output_per_million_tokens": 25,
+            "note": "Claude API public token pricing; Claude Code plan billing and live quota remain separate"
+          },
+          "benchmarks": null,
+          "selectors": [],
+          "source_refs": ["anthropic-models-overview", "anthropic-opus"],
+          "supersedes": ["claude-opus-4-8"]
+        },
         {
           "model_id": "claude-sonnet-5",
           "display_name": "Sonnet 5",
@@ -57,7 +78,7 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": ["anthropic-sonnet-5"],
+          "source_refs": ["anthropic-models-overview", "anthropic-sonnet-5"],
           "supersedes": ["claude-sonnet-4-6"]
         },
         {
@@ -77,13 +98,17 @@
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": ["anthropic-fable-5", "anthropic-fable-5-capabilities"],
+          "source_refs": [
+            "anthropic-models-overview",
+            "anthropic-fable-5",
+            "anthropic-fable-5-capabilities"
+          ],
           "supersedes": []
         },
         {
-          "model_id": "claude-opus-4-8",
-          "display_name": "Opus 4.8",
-          "tier": "frontier",
+          "model_id": "claude-haiku-4-5",
+          "display_name": "Haiku 4.5",
+          "tier": "economy",
           "relative_output_cost": null,
           "availability": {
             "state": "published",
@@ -91,13 +116,13 @@
           },
           "pricing": {
             "currency": "USD",
-            "input_per_million_tokens": 5,
-            "output_per_million_tokens": 25,
-            "note": "Claude API public token pricing; Claude Code plan billing and live quota remain separate"
+            "input_per_million_tokens": 1,
+            "output_per_million_tokens": 5,
+            "note": "pinned snapshot id claude-haiku-4-5-20251001; 200k context, 64k max output"
           },
           "benchmarks": null,
           "selectors": [],
-          "source_refs": ["anthropic-opus"],
+          "source_refs": ["anthropic-models-overview"],
           "supersedes": []
         }
       ]
@@ -105,21 +130,30 @@
     "codex": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "codex",
-      "revision": "2026-07-22.1",
+      "revision": "2026-07-30.1",
       "supported_surfaces": ["codex-cli"],
       "supported_client_versions": ["current"],
       "source": [
+        {
+          "id": "openai-api-pricing",
+          "url": "https://developers.openai.com/api/docs/pricing",
+          "retrieved_at": "2026-07-30T05:30:00Z"
+        },
         {
           "id": "openai-gpt-5-6",
           "url": "https://openai.com/index/gpt-5-6/",
           "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-22T06:45:36Z",
-      "valid_until": "2026-07-29T06:45:36Z",
+      "observed_at": "2026-07-30T05:30:00Z",
+      "valid_until": "2026-08-06T05:30:00Z",
       "account_scope": "public catalog; live Codex account entitlement separate",
       "confidence": "official-published-snapshot",
-      "unknown": ["live_account_model_entitlement", "live_account_quota"],
+      "unknown": [
+        "live_account_model_entitlement",
+        "live_account_quota",
+        "openai_launch_post_unreachable_2026_07_30"
+      ],
       "models": [
         {
           "model_id": "gpt-5.6-luna",
@@ -141,7 +175,7 @@
             "terminal_bench_2_1_pct": 84.7
           },
           "selectors": ["gpt-5.6-luna"],
-          "source_refs": ["openai-gpt-5-6"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         },
         {
@@ -164,7 +198,7 @@
             "terminal_bench_2_1_pct": 87.4
           },
           "selectors": ["gpt-5.6-terra"],
-          "source_refs": ["openai-gpt-5-6"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         },
         {
@@ -187,7 +221,7 @@
             "terminal_bench_2_1_pct": 88.8
           },
           "selectors": ["gpt-5.6-sol"],
-          "source_refs": ["openai-gpt-5-6"],
+          "source_refs": ["openai-api-pricing"],
           "supersedes": []
         }
       ]
@@ -195,28 +229,28 @@
     "cursor": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "cursor",
-      "revision": "2026-07-22.2",
+      "revision": "2026-07-30.1",
       "supported_surfaces": ["cursor-agent-cli", "cursor-ide"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "cursor-models-pricing",
           "url": "https://cursor.com/docs/models-and-pricing.md",
-          "retrieved_at": "2026-07-22T07:46:31Z"
+          "retrieved_at": "2026-07-30T05:30:00Z"
         },
         {
           "id": "cursor-composer-2-5",
           "url": "https://cursor.com/changelog/composer-2-5",
-          "retrieved_at": "2026-07-22T07:46:31Z"
+          "retrieved_at": "2026-07-30T05:30:00Z"
         },
         {
           "id": "cursor-grok-4-5",
           "url": "https://cursor.com/grok-4-5",
-          "retrieved_at": "2026-07-22T07:46:31Z"
+          "retrieved_at": "2026-07-30T05:30:00Z"
         }
       ],
-      "observed_at": "2026-07-22T07:46:31Z",
-      "valid_until": "2026-07-29T07:46:31Z",
+      "observed_at": "2026-07-30T05:30:00Z",
+      "valid_until": "2026-08-06T05:30:00Z",
       "account_scope": "Cursor public catalog and first-party pool; live plan entitlement and quota separate",
       "confidence": "official-published-snapshot-with-regional-and-surface-unknowns",
       "unknown": [
@@ -349,14 +383,14 @@
     "kimi-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "kimi-code",
-      "revision": "2026-07-22.1",
+      "revision": "2026-07-30.1",
       "supported_surfaces": ["kimi-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "moonshot-kimi-k3-pricing",
           "url": "https://platform.kimi.ai/docs/pricing/chat-k3",
-          "retrieved_at": "2026-07-22T06:45:36Z"
+          "retrieved_at": "2026-07-30T05:30:00Z"
         },
         {
           "id": "moonshot-kimi-k27-code-pricing",
@@ -384,8 +418,8 @@
           "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-22T06:45:36Z",
-      "valid_until": "2026-07-29T06:45:36Z",
+      "observed_at": "2026-07-30T05:30:00Z",
+      "valid_until": "2026-08-06T05:30:00Z",
       "account_scope": "Kimi Code public model catalog and plan requirements; live account entitlement and quota separate",
       "confidence": "official-published-snapshot-with-k3-limitations-documented-and-independent-benchmark-unknowns",
       "unknown": [
@@ -408,8 +442,8 @@
           },
           "pricing": {
             "currency": "USD",
-            "input_per_million_tokens": 3.0,
-            "output_per_million_tokens": 15.0,
+            "input_per_million_tokens": 3,
+            "output_per_million_tokens": 15,
             "note": "cache-hit input $0.30/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; 1M context; reasoning_effort supports low/high/max; the Kimi API pricing page documents API default max, while the current Kimi Code model page documents default high, so the effective Kimi Code default is not inferred; official Limitations (moonshot-kimi-k3-blog): (1) trained in preserved-thinking-history mode, so generation quality can become highly unstable if the agent harness drops historical thinking content or if a session is switched to K3 mid-stream from another model — run K3 in a verified-compatible harness (Kimi Code) on a fresh session and never a mid-session model switch; (2) tuned for long-horizon tasks and over-proactive under ambiguity, so on minor issues or ambiguous intent it may make unexpected decisions on the user's behalf — set explicit behavioral boundaries in the system prompt or AGENTS.md when tight guardrails are required; (3) noticeable user-experience gap vs Claude Fable 5 and GPT-5.6 Sol; vendor-published benchmarks are not imported into this registry and independent cross-vendor verification remains unknown"
           },
           "benchmarks": null,
@@ -434,7 +468,7 @@
           "pricing": {
             "currency": "USD",
             "input_per_million_tokens": 0.95,
-            "output_per_million_tokens": 4.0,
+            "output_per_million_tokens": 4,
             "note": "cache-hit input $0.19/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; thinking required (no non-thinking mode); 256K context; vendor-published benchmarks are not imported into this registry and independent cross-vendor comparability remains unknown"
           },
           "benchmarks": null,

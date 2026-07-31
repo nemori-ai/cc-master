@@ -36,10 +36,17 @@ const SIDECAR_REQUIRED_KEYS = Object.freeze([
   'expected_final_manifest_sha256',
   'compiler_contract',
 ]);
+// First-party publication hosts only. A marketing page and a docs site are both
+// official when the vendor serves them; what this set excludes is aggregators
+// and resellers, whose numbers can differ from the vendor's own list price.
 const OFFICIAL_HOSTS = new Set([
   'anthropic.com',
   'www.anthropic.com',
+  // docs.claude.com 302s here; this is where Anthropic publishes the model catalog.
+  'platform.claude.com',
   'openai.com',
+  // OpenAI's own API reference, including the price list.
+  'developers.openai.com',
   'cursor.com',
   'platform.kimi.ai',
   'www.kimi.com',

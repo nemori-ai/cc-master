@@ -58,7 +58,7 @@
         "own_row"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "path": "plugin/src/knowledge/points/pacing.own-row.md",
         "marker": "point:pacing.own-row",
         "heading_hint": "读 own_row"
       },
@@ -94,7 +94,7 @@
         "hold 是否忽略 sibling"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "path": "plugin/src/knowledge/points/pacing.pool-vs-usage.md",
         "marker": "point:pacing.pool-vs-usage",
         "heading_hint": "与 usage advise"
       },
@@ -130,7 +130,7 @@
         "我是 urgent 可吃完池"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
+        "path": "plugin/src/knowledge/points/pacing.pool-rationalization.md",
         "marker": "point:pacing.pool-rationalization",
         "heading_hint": "Rationalization"
       },

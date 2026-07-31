@@ -25,6 +25,7 @@ import {
 import {
   atlasDistPath,
   canonicalBindingToDistPath,
+  pointHostSourcePath,
   entrySurfaceToDistPath,
   moduleAnchorId,
   moduleRouterDistPath,
@@ -135,7 +136,7 @@ function authoredEdgeLinkLine(label, fromFile, toFile, fragment, edgeId) {
 }
 
 function pointDistPath(host, point) {
-  return canonicalBindingToDistPath(host, point.binding.path);
+  return canonicalBindingToDistPath(host, pointHostSourcePath(point));
 }
 
 function lstatOrNull(target) {

@@ -54,16 +54,13 @@
         "脑中只有先 schema/API/UI"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
+        "path": "plugin/src/knowledge/points/slicing.example-contrast.md",
         "marker": "point:slicing.example-contrast",
         "heading_hint": "横切 vs 纵切"
       },
       "authority": {
-        "role": "example",
-        "subject": "subject:slicing.vertical-rule",
-        "canonical": "point:slicing.vertical-rule",
-        "review_policy": "review-on-canonical-change",
-        "reviewed_canonical_sha256": "8c3e2f28d6d691615861fdee2b7ff52001877302111cb02cf9194d803e7f2ded"
+        "role": "canonical",
+        "subject": "subject:slicing.example-contrast"
       },
       "lifecycle": {
         "state": "accepted",

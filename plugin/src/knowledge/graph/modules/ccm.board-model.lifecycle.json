@@ -58,7 +58,7 @@
         "能不能 --set"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.task-fields.md",
         "marker": "point:ccm.board.task-fields",
         "heading_hint": "A. task 字段"
       },
@@ -95,7 +95,7 @@
         "uncertain vs blocked"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.status-semantics.md",
         "marker": "point:ccm.board.status-semantics",
         "heading_hint": "B. status 八态"
       },
@@ -132,7 +132,7 @@
         "executor 决策树"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.executor-choice.md",
         "marker": "point:ccm.board.executor-choice",
         "heading_hint": "C. executor"
       },
@@ -169,7 +169,7 @@
         "验收条件怎么写"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.acceptance.md",
         "marker": "point:ccm.board.acceptance",
         "heading_hint": "D. acceptance"
       },
@@ -206,7 +206,7 @@
         "estimate 单位"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.estimate-judgment.md",
         "marker": "point:ccm.board.estimate-judgment",
         "heading_hint": "E. estimate"
       },
@@ -243,7 +243,7 @@
         "review-gate deps"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.deps-linking.md",
         "marker": "point:ccm.board.deps-linking",
         "heading_hint": "F. deps"
       },
@@ -280,7 +280,7 @@
         "decision_package"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
+        "path": "plugin/src/knowledge/points/ccm.board.blocked-on.md",
         "marker": "point:ccm.board.blocked-on",
         "heading_hint": "G. blocked_on"
       },
@@ -745,6 +745,40 @@
           {
             "kind": "golden",
             "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm-deps-linking-not-critical-path",
+      "type": "contrasts_with",
+      "from": "point:ccm.board.deps-linking",
+      "to": "point:scheduling.dag-and-critical-path",
+      "when": [
+        "要算哪条链最长、哪个任务先派最解锁下游"
+      ],
+      "avoid_when": [
+        "只是要把已经想清楚的依赖关系正确写进 board"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/references/board-model-guide.md：deps 图的排期与临界路径计算属于调度方法论，本文只给「怎么连对」"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-deps-linking-not-critical-path"
           }
         ]
       }

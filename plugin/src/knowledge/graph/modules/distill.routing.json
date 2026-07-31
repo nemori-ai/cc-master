@@ -51,46 +51,6 @@
   },
   "points": [
     {
-      "id": "point:distill.routing-overview",
-      "title": "归宿判断三问概览",
-      "point_kind": "decision_rule",
-      "summary": "事实→纪律文档；判断力再分机制/角色/skill；不确定不丢弃。",
-      "recognition_cues": [
-        "归宿判断",
-        "三问"
-      ],
-      "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
-        "marker": "point:distill.routing-overview",
-        "heading_hint": "归宿判断决策树"
-      },
-      "authority": {
-        "role": "summary",
-        "subject": "subject:distill.routing-tree",
-        "canonical": "point:distill.routing-tree",
-        "review_policy": "review-on-canonical-change",
-        "reviewed_canonical_sha256": "d0ab35a69b39765ef40562795a0cf3d94cc72aa586804d1a2aabedb7f1b8000f"
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "point:distill.routing-overview"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.point.distill.routing-overview"
-          }
-        ]
-      }
-    },
-    {
       "id": "point:distill.boundary",
       "title": "与其他判断力边界",
       "point_kind": "boundary",
@@ -99,7 +59,7 @@
         "是不是该用本 skill"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/distill.boundary.md",
         "marker": "point:distill.boundary",
         "heading_hint": "边界"
       },
@@ -135,7 +95,7 @@
         "完整决策树"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.routing-tree.md",
         "marker": "point:distill.routing-tree",
         "heading_hint": "顶层三问"
       },
@@ -171,7 +131,7 @@
         "既是事实又是判断力"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.dual-dest.md",
         "marker": "point:distill.dual-dest",
         "heading_hint": "二义性"
       },
@@ -208,7 +168,7 @@
         "没地方放"
       ],
       "binding": {
-        "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
+        "path": "plugin/src/knowledge/points/distill.fallback-no-drop.md",
         "marker": "point:distill.fallback-no-drop",
         "heading_hint": "兜底"
       },
@@ -237,38 +197,6 @@
     }
   ],
   "edges": [
-    {
-      "id": "edge:distill.overview-to-tree",
-      "type": "deepens_to",
-      "from": "point:distill.routing-overview",
-      "to": "point:distill.routing-tree",
-      "when": [
-        "需要完整三问与陷阱"
-      ],
-      "path_role": "next",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.overview-to-tree"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge.distill.overview-to-tree"
-          }
-        ]
-      },
-      "order": 1
-    },
     {
       "id": "edge:distill.tree-to-dual",
       "type": "next",
@@ -364,37 +292,6 @@
       }
     },
     {
-      "id": "edge:distill.boundary-to-overview",
-      "type": "routes_to",
-      "from": "point:distill.boundary",
-      "to": "point:distill.routing-overview",
-      "when": [
-        "确认在本 skill 边界内后开始路由"
-      ],
-      "path_role": "route",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.boundary-to-overview"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge.distill.boundary-to-overview"
-          }
-        ]
-      }
-    },
-    {
       "id": "edge:distill.boundary-to-evidence",
       "type": "requires",
       "from": "point:distill.boundary",
@@ -421,37 +318,6 @@
           {
             "kind": "golden",
             "ref": "golden.edge:distill.boundary-to-evidence"
-          }
-        ]
-      }
-    },
-    {
-      "id": "edge:distill.overview-to-evidence",
-      "type": "requires",
-      "from": "point:distill.routing-overview",
-      "to": "point:distill.evidence-fidelity",
-      "when": [
-        "路由全程受证据硬约束"
-      ],
-      "path_role": "check",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.overview-to-evidence"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge:distill.overview-to-evidence"
           }
         ]
       }
@@ -607,37 +473,6 @@
           {
             "kind": "golden",
             "ref": "golden.edge:distill.fallback-to-tree"
-          }
-        ]
-      }
-    },
-    {
-      "id": "edge:distill.hub-from.overview",
-      "type": "routes_to",
-      "from": "point:distill.routing-overview",
-      "to": "point:distill.routing-tree",
-      "when": [
-        "概览回决策树主点"
-      ],
-      "path_role": "route",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.hub-from.overview"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge:distill.hub-from.overview"
           }
         ]
       }

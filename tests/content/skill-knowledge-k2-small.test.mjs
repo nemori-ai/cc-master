@@ -13,6 +13,12 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  liveAdmissionPolicy,
+  pruneDanglingNavEdges,
+  rederiveSubsetAnalyses,
+} from './helpers/skill-knowledge-subset-fixture.mjs';
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const SKILLS = [
@@ -212,8 +218,12 @@ function buildClosedSetSource() {
       module_max_tokens: 1200,
       point_nav_max_lines: 4,
     },
+    // Judge the subset by the live rules, not the conservative defaults a
+    // synthetic portfolio would otherwise inherit.
+    candidate_admission: liveAdmissionPolicy(repoRoot),
     rollout: 'K1',
   });
+  pruneDanglingNavEdges(path.join(sourceRoot, 'graph', 'modules'));
 
   return { tempRoot, sourceRoot };
 }
@@ -294,6 +304,11 @@ test('SKG-K2-SMALL-04: closed-set graph invariants + authored hop budgets', asyn
   const { graph } = await loadDomain();
   const { tempRoot, sourceRoot } = buildClosedSetSource();
   try {
+    await rederiveSubsetAnalyses({
+      repoRoot,
+      sourceRoot,
+      graphSourceRoot: path.relative(repoRoot, sourceRoot).split(path.sep).join('/'),
+    });
     const built = graph.buildAndValidateGraph({
       repoRoot,
       sourceRoot: path.relative(repoRoot, sourceRoot).split(path.sep).join('/'),

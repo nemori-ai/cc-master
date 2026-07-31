@@ -24,6 +24,7 @@
 Knowledge navigation:
 - [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:pacing.estimation](./estimation.md#ccm-k-module-pacing-estimation)
+- [routes_to: namespace estimate](../../using-ccm/references/command-catalog.md#ccm-k-point-ccm-cmd-estimate) <!-- ccm:k:edge edge:pacing-estimate-verbs-to-cmd-estimate -->
 - [requires: baseline 是 EVM 前置](./estimation.md#ccm-k-point-pacing-baseline-precondition) <!-- ccm:k:edge edge:pacing.verbs-to-baseline -->
 - [deepens_to: 交付 DDL 风险消费](./estimation.md#ccm-k-point-pacing-deadline-risk) <!-- ccm:k:edge edge:pacing.verbs-to-ddl -->
 - [requires: 估算诚实字段](./estimation.md#ccm-k-point-pacing-honest-fields) <!-- ccm:k:edge edge:pacing.verbs-to-honest -->

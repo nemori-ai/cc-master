@@ -55,7 +55,7 @@
         "namespace jc flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.jc.md",
         "marker": "point:ccm.cmd.jc",
         "heading_hint": "namespace jc"
       },
@@ -92,7 +92,7 @@
         "namespace cadence flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.cadence.md",
         "marker": "point:ccm.cmd.cadence",
         "heading_hint": "namespace cadence"
       },
@@ -129,7 +129,7 @@
         "namespace watchdog flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.watchdog.md",
         "marker": "point:ccm.cmd.watchdog",
         "heading_hint": "namespace watchdog"
       },
@@ -166,7 +166,7 @@
         "namespace agent flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.agent.md",
         "marker": "point:ccm.cmd.agent",
         "heading_hint": "namespace agent"
       },
@@ -203,7 +203,7 @@
         "namespace baseline flag"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.baseline.md",
         "marker": "point:ccm.cmd.baseline",
         "heading_hint": "namespace baseline"
       },

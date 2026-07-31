@@ -60,7 +60,7 @@
         "号池模型"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "path": "plugin/src/knowledge/points/ccm.account-pool-model.md",
         "marker": "point:ccm.account-pool-model",
         "heading_hint": "号池模型"
       },
@@ -98,7 +98,7 @@
         "setup-token"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "path": "plugin/src/knowledge/points/ccm.account-enroll-why.md",
         "marker": "point:ccm.account-enroll-why",
         "heading_hint": "录号机制 why"
       },
@@ -136,7 +136,7 @@
         "5h/7d 硬闸"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "path": "plugin/src/knowledge/points/ccm.account-select-method.md",
         "marker": "point:ccm.account-select-method",
         "heading_hint": "选号方法论"
       },
@@ -174,7 +174,7 @@
         "file vault 明文"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
+        "path": "plugin/src/knowledge/points/ccm.account-policy-vault.md",
         "marker": "point:ccm.account-policy-vault",
         "heading_hint": "policy 机制硬闸"
       },
@@ -211,7 +211,7 @@
         "account list"
       ],
       "binding": {
-        "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
+        "path": "plugin/src/knowledge/points/ccm.cmd.account.md",
         "marker": "point:ccm.cmd.account",
         "heading_hint": "namespace account"
       },
@@ -518,6 +518,40 @@
           {
             "kind": "golden",
             "ref": "golden.using-ccm.k2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:ccm-account-vault-not-switch-decision",
+      "type": "contrasts_with",
+      "from": "point:ccm.account-policy-vault",
+      "to": "point:capacity.switch-is-not-your-lever",
+      "when": [
+        "要判断配额到边界时编排侧该做什么、为什么换号不归编排器"
+      ],
+      "avoid_when": [
+        "只是要知道号池与凭证在机制上怎么存怎么切"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "using-ccm/canonical/references/account-pool.md：这个字段是后台自动换号的开关，不是给编排 agent 放权"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.ccm-account-vault-not-switch-decision"
           }
         ]
       }

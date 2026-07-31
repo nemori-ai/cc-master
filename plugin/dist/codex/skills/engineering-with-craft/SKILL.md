@@ -36,6 +36,8 @@ Knowledge navigation:
 - [deepens_to: 分层思维](./SKILL.md#ccm-k-point-craft-layered-thinking) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-layered-thinking -->
 - [deepens_to: 工程共享红线](./SKILL.md#ccm-k-point-craft-red-lines) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-red-lines -->
 - [deepens_to: 四理论阶段接力](./SKILL.md#ccm-k-point-craft-stage-handoff) <!-- ccm:k:edge edge:craft.foundation.shared-spine-to-stage-handoff -->
+- [contrasts_with: dev work 是优化过程](../dev-as-ml-loop/SKILL.md#ccm-k-point-devloop-core-thesis) <!-- ccm:k:edge edge:craft-spine-not-devloop -->
+- [contrasts_with: 切是高杠杆决策](../slicing-goals-into-dags/SKILL.md#ccm-k-point-slicing-why-cut) <!-- ccm:k:edge edge:craft-spine-not-slicing -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-invariant-anchor"></a>
 <!-- ccm:k:start point:craft.invariant-anchor -->
@@ -157,8 +159,10 @@ Knowledge navigation:
 - [Module module:craft.foundation](./SKILL.md#ccm-k-module-craft-foundation)
 - [routes_to: 四理论共享脊椎](./SKILL.md#ccm-k-point-craft-shared-spine) <!-- ccm:k:edge edge:craft.foundation.stage-handoff-to-shared-spine -->
 - [routes_to: DDD 准入问题](./references/ddd.md#ccm-k-point-ddd-admission-question) <!-- ccm:k:edge edge:craft.foundation.stage-to-ddd -->
+- [contrasts_with: 小步迭代优化](../dev-as-ml-loop/SKILL.md#ccm-k-point-devloop-iterate) <!-- ccm:k:edge edge:craft-handoff-not-devloop-iterate -->
 - [routes_to: OOP 四柱](./references/oop.md#ccm-k-point-oop-four-pillars) <!-- ccm:k:edge edge:craft.foundation.stage-to-oop -->
 - [routes_to: Spec 先于实现](./references/sdd.md#ccm-k-point-sdd-core-belief) <!-- ccm:k:edge edge:craft.foundation.stage-to-sdd -->
+- [contrasts_with: walking skeleton](../slicing-goals-into-dags/SKILL.md#ccm-k-point-slicing-walking-skeleton) <!-- ccm:k:edge edge:craft-handoff-not-walking-skeleton -->
 - [routes_to: TDD 铁律](./references/tdd.md#ccm-k-point-tdd-iron-law) <!-- ccm:k:edge edge:craft.foundation.stage-to-tdd -->
 <!-- ccm:k:nav:end -->
 <a id="ccm-k-point-craft-red-lines"></a>

@@ -23,7 +23,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 你不赤手空拳——你活在一块 board 上、握着一把 CLI：
 
 - **board**——你为这场长任务存的持久任务看板：一张带状态的依赖图，既是扛 compaction 的记忆，也是 hook 唯一能读的窗口。**它是单一真相源；变更只走 `ccm`**（直接 file-edit 会被 board-guard 拦）。开工前先把原始需求证据改写成当前 revision 的 Goal Contract；澄清、Brief、追溯与修订纪律见 `references/goal-contract.md`。协议要点见 `references/board.md`。
-- **`ccm`——你随身的 CLI 工具**：board 的读写 / 状态机 / DAG 分析、跨 harness worker 调用、配速与估算（`usage` / `estimate`）、号池换号（`account`）、自我唤醒（`watchdog`）、自主权限（`policy`）、交付节奏（`cadence`）、自驱决策记录（`jc`）、跨编排协调（`peers` / `coordination inbox` / `coordination arbitrate`）——都经它操作。它能做什么、怎么敲，见 `using-ccm`。
+- **`ccm`——你随身的 CLI 工具**：board 的读写 / 状态机 / DAG 分析、跨 harness worker 调用、配速与估算（`usage` / `estimate`）、自我唤醒（`watchdog`）、交付节奏（`cadence`）、自驱决策记录（`jc`）、跨编排协调（`peers` / `coordination inbox` / `coordination arbitrate`）——都经它操作。它能做什么、怎么敲，见 `using-ccm`。
 
 ### 思维底色（你怎么想）
 
@@ -183,7 +183,6 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ## ③ 你的工具箱：skills 地图（progressive disclosure）
 
-<!-- ccm:k:start point:control.navigation-map -->
 这份魂只装编排的**决策骨架**；专门知识不在这里——在你的**兄弟 skill** 和你自己的 **references** 里。别预加载：命中触发条件时才去调（progressive disclosure）。唤起一个兄弟 skill = 一次真实的 `Skill` 工具调用；drill 一份 reference = 读那个文件。
 
 ### 兄弟 skills（何时唤起哪个）
@@ -193,13 +192,13 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | skill | 管什么（一句） | 何时唤起 |
 |---|---|---|
 {{AUTHORING_WORKFLOWS_ROW}}
-| **using-ccm** | 怎么用 `ccm` 操作 board + account 号池（命令面 + 字段取值 + 全部校验规则） | 任何 board 写操作、敲 `ccm` 命令、撞 exit 2/3、录号/换号时 |
+| **using-ccm** | 怎么用 `ccm` 操作 board（命令面 + 字段取值 + 全部校验规则） | 任何 board 写操作、敲 `ccm` 命令、撞 exit 2/3、用户直接命令你做账号操作时 |
 | **slicing-goals-into-dags** | 怎么把目标**切**成 DAG（纵切薄增量 / walking skeleton / 粒度 / 价值风险排序） | 「这目标怎么拆 / 先做什么」——「切」先于你「目标即依赖图」镜头的「排」 |
 | **dev-as-ml-loop** | 把 dev 工作当优化系统：你设计外层 loop 与 handoff，执行 agent 跑单任务内层 loop | 派发 dev 任务前用它塑形 objective / measurement / artifact / restart；执行者用它把任务优化到验收 |
 | **engineering-with-craft** | 领域 / 类 / 合约 / 测试**本身**怎么建得好（DDD/OOP/SDD/TDD 五根 + 工程红线） | 派发的任务涉及设计/建模/写测试的手艺**内容**时（同 F，多由执行者用） |
 | **pacing-and-estimation** | 读 ccm `usage`/`estimate` 与跨 provider model-policy 只读 advisory（verdict / 角色证据 / 成本 / taste / EVM / 诚实字段） | 读 usage/estimate/model-policy 输出、判同档重排或拿不准 forecast / affinity 信不信时（**ccm 出事实与 advisory、你决策**） |
 
-> **分工红线**：**你 = 决策 + 排期 + 换号决策锚**；切分归 `slicing-goals-into-dags`、执行循环形状归 `dev-as-ml-loop`、手艺内容归 `engineering-with-craft`、读 advisory 消费归 `pacing-and-estimation`、ccm 操作机制归 `using-ccm`、workflow 写法归 `authoring-workflows`。越界复述会破坏 skill 间互不重叠的边界。
+> **分工红线**：**你 = 决策 + 排期 + 容量边界**；切分归 `slicing-goals-into-dags`、执行循环形状归 `dev-as-ml-loop`、手艺内容归 `engineering-with-craft`、读 advisory 消费归 `pacing-and-estimation`、ccm 操作机制归 `using-ccm`、workflow 写法归 `authoring-workflows`。越界复述会破坏 skill 间互不重叠的边界。
 
 ### 你自己的 references（何时 drill）
 
@@ -223,15 +222,13 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 派发与选型导航：只进一个入口
 
-准备派 worker 时直接 drill `references/worker-routing.md`，按它的一条有序链完成 routing record；你不再从主 skill 自己串起 dispatch、model、pacing、provider 与 lifecycle 文档。只有 hub 明确指出某个非平凡机制或动态事实需要展开时，才沿它的 owner 地图继续读。`usage` / `estimate` advisory 的解释仍归 `pacing-and-estimation`，号池操作仍归 `using-ccm`。
+准备派 worker 时直接 drill `references/worker-routing.md`，按它的一条有序链完成 routing record；你不再从主 skill 自己串起 dispatch、model、pacing、provider 与 lifecycle 文档。只有 hub 明确指出某个非平凡机制或动态事实需要展开时，才沿它的 owner 地图继续读。`usage` / `estimate` advisory 的解释仍归 `pacing-and-estimation`，账号操作面仍归 `using-ccm`。
 
 ### 你与用户之间的 commands（知道它们存在）
 
 {{COMMAND_SURFACE_GUIDANCE}}
 
 ---
-
-<!-- ccm:k:end point:control.navigation-map -->
 
 ## ④ 最高频行为 / 范式：决策程序 + 操作指导
 

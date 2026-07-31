@@ -65,6 +65,7 @@
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:state.board](./board.md#ccm-k-module-state-board)
+- [routes_to: ccm 是 board 写入关卡](../../using-ccm/SKILL.md#ccm-k-point-ccm-write-gate) <!-- ccm:k:edge edge:board-waist-to-write-gate -->
 <!-- ccm:k:nav:end -->
 ## Supersession —— 显式状态，非隐式 GC
 

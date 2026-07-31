@@ -57,7 +57,7 @@
         "需要组合优于包装"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.composition-over-wrapper.md",
         "marker": "point:craft.composition-over-wrapper",
         "heading_hint": "组合优于包装"
       },
@@ -93,7 +93,7 @@
         "需要契约即 SSOT"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.contract-ssot.md",
         "marker": "point:craft.contract-ssot",
         "heading_hint": "契约即 SSOT"
       },
@@ -129,7 +129,7 @@
         "需要证据优于声称"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.evidence-over-claim.md",
         "marker": "point:craft.evidence-over-claim",
         "heading_hint": "证据优于声称"
       },
@@ -165,7 +165,7 @@
         "需要不变式即锚"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.invariant-anchor.md",
         "marker": "point:craft.invariant-anchor",
         "heading_hint": "不变式即锚"
       },
@@ -201,7 +201,7 @@
         "需要分层思维"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.layered-thinking.md",
         "marker": "point:craft.layered-thinking",
         "heading_hint": "分层思维"
       },
@@ -237,7 +237,7 @@
         "需要工程共享红线"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.red-lines.md",
         "marker": "point:craft.red-lines",
         "heading_hint": "工程共享红线"
       },
@@ -273,7 +273,7 @@
         "需要四理论共享脊椎"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.shared-spine.md",
         "marker": "point:craft.shared-spine",
         "heading_hint": "四理论共享脊椎"
       },
@@ -309,7 +309,7 @@
         "需要四理论阶段接力"
       ],
       "binding": {
-        "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/craft.stage-handoff.md",
         "marker": "point:craft.stage-handoff",
         "heading_hint": "四理论阶段接力"
       },
@@ -892,6 +892,142 @@
           {
             "kind": "review",
             "ref": "k2-medium.edge.craft.foundation.stage-to-tdd"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-spine-not-slicing",
+      "type": "contrasts_with",
+      "from": "point:craft.shared-spine",
+      "to": "point:slicing.why-cut",
+      "when": [
+        "要决定顶层怎么敏捷切"
+      ],
+      "avoid_when": [
+        "片已切好，问题是这段代码本身该怎么建"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md：五根同时管手艺与交付尺度，顶层怎么切归 slicing"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-spine-not-slicing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-spine-not-devloop",
+      "type": "contrasts_with",
+      "from": "point:craft.shared-spine",
+      "to": "point:devloop.core-thesis",
+      "when": [
+        "要决定任务内怎么迭代收敛"
+      ],
+      "avoid_when": [
+        "关心的是领域、类、合约、测试本身该长什么样"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 的交付尺度段：任务内迭代不归手艺内容"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-spine-not-devloop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-handoff-not-walking-skeleton",
+      "type": "contrasts_with",
+      "from": "point:craft.stage-handoff",
+      "to": "point:slicing.walking-skeleton",
+      "when": [
+        "要在顶层做敏捷迭代：纵切薄增量、走 walking skeleton、按 cadence 交付"
+      ],
+      "avoid_when": [
+        "关心的是片内三阶段之间怎么交接"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 三尺度段①：顶层敏捷迭代"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-handoff-not-walking-skeleton"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:craft-handoff-not-devloop-iterate",
+      "type": "contrasts_with",
+      "from": "point:craft.stage-handoff",
+      "to": "point:devloop.iterate",
+      "when": [
+        "要在任务内反复迭代直到验收"
+      ],
+      "avoid_when": [
+        "关心的是 design 到 build 到 test 的阶段交接"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "engineering-with-craft/canonical/SKILL.md 三尺度段③：任务内迭代"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.craft-handoff-not-devloop-iterate"
           }
         ]
       }

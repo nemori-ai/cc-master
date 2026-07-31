@@ -58,7 +58,7 @@
         "需要起草与 launch 契约"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/workflow.authoring-contract.md",
         "marker": "point:workflow.authoring-contract",
         "heading_hint": "起草与 launch 契约"
       },
@@ -94,7 +94,7 @@
         "需要后台执行契约"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.background-contract.md",
         "marker": "point:workflow.background-contract",
         "heading_hint": "后台执行契约"
       },
@@ -130,7 +130,7 @@
         "需要Barrier 与 streaming 判断"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.barrier-vs-streaming.md",
         "marker": "point:workflow.barrier-vs-streaming",
         "heading_hint": "Barrier 与 streaming 判断"
       },
@@ -166,7 +166,7 @@
         "需要契约与内部机制分界"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.contract-vs-internals.md",
         "marker": "point:workflow.contract-vs-internals",
         "heading_hint": "契约与内部机制分界"
       },
@@ -202,7 +202,7 @@
         "需要Determinism 三禁"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.determinism.md",
         "marker": "point:workflow.determinism",
         "heading_hint": "Determinism 三禁"
       },
@@ -238,7 +238,7 @@
         "需要确定性协调器本质"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.execution-model.md",
         "marker": "point:workflow.execution-model",
         "heading_hint": "确定性协调器本质"
       },
@@ -274,7 +274,7 @@
         "需要Primitive 与注入对象模型"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.primitive-model.md",
         "marker": "point:workflow.primitive-model",
         "heading_hint": "Primitive 与注入对象模型"
       },
@@ -310,7 +310,7 @@
         "需要Workflow 资源上限"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.resource-caps.md",
         "marker": "point:workflow.resource-caps",
         "heading_hint": "Workflow 资源上限"
       },
@@ -346,7 +346,7 @@
         "需要最长未变前缀 Resume"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/mechanism.md",
+        "path": "plugin/src/knowledge/points/workflow.resume-prefix.md",
         "marker": "point:workflow.resume-prefix",
         "heading_hint": "最长未变前缀 Resume"
       },
@@ -382,7 +382,7 @@
         "需要agent API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-agent.md",
         "marker": "point:workflow.api-agent",
         "heading_hint": "agent API"
       },
@@ -418,7 +418,7 @@
         "需要args 注入"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-args.md",
         "marker": "point:workflow.api-args",
         "heading_hint": "args 注入"
       },
@@ -454,7 +454,7 @@
         "需要共享 budget API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-budget.md",
         "marker": "point:workflow.api-budget",
         "heading_hint": "共享 budget API"
       },
@@ -490,7 +490,7 @@
         "需要Resume cache key"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-cache-key.md",
         "marker": "point:workflow.api-cache-key",
         "heading_hint": "Resume cache key"
       },
@@ -526,7 +526,7 @@
         "需要API 硬 caps"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-caps.md",
         "marker": "point:workflow.api-caps",
         "heading_hint": "API 硬 caps"
       },
@@ -562,7 +562,7 @@
         "需要workflow 组合 API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-composition.md",
         "marker": "point:workflow.api-composition",
         "heading_hint": "workflow 组合 API"
       },
@@ -598,7 +598,7 @@
         "需要Workflow failure 语义"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-failure.md",
         "marker": "point:workflow.api-failure",
         "heading_hint": "Workflow failure 语义"
       },
@@ -634,7 +634,7 @@
         "需要meta 脚本头"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-meta.md",
         "marker": "point:workflow.api-meta",
         "heading_hint": "meta 脚本头"
       },
@@ -670,7 +670,7 @@
         "需要parallel API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-parallel.md",
         "marker": "point:workflow.api-parallel",
         "heading_hint": "parallel API"
       },
@@ -706,7 +706,7 @@
         "需要pipeline API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-pipeline.md",
         "marker": "point:workflow.api-pipeline",
         "heading_hint": "pipeline API"
       },
@@ -742,7 +742,7 @@
         "需要phase 与 log API"
       ],
       "binding": {
-        "path": "plugin/src/skills/authoring-workflows/canonical/references/api-reference.md",
+        "path": "plugin/src/knowledge/points/workflow.api-progress.md",
         "marker": "point:workflow.api-progress",
         "heading_hint": "phase 与 log API"
       },

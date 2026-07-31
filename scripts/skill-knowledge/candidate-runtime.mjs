@@ -17,7 +17,12 @@ import { EXIT_CODES } from './contracts.mjs';
 import { diagnostic } from './diagnostics.mjs';
 import { runCompile } from './compile.mjs';
 import { buildHostArtifacts, writeArtifacts } from './compile/emit.mjs';
-import { PRODUCT_HOSTS, entrySurfaceToDistPath, canonicalBindingToDistPath } from './compile/paths.mjs';
+import {
+  PRODUCT_HOSTS,
+  entrySurfaceToDistPath,
+  canonicalBindingToDistPath,
+  pointHostSourcePath,
+} from './compile/paths.mjs';
 import {
   countEnabledRuntimeEdges,
   verifyHopContracts,
@@ -360,7 +365,7 @@ function materializePartialHostTree({ runtimeRoot, host, graph, moduleIds }) {
   // Only seed Markdown files that bind covered points (plus skill SKILL.md when needed).
   const neededDistFiles = new Set();
   for (const point of projectedGraph.points ?? []) {
-    const distRel = canonicalBindingToDistPath(host, point.binding?.path);
+    const distRel = canonicalBindingToDistPath(host, pointHostSourcePath(point));
     if (distRel) neededDistFiles.add(distRel.replace(`plugin/dist/${host}/`, ''));
   }
   for (const skill of projectedGraph.skills ?? []) {

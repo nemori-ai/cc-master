@@ -33,9 +33,10 @@
   },
   "graph_metrics": {
     "module_count": 4,
-    "point_count": 12,
-    "internal_edge_count": 33,
-    "external_edge_count": 0
+    "point_count": 8,
+    "internal_edge_count": 20,
+    "external_edge_count": 0,
+    "external_nav_edge_count": 0
   },
   "verdict": "admit",
   "witness": {
@@ -51,18 +52,14 @@
       "point:distill.boundary",
       "point:distill.dual-dest",
       "point:distill.evidence-fidelity",
-      "point:distill.evidence-hard-line",
       "point:distill.fallback-no-drop",
       "point:distill.landing-craft",
-      "point:distill.landing-preview",
       "point:distill.landing-rationalization",
-      "point:distill.routing-overview",
       "point:distill.routing-tree",
-      "point:distill.taxonomy",
-      "point:distill.taxonomy-quick"
+      "point:distill.taxonomy"
     ],
     "trigger_job_coherence": true,
-    "internal_cohesion": 2.75,
+    "internal_cohesion": 2.5,
     "external_cut_coupling": 0,
     "overlap_signature": {},
     "ssot_closure": true,
@@ -75,7 +72,7 @@
           "projected_directed_diameter": 3,
           "undirected_entry_distance_max": 1,
           "directed_diameter": 3,
-          "directed_unreachable_pair_count": 61,
+          "directed_unreachable_pair_count": 19,
           "undirected_unreachable_count": 0
         },
         "policy": {
@@ -90,9 +87,9 @@
         "files": [
           {
             "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
-            "utf8_bytes": 8430,
-            "lines": 83,
-            "estimated_tokens": 2810
+            "utf8_bytes": 8024,
+            "lines": 75,
+            "estimated_tokens": 2675
           },
           {
             "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/references/routing-decision-tree.md",
@@ -119,14 +116,14 @@
             "estimated_tokens": 1288
           }
         ],
-        "utf8_bytes": 25946,
-        "estimated_lines": 333,
+        "utf8_bytes": 25540,
+        "estimated_lines": 325,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 8649,
+        "estimated_tokens": 8514,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }
@@ -144,7 +141,7 @@
         "point:distill.routing-tree"
       ],
       "authored_directed_diameter": null,
-      "authored_directed_unreachable_pair_count": 61,
+      "authored_directed_unreachable_pair_count": 19,
       "authored_directed_unreachable_sample": [
         {
           "from": "point:distill.boundary",
@@ -152,15 +149,7 @@
         },
         {
           "from": "point:distill.boundary",
-          "to": "point:distill.landing-preview"
-        },
-        {
-          "from": "point:distill.boundary",
           "to": "point:distill.landing-rationalization"
-        },
-        {
-          "from": "point:distill.boundary",
-          "to": "point:distill.taxonomy-quick"
         },
         {
           "from": "point:distill.dual-dest",
@@ -172,10 +161,18 @@
         },
         {
           "from": "point:distill.dual-dest",
-          "to": "point:distill.landing-preview"
+          "to": "point:distill.landing-rationalization"
         },
         {
-          "from": "point:distill.dual-dest",
+          "from": "point:distill.evidence-fidelity",
+          "to": "point:distill.boundary"
+        },
+        {
+          "from": "point:distill.evidence-fidelity",
+          "to": "point:distill.landing-craft"
+        },
+        {
+          "from": "point:distill.evidence-fidelity",
           "to": "point:distill.landing-rationalization"
         }
       ],
@@ -223,7 +220,7 @@
       "undirected_entry_distance_max": 1,
       "undirected_unreachable_from_entry_primary": [],
       "directed_diameter": 3,
-      "directed_unreachable_pair_count": 61,
+      "directed_unreachable_pair_count": 19,
       "directed_unreachable_sample": [
         {
           "from": "point:distill.boundary",
@@ -231,15 +228,7 @@
         },
         {
           "from": "point:distill.boundary",
-          "to": "point:distill.landing-preview"
-        },
-        {
-          "from": "point:distill.boundary",
           "to": "point:distill.landing-rationalization"
-        },
-        {
-          "from": "point:distill.boundary",
-          "to": "point:distill.taxonomy-quick"
         },
         {
           "from": "point:distill.dual-dest",
@@ -251,10 +240,18 @@
         },
         {
           "from": "point:distill.dual-dest",
-          "to": "point:distill.landing-preview"
+          "to": "point:distill.landing-rationalization"
         },
         {
-          "from": "point:distill.dual-dest",
+          "from": "point:distill.evidence-fidelity",
+          "to": "point:distill.boundary"
+        },
+        {
+          "from": "point:distill.evidence-fidelity",
+          "to": "point:distill.landing-craft"
+        },
+        {
+          "from": "point:distill.evidence-fidelity",
           "to": "point:distill.landing-rationalization"
         }
       ],
@@ -266,9 +263,10 @@
     },
     "graph_metrics": {
       "module_count": 4,
-      "point_count": 12,
-      "internal_edge_count": 33,
-      "external_edge_count": 0
+      "point_count": 8,
+      "internal_edge_count": 20,
+      "external_edge_count": 0,
+      "external_nav_edge_count": 0
     },
     "admission_gates": {
       "ok": true,

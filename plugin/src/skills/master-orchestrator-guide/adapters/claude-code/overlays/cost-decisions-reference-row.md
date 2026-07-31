@@ -1,1 +1,1 @@
-| `cost-decisions.md` | 换号决策锚（lever 阶梯 / policy 授权 / **绝不自授权**） |
+| `cost-decisions.md` | 容量边界（配额烧穿时能做什么 / 换号为何不归你 / 用户直接命令时怎么执行） |

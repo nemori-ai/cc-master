@@ -76,6 +76,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:devloop.ledger](./optimization-ledger.md#ccm-k-module-devloop-ledger)
+- [routes_to: ccm 是 board 写入关卡](../../using-ccm/SKILL.md#ccm-k-point-ccm-write-gate) <!-- ccm:k:edge edge:devloop-ledger-to-write-gate -->
 - [next: 持续 handoff](./optimization-ledger.md#ccm-k-point-devloop-ledger-handoff) <!-- ccm:k:edge edge:devloop.ledger-ccm-to-handoff -->
 - [routes_to: 验收标准 = 目标函数](../SKILL.md#ccm-k-point-devloop-objective) <!-- ccm:k:edge edge:devloop.hub-from.devloop.ledger-ccm -->
 <!-- ccm:k:nav:end -->

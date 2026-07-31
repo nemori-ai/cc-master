@@ -182,11 +182,26 @@
       "type": "string",
       "minLength": 1
     },
-    "action": {"enum": ["begin", "validate", "apply"]},
-    "workspace": {"$ref": "#/$defs/repoPath"},
-    "ledger_path": {"$ref": "#/$defs/repoPath"},
-    "result_graph_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "validation": {"type": "object"},
+    "action": {
+      "enum": [
+        "begin",
+        "validate",
+        "apply"
+      ]
+    },
+    "workspace": {
+      "$ref": "#/$defs/repoPath"
+    },
+    "ledger_path": {
+      "$ref": "#/$defs/repoPath"
+    },
+    "result_graph_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "validation": {
+      "type": "object"
+    },
     "diagnostics": {
       "type": "array",
       "items": {
@@ -196,8 +211,22 @@
   },
   "allOf": [
     {
-      "if": {"properties": {"result_kind": {"const": "change"}}, "required": ["result_kind"]},
-      "then": {"required": ["action", "diagnostics"]}
+      "if": {
+        "properties": {
+          "result_kind": {
+            "const": "change"
+          }
+        },
+        "required": [
+          "result_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "action",
+          "diagnostics"
+        ]
+      }
     },
     {
       "if": {
@@ -764,6 +793,7 @@
                 "inventory_max_tokens",
                 "min_internal_cohesion",
                 "max_external_edge_count",
+                "external_edge_policy",
                 "max_overlap_shared_modules",
                 "require_ssot_closure",
                 "require_four_host_denominator",
@@ -772,23 +802,60 @@
                 "hop_gate"
               ],
               "properties": {
-                "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 },
-                "inventory_max_lines": { "type": "integer", "minimum": 1 },
-                "inventory_max_tokens": { "type": "integer", "minimum": 1 },
+                "inventory_max_utf8_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "inventory_max_lines": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "inventory_max_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
                 "min_internal_cohesion": {
                   "type": "number",
                   "minimum": 0,
                   "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)."
                 },
-                "max_external_edge_count": { "type": "integer", "minimum": 0 },
+                "max_external_edge_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "external_edge_policy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "allowed_types"
+                  ],
+                  "properties": {
+                    "allowed_types": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "contrasts_with",
+                          "routes_to"
+                        ]
+                      }
+                    }
+                  }
+                },
                 "max_overlap_shared_modules": {
                   "type": "integer",
                   "minimum": 0,
                   "description": "Max modules shared with any other accepted composition peer."
                 },
-                "require_ssot_closure": { "type": "boolean" },
-                "require_four_host_denominator": { "type": "boolean" },
-                "reject_all_hosts_unsupported": { "type": "boolean" },
+                "require_ssot_closure": {
+                  "type": "boolean"
+                },
+                "require_four_host_denominator": {
+                  "type": "boolean"
+                },
+                "reject_all_hosts_unsupported": {
+                  "type": "boolean"
+                },
                 "require_declared_projection": {
                   "type": "boolean",
                   "description": "Declared full/partial host_coverage must pass planSkillProjection at that level."
@@ -1191,6 +1258,12 @@
         },
         "binding": {
           "type": "object"
+        },
+        "anchor_path": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "recognition_cues": {
           "type": "array",

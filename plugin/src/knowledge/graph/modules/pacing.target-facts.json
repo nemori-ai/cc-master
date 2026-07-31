@@ -55,7 +55,7 @@
         "跨 harness 解释 envelope"
       ],
       "binding": {
-        "path": "plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md",
+        "path": "plugin/src/knowledge/points/pacing.selected-target-facts.md",
         "marker": "point:pacing.selected-target-facts",
         "heading_hint": "selected target"
       },

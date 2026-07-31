@@ -35,16 +35,7 @@ task shape
 ```
 
 这不是可交换的清单。routing record 的输出字段也必须保持这一次序；即使 effect floor 的判断依据来自 task shape，也不得把 `effect_floor` 提前到 `target_surface` 之前。`target_surface` 在这里先声明精确执行面，不等于先按品牌 / 型号替 floor 做决定；后一个 `effect_floor` 仍只由任务形状与风险推出。`effect_floor` 必须写出档位，以及仅由任务形状、风险与错误代价推出该档位的理由；只写 `T1` 之类的标签不算完成，也不得用某个 target 的品牌、容量或偏好倒推理由。先看品牌再猜任务档，会让偏好替代能力门；先排名再做资格核验，会把 `candidate` 偷换成可派发 target；先写 `in_flight` 再找 handle，会制造幽灵任务；
-<a id="ccm-k-point-verification-terminal-summary"></a>
-<!-- ccm:k:start point:verification.terminal-summary -->
 把 agent terminal 当 task done，会绕过验收。
-<!-- ccm:k:end point:verification.terminal-summary -->
-<!-- ccm:k:nav:start point:verification.terminal-summary -->
-Knowledge navigation:
-- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
-- [Module module:verification.endpoint](./worker-routing.md#ccm-k-module-verification-endpoint)
-- [Canonical: runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
-<!-- ccm:k:nav:end -->
 任一承重证据是 unknown、stale、conflicting 或 deny，就停在对应硬门，不用感觉补值。
 
 你的 routing record 至少保留这些字段，字段怎么写入 board 则只查 `using-ccm`：
@@ -123,6 +114,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:routing.worker-chain](./worker-routing.md#ccm-k-module-routing-worker-chain)
+- [routes_to: Workflow 准入](../../authoring-workflows/SKILL.md#ccm-k-point-workflow-admission) <!-- ccm:k:edge edge:routing-workflow-boundary-to-admission -->
 <!-- ccm:k:nav:end -->
 ## 确定 effect floor
 
@@ -257,8 +249,6 @@ Knowledge navigation:
 - [Loop 收敛闸](./resume-verify.md#ccm-k-point-verification-loop-convergence)
 - [resume 接管基线](./resume-verify.md#ccm-k-point-verification-resume-takeover)
 - [runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
-- [summary: routing 链中的 terminal 提醒](./worker-routing.md#ccm-k-point-verification-terminal-summary)
-- [canonicalize → runtime terminal 不等于 task done](./worker-routing.md#ccm-k-point-verification-terminal-is-not-done)
 - [用户理解校验](./resume-verify.md#ccm-k-point-verification-user-understanding)
 
 ## Back to atlas

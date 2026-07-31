@@ -8,26 +8,26 @@
   "intent": "让执行 agent 用 DDD、OOP、SDD、TDD 的共享根设计、实现并验证真实代码。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:craft.foundation",
-      "manifest": "plugin/src/knowledge/graph/modules/craft.foundation.json"
-    },
-    {
-      "id": "module:craft.domain-modeling",
-      "manifest": "plugin/src/knowledge/graph/modules/craft.domain-modeling.json"
-    },
-    {
-      "id": "module:craft.object-design",
-      "manifest": "plugin/src/knowledge/graph/modules/craft.object-design.json"
-    },
-    {
-      "id": "module:craft.spec-first",
-      "manifest": "plugin/src/knowledge/graph/modules/craft.spec-first.json"
-    },
-    {
-      "id": "module:craft.test-first",
-      "manifest": "plugin/src/knowledge/graph/modules/craft.test-first.json"
-    }
+      {
+        "id": "module:craft.foundation",
+        "manifest": "plugin/src/knowledge/graph/modules/craft.foundation.json"
+      },
+      {
+        "id": "module:craft.domain-modeling",
+        "manifest": "plugin/src/knowledge/graph/modules/craft.domain-modeling.json"
+      },
+      {
+        "id": "module:craft.object-design",
+        "manifest": "plugin/src/knowledge/graph/modules/craft.object-design.json"
+      },
+      {
+        "id": "module:craft.spec-first",
+        "manifest": "plugin/src/knowledge/graph/modules/craft.spec-first.json"
+      },
+      {
+        "id": "module:craft.test-first",
+        "manifest": "plugin/src/knowledge/graph/modules/craft.test-first.json"
+      }
     ]
   },
   "entry_modules": [
@@ -51,7 +51,49 @@
         "point:craft.shared-spine",
         "point:craft.stage-handoff"
       ],
-      "reviewed_unbound_sha256": "97e652fc3c949fd67a77c848038fd3be5284bec7ba9828cb4b08229ac7d138a9"
+      "reviewed_unbound_sha256": "97e652fc3c949fd67a77c848038fd3be5284bec7ba9828cb4b08229ac7d138a9",
+      "reconciliations": [
+        {
+          "point": "point:craft.composition-over-wrapper",
+          "point_sha256": "cddb6e3541525ebdd340c0acacfc3552757f384881e71b3d980b25d3a069e296",
+          "passage_sha256": "cddb6e3541525ebdd340c0acacfc3552757f384881e71b3d980b25d3a069e296"
+        },
+        {
+          "point": "point:craft.contract-ssot",
+          "point_sha256": "8a9be92b53a94a5bf4fd4189560e7eb8663df788617c8339ec0e33ce9ce300ee",
+          "passage_sha256": "8a9be92b53a94a5bf4fd4189560e7eb8663df788617c8339ec0e33ce9ce300ee"
+        },
+        {
+          "point": "point:craft.evidence-over-claim",
+          "point_sha256": "77656a37726da813d3fd961a78302f27c6408608549f0fa3f616bef813db4a45",
+          "passage_sha256": "77656a37726da813d3fd961a78302f27c6408608549f0fa3f616bef813db4a45"
+        },
+        {
+          "point": "point:craft.invariant-anchor",
+          "point_sha256": "e06e19e2762615d41af197d92abb213a4208da3e845fe3c5f0a6153986cd45e4",
+          "passage_sha256": "e06e19e2762615d41af197d92abb213a4208da3e845fe3c5f0a6153986cd45e4"
+        },
+        {
+          "point": "point:craft.layered-thinking",
+          "point_sha256": "0f98b184183570f9f62e5cb2026292309c67b1ee21f170a0bdee7cc3bf21a2de",
+          "passage_sha256": "0f98b184183570f9f62e5cb2026292309c67b1ee21f170a0bdee7cc3bf21a2de"
+        },
+        {
+          "point": "point:craft.red-lines",
+          "point_sha256": "7b31ed5f6a22ec35b0274ea6b4b6cfd687168e7fb603be7068e11ac463f99e46",
+          "passage_sha256": "7b31ed5f6a22ec35b0274ea6b4b6cfd687168e7fb603be7068e11ac463f99e46"
+        },
+        {
+          "point": "point:craft.shared-spine",
+          "point_sha256": "3ca37bd0ee38c57cd392c839303cec98dfc849fc8f3d9dee9446b4844adf0f21",
+          "passage_sha256": "ca0708f046c77ba03188f3a0a8e7fdfd5f328b4d87a769f9f756fe9c3c00c606"
+        },
+        {
+          "point": "point:craft.stage-handoff",
+          "point_sha256": "599f6b125f4fc8857b40f27ae1af6f54e9c0ed5bb866d3672540f36825de03fc",
+          "passage_sha256": "3b40403e70b0cb48b3c2ed892275d1eb79e3bb25bb607841165d57a15ce37de7"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
@@ -65,7 +107,44 @@
         "point:ddd.red-lines",
         "point:ddd.strategic-boundaries"
       ],
-      "reviewed_unbound_sha256": "72a3b215bd10d243379dee845c820e850fe0d65b88824346908b94ce815fd9d0"
+      "reviewed_unbound_sha256": "72a3b215bd10d243379dee845c820e850fe0d65b88824346908b94ce815fd9d0",
+      "reconciliations": [
+        {
+          "point": "point:ddd.admission-question",
+          "point_sha256": "b0a1a977d4882d204c7afa4a32f84055b910e121b18abb454613f5f287d62a4e",
+          "passage_sha256": "b0a1a977d4882d204c7afa4a32f84055b910e121b18abb454613f5f287d62a4e"
+        },
+        {
+          "point": "point:ddd.aggregate-ownership",
+          "point_sha256": "36f52adfdebbf7c1cc8389869069545ed613b8b4f71080bbae16cb561acdc2a5",
+          "passage_sha256": "36f52adfdebbf7c1cc8389869069545ed613b8b4f71080bbae16cb561acdc2a5"
+        },
+        {
+          "point": "point:ddd.application-derivation",
+          "point_sha256": "92bb6a704e0d451bde99b864faab0b21936524cdd16b84383cc344499bc5c631",
+          "passage_sha256": "92bb6a704e0d451bde99b864faab0b21936524cdd16b84383cc344499bc5c631"
+        },
+        {
+          "point": "point:ddd.design-focus",
+          "point_sha256": "947933fe8cfa7df96c7d67cb6f9a4515bdd024fc45fa8f1e1b969093948572ec",
+          "passage_sha256": "947933fe8cfa7df96c7d67cb6f9a4515bdd024fc45fa8f1e1b969093948572ec"
+        },
+        {
+          "point": "point:ddd.failure-radar",
+          "point_sha256": "b7f130da040b5e6c0a9cb60db286a9fe7276ce36adcdae3101808b0eb35aafb0",
+          "passage_sha256": "b7f130da040b5e6c0a9cb60db286a9fe7276ce36adcdae3101808b0eb35aafb0"
+        },
+        {
+          "point": "point:ddd.red-lines",
+          "point_sha256": "19396780fcb4f97304662850bae1158f33f979375282057edbd420dca8f2f6c3",
+          "passage_sha256": "19396780fcb4f97304662850bae1158f33f979375282057edbd420dca8f2f6c3"
+        },
+        {
+          "point": "point:ddd.strategic-boundaries",
+          "point_sha256": "0e35dd79f9973efb5a641e4e5e966a382e756f851df1c2d08d841139fc89bf00",
+          "passage_sha256": "0e35dd79f9973efb5a641e4e5e966a382e756f851df1c2d08d841139fc89bf00"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/engineering-with-craft/canonical/references/oop.md",
@@ -80,7 +159,49 @@
         "point:oop.shared-root-links",
         "point:oop.solid-judgment"
       ],
-      "reviewed_unbound_sha256": "1c41b5b01368359ab0b4ba04304357e1c29804630a5a3f65213d152d251c6082"
+      "reviewed_unbound_sha256": "1c41b5b01368359ab0b4ba04304357e1c29804630a5a3f65213d152d251c6082",
+      "reconciliations": [
+        {
+          "point": "point:oop.abstraction-cost",
+          "point_sha256": "46d1c1180b4ccc49c2df209c6c713bc7764a9b5d236743df351256b003bd1111",
+          "passage_sha256": "46d1c1180b4ccc49c2df209c6c713bc7764a9b5d236743df351256b003bd1111"
+        },
+        {
+          "point": "point:oop.composition-over-inheritance",
+          "point_sha256": "abf3afc287e24ae457c6bc964b3ba64b03c99648bece1efb4f92dccea53b1551",
+          "passage_sha256": "abf3afc287e24ae457c6bc964b3ba64b03c99648bece1efb4f92dccea53b1551"
+        },
+        {
+          "point": "point:oop.encapsulation-vocabulary",
+          "point_sha256": "95b4f951481823a02f00ab5ac5c661fc93b48bcf4d05f23f7d47199e777f56ab",
+          "passage_sha256": "95b4f951481823a02f00ab5ac5c661fc93b48bcf4d05f23f7d47199e777f56ab"
+        },
+        {
+          "point": "point:oop.failure-radar",
+          "point_sha256": "f0705ab3fb0171f69529eda69b6948aa75ea85b62a26becebd75d1f3f0820287",
+          "passage_sha256": "f0705ab3fb0171f69529eda69b6948aa75ea85b62a26becebd75d1f3f0820287"
+        },
+        {
+          "point": "point:oop.four-pillars",
+          "point_sha256": "d697174723015b3dcedabade22218f59a377357d96183c87231823f539e482e0",
+          "passage_sha256": "d697174723015b3dcedabade22218f59a377357d96183c87231823f539e482e0"
+        },
+        {
+          "point": "point:oop.red-lines",
+          "point_sha256": "5be5fc7229d814a8a9d69b5eef142dd83d2f055b98c8a4fc70adf6bb3c562f4f",
+          "passage_sha256": "5be5fc7229d814a8a9d69b5eef142dd83d2f055b98c8a4fc70adf6bb3c562f4f"
+        },
+        {
+          "point": "point:oop.shared-root-links",
+          "point_sha256": "05a65647686cb25cb85f1f6d478df07ceee2feab4d87daad47de4a403406d3ba",
+          "passage_sha256": "05a65647686cb25cb85f1f6d478df07ceee2feab4d87daad47de4a403406d3ba"
+        },
+        {
+          "point": "point:oop.solid-judgment",
+          "point_sha256": "1777acaca57f355bf0be47f7ca56e42c82869dbc5721881a1fa08bf273f5cf5d",
+          "passage_sha256": "1777acaca57f355bf0be47f7ca56e42c82869dbc5721881a1fa08bf273f5cf5d"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
@@ -96,7 +217,54 @@
         "point:sdd.spec-boundary",
         "point:sdd.theory-handoff"
       ],
-      "reviewed_unbound_sha256": "6e01dbd972c58a041ebbdfa19fee78634419f7746434caa598861d2989cdfc2a"
+      "reviewed_unbound_sha256": "6e01dbd972c58a041ebbdfa19fee78634419f7746434caa598861d2989cdfc2a",
+      "reconciliations": [
+        {
+          "point": "point:sdd.admission",
+          "point_sha256": "21f6fdef767bb68d13d6b74bcfe78da45bf8a2f21ce5fb75b1f031f2f88e912c",
+          "passage_sha256": "21f6fdef767bb68d13d6b74bcfe78da45bf8a2f21ce5fb75b1f031f2f88e912c"
+        },
+        {
+          "point": "point:sdd.alignment",
+          "point_sha256": "9181b2af20c046ea741c3674ff4a282b265052e55dd85804c1bd8bfb4c657c10",
+          "passage_sha256": "9181b2af20c046ea741c3674ff4a282b265052e55dd85804c1bd8bfb4c657c10"
+        },
+        {
+          "point": "point:sdd.change-order",
+          "point_sha256": "283f3a8a19e8afb17a0160772541216b59a5d46dc51af9b6315de0f431141688",
+          "passage_sha256": "283f3a8a19e8afb17a0160772541216b59a5d46dc51af9b6315de0f431141688"
+        },
+        {
+          "point": "point:sdd.core-belief",
+          "point_sha256": "4d17c122dd32280f5c62cb3c8621f7f3a2687a2b490bd59c91c4277f9e2464fb",
+          "passage_sha256": "4d17c122dd32280f5c62cb3c8621f7f3a2687a2b490bd59c91c4277f9e2464fb"
+        },
+        {
+          "point": "point:sdd.drift-red-line",
+          "point_sha256": "189b1c3a1ca9abc11d019dfcabdbd9795c36dea6dfa80805932fa9fd9efa38ad",
+          "passage_sha256": "189b1c3a1ca9abc11d019dfcabdbd9795c36dea6dfa80805932fa9fd9efa38ad"
+        },
+        {
+          "point": "point:sdd.implementation-gate",
+          "point_sha256": "2010a9c1cd3a8908b18559d425b45f3ad10d39addb44cdad5fe5d6607895404a",
+          "passage_sha256": "2010a9c1cd3a8908b18559d425b45f3ad10d39addb44cdad5fe5d6607895404a"
+        },
+        {
+          "point": "point:sdd.practice-anchors",
+          "point_sha256": "a9ab77de54a289d8d5bb0ddacf21aeefaeb8d222e63bafcdb10638d2f9ca8cfc",
+          "passage_sha256": "a9ab77de54a289d8d5bb0ddacf21aeefaeb8d222e63bafcdb10638d2f9ca8cfc"
+        },
+        {
+          "point": "point:sdd.spec-boundary",
+          "point_sha256": "b7b7e1d066c45e3c5433c50a69e63f13c121aeb5bdeb7e3dbad007920998f269",
+          "passage_sha256": "b7b7e1d066c45e3c5433c50a69e63f13c121aeb5bdeb7e3dbad007920998f269"
+        },
+        {
+          "point": "point:sdd.theory-handoff",
+          "point_sha256": "15b5486a91c924cb4807fb9d14a45eaa052999d04c91459428bd4afa14c837ab",
+          "passage_sha256": "15b5486a91c924cb4807fb9d14a45eaa052999d04c91459428bd4afa14c837ab"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
@@ -111,7 +279,49 @@
         "point:tdd.red-evidence",
         "point:tdd.red-green-loop"
       ],
-      "reviewed_unbound_sha256": "8b9e989ddcc303e3d51726555b5e4781f8770277e95c90bf0136f642b6ed3b4a"
+      "reviewed_unbound_sha256": "8b9e989ddcc303e3d51726555b5e4781f8770277e95c90bf0136f642b6ed3b4a",
+      "reconciliations": [
+        {
+          "point": "point:tdd.completion-gate",
+          "point_sha256": "83be16b644caa49bf561f03d78761b534ff94cc1e1b76bbe7da565cbba5b5d02",
+          "passage_sha256": "83be16b644caa49bf561f03d78761b534ff94cc1e1b76bbe7da565cbba5b5d02"
+        },
+        {
+          "point": "point:tdd.constraint-parity",
+          "point_sha256": "11c0c1fc0273c6eb008b0f75c03b89a2f8e1267ea1bede948bb76cfb342b901d",
+          "passage_sha256": "11c0c1fc0273c6eb008b0f75c03b89a2f8e1267ea1bede948bb76cfb342b901d"
+        },
+        {
+          "point": "point:tdd.design-feedback",
+          "point_sha256": "10ed3f753a7661e6b1b7f6e50085e60c4d62a7779bba75dfbf3e7fcdd8413388",
+          "passage_sha256": "10ed3f753a7661e6b1b7f6e50085e60c4d62a7779bba75dfbf3e7fcdd8413388"
+        },
+        {
+          "point": "point:tdd.iron-law",
+          "point_sha256": "3383293f998802c8c8724bde08e571575566bcbd02d8932daf3eb91806eeba86",
+          "passage_sha256": "3383293f998802c8c8724bde08e571575566bcbd02d8932daf3eb91806eeba86"
+        },
+        {
+          "point": "point:tdd.loop-boundary",
+          "point_sha256": "db65883b35d7d8cebcba8755bf86f37f41dd91f1443bcd15b24ed9134e67635b",
+          "passage_sha256": "42fff02d1b957697ded21c1fafd5b0169c876ca0323237484d4bf0901d304f94"
+        },
+        {
+          "point": "point:tdd.rationalizations",
+          "point_sha256": "4b051bbc14a2828619cc74736d02214ab4b88a5f2b391e0234eb0558e3a3d20c",
+          "passage_sha256": "4b051bbc14a2828619cc74736d02214ab4b88a5f2b391e0234eb0558e3a3d20c"
+        },
+        {
+          "point": "point:tdd.red-evidence",
+          "point_sha256": "76d61c4e570bdbbbeb26a37b30f1446b1882eec84169ef7c0d7e40e48ad20e64",
+          "passage_sha256": "76d61c4e570bdbbbeb26a37b30f1446b1882eec84169ef7c0d7e40e48ad20e64"
+        },
+        {
+          "point": "point:tdd.red-green-loop",
+          "point_sha256": "42aa77a75ce661c0693e394932f38e8585609cbd46d9706b73f3136f6ecf01f4",
+          "passage_sha256": "42aa77a75ce661c0693e394932f38e8585609cbd46d9706b73f3136f6ecf01f4"
+        }
+      ]
     }
   ],
   "host_coverage": [

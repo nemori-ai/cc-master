@@ -59,7 +59,7 @@
         "把开发当线性完工"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.core-thesis.md",
         "marker": "point:devloop.core-thesis",
         "heading_hint": "核心论题"
       },
@@ -96,7 +96,7 @@
         "acceptance 空"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.objective.md",
         "marker": "point:devloop.objective",
         "heading_hint": "心智锚 1"
       },
@@ -133,7 +133,7 @@
         "说不出 hypothesis"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.iterate.md",
         "marker": "point:devloop.iterate",
         "heading_hint": "心智锚 2"
       },
@@ -170,7 +170,7 @@
         "flaky 当梯度"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.instrument.md",
         "marker": "point:devloop.instrument",
         "heading_hint": "心智锚 3"
       },
@@ -206,7 +206,7 @@
         "一上来就精修未验证方案"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.explore-exploit.md",
         "marker": "point:devloop.explore-exploit",
         "heading_hint": "心智锚 4"
       },
@@ -243,7 +243,7 @@
         "补丁打补丁"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.plateau-restart.md",
         "marker": "point:devloop.plateau-restart",
         "heading_hint": "心智锚 5"
       },
@@ -280,7 +280,7 @@
         "验收已绿还继续镀金"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.converge.md",
         "marker": "point:devloop.converge",
         "heading_hint": "心智锚 6"
       },
@@ -316,7 +316,7 @@
         "特判让测试变绿"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.fit-intent.md",
         "marker": "point:devloop.fit-intent",
         "heading_hint": "心智锚 7"
       },
@@ -352,7 +352,7 @@
         "为复杂而复杂"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.regularize.md",
         "marker": "point:devloop.regularize",
         "heading_hint": "心智锚 8"
       },
@@ -389,7 +389,7 @@
         "需要一张循环图"
       ],
       "binding": {
-        "path": "plugin/src/skills/dev-as-ml-loop/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/devloop.taste-and-cycle.md",
         "marker": "point:devloop.taste-and-cycle",
         "heading_hint": "Taste / 一图流"
       },
@@ -1101,6 +1101,204 @@
           {
             "kind": "golden",
             "ref": "golden.edge:devloop.hub-from.devloop.regularize"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-converge-not-terminal-done",
+      "type": "contrasts_with",
+      "from": "point:devloop.converge",
+      "to": "point:verification.terminal-is-not-done",
+      "when": [
+        "要判断「收敛了」到底算不算真完成"
+      ],
+      "avoid_when": [
+        "还在循环里调，尚未触及完成声称"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md：verified 表示端点测过，不是「我觉得差不多了」"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-converge-not-terminal-done"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-converge-to-artifact-verified",
+      "type": "routes_to",
+      "from": "point:devloop.converge",
+      "to": "point:ccm.board.artifact-verified",
+      "when": [
+        "要把收敛写成 board 上的 done + verified + artifact 组合语义"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md 的 board 接地段"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-converge-to-artifact-verified"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-taste-not-slicing",
+      "type": "contrasts_with",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:slicing.why-cut",
+      "when": [
+        "要决定这个目标怎么切成小 batch"
+      ],
+      "avoid_when": [
+        "batch 已经切好，只管这一片里的优化形状"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md：slicing 切出小 batch，本 skill 管每片里的优化形状"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-taste-not-slicing"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-taste-not-decision-program",
+      "type": "contrasts_with",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:control.decision-program",
+      "when": [
+        "要排程与验收这些训练 run"
+      ],
+      "avoid_when": [
+        "你就是那个执行者，只管把手上这一片优化到验收"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md：总指挥排程和验收训练 run"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-taste-not-decision-program"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-taste-not-craft",
+      "type": "contrasts_with",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:craft.shared-spine",
+      "when": [
+        "要判断循环里每一步的工程质量本身好不好"
+      ],
+      "avoid_when": [
+        "关心的是循环形状与停机条件，不是单步手艺"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md：engineering-with-craft 管每一步的工程质量"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-taste-not-craft"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:devloop-taste-to-spec-admission",
+      "type": "routes_to",
+      "from": "point:devloop.taste-and-cycle",
+      "to": "point:sdd.admission",
+      "when": [
+        "循环入口要过 spec 硬闸，且尚无已认可的 spec"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "dev-as-ml-loop/canonical/SKILL.md 的决策树：未过 spec 闸则先产出或引用 spec"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.devloop-taste-to-spec-admission"
           }
         ]
       }

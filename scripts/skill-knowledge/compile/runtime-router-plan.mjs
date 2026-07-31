@@ -1,5 +1,6 @@
 import {
   canonicalBindingToDistPath,
+  pointHostSourcePath,
   moduleAnchorId,
   skillAnchorId,
 } from './paths.mjs';
@@ -33,7 +34,7 @@ export function buildRuntimeRouterPlan({ host, graph }) {
   )) {
     const point = placementPoint(module, graph);
     const placementPath =
-      point && canonicalBindingToDistPath(host, point.binding?.path);
+      point && canonicalBindingToDistPath(host, pointHostSourcePath(point));
     if (!placementPath) continue;
     modules.set(module.id, {
       path: placementPath,

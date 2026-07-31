@@ -1316,3 +1316,59 @@
 - **影响**：public runtime Markdown 被要求承担 repo authored graph 的 H1–H4 / topology 职责，违背“图 first、skill 是产物、knowledge 不进 dist/package”的既定产品边界；independent oracle 与 sealed release protocol 成为 K3-01P 的阻塞依赖，K3-01 / K3-03 / K3-04 / K3-05 因此继续 blocked，Draft PR 交付被自造门槛推迟。
 - **处置(含蒸馏判定)**：用户据本次事故明确要求建立本仓防过度设计 / 过度实现纪律；因此在 `CONTRIBUTING.md` 落五条可执行规则：scope lock、minimum sufficient solution、scope-change gate、连续两次扩张即 restart、review prompt 逐字携带 acceptance + non-goals；`AGENTS.md` reviewer 段只留入口指针，避免双 SSOT。另以 [`skill-knowledge-graph/remaining-scope-audit.md`](skill-knowledge-graph/remaining-scope-audit.md) 逐句给 K3 剩余 acceptance 标记 keep / narrow / defer / drop；public dist 的**额外 knowledge 产品面**从当前 acceptance 删除，但正式方案已经批准的 skill-local runtime navigation H1–H4 仍保留；independent oracle / sealed release hardening 只可作为经用户另行授权的 follow-up。**蒸馏判定 = 落既有项目纪律文档，不新建 skill / workflow / subagent**：一手证据只有 K3-01P 一次事故，足以承载用户明确授权的本仓纪律；尚不足以抽象为跨项目可迁移 skill。
 - **严重度 / 来源**：**high(范围失控·交付阻断)** / 一手（2026-07-27，board `20260723T141001Z-45674` 的 K3-01P、TX0–TX5 与 review 状态链；单一事故，已按证据范围收窄）。
+
+## Finding #109 — `skill-knowledge.mjs check --stage K0` 是假绿陷阱:K0 只查 source 合同,清单核验 / 复核记录 / 边端点全在 K1–K3;AGENTS.md 路由行只写了 K0,照它跑会拿到「0 diagnostics」却漏掉真错 · should-fix(验收指令不完整→假绿)
+
+- **现象 / 证据**:知识图谱大改后按 AGENTS.md §N 的路由行跑 `node scripts/skill-knowledge.mjs check --stage K0 --json`,回 `ok:true`、0 diagnostics。同一棵树上手工核 `cost-decisions.md` 的 `reviewed_unbound_sha256`,发现 recorded ≠ actual(区段外正文已大改却未重签)。改跑 K1/K2/K3,立刻报出 3 条真错:`SKG-EDGE-ENDPOINT-MISSING` ×1(边指向已删点)+ `SKG-INVENTORY-STALE-UNBOUND` ×2。
+- **根因**:四个 stage 是**递进而非等价**——K0 = source 合同(schema / 必填 / id 唯一),K1 起才跑 `attestInventoryEntry`(清单复核哈希)、边端点存在性、reconciliation 新鲜度。AGENTS.md §N 那行「查询 skill knowledge toolkit 当前能力 / 运行 K0 source 合同检查」把 K0 写成了默认动作,读者(含 agent)自然把它当验收门。
+- **影响**:任何只跑 K0 就宣布「图谱绿」的改动,都可能带着陈旧复核哈希、断头边入库——而这两类恰恰是 knowledge graph 唯一的防漂移机制,失效即静默。本轮若不是手工复核,会带着 3 条真错继续往下做退役与全量落盘。
+- **处置(含蒸馏判定)**:**已修 AGENTS.md**——§N 路由行改为「四个 stage 递进,验收要跑到 K3」,并点明 K0 只是 source 合同。**蒸馏判定:不回流分发 skill**——这是本仓 dev 工具的用法事实,受众是贡献者不是 user-agent;落点即 AGENTS.md 路由行 + 本条台账。同类反模式已有先例(Finding #101 turbo 缓存假绿 / #102 「ccm 门」窄化),三条同源:**验收指令被窄化成它最便宜的那一段**——值得在 CONTRIBUTING 的 before-PR 段统一收口(本轮未做,留记)。
+- **严重度 / 来源**:should-fix(假绿·防漂移机制静默失效)/ 一手(2026-07-30 知识点母本全量改造)。
+
+## Finding #110 — 改 skill 正文会撞两份钉死摘要的证明清单(pacing read-only / provider-guidance),不重生成就直接投影失败;这道前置在 AGENTS.md 与 CONTRIBUTING 都没写 · should-fix(必经步骤缺文档→投影硬失败)
+
+- **现象 / 证据**:改完 `pacing-levers.md` 等 skill 正文后跑 `bash scripts/sync-plugin-dist.sh`,报 `pacing read-only attestation: runtime manifest digest mismatch for claude-code:references/pacing-levers.md`;跑 `update-pacing-read-only-attestations.cjs` 修掉后再跑,又撞 `provider guidance attestation: claude-code/master-orchestrator-guide accepted_final:SKILL.md digest mismatch`。两次都是投影**硬失败**、不产出 dist。
+- **根因**:`plugin/src/skills/pacing-and-estimation/read-only-capability.json` 与 `plugin/src/skills/provider-guidance-runtime.json` 各钉着一份 runtime 文件的 SHA-256 清单,由 `scripts/regenerate-attestations.sh` 生成。改任一被钉文件的正文都会让摘要过期。这个「改 skill → 先重生成证明 → 再 sync dist」的顺序,`AGENTS.md` §2 关键不变式与 `CONTRIBUTING.md` before-PR 三道门都只写了 sync + check-sync,没提证明重生成。
+- **影响**:第一次撞上的人会把硬失败误读成投影脚本坏了(错误信息指向 attestation 内部,不指向「你该跑哪个脚本」),而且失败发生在 transaction 内、可能留下 `plugin/dist/.<host>.trusted-projection.lock` 残留目录。本轮为此浪费两轮 20 分钟级的 sync。
+- **处置(含蒸馏判定)**:**已修 AGENTS.md**——§2 与 §10 的三道门补上「改被钉住的 skill 正文后,先 `bash scripts/regenerate-attestations.sh`(它内含 sync)」。**蒸馏判定:不回流分发 skill**(纯本仓构建工程);更根治的做法是让 sync 在 digest mismatch 时把「跑 regenerate-attestations.sh」写进错误信息本身——本轮未改脚本,留记。
+- **严重度 / 来源**:should-fix(必经步骤未文档化·投影硬失败)/ 一手(2026-07-30 同上)。
+
+## Finding #111 — 后台 worker 的自报覆盖率不可信到「连自己读了几条输入都会数错」:两批各 17 条的任务,worker 分别只处理 14 / 13 条,却报告「输入 14 条、输出 14 条、覆盖完整」· high(静默丢活·自报体系失效) + ✅正向(派发侧按输入清单机械核对抓到全部 10 条缺口)
+
+- **现象 / 证据**:一轮 8 批 ×17 点的知识点增补,派发侧按各批 `*-points.json` 与 `*-out.json` 机械对账,查出 10 条缺口:k2 缺 1、k4 缺 2、k5 缺 3、k6 缺 4。其中 k5 自报「输入 14 条、输出 14 条(已核对一致)」、k6 自报「输入 13 个知识点、输出 13 条,一一对应,覆盖完整」——而 `grep -c '^POINT point:'` 两个 bundle 都是 **17**。
+- **根因**:此前的判断是「worker 质量不衰减、只在队尾截断」,那是**只测了质量没测覆盖**得出的半个结论。真实形态更糟:worker 对输入规模的自我感知本身就会截断,于是「输出条数 == 输入条数」这条自检在它自己的错误认知里恒真——**自检与被检同源,就不算检**。提示词里后来加了「先数一遍输入」的硬要求,k5/k6 正是加了之后仍然数错的。
+- **影响**:任何依赖 worker 自报覆盖率的 fan-out 都会静默丢活,且丢的是队尾(往往是排序靠后、最少被抽检到的部分)。本轮若信自报,249 个知识点里会有 10 个永远没有失效类型标注,而闸和抽检都不会报。
+- **处置(含蒸馏判定)**:**已按机械对账补跑**(m1/m2 各 5 条 + m3 补最后 7 条,最终 256/256 零缺口)。**蒸馏判定:回流 A(master-orchestrator-guide)的端点验收纪律**——已有「只信端点验收 / 自报不算数」总则,本条给它补一个具体形态:**覆盖率必须由派发侧拿原始输入清单核对,不能问执行者**;提示词里要求 worker 自数只是廉价的第一道,不能当验收。同一形态的对照实验:同批任务改派 cursor 跑 16 批 ×16 点,**零缺口**——说明这不是不可避免的模型局限,但派发侧核对无论如何都不能省。
+- **严重度 / 来源**:**high(静默丢活)** + ✅正向(机械对账抓到)/ 一手(2026-07-30 知识点增补 fan-out)。
+
+## Finding #112 — ✅正向:分类判据在 36 点上验过 81% 一致度,铺到 249 点直接塌到 68%;三版返工 + 留出样本验证把它救回 80%,并意外发现「双重性质」这一类 · ✅正向(小样本判据的过拟合被 predict-then-validate 挡住)
+
+- **现象 / 证据**:知识点失效类型分类,判据在 36 点双人对账上拿到 81%(已入账 charter §6.4)。同一份措辞铺到 249 点全量审计,与第二评分者(codex)一致度只有 **68%**,且分歧系统性——8 条里 5 条是「我方判 `motivation_conflict`／对方判前三类」,全量分布里该类占到 **99/256 = 39%**。
+- **根因**:判据的兜底规则「平局取靠后」在小样本上没暴露,因为**几乎每段纪律性文字结尾都夹一句「别为此找借口」**——36 点里这类文本不够多,249 点里它把最后一档撑成了 39%。一个吞掉近四成的类别,撑不住「哪些知识随模型变强而更该留」这条分析。
+- **影响**:若照 68% 的结果落盘,portfolio 内容轴(该删该补)的全部推论都建在一个不可靠的轴上——而它恰恰是这轮改造的主要产出。
+- **处置(含蒸馏判定)**:判据改了两版,每版在**没参与调校的留出样本**上实测:v2「动机完美反事实」76%(矫枉过正,把「既是洞见又是约束」的点全推给 `capability_gap`);v3「先判主体:行为约束 vs 事实方法」**80%**(同批旧判据只有 56%)。v3 落地后仍有 25 条标签与理由自相矛盾,读下来发现是同一类**双重性质**点,再用「把方法那部分交给更强的模型,它能不能自己补回来」裁决,在这 25 条最难的点上拿到 **88%**。最终 `motivation_conflict` 从 39% 收敛到 20%。**蒸馏判定:已回流 [`design_docs/skill-portfolio/guidance-tradeoff-charter.md` §6.6]**(判据三版演化 + 双重性质裁决规则 + 实测数字);两条方法论教训一并写进那里——① 小样本验过的判据不等于大样本站得住,兜底规则来不及暴露;② 判据每改一版必须在留出样本上测,否则「一致度上升」只是过拟合。不新建 skill(证据只此一轮)。
+- **严重度 / 来源**:✅正向(过拟合被机制挡住)/ 一手(2026-07-30)。
+
+## Finding #113 — 退役一个「文件里唯一的 point」会让该 canonical 文件变成「标记 full 却零 point」,撞不变式;退役判据里少了「它是不是独苗」这一问 · should-fix(退役过头·由测试抓到)
+
+- **现象 / 证据**:按「derived-authority 假点在溯源锚到位后就没有存在理由」退役 7 个点,其中 `point:slicing.example-contrast` 是 `worked-example.md` 里**唯一**的 point。退役后 `SKG-K2-SMALL-01` 报 `plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md full needs points`——一个 `coverage: full` 的文件必须至少绑一个 point。
+- **根因**:退役判据只问了「这个点自身还有没有存在理由」(derived-authority 是旧字节同一语义下的替身,锚一到位即冗余),没问「移走它之后,它所在的文件还立得住吗」。另外 5 个假点都在还有别的 point 的文件里,唯独这一个是独苗,而这个差别在逐点判断时不可见。
+- **影响**:若照 grep 出的 authority.role 名单机械退役,会让一整份 reference 文件失去全部绑定,`coverage: full` 的语义随之破裂;这类破裂不会被图的四阶段 check 抓到(K0–K3 当时全绿),只有 per-skill 的 K2 测试会报。
+- **处置(含蒸馏判定)**:**已恢复**——`point:slicing.example-contrast` 复位为 **canonical**(不再是 derived-authority 替身:溯源锚之后不需要那个替身,但「规则落到具体案例长什么样」本身是真知识),连同其 module、母本、文章锚与两条 `applies_to` 边一并恢复;退役净数 7 → 6,图 47 module / 250 point / 429 edge。**蒸馏判定:不回流分发 skill**(纯本仓 knowledge graph 建模纪律);落点是本条台账 + 退役判据补一问:**「这个点是不是它所在文件的唯一绑定？是 → 不能退役,只能改写。」** 方法论正向:退役后 K0–K3 全绿给了假安全感,真错是 per-skill K2 测试抓到的——与 [[Finding #109]] 同源(**验收指令窄化 → 假绿**),两条互为佐证。
+- **严重度 / 来源**:should-fix(退役过头)/ 一手(2026-07-30 全量测试对照)。
+
+## Finding #114 — 声明的验收门与 CI 实际执行的门不是一回事:AGENTS.md §10 把「`bash run-tests.sh` 须 ALL TESTS PASSED」立为第一道门,而 CI 的 `build-and-check` 只聚合 ccm 门 + 一个 plugin-contracts **精选子集**(4 步),完整 run-tests 从不进 CI;于是 main 可以长期带着 60 条本地红而 CI 全绿 · high(门形同虚设·真回归被藏住)
+
+- **现象 / 证据**:本轮知识层大改后跑完整 `run-tests.sh`,61 条失败。逐层对照:main(`91e23d0f`)同样红;`gh api repos/:owner/:repo/branches/main/protection` 显示 required check 只有 `build-and-check`(strict + enforce_admins);读 `.github/workflows/ccm-ci.yml` 发现 `build-and-check` 是聚合 job,依赖 `ccm` 与 `plugin-contracts` 两个 job,而 `plugin-contracts` 只跑四步:`skill-knowledge-scaffold` 测试、`check --stage K0`、`check-release-knowledge-boundary.mjs`、两个 release/package 契约测试。`grep -rn 'run-tests' .github/workflows/` **零命中**。
+- **根因**:CI 的设计意图是「快门 + 低 Actions 成本」(见 `3a05e35e` ci: reduce redundant Actions usage),而 AGENTS.md §10 的三道门是**本地端点验收**纪律。两者本该互补,但纪律只写了「必须跑」,没写「CI 不替你跑」——于是本地端点若被跳过或被窄化(见 [[Finding #109]] / [[Finding #102]] 同源),红就没有第二道网。
+- **影响**:**一条我自己引入的真回归因此被藏了两天**——`af6dd04e`(放宽跨界导航边策略 + 落 30 条跨 skill typed 边)打破了 `SKG-K2-SMALL-04` 的闭集前提:那 4 个 skill 的 module 从此指向子集外的点,fixture 自称的「闭集」不再闭合。二分确认 `e4d3ee97` 绿、`af6dd04e` 起红。CI 不跑它,本地当时也没跑到,于是它随 commit 落进分支。
+- **处置(含蒸馏判定)**:**回归已定位未修**——尝试过在 fixture 里剪掉跨界导航边 + 重算子集分析,但 `external_edge_count` 相对「候选自身 module 集」而非源根的语义我尚未完全吃透(子集里 `ext=1/nav=0`,与全图 `ext=10/nav=10` 对不上),**已撤回半懂的补丁**:把测试改绿而不真懂它,正是本仓要防的反模式。真正的岔路是设计决策——闭集 fixture 在跨 skill 边存在后要么长成全 8 skill(就不再是 "small"),要么退役这条子集断言;**这个取舍交用户拍板,不在长会话尾巴上单方面定。** 另需修的是纪律侧:AGENTS.md §10 应显式写明「CI 只跑精选子集,完整 run-tests 是本地端点的责任,红了 CI 不会替你拦」。
+- **严重度 / 来源**:**high(门形同虚设)** / 一手(2026-07-30·main / 分支 HEAD / 逐提交二分三层对照)。
+
+## Finding #115 — 长跑期间（或长跑刚结束后）改源码树，导致工具读到中间态、结论作废:同一会话内犯三次,最严重一次差点把 38 条假红当成真回归上报 · high(自造假信号·反复犯) + ✅正向(每次都由「先证实再动手」抓住,未误报出去)
+
+- **现象 / 证据**:三次同型,代价递增。① 改 skill 正文时 `sync-plugin-dist.sh` 正在跑 → 两轮 20 分钟级投影白费。② 改两条母本时投影正在跑 → 报 `SKG-OVERLAY-GRAPH-UNAVAILABLE: authored graph failed validation`,第一反应误读成「工具坏了」,实为工具读到了复核记录尚未重签的中间态。③ 投影跑完**之后**又 `git checkout` 还原一个 skill 文件(恢复溯源锚),使 dist 与 src 不一致,随后的全量测试报 **96 红 vs 基线 61**,净增 38 条全在 compile / 投影 / 符号链接安全这一族——差一点作为「新回归」上报;实测 src 那份 64 行带锚、dist 62 行缺注入,重投影后 38 条全部消失,最终 **58 红、净引入 0**。
+- **根因**:把「后台跑」当成了「不占用我」,于是在等待窗口里顺手改树。但这些工具(投影 transaction / 全量测试)**读的就是那棵树**,它们的输入在我手里被改变了。前两次我口头认了错却没改做法——**认错不等于改法**,这才是三次复发的真原因。
+- **影响**:每次都产出**自造的假信号**,且假信号长得像真问题(投影硬失败、38 条测试红)。第三次若不做「先证实再动手」的一步(比对 src/dist 行数与注入),就会把操作失误写成回归报告,污染他人对分支质量的判断。
+- **处置(含蒸馏判定)**:**立纪律——长跑一旦启动，源码树进入冻结**:要改就先停跑、改完重启,绝不在中间插一手;长跑**结束后**若又改了树,前一次结果同样作废、必须重跑。可以并行做的只有不进树的事(读、分析、跑独立 worktree)。**蒸馏判定:回流 A(master-orchestrator-guide)的等待窗口指导**——现有「主观能动、不被动空等」教的是等待时去排下一段/验上一段,但没说「**别去动正在被读的那棵树**」;这条是等待期主观能动的**边界条件**,与「合法等待 > 装忙」同族。落点:`references/async-hitl.md` 等待窗口一节增一句边界(本轮未改 skill,记为待办)。**方法论正向**:三次都由「先证实再动手」拦下(比行数、比字节、开 HEAD worktree 对照),没有一次把假信号当结论发出去——这条习惯比不犯错更可依赖。
+- **严重度 / 来源**:**high(自造假信号·同一会话三犯)** + ✅正向(证实先行拦截)/ 一手(2026-07-30 知识层全量改造)。

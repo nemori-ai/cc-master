@@ -58,7 +58,7 @@
         "要写出 routing record 的字段次序"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.ordered-chain.md",
         "marker": "point:routing.ordered-chain",
         "heading_hint": "一条不可换序的路由链"
       },
@@ -94,7 +94,7 @@
         "把 subagent 当成当前 origin 的同名工具"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.executor-vs-target.md",
         "marker": "point:routing.executor-vs-target",
         "heading_hint": "executor 不等于 target surface"
       },
@@ -131,7 +131,7 @@
         "想先写 in_flight 再找 handle"
       ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.handle-gate.md",
         "marker": "point:routing.handle-gate",
         "heading_hint": "拿到真实 handle 才算派发"
       },
@@ -163,17 +163,36 @@
       "title": "任务形状决定 executor",
       "point_kind": "decision_rule",
       "summary": "先按责任与控制形状选 subagent/workflow/master/user/external，再考虑数量与 target。",
-      "recognition_cues": ["需要选择 executor", "叶子其实是一张 sub-DAG"],
+      "recognition_cues": [
+        "需要选择 executor",
+        "叶子其实是一张 sub-DAG"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.task-shape.md",
         "marker": "point:routing.task-shape",
         "heading_hint": "任务形状决定 executor"
       },
-      "authority": {"role": "canonical", "subject": "subject:routing.task-shape"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.task-shape"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "worker-routing.md task shape"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.routing.task-shape"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md task shape"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.routing.task-shape"
+          }
+        ]
       }
     },
     {
@@ -181,17 +200,35 @@
       "title": "workflow 规划语义边界",
       "point_kind": "boundary",
       "summary": "executor=workflow 保留结构化多叶语义，但不承诺当前 host 有同名 runtime。",
-      "recognition_cues": ["把 workflow 计划值冒充工具能力"],
+      "recognition_cues": [
+        "把 workflow 计划值冒充工具能力"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.workflow-boundary.md",
         "marker": "point:routing.workflow-boundary",
         "heading_hint": "workflow 是规划语义"
       },
-      "authority": {"role": "canonical", "subject": "subject:routing.workflow-boundary"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.workflow-boundary"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "worker-routing.md workflow boundary"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.routing.workflow"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md workflow boundary"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.routing.workflow"
+          }
+        ]
       }
     },
     {
@@ -199,17 +236,36 @@
       "title": "effect floor、资格与同档 fallback",
       "point_kind": "procedure",
       "summary": "由任务定 floor，逐候选核验实时资格，仅在同档已准入链上排序与 fallback。",
-      "recognition_cues": ["需要确定 effect floor", "候选证据 unknown/stale/conflicting"],
+      "recognition_cues": [
+        "需要确定 effect floor",
+        "候选证据 unknown/stale/conflicting"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.qualification-and-fallback.md",
         "marker": "point:routing.qualification-and-fallback",
         "heading_hint": "确定 effect floor"
       },
-      "authority": {"role": "canonical", "subject": "subject:routing.qualification-and-fallback"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.qualification-and-fallback"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "worker-routing.md floor/qualification/fallback"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.routing.qualification"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md floor/qualification/fallback"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.routing.qualification"
+          }
+        ]
       }
     },
     {
@@ -217,17 +273,35 @@
       "title": "路由承重 owner 地图",
       "point_kind": "reference",
       "summary": "每个承重不变量只保留一个 owner，并仅在 hub 缺证据时继续 drill。",
-      "recognition_cues": ["需要定位 dispatch/model/ccm/verification owner"],
+      "recognition_cues": [
+        "需要定位 dispatch/model/ccm/verification owner"
+      ],
       "binding": {
-        "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
+        "path": "plugin/src/knowledge/points/routing.owner-map.md",
         "marker": "point:routing.owner-map",
         "heading_hint": "权威 owner 地图"
       },
-      "authority": {"role": "canonical", "subject": "subject:routing.owner-map"},
-      "lifecycle": {"state": "accepted", "since": "2026-07-24"},
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:routing.owner-map"
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
       "admission": {
-        "evidence": [{"kind": "canonical-prose", "ref": "worker-routing.md owner map"}],
-        "verifiers": [{"kind": "review", "ref": "k2.point.routing.owner-map"}]
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "worker-routing.md owner map"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "review",
+            "ref": "k2.point.routing.owner-map"
+          }
+        ]
       }
     }
   ],
@@ -355,6 +429,37 @@
           {
             "kind": "projection",
             "ref": "authored-nav.edge.routing.chain-to-terminal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:routing-workflow-boundary-to-admission",
+      "type": "routes_to",
+      "from": "point:routing.workflow-boundary",
+      "to": "point:workflow.admission",
+      "when": [
+        "要学习具体 workflow 脚本语法"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "master-orchestrator-guide/canonical/references/worker-routing.md：需要学习脚本语法时才调用"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.routing-workflow-boundary-to-admission"
           }
         ]
       }

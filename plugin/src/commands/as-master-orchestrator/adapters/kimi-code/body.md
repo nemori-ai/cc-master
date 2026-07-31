@@ -45,7 +45,7 @@ bootstrap hook 已在你的 cc-master home 里建好一块全新的编排 board�
    - **并发上限 WIP** → `ccm board update --board <path> --wip-limit <N>`（owner 级再加 `--owner-wip <N>`）
    - **节奏 / cadence**（局部 timebox）→ `ccm cadence update --board <path> ...`
    - **交付截止期 DDL**（整场编排最终交付时刻·与 cadence 正交）→ `ccm goal deadline set/confirm`（落 `goal_contract.deadline`）。用户敲的 `--ddl <ISO-8601-UTC>` 已由 bootstrap 落为 `asserted`（context 带 DDL evidence advisory）——原样保留，framing 阶段与用户确认后 `ccm goal deadline confirm --user-authorized` 升 `confirmed`；非 ISO 值 bootstrap 不落地、原值作 evidence 传你去规范化。`ccm goal check` 回 `ok`（非 `deadline_pending`）才拆 DAG；无 DDL 用 `ccm goal deadline confirm-none --user-authorized`。DDL 排期/风险纪律见 `master-orchestrator-guide`。
-   - **自主换号偏好** → `ccm policy set --board <path> --autonomous-account-switch <allow|deny>`（只在用户明确表态时设）
+   - **后台自动换号开关**（用户明确说「别自动换号 / 可以自动换号」）→ `ccm policy set --board <path> --autonomous-account-switch <allow|deny>`（这是后台容量层的开关，不是给你放权；写它的授权只由用户给，你绝不自设 `--user-authorized`）
    - **GitHub issue 需求入口**（`--github-issue <url>`）→ 先读 issue、提炼 goal/acceptance，再拆出真实 DAG
    - **没有的别硬塞**：token 预算/目标与板级默认模型字段都不存在——只影响你的决策，不落 board
 4. **每回合跑一遍决策程序**：先对当前 Goal Contract revision 跑 Goal Trace Test，把新增工作分成 aligned / amendment-required / unrelated；只有 aligned 才进入 DAG，amendment-required 先走 `ccm goal amend`，unrelated 不做。随后 reconcile board → surface 任何须由用户拍板的事 → 在 WIP 限额内用后台机制（Bash / sub-agent）派发就绪任务 → 在等待窗口里做合规的 fill-work → 按当前 revision 的全局 acceptance 做端点验收 → 让步前 flush board。

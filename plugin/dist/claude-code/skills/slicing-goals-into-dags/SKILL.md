@@ -126,6 +126,7 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
+- [contrasts_with: DAG、临界路径与机器 graph](../master-orchestrator-guide/references/decomposition.md#ccm-k-point-scheduling-dag-and-critical-path) <!-- ccm:k:edge edge:slicing-value-risk-not-dispatch-order -->
 - [operationalizes: 落到 board](./SKILL.md#ccm-k-point-slicing-board-landing) <!-- ccm:k:edge edge:slicing.value-to-board -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.value-to-vertical -->
 <!-- ccm:k:nav:end -->
@@ -148,6 +149,8 @@ Knowledge navigation:
 Knowledge navigation:
 - [Knowledge atlas](../master-orchestrator-guide/SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:slicing.craft](./SKILL.md#ccm-k-module-slicing-craft)
+- [routes_to: planning/routing 合同判断](../using-ccm/references/board-model-guide.md#ccm-k-point-ccm-board-planning-routing) <!-- ccm:k:edge edge:slicing-board-landing-to-planning-routing -->
+- [routes_to: SDD 适用性判断](../engineering-with-craft/references/sdd.md#ccm-k-point-sdd-admission) <!-- ccm:k:edge edge:slicing-board-landing-to-spec-admission -->
 - [contrasts_with: 切分反模式速查](./SKILL.md#ccm-k-point-slicing-antipatterns) <!-- ccm:k:edge edge:slicing.board-to-anti -->
 - [routes_to: 纵切不要横切硬规则](./SKILL.md#ccm-k-point-slicing-vertical-rule) <!-- ccm:k:edge edge:slicing.board-to-vertical -->
 <!-- ccm:k:nav:end -->

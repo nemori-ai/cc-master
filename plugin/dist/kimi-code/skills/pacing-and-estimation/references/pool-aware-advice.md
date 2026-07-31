@@ -15,7 +15,7 @@
 | `pacing_yield` | 本板当前 burn 高于加权目标；把 `delta_headroom_pct` 作为应让出多少 headroom 的强度输入，并列出 WIP、模型档和 high-float 对 burn 的影响供编排决策层取舍。 |
 | `pacing_claim` | 本板低于加权目标，且同池存在超额 peer；own row 显示正 headroom 空间。 |
 | `pacing_throttle` | 没有明确 sibling 可 claim，或全池压力已达到 throttle 区间。 |
-| `pacing_switch` | 引擎提出 host-specific 重 lever 候选；它不是账号 mutation 授权，禁止自动换号的 host 仍保持禁止。 |
+| `pacing_switch` | 引擎给出的容量层候选，消费方是后台统一管控、不是你；你不因此获得换号这个动作，禁止自动换号的 host 仍保持禁止。 |
 | `pacing_stop` | 全池到 stop 边界；输出 stop 强度、reset 事实和用户决策边界，具体编排动作查 `master-orchestrator-guide`。 |
 | `hold` | 没有 durable 通知，容量压力未触发。 |
 

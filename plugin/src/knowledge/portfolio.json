@@ -812,7 +812,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -832,7 +832,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -852,7 +852,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -872,7 +872,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -932,6 +932,9 @@
     "inventory_max_tokens": 131072,
     "min_internal_cohesion": 0.1,
     "max_external_edge_count": 0,
+    "external_edge_policy": {
+      "allowed_types": ["contrasts_with", "routes_to"]
+    },
     "max_overlap_shared_modules": 2,
     "require_ssot_closure": true,
     "require_four_host_denominator": true,

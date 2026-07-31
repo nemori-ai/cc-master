@@ -8,18 +8,18 @@
   "intent": "把目标切成纵切薄增量 DAG：walking skeleton、粒度、价值风险排序与 board 落地。",
   "consumes": {
     "modules": [
-    {
-      "id": "module:slicing.vertical",
-      "manifest": "plugin/src/knowledge/graph/modules/slicing.vertical.json"
-    },
-    {
-      "id": "module:slicing.craft",
-      "manifest": "plugin/src/knowledge/graph/modules/slicing.craft.json"
-    },
-    {
-      "id": "module:slicing.example",
-      "manifest": "plugin/src/knowledge/graph/modules/slicing.example.json"
-    }
+      {
+        "id": "module:slicing.vertical",
+        "manifest": "plugin/src/knowledge/graph/modules/slicing.vertical.json"
+      },
+      {
+        "id": "module:slicing.craft",
+        "manifest": "plugin/src/knowledge/graph/modules/slicing.craft.json"
+      },
+      {
+        "id": "module:slicing.example",
+        "manifest": "plugin/src/knowledge/graph/modules/slicing.example.json"
+      }
     ]
   },
   "entry_modules": [
@@ -39,7 +39,44 @@
         "point:slicing.board-landing",
         "point:slicing.antipatterns"
       ],
-      "reviewed_unbound_sha256": "aa31155d72a27093d0bbc30bf5e8f7fe455ac25ff27cb732afc7ee12135be0c8"
+      "reviewed_unbound_sha256": "aa31155d72a27093d0bbc30bf5e8f7fe455ac25ff27cb732afc7ee12135be0c8",
+      "reconciliations": [
+        {
+          "point": "point:slicing.antipatterns",
+          "point_sha256": "0acbbe07dfd31643f87ff079782362b44bf57c9beefc937dc05ec54d2ddc2ba7",
+          "passage_sha256": "b44758f6fe9d55352cfd9b513c9b15969cd3570718a158b199534ec455abb56c"
+        },
+        {
+          "point": "point:slicing.board-landing",
+          "point_sha256": "2724ec31929bab008bb660eca5b0f47e6e73164e67788e13466b9fb9b282602a",
+          "passage_sha256": "1ddcc71b23434f2ecbfafad3e0dc346565894e8d479f95970dfb62775ab70a30"
+        },
+        {
+          "point": "point:slicing.grain",
+          "point_sha256": "5785584a4aaa787cc9c06c81eb151de3c1d71fe46aaf73b7701e1f80998145cd",
+          "passage_sha256": "2ad683d769c6bf263cb8751884089264a9df8a497c0d23f6fa27886b2876f78e"
+        },
+        {
+          "point": "point:slicing.value-risk",
+          "point_sha256": "85f6c23dddb2f34c125a8366c054a7ae43152e30dbc0b57d671c73c1525359e8",
+          "passage_sha256": "75e7c8e12857dcd54cf5beafe868acbdcd7e03bdb76a6027c88bb96e9480f353"
+        },
+        {
+          "point": "point:slicing.vertical-rule",
+          "point_sha256": "14be5c988fd1837b846d3d9e348a8ac1fec9848f262d9a253e0fead45f5a060d",
+          "passage_sha256": "8c3e2f28d6d691615861fdee2b7ff52001877302111cb02cf9194d803e7f2ded"
+        },
+        {
+          "point": "point:slicing.walking-skeleton",
+          "point_sha256": "8d3433741bcc6dee43026042dae4ea496fdfb394c742d6f87a5ceb8d991dba9b",
+          "passage_sha256": "8d3433741bcc6dee43026042dae4ea496fdfb394c742d6f87a5ceb8d991dba9b"
+        },
+        {
+          "point": "point:slicing.why-cut",
+          "point_sha256": "880b99b6a42fc479790da2706212c631150a1f887a97451f3141c87c028d3c42",
+          "passage_sha256": "880b99b6a42fc479790da2706212c631150a1f887a97451f3141c87c028d3c42"
+        }
+      ]
     },
     {
       "path": "plugin/src/skills/slicing-goals-into-dags/canonical/references/worked-example.md",
@@ -47,7 +84,14 @@
       "point_ids": [
         "point:slicing.example-contrast"
       ],
-      "reviewed_unbound_sha256": "0a5c9a79f0a954f17683ca9923011bc4df43769c84a89c4379a8cb65687db056"
+      "reviewed_unbound_sha256": "0a5c9a79f0a954f17683ca9923011bc4df43769c84a89c4379a8cb65687db056",
+      "reconciliations": [
+        {
+          "point": "point:slicing.example-contrast",
+          "point_sha256": "2b4f33a07e6f37861c464e5ceeb8d6e24d5876b3cb224f49a140d9fc6c6922ea",
+          "passage_sha256": "2b4f33a07e6f37861c464e5ceeb8d6e24d5876b3cb224f49a140d9fc6c6922ea"
+        }
+      ]
     }
   ],
   "host_coverage": [

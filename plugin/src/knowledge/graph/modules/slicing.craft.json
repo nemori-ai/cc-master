@@ -58,7 +58,7 @@
         "一次定全地基"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.walking-skeleton.md",
         "marker": "point:slicing.walking-skeleton",
         "heading_hint": "心智锚 2"
       },
@@ -95,7 +95,7 @@
         "大爆炸节点"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.grain.md",
         "marker": "point:slicing.grain",
         "heading_hint": "心智锚 3"
       },
@@ -131,7 +131,7 @@
         "先做哪片"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.value-risk.md",
         "marker": "point:slicing.value-risk",
         "heading_hint": "心智锚 4"
       },
@@ -167,7 +167,7 @@
         "怎么写进 board"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.board-landing.md",
         "marker": "point:slicing.board-landing",
         "heading_hint": "落到 board"
       },
@@ -203,7 +203,7 @@
         "对照切坏了没有"
       ],
       "binding": {
-        "path": "plugin/src/skills/slicing-goals-into-dags/canonical/SKILL.md",
+        "path": "plugin/src/knowledge/points/slicing.antipatterns.md",
         "marker": "point:slicing.antipatterns",
         "heading_hint": "anti-pattern"
       },
@@ -510,6 +510,102 @@
           {
             "kind": "golden",
             "ref": "golden.edge:slicing.board-to-vertical"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing-value-risk-not-dispatch-order",
+      "type": "contrasts_with",
+      "from": "point:slicing.value-risk",
+      "to": "point:scheduling.dag-and-critical-path",
+      "when": [
+        "几片同时 ready，要决定先派哪一片"
+      ],
+      "avoid_when": [
+        "还在决定怎么切，硬先后关系尚未成形"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "slicing-goals-into-dags/canonical/SKILL.md：硬先后用 --deps 编码，同为 ready 时先派哪片是 dispatch 决策"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.slicing-value-risk-not-dispatch-order"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing-board-landing-to-spec-admission",
+      "type": "routes_to",
+      "from": "point:slicing.board-landing",
+      "to": "point:sdd.admission",
+      "when": [
+        "共享脊椎片的验收要回答「这根线的最小设计先确认过了吗」"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "slicing-goals-into-dags/canonical/SKILL.md：命中「值得 SDD」的场景（跨边界合约 / 多方消费者）时"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.slicing-board-landing-to-spec-admission"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing-board-landing-to-planning-routing",
+      "type": "routes_to",
+      "from": "point:slicing.board-landing",
+      "to": "point:ccm.board.planning-routing",
+      "when": [
+        "切完的片近期要交给 agent，需要留下可路由画像"
+      ],
+      "path_role": "route",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-28"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "slicing-goals-into-dags/canonical/SKILL.md：写入 board 的 opt-in planning/routing contract"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "projection",
+            "ref": "authored-nav.slicing-board-landing-to-planning-routing"
           }
         ]
       }

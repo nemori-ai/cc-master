@@ -1,63 +1,73 @@
-# Cost decisions —— 换号 lever 的编排决策锚
+# 容量边界 —— 配额烧穿时你能做什么、不能做什么
 
-> **何时读：** 轻 lever（降档 / 降 WIP / 推迟 float）用尽、一份配额本窗口真要烧穿、而你还握着未消费备号时，要拍「换不换号、谁授权」这个**决策**。
-> **这是决策锚，不是机制手册。** 换号**决策**（何时换、谁拍板、policy 授权、绝不自授权）归这里（master-orchestrator-guide）；换号**消费**（怎么读 `ccm usage advise` 的 `switch_candidate`、effective-N 缩放节奏）归 `pacing-and-estimation`；换号**机制**（`ccm account switch` 怎么切、policy 硬闸怎么 exit 7、vault token 安全）归 `using-ccm`（`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md` + `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md`）+ ccm `account` 引擎。本文只立编排须知、单向引用机制（渐进式披露、不复述）。
+> **何时读：** 选定 target 的配额窗口逼近硬边界，你在盘算「还能怎么把活干下去」；或者你收到一条「账号已切换」的背景通报，不确定要不要做点什么。
+> **一句话结论：** 同一份配额之内的腾挪归你；**换哪份配额不归你**。后者由后台的容量管控层在整机范围统一决定。
+> 同一份配额内怎么读信号、怎么缩放节奏，见 `${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/SKILL.md`；用户直接命令你换号时那条命令怎么敲，见 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md` 的 namespace account。
 
-## 换号 lever —— 最重的一根（本窗口真烧穿 + 还有备号）
+## 换号不在你的 lever 清单里
 
-<a id="ccm-k-point-capacity-account-switch-gate"></a>
-<!-- ccm:k:start point:capacity.account-switch-gate -->
-减速侧轻 lever（降档 / 降 WIP / 推迟 float）在**同一份配额内**腾挪、不换底层容量。当一份配额真要在本窗口烧穿、而你手上还握着**未消费的备号**（effective-N>1、`ccm usage advise` 的 `switch_candidate` 非空）时，有一根**最重的 lever**：**切到下一份配额（换号），把整张 board 续过去继续跑。** 怎么读 `switch_candidate` / effective-N 的消费见 `pacing-and-estimation` skill；这里管「读完之后该不该切」。
+<a id="ccm-k-point-capacity-switch-is-not-your-lever"></a>
+<!-- ccm:k:start point:capacity.switch-is-not-your-lever -->
+配额吃紧时，你手上的 lever 全都落在**同一份配额之内**：降模型档、降并发上限、把高 float 的任务往后推。这些都是在既有容量里腾挪。
 
-> **换号前必先过 board-policy 闸。** 在拍「要不要换号」之前，先确认这块板**是否被授权自主换号**：读 `ccm policy show --json` 的 `.data.effective.autonomous_account_switch`（缺省 = `allow`，向后兼容旧板）。
-> - **`deny`** → **绝不自主换号**。把「是否授权这块板自主换号」当成一个 `blocked_on:"user"` 决策 surface 给用户、等用户拍板，绝不擅自切。
-> - **红线『绝不自授权』**：你**绝不**自己 `ccm policy set --autonomous-account-switch=allow --user-authorized` 去给自己放权——那是 self-grant，与擅自 merge 同属越权（policy 写是用户所有，非 TTY 须 `--user-authorized`，那个标记只该由用户给）。改 policy 的决策永远归用户。
-> - 机制层另有一道**硬闸兜底**（`ccm account switch` 在覆写凭证前也读 board.policy、`deny` 即拒并 **exit 7** + best-effort 往 board.log 记一条 decision）——它是**纵深防御的安全网、不是许可绕过**：它存在不代表你可以省掉建议层这道判断，更不代表 `allow`-fail-open 时就该随手切（切不切仍要过下面的 lever 阶梯 + 用户拍板纪律）。机制细节单向引用 `using-ccm`（`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md` + `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md` 的 `account switch`），本文不复述。
+**「换到下一份配额」不在你的 lever 清单里。** 当前用哪份配额，由后台的容量管控层在机器范围内统一决定——切换覆写的是本机的登录凭证，一切全机所有会话一起切，不是任何一块看板能局部拍的事。因此：
 
-> **lever 阶梯——换号永远排在最后。** 先用尽所有轻 lever（降档 / 降 WIP / 推迟高 float），只有当「本窗口的真实容量确实不够装完该装的活、**且** effective-N 仍有未消费余号、**且** board-policy 授权自主换号（见上）」时才上换号。换号现在是**无重启的凭证覆写**（`ccm account switch` 覆写官方共享凭证、运行中 claude 惰性 re-read 接管新号·见下），比从前的「exec 重启 + handoff」轻得多、无 session 边界、无上下文丢失风险——但它仍是**换底层容量**的动作（不是同一份配额内腾挪），故仍排在轻 lever 之后、不是日常节流手段。**7d≥85% 总闸下尤其注意**：换号会刷新新号的 7d 窗，所以它是「7d 逼顶 surface 给用户的那个决策」里**用户可选的一个响应**（与「暂停续耗」并列）——但**切不切由用户拍**（同 7d 总闸纪律 + merge 越权），编排器 surface 选项、不擅自跨这条不可逆消耗边界。
+- 你**不判断**「该不该换号」；
+- 你**不执行**切号命令；
+- 你**更不去**改任何能让自己获得这项权限的开关。授权类标记只由用户给，自己给自己签发就是越权。
 
-> **切换前/后注意事项（拍板前必权衡的约束）。** 换号不是免费的——surface 给用户拍板时，你该知道这几条真实约束（机制细节单向引用 `using-ccm`，本文只立编排须知）：
-> - **覆写的是全局登录**：switch 覆写 `$USER` 视角的官方共享凭证三存储 → **本机所有 claude session 一起切到新号**（不只本编排）。这是好处（pacing 口径变准）也是必须知道的副作用——多 session 并跑时换号会连带把别的 session 也切过去。
-> - **旧 blob 会失效、需重录**：号池里早期版本 / 旧写法录的 blob 可能已失效，换号会因此**硬失败**（提示重跑 `ccm account refresh <email>` 重录完整 blob）——这是个该 surface 给用户的失败模式，不是静默放弃。
-> - **死依赖 refreshToken 续期**：keychain 里的 access token 仅 ~8h，换号靠 refreshToken 主动续期接管；**refresh 失效则换号硬失败**。故备号必须是**真 `/login` 走完整 OAuth 录的**（`claude setup-token` 铸的 headless token 结构上无 refreshToken、换不进——一句指针，机制见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md`）。
-> - **惰性 pickup**：运行中 claude 在 access token 临近过期才 re-read 被覆写的存储、接管新号（非立即）。
+**唯一的例外是用户直接命令你换号。** 那时照他说的执行，执行完把结果回报给他——这是在替用户跑一条命令，不是你自己做了一个容量决策，也不会因此获得下一次自行决定的资格。
 
-<!-- ccm:k:end point:capacity.account-switch-gate -->
-<!-- ccm:k:nav:start point:capacity.account-switch-gate -->
+配额真的到了边界、而后台没有替你续上时，正确动作只有一个：**停止派发新工作，把「哪份配额已到边界、最近的恢复时刻是什么时候、用户有哪些选项」作为一个等待用户拍板的阻塞项摆出来，然后等。** 等待不是失败；擅自扩容才是。
+
+> **越顺耳的论证越要停。** 「池子里明明还有备号」「默认本来就是允许的」「就切这一次，活干完就不动了」「用户肯定希望我别停」——这类话把一个全机生效、连带影响别人正在跑的会话、消耗用户真实资源的动作，包装成一次无害的本地优化。你越强，编出的理由越像样，而理由像样恰恰是它最危险的地方。判据很硬：这个动作的作用域超出你这块看板，就不归你拍。
+<!-- ccm:k:end point:capacity.switch-is-not-your-lever -->
+<!-- ccm:k:nav:start point:capacity.switch-is-not-your-lever -->
+Knowledge navigation:
+- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
+- [Module module:capacity.account-switch](./cost-decisions.md#ccm-k-module-capacity-account-switch)
+- [routes_to: policy 硬闸 + vault/token-blind](../../using-ccm/references/account-pool.md#ccm-k-point-ccm-account-policy-vault) <!-- ccm:k:edge edge:account-switch-gate-to-policy-vault -->
+- [routes_to: 决策影响向量](../../pacing-and-estimation/references/pacing-levers.md#ccm-k-point-pacing-decision-vectors) <!-- ccm:k:edge edge:account-switch-gate-to-decision-vectors -->
+<!-- ccm:k:nav:end -->
+**你手上真正能动的那几根**，以及怎么按信号选，见 `${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/references/pacing-levers.md`。配速建议里出现的账号候选字段是**引擎侧的机器事实**，喂给后台容量层用的，不是发给你的换号许可。
+
+## 后台换号之后
+
+<a id="ccm-k-point-capacity-post-switch-continuity"></a>
+<!-- ccm:k:start point:capacity.post-switch-continuity -->
+后台换过账号之后，你会收到一条背景通报说「账号已切换」。它是**既成事实的告知**，不是派给你的活。
+
+你要做的只有一件：**让配速模型跟上**——旧那份配额的读数就此作废，按新账号的读数重新判断能装多少活。
+
+你**不需要**做的：重建看板、重派在飞的任务、把已经完成的工作再验一遍。切换是无重启的凭证覆写——进程没换、会话没换、看板一字未动；已派出去的后台作业句柄不失效，在飞的工作继续跑，照常在端点回收。**账号换了，目标没忘。**
+
+也别把这条通报读成「换号是可用手段」的证据。它证明的是**容量层有人在管**，不是你新拿到了一根 lever。
+<!-- ccm:k:end point:capacity.post-switch-continuity -->
+<!-- ccm:k:nav:start point:capacity.post-switch-continuity -->
 Knowledge navigation:
 - [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
 - [Module module:capacity.account-switch](./cost-decisions.md#ccm-k-module-capacity-account-switch)
 <!-- ccm:k:nav:end -->
-## 编排决策序列（无重启形态，4 步）
+## 用户直接命令你换号时
 
-<a id="ccm-k-point-capacity-account-switch-sequence"></a>
-<!-- ccm:k:start point:capacity.account-switch-sequence -->
-机制 SSOT 在 ccm `account` 引擎 + `using-ccm`——本文只留**编排决策序列**：
+这是本页唯一让你碰账号的场景。执行、回报，就结束——不要顺势把它变成一条你以后可以自己走的路。
 
-1. **探测 + policy 闸** —— 在 pacing 决策点读 `ccm usage advise --json`：触发 = `verdict==="switch"`（= 5h 临界 + n>1 + 7d 有余量 + `switch_candidate` 非空）。**先过 board-policy 闸**（见上）：`ccm policy show --json` 的 `autonomous_account_switch==deny` → 不自主换号，把授权问题 surface 给用户（绝不自授权）。注：`usage-pacing.js` hook 在 `switch` + policy=allow 下已**机械换号**（切号执行归 hook·你只在事后调配速）；这里的编排决策只在 hook 未自动切（policy=deny / 全池逼顶 / 多板歧义）时接管。
-2. **拍板** —— 选号是机械的（ccm `account` 引擎按各号配额恢复度选最优切入号，即 `usage advise` 的 `switch_candidate`），但**切不切由用户拍**——尤其全员逼顶必 surface 给用户、绝不盲切（对齐 7d 总闸纪律，是 `blocked_on:"user"` 决策）。
-3. **切（机制归 using-ccm / ccm 引擎）** —— 跑 `ccm account switch`：续期新号 → 覆写官方共享凭证三存储（`$USER` 视角·原子写·全或无回滚）→ 翻 registry `active`。token 全程经 vault 读 / refresh POST body / 三存储写，**绝不进 agent / 绝不进 registry**（机制 / 失败模式 / token 安全见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md`）。
-4. **续跑** —— claude 进程惰性 re-read 接管新号后照常推进；board 没动、整张 DAG 没忘。账号切了，目标没忘。无重启凭证覆写**不换进程、不换 session**——所以从前那套「换号前 drain 在飞 / 带飞切后孤儿 reconcile」**不再需要**：sub-agent / workflow 的 handle 不失效、board 连续性锚 `owner.session_id` 不变，在飞工作继续跑、照常在端点回收。
-
-> **ship-anywhere**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hook 层**。
-<!-- ccm:k:end point:capacity.account-switch-sequence -->
-<!-- ccm:k:nav:start point:capacity.account-switch-sequence -->
-Knowledge navigation:
-- [Knowledge atlas](../SKILL.md#ccm-k-skill-master-orchestrator-guide)
-- [Module module:capacity.account-switch](./cost-decisions.md#ccm-k-module-capacity-account-switch)
-<!-- ccm:k:nav:end -->
+- 命令怎么敲、参数什么含义：`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md` 的 namespace account。
+- 号池是怎么回事、凭证为什么全程不经你手：`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md`。
+- 有两类**硬失败**该直接回报用户、不要静默吞掉：备用号的凭证已失效需要重录；以及机制层的开关处于禁止状态、命令被拒。两者都是用户要知道的事实。
+- 只在订阅口径下才有换号这回事。走云端后端的部署没有订阅配额窗口，这条命令自然无从谈起。
 
 <!-- ccm:k:generated -->
-## 账号切换决策锚
+## 换号不归编排器
 
 <a id="ccm-k-module-capacity-account-switch"></a>
 
-仅在订阅账号池语义存在时守住换号 lever 的授权 gate 与切后重验序列。
+守住「哪份配额在用由后台机器层统管、编排器既不决策也不执行」这条边界，并说明后台切换发生后编排器该做与不该做什么。
 
 ## Member points
 
-- [换号 lever 授权 gate](./cost-decisions.md#ccm-k-point-capacity-account-switch-gate)
-- [换号决策序列](./cost-decisions.md#ccm-k-point-capacity-account-switch-sequence)
+- [后台换号后的连续性](./cost-decisions.md#ccm-k-point-capacity-post-switch-continuity)
+- [换号不在你的 lever 清单里](./cost-decisions.md#ccm-k-point-capacity-switch-is-not-your-lever)
 
 ## Back to atlas
 
