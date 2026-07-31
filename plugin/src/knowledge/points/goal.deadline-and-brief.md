@@ -30,15 +30,13 @@ ccm goal deadline confirm --board <board> --user-authorized        # asserted/pe
 ccm goal deadline confirm-none --board <board> --user-authorized    # 用户确认无 DDL → none（持久·不再追问）
 ```
 
-5. **DDL / no-DDL 确认完成后**，`goal check` 才返回 `ok`（而非 `deadline_pending`）→ 进入 DAG 拆解与派发。命令面细节与字段取值归 `using-ccm`。
+5. **DDL / no-DDL 确认完成后**，`goal check` 才返回 `ok`（而非 `deadline_pending`）→ 进入 DAG 拆解与派发。
 
 ### Resume / legacy / 已过期
 
 - **resume**：保留原 DDL 与确认状态、**不重置**。但恢复执行前**补做一次 DDL / no-DDL 确认 + 一次 deadline-risk 刷新**，绝不沿用上个 session 的陈旧绿 verdict。
 - **legacy board**（无 `goal_contract` / 无 deadline 键）：可读、可续跑、不因 schema 演进失效。`goal set` 激活 contract 后可 `goal deadline set` 补 DDL；恢复执行前补一次 DDL / no-DDL 确认。
 - **已过期 DDL**（`state ∈ {asserted, confirmed}` 且 `now >= at` 且目标未完成）：**不当普通 resume 处理**。先向用户报告当前状态、剩余交付物、可选方案，再由用户决定**延期 / 缩范围 / 分阶段交付 / 终止**——延期走 `ccm goal deadline amend --board <board> --at <新 ISO> --reason "<why>" --user-authorized`，缩范围走 `ccm goal amend`，**均不静默**。deadline 的 amend 不改 `goal_contract.revision`（延期不是 scope 变更）。
-
-DDL 一旦在场，它落到你排期 / 范围控制 / 风险升级 / 收口决策上的九条纪律见 `references/deadline-discipline.md`。
 
 ## 什么时候必须写 Goal Brief
 
@@ -54,5 +52,18 @@ ccm goal check --board <board> --json
 ```
 
 Goal Brief 至少包含：Outcome；背景与需求证据指针；in-scope / non-goals；验收标准；约束；用户权限边界；未决问题；评审与交付形态。不要写 token、凭证、个人信息等秘密。board 只保存相对 `ref` 与 `sha256`；Brief 文件在 `$CC_MASTER_HOME/goals/`，由 `ccm goal show` 给出真实路径。旧 revision 只读，绝不覆盖。
-
 <!-- ccm:k:end point:goal.deadline-and-brief -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后模型仍知道该用哪些命令设置/确认 DDL，但真撞上"已过期还没交付"这一刻，会更倾向于自己权衡后悄悄顺延或缩范围继续往下做，而不是先停下来把现状、剩余交付物和可选方案摆给用户来拍板。
+
+主体是 deadline 四态状态机、字段位置、ccm verb 语法与 Goal Brief 的落盘约定，全是本工具的具体事实。
+
+## 边界
+
+只在目标已进入这套显式 DDL 合约的形态后才生效——没有该合约的旧目标继续可读可续跑，不因缺 deadline 被判定失格，直到显式激活合约那一刻起，识别/确认 DDL 的义务才开始约束你。
+
+## 失败形态
+
+最隐蔽的违反不是忘了设 DDL，而是撞上过期还继续往前冲——自己权衡后直接顺延或缩范围继续派任务，事后才在总结里补一句超期说明；过程中 board 照常流转、日志照写，看起来一切正常，但那次本该用户拍板的决定从头到尾没有真正问过用户。

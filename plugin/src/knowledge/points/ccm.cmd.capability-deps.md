@@ -110,3 +110,9 @@ qualification 与 diagnostic codes；不持久化布尔。显式 edge 一律先�
 ---
 
 <!-- ccm:k:end point:ccm.cmd.capability-deps -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 的 capability/target/delivery/dependency namespace 的具体命令、flag、机制，模型会按旧或不完整理解调用，撞 exit 3 或语义误解
+
+capability/target/delivery/dependency 四个 namespace 的稳定 id、verb 形态与 exit code 是本项目接口清单。

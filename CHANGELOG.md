@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Account switching is no longer presented to the orchestrator as a lever it
+  may pull.** Which quota is in use is decided by the background capacity layer
+  across the whole machine; an orchestrator neither judges nor performs a
+  switch. When quota reaches its boundary it stops dispatching and surfaces the
+  boundary, the nearest reset and the user's options as a blocking decision.
+  The one exception is a direct user instruction — carried out and reported
+  back, and explicitly not a licence to decide next time.
+  `master-orchestrator-guide`'s `references/cost-decisions.md` was rewritten
+  around that boundary, and `using-ccm` now frames
+  `board.policy.autonomous_account_switch` as the user's switch for *background*
+  automatic switching rather than as a grant of agent autonomy. The field, its
+  default, its authorization flag and the engine's hard gate are unchanged.
+
 ### Added
 
 - `master-orchestrator-guide` gains a new on-demand reference,

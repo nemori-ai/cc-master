@@ -21,3 +21,17 @@ point: verification.hash-and-stale
 ---
 
 <!-- ccm:k:end point:verification.hash-and-stale -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后不会想到把动态 workflow 当增量构建引擎处理——续跑时要么全量重跑、要么只凭表面判断「看起来做完了」就跳过，而不会用 content-hash 判定复用、用端点验收结果当作缓存有效性的校验点。
+
+主体是把 workflow 当增量构建引擎的 content-hash / journal / stale 心智模型与机制设计。
+
+## 边界
+
+对不可重复执行的外部副作用（发一封邮件、扣一笔款、触发一次外部通知）——缓存有效性没法靠重新验证来查，因为重新验证本身就是再执行一次副作用；这类节点只能靠一条已落地的回执记录判定，而不是靠重跑校验闸。
+
+## 失败形态
+
+一个节点的产物存在、journal 里也有记录，但那条记录是在上游输入还没变化前写的旧 hash——校验时只看「存在 journal 条目」就判它 done，没有重新对比当前 hash 与记录里的 hash 是否一致，一个早已 stale 的节点被当成仍然有效而被跳过。

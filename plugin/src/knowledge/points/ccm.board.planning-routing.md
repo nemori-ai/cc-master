@@ -116,3 +116,9 @@ ccm task update T8 --executor subagent
 ---
 
 <!-- ccm:k:end point:ccm.board.planning-routing -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 这是 planning/routing 合同的字段表、枚举值、JSON schema 与命令写入顺序的接口转录,删掉后 agent 无法凭通用推理还原这些具体事实,只会写出撞 ccm 校验或漏字段的 profile/policy。
+
+主体是 task-planning/agent-routing 两个 schema 的字段全集、合法值与 activation 写入顺序。

@@ -20,7 +20,7 @@ point: ccm.board.task-fields
 
 **为什么 id/status/deps/parent 是 🔒？** 这四个字段被 hook、图算法、readySet、lint 机器读取。手改绕过写关卡，会造成悬挂引用、环、lint 拦不住的非法态转移——后果是 board 说谎，所有下游消费者（viewer / resume / hook）沿着错误输入跑。**这正是为什么 board 变更根本不给手改的路**：{{USING_CCM_BOARD_GUARD_GUIDANCE}}
 
-> `--set tasks[T1].status=done` 和裸 `--set status=done`（task verb 语境）都会被 🔒 守门拒（exit 3）。status 永远走 verb（锚 2·SKILL.md）。
+> `--set tasks[T1].status=done` 和裸 `--set status=done`（task verb 语境）都会被 🔒 守门拒（exit 3）。status 永远走 verb。
 
 ### ✎ flexible 字段
 
@@ -93,10 +93,15 @@ point: ccm.board.task-fields
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
 - `owner.harness`——当前 board 所属 harness 的观察字段，取值 `claude-code | codex | cursor | kimi-code | unknown`。它**不是武装闸**：hook arming 仍只看 `owner.active` + `owner.session_id`；`owner.harness` 只给 `ccm peers` / 后续池中介做配额池分区。ARM 时 bootstrap 通过 `ccm board stamp-harness` 从当前进程 env 的可信 harness detect 盖写；无可信 env 时不写、不覆盖已有值。缺失或坏值都按 `unknown` 降级；`ccm peers` 会把 unknown board 放进单例池，避免跨 harness 或不明来源 board 混排。坏值→`FMT-HARNESS` warn。
 - `agents`——**运行时 agent 登记簿**（✎ 非窄腰·hook 不读），跨所有派发类型的统一花名册：凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）皆登记。手工登记只用 `ccm agent create / bind / link / terminal / probe` 写、`ccm agent list / show` 读、`ccm agent amend / rm` 事后修正；跨 harness 同步 tracked transport 可用 `ccm worker dispatch` 经专用 repository 原子写该 agent 自己的 `dispatch/handle/lifecycle/links`。两条路径都别用 `--set-json` 手拼（会绕过状态机校验、handle 证据闸与幂等 link）。缺 → 无登记（花名册空）；形状坏 → `FMT-AGENTS` warn；`in_flight` task 无登记指向 → `BIZ-INFLIGHT-AGENT` warn 软提示。概念与字段取值见 [C.6 节](#c6-agents运行时-agent-登记簿)。
-- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（多数是 ISO-8601 UTC 时间戳·一个是任意非空字符串指纹）：`last_identity_remind`（周期身份提示 hook 读它判阈值·ISO）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值·ISO）、`last_goal_remind`（Goal Contract 对齐提示判阈值·ISO）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient·ISO）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻·ISO）、`last_deadline_risk_check`（交付 DDL 风险 hook 上次重估时刻·判周期重估阈值·ISO）、`last_deadline_risk_fingerprint`（交付 DDL 风险 hook 上次 risk-input 指纹·非空字符串·判 verdict/driver/bucket 是否变化以去重节流·**不是时间戳**）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 / 字符串键传空值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
+- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（多数是 ISO-8601 UTC 时间戳·一个是任意非空字符串指纹）：`last_identity_remind`（周期身份提示 hook 读它判阈值·ISO）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值·ISO）、`last_goal_remind`（Goal Contract 对齐提示判阈值·ISO）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient·ISO）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻·ISO）、`last_deadline_risk_check`（交付 DDL 风险 hook 上次重估时刻·判周期重估阈值·ISO）、`last_deadline_risk_fingerprint`（交付 DDL 风险 hook 上次 risk-input 指纹·非空字符串·判 verdict/driver/bucket 是否变化以去重节流·**不是时间戳**）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 / 字符串键传空值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
 
 ---
-
 <!-- ccm:k:end point:ccm.board.task-fields -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道哪些字段走 --set 会被拒 exit 3（load-bearing）、哪些 read-only、哪些 flexible 可写，试错成本高。
+
+主体是 task 三档字段（锁定/灵活/观察）各自的名字、写口与缺失行为，纯本项目接口速查。

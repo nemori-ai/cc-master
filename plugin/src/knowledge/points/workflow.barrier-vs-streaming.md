@@ -46,3 +46,17 @@ const c = await parallel(b.map(...))
 最快的 3 倍时，barrier 白白浪费掉那几个快 finder 三分之二的空闲时间。
 
 <!-- ccm:k:end point:workflow.barrier-vs-streaming -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 不知道两个 primitive 具体的失败语义与形状差异（thunk 数组非 promise、barrier 绝不 reject、pipeline 逐 item 独立流过 stage），会把它们当成等价选项互换使用，造成不必要的等待或漏判空槽位。
+
+主体是本 runtime 两个 primitive 的语义差异（parallel 收 thunk、绝不 reject、返回槽位有 null；pipeline 无 barrier、stage 回调签名），不知道这些就写不对脚本。
+
+## 边界
+
+只在判断该用哪个 primitive 时适用；已经确定用某一个之后，如何组织具体 stage 内部逻辑不受这条约束。
+
+## 失败形态
+
+代码结构上用了流式而不是 barrier，看起来『选对了』，但某个 stage 里悄悄攒了一个跨 item 的数组再统一处理——形式上是无阻塞流式，实质上人为造出了一个隐藏同步点，拿不到本该有的时间收益。

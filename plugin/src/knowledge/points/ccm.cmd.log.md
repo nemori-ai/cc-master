@@ -56,3 +56,9 @@ ccm log list [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.log -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型不知道这个项目里 ccm log 命令的确切 flags、log kind 枚举值和 --detail 字段的约定
+
+log add/list 的 kind 枚举与 flag 名是本工具的具体命令语法。

@@ -20,5 +20,19 @@ ccm provider facts <claude-code|codex|cursor|kimi-code> --json
 
 成本比较也要 target-bound：官方 API price、订阅内 credits、on-demand、BYOK 和未知 payer 不是同一个成本池。缺真实 payer / quota / authorization 时标 unknown，不因为另一个 surface、同品牌账号或宣传价格看起来便宜就补值。
 
-本页只解释事实与不确定性，不决定 executor、route、WIP 或是否发车。排序决策与 ample / tight fallback 回 `master-orchestrator-guide`；命令输入形状查 `using-ccm`。
+本页只解释事实与不确定性，不决定 executor、route、WIP 或是否发车。
 <!-- ccm:k:end point:pacing.model-tier-facts -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型知道三层事实框架，但缺这个项目的具体模型档位表、当前价格、entitlement 和 quota 事实
+
+主体是 ccm registry 查询命令与 hard_facts / project_role_evidence / community_advisory 三层输出的读法，是环境事实。
+
+## 边界
+
+仅用于模型选择、预算分配、capacity planning 决策；不适用于代码实现决策或架构设计（那些用相反的事实源）
+
+## 失败形态
+
+直接引用了内嵌或过时的模型表；把某次 benchmark 的社区共识当硬约束而忽视本项目实际 entitlement；混用不同 payer 的价格做成本比较

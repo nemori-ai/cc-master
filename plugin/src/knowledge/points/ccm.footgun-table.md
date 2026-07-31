@@ -33,3 +33,9 @@ point: ccm.footgun-table
 | 收割完 agent 产出、roster 却还满是 `running` | 收割 / 端点验收掉 agent 产出后要显式 `ccm agent terminal <id> --outcome "..."` 收口——「凡派发皆登记」的对称另一半是「凡收割皆收口」。`agent probe` 只判死活、**永不 →terminal**;不收口 = 永久 `running` 僵尸污染 recon 的 in_flight/phantom 判定(`agent terminal ≠ task done` 只挡正向,不豁免这条反向闭环)。 |
 | 以为批量 `agent terminal` 要一个个小心防锁竞态 | 顺序 bash 背靠背跑多条 `ccm agent terminal`(已知 id)**无 race**——每条各抢一次 O_EXCL board 锁·天然串行。别 `&` 后台并行 ccm 写(争锁 exit 4)。真正要定序的是**单 agent 的 create→bind→link 三连**(bind/link 吃 create 返回的 id·靠数据依赖定序),不是「所有 agent 操作都必须逐个」。 |
 <!-- ccm:k:end point:ccm.footgun-table -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 这是一张现象→项目专属事实的对照表，删掉后模型只能靠现场试错重新踩一遍这些坑，属于缺具体事实做不对，不是缺原理。
+
+主体是「报这个错等于什么真相」的现象-成因对照，全是本项目的具体行为事实。

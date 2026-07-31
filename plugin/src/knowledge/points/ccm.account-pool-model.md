@@ -21,3 +21,17 @@ point: ccm.account-pool-model
 
 **关键不变式：registry 零凭证。** 读到它的任何 agent / 程序都无害（vault 是指针，仍要过 OS keychain 解锁 / 文件 0600 才拿得到 token）。**「指针 vs 值」的分离不是官僚，是让 registry 永远可安全读**：registry 是会被 cat / 贴 bug 报告 / 截图 / 同步 / 误 commit 的台账——token 进去就把每个日常操作变成泄漏面。`base64` / 标 `# sensitive` 都不算缓解（base64 `atob()` 一下就解、不是加密）。token 进 vault，registry 进指针，没有第三条路。
 <!-- ccm:k:end point:ccm.account-pool-model -->
+
+## 失效类型
+
+`environment_fact`（双重性质·方法部分补不回来，它才是承重结构） —— 删除后,agent 在图省事(比如想省一次 keychain 查找延迟)的压力下,会把 token 值本身或做过简单编码的版本直接写进 registry,而不是老实存指针,让 registry 悄悄变成明文凭证台账。
+
+删掉后不知 accounts.json 指针-vs-值模型、registry 字段与零凭证不变式。
+
+## 边界
+
+唯一客观做不到别的的例外是运行环境彻底没有任何安全存储原语(既无 OS keychain 也无带权限控制的本地文件系统),此时存指针方案本身没有落脚点,只能拒绝录号并 surface 给用户,而不是退而求其次把 token 直接摆进 registry。
+
+## 失败形态
+
+registry JSON 里字段名仍叫 vault、结构看起来像指针,但塞进去的值其实是被简单编码(如 base64)过的 token 本身,不是真正指向 keychain/文件的引用——schema 表面完全看不出问题,只有解出该字段的值才会发现它其实是凭证。

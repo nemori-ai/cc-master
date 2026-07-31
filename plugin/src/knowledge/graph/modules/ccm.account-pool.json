@@ -526,9 +526,9 @@
       "id": "edge:ccm-account-vault-not-switch-decision",
       "type": "contrasts_with",
       "from": "point:ccm.account-policy-vault",
-      "to": "point:capacity.account-switch-gate",
+      "to": "point:capacity.switch-is-not-your-lever",
       "when": [
-        "要判断何时换号、谁来授权、能不能自己授权"
+        "要判断配额到边界时编排侧该做什么、为什么换号不归编排器"
       ],
       "avoid_when": [
         "只是要知道号池与凭证在机制上怎么存怎么切"
@@ -545,7 +545,7 @@
         "evidence": [
           {
             "kind": "canonical-prose",
-            "ref": "using-ccm/canonical/references/account-pool.md：机制层只在 deny 时拦下，不替编排做「换不换」的决策"
+            "ref": "using-ccm/canonical/references/account-pool.md：这个字段是后台自动换号的开关，不是给编排 agent 放权"
           }
         ],
         "verifiers": [

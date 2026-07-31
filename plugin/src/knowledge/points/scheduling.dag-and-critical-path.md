@@ -25,7 +25,7 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 
 **agent 任务时长天生不确定**——倾向 **PERT 心态**（留 buffer），别把单点估时当承诺。这也是为什么排期只排当前增量：越远的节点估时越不可信。
 
-**资源决策 —— 把最强资源压临界链**：临界路径上的**难实现**用强模型 + 双 reviewer + 你紧盯；高 float 任务配便宜资源、塞进空隙里跑。这里的「资源」含每节点的**模型档位（model tier）**——各 host 的 family×effort / 相对成本、配额充足与紧张时的选档、以及为何*主线*绝不切模型，全在 `pacing-and-estimation` 的 model-tiers；本文只给「把稀缺档位压临界链」这条排期判断，**不复述档位语义**。
+**资源决策 —— 把最强资源压临界链**：临界路径上的**难实现**用强模型 + 双 reviewer + 你紧盯；高 float 任务配便宜资源、塞进空隙里跑。这里的「资源」含每节点的**模型档位（model tier）**——各 host 的 family×effort / 相对成本、配额充足与紧张时的选档。
 
 ---
 
@@ -50,7 +50,7 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 - **`mixed` / `unit`**（部分 / 全部节点缺时长）→ **只报临界链结构 + 节点数，不报小时级 float / makespan**。补全时间锚后才升级。**别把 unit 态吐的节点数当小时数汇报**——那比心算更误导（伪精确）。
 - **`cycle`**（deps 有环）→ CPM 未定义，先解环。
 
-**时间输入从哪来**——`criticalPath.makespan` 要 measured 才有小时数；要**预测**这片的 ETA / 查进度偏差，用 `ccm estimate`（ETA / 临界路径 / EVM / 风险）+ `ccm baseline`（EVM 计划基线）。**这两者的输出怎么读、forecast / EVM / confidence / 风险该不该信、coverage 低时怎么降低信任——全归 `pacing-and-estimation`，本文不复述**；本文只说：把 estimate 的 ETA / risk 当排期的时间输入，靠数据排程、不靠手感。
+**时间输入从哪来**——`criticalPath.makespan` 要 measured 才有小时数；要**预测**这片的 ETA / 查进度偏差，用 `ccm estimate`（ETA / 临界路径 / EVM / 风险）+ `ccm baseline`（EVM 计划基线）。把 estimate 的 ETA / risk 当排期的时间输入，靠数据排程、不靠手感。
 
 **★何时机器算 vs 何时心算够用（判据锚在拓扑复杂度）**：
 
@@ -59,8 +59,17 @@ CPM（Kelley & Walker, 1959）用确定性时长找出「决定这一片最短�
 
 判据本质：`ccm board graph` 是心算的**廉价升级**（零 token、只读、秒级），触发条件是拓扑复杂度——图复杂到心算会估错时升级机器算，图平凡到一眼看穿时心算够用、跑 CLI 反成镀金。两侧都是错。
 
-**它不是 gate**——「图坏」（缺窄腰 / dep 悬挂 / 成环）时图分析仍只分析 + 报告；合法性闸是 `ccm board lint`（见 `board.md` 的 board lint 段）。owner rollup **一致性这道 gate 仍由 hook 强制**（verify-board Stop 软提醒 + board-lint 的 `GRAPH-ROLLUP` warn），graph 的 `rollup` 只把同一份事实摆给你看当 advisory。
+**它不是 gate**——「图坏」（缺窄腰 / dep 悬挂 / 成环）时图分析仍只分析 + 报告；合法性闸是 `ccm board lint`。owner rollup **一致性这道 gate 仍由 hook 强制**（verify-board Stop 软提醒 + board-lint 的 `GRAPH-ROLLUP` warn），graph 的 `rollup` 只把同一份事实摆给你看当 advisory。
 
 ---
-
 <!-- ccm:k:end point:scheduling.dag-and-critical-path -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后,agent 在复杂拓扑上会过度自信地心算出错误临界链却照常汇报,或反过来在平凡小图上仪式性跑一遍 CLI 制造 busywork——原文明确点名『两侧都是错』。
+
+主体是 DAG/拓扑序/临界路径/float 的排期理论及何时该机器算的判据，属方法框架。
+
+## 失败形态
+
+面对多源多汇的钻石依赖图,直接口头汇报『临界链是 A→B→D→F,大约还要 3 天』,却从没跑过 ccm board graph,这个『3 天』其实是编出来的;或者跑了图分析拿到 weight_source:unit 的结果,却仍把节点数当小时数汇报进度——表面上『用了机器分析』,实质仍是伪造精度。

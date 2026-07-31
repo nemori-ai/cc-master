@@ -214,3 +214,9 @@ ccm board enable-contract [--preflight] [--json]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.board -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 二进制对 board namespace（show、lint、graph 等八个子命令）的具体实现事实
+
+board namespace 的 verb、flag、set-param 白名单键与 enable-contract 写入语义都是本项目 CLI 的具体接口事实，删掉就只能靠猜命令行。

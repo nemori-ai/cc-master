@@ -39,8 +39,8 @@
     "module_count": 8,
     "point_count": 52,
     "internal_edge_count": 107,
-    "external_edge_count": 11,
-    "external_nav_edge_count": 11
+    "external_edge_count": 10,
+    "external_nav_edge_count": 10
   },
   "verdict": "admit",
   "witness": {
@@ -139,9 +139,9 @@
         "files": [
           {
             "path": "plugin/src/skills/using-ccm/canonical/references/account-pool.md",
-            "utf8_bytes": 11112,
-            "lines": 79,
-            "estimated_tokens": 3704
+            "utf8_bytes": 11856,
+            "lines": 82,
+            "estimated_tokens": 3952
           },
           {
             "path": "plugin/src/skills/using-ccm/canonical/references/board-model-guide.md",
@@ -157,19 +157,19 @@
           },
           {
             "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
-            "utf8_bytes": 22549,
+            "utf8_bytes": 22573,
             "lines": 215,
-            "estimated_tokens": 7517
+            "estimated_tokens": 7525
           }
         ],
-        "utf8_bytes": 353279,
-        "estimated_lines": 5349,
+        "utf8_bytes": 354047,
+        "estimated_lines": 5352,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 117760,
+        "estimated_tokens": 118016,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }
@@ -317,8 +317,8 @@
       "module_count": 8,
       "point_count": 52,
       "internal_edge_count": 107,
-      "external_edge_count": 11,
-      "external_nav_edge_count": 11
+      "external_edge_count": 10,
+      "external_nav_edge_count": 10
     },
     "admission_gates": {
       "ok": true,

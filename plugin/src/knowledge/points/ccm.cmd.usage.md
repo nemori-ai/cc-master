@@ -10,7 +10,7 @@ point: ccm.cmd.usage
 `usage` 用全局 `--harness <target>` 下钻一个 selected target 的当前登录态；它不是 machine-wide inventory。
 要一次看本机所有受支持 quota target，先用 `quota status --machine-wide`。全部 usage verb 纯 query / compute，
 不写 board、不切账号、不调 WIP、不启动 worker；信号不可得时 exit 0 + `available:false`。输出携带 source、
-confidence、as-of / freshness 等诚实字段，编排动作归 `master-orchestrator-guide`。
+confidence、as-of / freshness 等诚实字段。
 
 > 信号按 target 绑定：Claude Code `claude-cli` 读当前 5h + 7d，`claude-fable-*-cli` 另有不可相加的独立 7d；Codex `codex-cli` 只把当前 7d 作为
 > hard pacing（实现若仍暴露 5h，只留作 ignored provenance）；Cursor `cursor-ide-plugin` 与
@@ -128,5 +128,10 @@ ccm usage runway [flags]
 - 例：`ccm usage runway` · `ccm usage runway --json`
 
 ---
-
 <!-- ccm:k:end point:ccm.cmd.usage -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm usage namespace 的具体命令、flag、输出形状，模型按旧或部分信息敲命令会踩 exit 0 + available:false 或输出形状猜错
+
+usage 各 verb 的 target 绑定、窗口字段位置与降级取值是本项目的读接口事实。

@@ -58,3 +58,9 @@ typed capability 合并是偏序：只有 `unavailable ≤ supported(同一 cano
 ---
 
 <!-- ccm:k:end point:ccm.board.agents-registry -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后，agent 仍知道“要记录运行时状态”这件事，但不知道这个具体工具的状态机名称、字段与命令，会做错（如重复 create、手填 probe）。
+
+删掉后不知 agents[] 生命周期 verb、handle.kind、probe/terminal 语义等本工具接口。

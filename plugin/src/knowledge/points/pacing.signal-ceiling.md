@@ -20,3 +20,17 @@ point: pacing.signal-ceiling
 - 账户级 pacing 与 per-node observability 正交。task token / duration / tool uses 来自对应后台任务的真实
   telemetry；不要用并发期间的账户级 delta 反推单节点成本。
 <!-- ccm:k:end point:pacing.signal-ceiling -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 这条全是具体字段路径与本系统的信号语义（data.current.* 下的具体键名、accounts[] 不点亮 available 等），模型不可能凭通用知识猜对，删掉就会读错字段或臆造出不存在的绝对 token 分母。
+
+主体是 machine-wide readings 与 usage show 的确切 JSON 路径和字段含义，删掉就会去读不存在的顶层窗口。
+
+## 边界
+
+这条只讲信号「是什么、放在哪、能不能兑现精确承诺」，不讲拿到信号后该怎么决策配速，也不讲某次具体调用是否被授权执行——只提示先读 authorization 字段，不替你做判断。
+
+## 失败形态
+
+表面顺从、实质违反：代码或推理里直接引用 data.five_hour 这类不存在的顶层字段，拿到 undefined 却当成「暂时没有压力」处理而不报错；或拿 used_percentage 反推出一个精确剩余 token 数字做预算承诺，又或用并发期间账户级的百分比变化去归因某一个后台节点的真实消耗。

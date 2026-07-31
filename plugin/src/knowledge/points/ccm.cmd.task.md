@@ -487,3 +487,9 @@ ccm task rm <id> [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.task -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条知识，agent 不知道 ccm task 当下有哪些命令、每个命令的 flag 是什么、怎么组合参数。这不是「概念不知」而是「CLI 易腐事实不知」。
+
+task 各 verb 的 flag、状态机合法转移、native-attempt 契约与批量 lint 语义是本工具的具体接口与机制事实。

@@ -12,3 +12,13 @@ point: verification.loop-convergence
 - **max-rounds 保险丝** —— 每个内层 loop 都必须有保险丝（打到轮数 / 调用上限就停）。没有 loop 可以无界地跑。
 - **dedup-against-seen** —— 把已否决的项目记下来，免得一个被否的选项每一轮又重新冒出来。
 <!-- ccm:k:end point:verification.loop-convergence -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后 agent 在处理分支未知的执行图时,不知道该用带类型的二选一去收敛,可能用一句模糊结论替代,也不会主动加 max-rounds 保险丝和 dedup-against-seen,导致循环可能无界重复劳动。
+
+主体是分支收敛的编排模式（Joiner 结构化二选一、带诊断的 replan、保险丝、dedup），删掉就缺了处理未知分支的方法框架。
+
+## 失败形态
+
+循环确实在跑、每轮都有输出,但 Replan 那侧从没真正携带上一轮的具体诊断(只是空泛的“再试一次”),也没有计数——外形在收敛,实质上是无诊断的裸重试,且没有保险丝防止无界运行。

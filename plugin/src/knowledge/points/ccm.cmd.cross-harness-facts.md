@@ -7,7 +7,7 @@ point: ccm.cmd.cross-harness-facts
 <!-- ccm:k:start point:ccm.cmd.cross-harness-facts -->
 ## 跨 harness 主动查询目标事实
 
-这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → orchestrator 显式选择 raw transport 或 tracked transport**。事实查询与 advice 都不会启动 worker；只有调用者明确执行 `worker run|dispatch` 才会启动。
+这是高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → orchestrator 显式选择 raw transport 或 tracked transport**。事实查询与 advice 都不会启动 worker；只有调用者明确执行 `worker run|dispatch` 才会启动。
 
 ### 1. 发现与目标事实
 
@@ -39,8 +39,7 @@ ccm quota preflight --input <json|@file|-> --json
   `blocking_reasons` 与 owner receipt；缺 authority reference、`automatic_spawn_limit:0` 或任一 blocker 都
   不能授权 spawn。`preflight` 只重验已有 authority evidence，不会现场查询某个 harness 的剩余额度，也不会创建 observation/reservation；不要由 caller 自铸 live / policy / effect 结论。
 - 这些命令只取得和重验事实，不代替 orchestrator 的选择、用户对一次付费调用的授权或 parent 验收。
-  字段如何解释查 {{CROSS_HARNESS_TARGET_FACTS_POINTER}}；是否派发归
-  `master-orchestrator-guide`。
+  字段如何解释查 {{CROSS_HARNESS_TARGET_FACTS_POINTER}}。
 
 ### 2. advise 与显式 dispatch
 
@@ -64,5 +63,10 @@ ccm worker dispatch --board /abs/run.board.json --harness <codex|claude-code|cur
 若选择 `worker run` 承载长时 worker，**后台 handle 来自 origin harness**：必须由 origin harness 的后台 terminal / Shell 机制包住它，`worker run` 自己**不会返回 running handle**。其 `ccm/worker-process-result/v1` 只是 terminal 结果，**不是 running handle**。`worker dispatch` 同样是同步 supervision，不会伪装 detach；需要外层异步时仍由 origin 机制持有后台 job，但 board 中 tracked runtime handle 来自实际 child PID / 已证 session identity，不是该外层 job。
 
 ---
-
 <!-- ccm:k:end point:ccm.cmd.cross-harness-facts -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺跨 harness 事实查询的顺序约定与 ccm 命令的具体行为（发现、查真实 CLI、查统一模型、查可证 usage、fail-closed 降级）
+
+主体是跨 harness 事实查询的命令面 SSOT——哪些只读命令存在、各自 envelope 证明什么不证明什么；反推诫命只是附加条款。

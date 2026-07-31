@@ -14,7 +14,7 @@ pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hol
 
 按精确 target 解读：
 
-- **Claude Code**：5h 与 7d 都承重；`switch_candidate` 只是一份账号池候选事实，不是换号授权。
+- **Claude Code**：5h 与 7d 都承重；`switch_candidate` 是喂给后台容量管控层的机器事实，不是发给你的换号许可——换哪份配额不由你决定。
 - **Codex**：只接受 7d hard gate；5h、`stop_5h`、`switch` 与 `switch_candidate` 不属于有效 Codex pacing
   合同。Codex 自动换号永久禁止；rolling-24h 只作 burn-risk advisory。
 - **Cursor**：IDE 与 Agent 各自只接受自己的 billing-period posture；`stop_billing_period` 只约束对应

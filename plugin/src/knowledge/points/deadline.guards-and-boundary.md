@@ -14,13 +14,23 @@ point: deadline.guards-and-boundary
 | 「折中——只做那个『快又低风险』的一半 / 半就绪的薄抽象。」 | 半让步仍是让步。「快又低风险」正是让非 acceptance scope 混过闸的那句话；「half ready」通常是「错形、伪装成完成」，还制造 false sense of done。要么在 acceptance 内、要么进 backlog。 |
 | 「现在还不确定会延期、报上去像杞人忧天——等这几个任务跑完再看。」 | 门槛是 actionability 不是 certainty。等确定，用户的延期 / 缩范围 / 分阶段选项已过期。cost 不对称：早报错了只花几分钟（可恢复），瞒着错了不可逆。「怕显得杞人忧天 / 累」是自利压力、不是进度证据。 |
 | 「我先悄悄把最不关键的几个任务砍了、把 margin 抢回来，就不用惊动用户了。」 | 那既瞒了风险信号、又替用户做了 ownership 级决定。descope / extend / phase 是用户拥有的承诺决定——surface 成 `decision_package`，别自己吸收。 |
-| 「DDL 逼近——把这几个任务串起来跑更稳妥。」 | 串行化不省 token 总量、只拉长 makespan。省的是降档 / 控 WIP / 推迟 float，不是焊死并行（消费机制见 `pacing-and-estimation`）。一条边指不出被下游消费的具体上游产物就删掉。 |
-
-## 单向引用边界（别复述）
-
-- **你（这份魂）** = 何时锁倒排约束、何时 surface 延期风险、何时 replan、scope 裁决——deadline-aware **决策**。
-- **`slicing-goals-into-dags`** = 怎么把「从 DDL 倒排 + 收口任务进 DAG」切成纵切薄增量（纪律 1/2/7 的切分手艺）。
-- **`pacing-and-estimation`** = 消费 `ccm estimate deadline-risk` 只读 verdict（band / margin / on_time_probability / 诚实字段），纪律 4/5 的读数机制——ccm 出 verdict、你决策。
-- **`using-ccm`** = `ccm goal deadline` 命令面 + deadline 字段取值 / 校验规则。
-- **`engineering-with-craft`**（纪律 3 手艺内容）/ **`dev-as-ml-loop`**（纪律 9 循环形状）/ **`references/goal-contract.md`**（识别·确认·过期·Delta Classifier·amendment）/ **`references/decomposition.md`**（CPM·float）/ **`references/async-hitl.md`**（decision_package）——各管一段，你在决策点引用，不复述其正文。
+| 「DDL 逼近——把这几个任务串起来跑更稳妥。」 | 串行化不省 token 总量、只拉长 makespan。省的是降档 / 控 WIP / 推迟 float，不是焊死并行。一条边指不出被下游消费的具体上游产物就删掉。 |
 <!-- ccm:k:end point:deadline.guards-and-boundary -->
+
+## 失效类型
+
+`motivation_conflict`（主体：行为约束） —— 删掉后，orchestrator 在 DDL 压力下会真的把某一行的诱惑付诸行动——比如悄悄砍任务抢 margin 不上报，或把用户拥有的 scope/deadline 决定权自己吸收了。
+
+主体是 DDL 压力下被点名的诱惑清单（镀金、半让步、瞒风险、悄悄砍范围），每条正确路径都比诱惑费力。
+
+## 边界
+
+若编排环境客观上没有任何用户可达通道（纯离线批处理、无法 surface 决策包等待响应），这几条默认动作因通道不存在而无法执行；只能转为最保守默认并留痕，不能因此当作已获授权。
+
+## 为什么它随模型变强而更重要
+
+模型越强，越能针对表格里每句诱惑现场组装出具体、贴合当前局面、逻辑自洽的风险评估，让先斩后奏读起来像称职判断而非越界——变强的是构造像样论证的能力，不是撞见 DDL 压力的次数。
+
+## 失败形态
+
+隐蔽违反：确实上报了，但措辞被稀释成'进度正常，有个小 note'，不是明确的 decision_package——技术上完成了上报动作，实质没让用户识别出这是需要拍板的信号。

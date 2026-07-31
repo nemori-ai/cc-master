@@ -90,3 +90,13 @@ canonical `watchdog` / legacy `wakeup`。只有带 nonblank `job_id` 且 `fire_a
 
 {{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}在 `dispatch.md` §派发卫生（watchdog/liveness 维度）。
 <!-- ccm:k:end point:hitl.watchdog -->
+
+## 失效类型
+
+`prosthetic`（双重性质·方法部分补不回来，它才是承重结构） —— 删掉后，agent 在压力下会把探活/退役当可选仪式选择性执行——比如只清 board 记录不取消真实定时器（或反之），或觉得“纯本地稳定跑没必要 arm”而放过真实盲区任务不设防。
+
+watchdog 这个装置的存在理由就是把「还有个可能静默失败的 in_flight」这个念头写进 board 以扛过 compaction 失忆，文中自陈单次决策模型自己会推对。
+
+## 失败形态
+
+退役只做一半：清了 board.watchdog 但没取消真实 job（留下一个未来会 fire 进陈旧上下文的空响），或取消了 job 但 board 仍写着有效 job_id 与未来 fire_at——两种都表面“看起来处理过了”，只有下次 reconcile 才会发现状态对不上。

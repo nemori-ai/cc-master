@@ -16,3 +16,9 @@ attempt cap）组合起来。用它来「跨 codebase 生成并稳住 test」，
 ---
 
 <!-- ccm:k:end point:workflow.pattern-test-repair -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 模型可能不知道如何将 fan-out test-generation stage 与 per-suite self-repair-loop（带有界 attempt cap）结合成完整模式
+
+主体是把 test 生成 fan-out 与 per-suite self-repair-loop 组合起来的复合形状方法。

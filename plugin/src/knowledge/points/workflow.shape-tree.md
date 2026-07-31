@@ -36,3 +36,13 @@ point: workflow.shape-tree
 > 起手。
 
 <!-- ccm:k:end point:workflow.shape-tree -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 概念上知道并行和流水线的区别，但不知道这个 workflow 系统具体提供哪几种原语、各自模板在哪、「默认用 pipeline」这条经验法则，容易选错原语或不知道有 scout-then-fanout 这种入口形状。
+
+主体是按 work 形状选范式的决策树，缺了就无法把任务映射到 fan-out / pipeline / loop / scout 这些形状。
+
+## 失败形态
+
+代码上用的是 pipeline，语法形式选对了，但阶段之间偷偷共享了可变状态、靠隐式执行顺序保证正确性——本该各阶段独立可流式推进，实际上阶段间藏着一条未声明的顺序依赖，只是没有用 barrier 语法把它暴露出来。

@@ -22,3 +22,17 @@ Cursor 两条 surface 即使可能观察到同一订阅，也必须分别保留 
 Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平均日预算的 burn risk，不能成为第二个 hard window。
 
 <!-- ccm:k:end point:pacing.window-contracts -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型不知道各 harness 的独立窗口合同，会跨 surface 拼接窗口（如把 claude-cli 7d 加上 fable 7d）或混淆 first-party 与 usage-based 池。
+
+主体是一张 harness→承重窗口→信号语义的对照表，纯粹是本环境的具体事实。
+
+## 边界
+
+仅适用于决策涉及多个 harness target 的场景（单 surface 内部决策可忽略）；Cursor 的两条 surface 和 Codex 的 7d 单一窗口都是硬约束，不可替代或互补。
+
+## 失败形态
+
+在 pacing 决策中跨 surface 相加窗口（如「总共还有 claude 7d 加 fable 7d」）；或把 Cursor 的 billing_period first-party 和 usage-based 当同一池；或把 Codex 的虚拟 24h 当第二个硬 window。

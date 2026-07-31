@@ -20,3 +20,13 @@ point: routing.task-shape
 派 dev worker 的 handoff 至少给齐：objective（含 acceptance / non-goals）、measurement、artifact、constraints、stop-or-restart、所需 skill pointers。非原子或不能一次验收的节点，再给一份已认可 spec，或先派 scoping；不要把未决架构偷偷交给实现 worker 猜。
 
 <!-- ccm:k:end point:routing.task-shape -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 不知道有这五种 executor 及其对应的责任/控制形状划分，容易只会用一种默认方式（全部丢给 subagent，或全部自己上手），既不会按任务形状分流，也不知道该在哪个点上向用户 surface。
+
+主体是按责任与控制形状分五类 executor 的分类判据与依赖边举证方法。
+
+## 失败形态
+
+一个任务其实需要多个叶子共享 schema、协同产出——本该判成结构化多叶责任，却被拆成几个互相独立的终端派发各自完成；每个派发单看都是「确实交出去了」，形式上符合把实现外包的原则，实际上叶子之间从未对齐过 schema，各自产出悄悄漂移成了不兼容的结果。

@@ -36,3 +36,9 @@ ccm calibration capture [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.calibration -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型无法正确调用 calibration 命令，不知道 capture 的参数（scope/as-of/runs）、幂等性保证、与 deadline-risk 的分工。
+
+calibration capture 的落盘路径、board_id 身份算法与幂等键都是本实现的具体事实。

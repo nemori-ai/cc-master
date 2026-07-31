@@ -62,7 +62,7 @@
         "point:ccm.account-pool-model",
         "point:ccm.account-select-method"
       ],
-      "reviewed_unbound_sha256": "448721c7cb9c24e70d129bd4a800ad23cd3e20ee62bd12f9ea06b5f882ba9598",
+      "reviewed_unbound_sha256": "9bd7ffdf9a01b10467af97d0ddc71e681ffed4b4ab5b88c2f1f0009ab435fa29",
       "reconciliations": [
         {
           "point": "point:ccm.account-enroll-why",
@@ -71,8 +71,8 @@
         },
         {
           "point": "point:ccm.account-policy-vault",
-          "point_sha256": "6589ae8a8e69598245754883a5aec588009f5d161f814aa1c5ebd72b5608bb48",
-          "passage_sha256": "6589ae8a8e69598245754883a5aec588009f5d161f814aa1c5ebd72b5608bb48"
+          "point_sha256": "1b65970ca8e328ee11ee6bc16f727792d45c4caeaa46bb4a653bf01340d0ae1f",
+          "passage_sha256": "550861735a3e10cd89c3e376146e5af5c0ee5085f48c96c85413da4539c63b61"
         },
         {
           "point": "point:ccm.account-pool-model",
@@ -81,8 +81,8 @@
         },
         {
           "point": "point:ccm.account-select-method",
-          "point_sha256": "074ce1179980098cd916b418b46e3d4c0950ef0b9d644e9d3a7c25a25f6c9caa",
-          "passage_sha256": "074ce1179980098cd916b418b46e3d4c0950ef0b9d644e9d3a7c25a25f6c9caa"
+          "point_sha256": "f434260318aa982761ed9cbae137dfc3e7757759115a6769d8ab23117ebb6262",
+          "passage_sha256": "275f6147a6f97d497e33247509994fe975f694ae1cd8679c9e298aacf9440e50"
         }
       ]
     },
@@ -112,7 +112,7 @@
       "reconciliations": [
         {
           "point": "point:ccm.board.acceptance",
-          "point_sha256": "4c334ab5f2a8284fe9049dcf0e815f292b5d569b9ff4ebfe46f6a58cfb02fe3a",
+          "point_sha256": "bfe72432d7b68ea81bd170e5a39f4cd0fedd6debe726dcd8871df37d1707f3d1",
           "passage_sha256": "4c334ab5f2a8284fe9049dcf0e815f292b5d569b9ff4ebfe46f6a58cfb02fe3a"
         },
         {
@@ -147,12 +147,12 @@
         },
         {
           "point": "point:ccm.board.deps-linking",
-          "point_sha256": "6dbf9707ff8e0090eb210f3fb7c039b741d332d27e39cc813d1f3233adbae032",
+          "point_sha256": "1081337a5983d9bc3c8d6b4537b58f3be059c5c815f1104bd80d5b242d5a01f0",
           "passage_sha256": "6dbf9707ff8e0090eb210f3fb7c039b741d332d27e39cc813d1f3233adbae032"
         },
         {
           "point": "point:ccm.board.estimate-judgment",
-          "point_sha256": "cd153a2ec93da248d65db30354f9eb843d6bb55aedd2dc60a07c71c8addca9fe",
+          "point_sha256": "09a74d7ebdb699e7dde52528be4b42ad4ac647ca57e7ca32372c67aa0d6d83b5",
           "passage_sha256": "cd153a2ec93da248d65db30354f9eb843d6bb55aedd2dc60a07c71c8addca9fe"
         },
         {
@@ -182,7 +182,7 @@
         },
         {
           "point": "point:ccm.board.task-fields",
-          "point_sha256": "ae2f7470a99549ede6aceeafc09625b303b0c948694ea3cff281c068138e11ec",
+          "point_sha256": "026017c00bd6a0ba6a467c05fb5650ee86edf9043e35b04b1e8a3e9dfd22d259",
           "passage_sha256": "ae2f7470a99549ede6aceeafc09625b303b0c948694ea3cff281c068138e11ec"
         },
         {
@@ -262,7 +262,7 @@
         },
         {
           "point": "point:ccm.cmd.cross-harness-facts",
-          "point_sha256": "58bc8a1cb575f119ed5ac5872871514fa94648e5f179e76ce23e19413893f42b",
+          "point_sha256": "5a63f7fdb03299da1e412bce2c6fc65b5b52413985e3b5a014eb19b605319af5",
           "passage_sha256": "58bc8a1cb575f119ed5ac5872871514fa94648e5f179e76ce23e19413893f42b"
         },
         {
@@ -317,7 +317,7 @@
         },
         {
           "point": "point:ccm.cmd.usage",
-          "point_sha256": "c876a3c6c4dc7166d33f0fa567ecd5e24432b150d5b27d47f0cc5bd9556fb3c2",
+          "point_sha256": "0618da96abcb62de3ac7ce48c46e00144d15d9256a508be9ee224f8e0cb0c2b4",
           "passage_sha256": "c876a3c6c4dc7166d33f0fa567ecd5e24432b150d5b27d47f0cc5bd9556fb3c2"
         },
         {
@@ -376,8 +376,8 @@
         },
         {
           "point": "point:ccm.pointers-routing",
-          "point_sha256": "0d2387e8b5af5c6f81e39d65f7ae4b0acf7770bb4c598495fe4ac390a9ce57f1",
-          "passage_sha256": "0d2387e8b5af5c6f81e39d65f7ae4b0acf7770bb4c598495fe4ac390a9ce57f1"
+          "point_sha256": "0d89634d934c0dbfb2897261b2573aff01b51c49b13812fa0f2b15490de1bbfb",
+          "passage_sha256": "5e2e04d6aedf705715a7c2523c60c074795f642593df3e206fdd58f871cdaba6"
         },
         {
           "point": "point:ccm.single-write-path",

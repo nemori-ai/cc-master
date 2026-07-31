@@ -13,3 +13,9 @@ point: ccm.when-to-open
 - **[references/board-model-guide.md](references/board-model-guide.md)**（面2·模型与取值）—— board 领域概念（task 字段 / status 八态 / executor 五种 / judgment_call / cadence / parent / watchdog）解释 + 字段**什么时候设什么值**的取值判断（acceptance 怎么写好 / estimate 怎么估 / deps 怎么连 / executor 怎么选）+ 决策树 + footgun 深化。**「这个字段填什么、这个概念是什么、这个场景选哪个」翻它。**
 
 <!-- ccm:k:end point:ccm.when-to-open -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删除后,agent 不知道该按命令怎么敲还是字段填什么/概念是什么这两类问题去选对应的参考资料,容易翻错文档或干脆不知道该查哪份,浪费来回摸索的成本。
+
+主体是本 skill 的适用场景与两本 reference 的分工，属项目文档约定。

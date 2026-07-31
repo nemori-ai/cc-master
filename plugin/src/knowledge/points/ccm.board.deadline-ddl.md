@@ -49,3 +49,13 @@ point: ccm.board.deadline-ddl
 
 > **实时真相永远以 `ccm <namespace> <cmd> --help` 为准**——本文是操作地图，`--help` 是当前领土。全量命令签名 / flag / `--json` 输出形状在 [command-catalog.md](command-catalog.md)。校验规则的权威实现在 ccm 引擎（board-model 注册表给每条规则的 level）。
 <!-- ccm:k:end point:ccm.board.deadline-ddl -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后,agent 仍理解“要有截止期”这个概念,但不知道这个系统把它拆成多种 settledness 状态、不知道哪些状态门控派发、也不知道 asserted 只能来自无歧义证据——会把用户一句模糊表达直接落成放行态,或混淆它与 iteration timebox / ETA / watchdog 这几个近邻概念。
+
+主体是 goal_contract.deadline 的字段取值、四态状态机与专属 verb，删掉就不知道本项目这个字段长什么样。
+
+## 失败形态
+
+最隐蔽的违反是把“周五前”“尽快”这类相对/模糊表达直接落成 asserted——状态机顺利放行、格式校验全过,看起来完全合规,实际上是把一次推断伪装成了无歧义证据,这类判断力错误不会被任何格式校验拦下,只有回头追问“这句话有没有指向一个无歧义绝对时刻”才能发现。

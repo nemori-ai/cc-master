@@ -108,8 +108,6 @@ Knowledge navigation:
 - [与其他判断力边界](../SKILL.md#ccm-k-point-distill-boundary)
 - [允许双落点](./routing-decision-tree.md#ccm-k-point-distill-dual-dest)
 - [不确定绝不丢弃](./routing-decision-tree.md#ccm-k-point-distill-fallback-no-drop)
-- [summary: 归宿判断三问概览](../SKILL.md#ccm-k-point-distill-routing-overview)
-- [canonicalize → 归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
 - [归宿判断决策树完整体](./routing-decision-tree.md#ccm-k-point-distill-routing-tree)
 
 ## Back to atlas

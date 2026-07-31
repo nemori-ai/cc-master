@@ -26,7 +26,7 @@ effect floor 只定义门槛，不证明任何具体 target 已过门。对每�
 4. **执行边界**：permission / sandbox / workspace / write capability 足以完成任务；retention、数据边界与付费授权允许发送这些上下文。
 5. **可追踪性**：这条 surface 能返回真实 handle，后续能 probe、收割 artifact 并端点验收。
 
-统一模型事实与证据分层从 `pacing-and-estimation` 的模型事实页读取；selected-target 的 surface / model / quota / binding 解释只按 {{CROSS_HARNESS_TARGET_FACTS_POINTER}}。这些页面拥有动态事实，你不要在本页或 board 复制 provider 型号、窗口、价格与 quota catalog。精确查询和写入语法查 {{CCM_COMMAND_CATALOG_POINTER}}。
+你不要在本页或 board 复制 provider 型号、窗口、价格与 quota catalog。
 
 任一硬门没有证据，就把候选标为 `insufficient` 并换另一个候选；如果没有候选满足 floor，就阻塞、重切任务或 surface 给用户，不把未知包装成 fallback。
 
@@ -38,6 +38,15 @@ effect floor 只定义门槛，不证明任何具体 target 已过门。对每�
 2. 只有基础分进入声明过的等价带，且社区证据有 provenance、TTL、confidence、contradictions 与衰减时，才让 taste 做有界 tie-break；stale / mixed / unknown 不加分。
 3. fallback 只沿同档、已准入、非 `never_on` 的候选链移动。policy、security、permission、workspace、payer、retention 或 acceptance failure 不是“换个模型继续猜”的理由，必须停下重规划或 surface。
 
-容量紧时先在同档换成本更低或余量更足的已认证 target，再降 WIP、推迟 high-float 工作、等待 reset 或缩 scope；不能直接降低原任务 floor。复杂性 / 风险 / duration 的深化判断与容量动作顺序见 [`model-allocation.md`](model-allocation.md#容量收紧时按顺序决策)。
-
+容量紧时先在同档换成本更低或余量更足的已认证 target，再降 WIP、推迟 high-float 工作、等待 reset 或缩 scope；不能直接降低原任务 floor。
 <!-- ccm:k:end point:routing.qualification-and-fallback -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 知道容量证据必须和目标绑定在同一个来源、不能用未知或另一 surface 的余量补齐，但容量紧张时会倾向于把相近但不严格对应的证据当成够用，先把任务派出去再说。
+
+主体是定 effect floor、逐项做 exact qualification、同档排序与 fallback 的判据体系，缺的是这套判断框架。
+
+## 失败形态
+
+某个候选在别的 surface 上确实有余量证据，被顺手当成这个候选自己的余量填了进来——字段表面看齐全了、“有容量证据”这一项打了勾，实质证据来源张冠李戴，并不满足容量必须与目标同源这条硬约束。

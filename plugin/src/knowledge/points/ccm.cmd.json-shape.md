@@ -674,3 +674,9 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 
 诚实降级（**绝不假绿**）：无 DDL / 含环 / 无估值 / 低置信 / 双通道分歧 > 0.25 / RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`（**绝不退 throughput 冒充 resource-aware**）；`now ≥ DDL` 且未完成 → `overdue`（strong）。`on_time_probability_source` 恒为 `rcpsp-in-trial` 或 `unknown`——throughput 通道永不做 verdict 源。band 阈值 `uncalibrated-conservative`（未经经验校准的保守起点）。
 <!-- ccm:k:end point:ccm.cmd.json-shape -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后,调用方仍知道'先看 --json 输出'这个通用原则,但不知道每个子命令具体的信封字段与例外(如 machine-wide 不套通用信封、dry-run 无 board_path),会凭直觉瞎解析导致读错字段或漏判 unavailable/降级态。
+
+纯粹是各命令 --json 的 data 字段名与形状，典型的本项目接口事实。

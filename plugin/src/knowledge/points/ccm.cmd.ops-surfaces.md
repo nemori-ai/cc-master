@@ -430,3 +430,9 @@ ccm runtime rollback [--json]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.ops-surfaces -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道 web-viewer/monitor/status-report 的命令参数（如 --port 0 会系统分配、--quota-source 的取值等）。
+
+status-report/web-viewer/monitor/services/runtime 的 artifact 路径、service state 与 exit code 是本实现的运维接口事实。

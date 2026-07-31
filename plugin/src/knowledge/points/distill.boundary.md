@@ -20,3 +20,9 @@ point: distill.boundary
   这个二级问题转交给项目自己的 skill 治理规范(若存在),本 skill 到此为止。
 
 <!-- ccm:k:end point:distill.boundary -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 没有这份负空间清单，容易在判断一条经验该落哪类资产时顺带给出其他性质的具体建议，把不同性质的判断力混进同一次输出而不自知。
+
+主体是本 skill 与其他判断力资产的职责分界，是本项目 skill 体系的结构事实而非通用方法。

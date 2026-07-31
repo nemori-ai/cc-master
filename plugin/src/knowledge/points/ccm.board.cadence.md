@@ -44,3 +44,17 @@ ccm cadence ship I1
 ---
 
 <!-- ccm:k:end point:ccm.board.cadence -->
+
+## 失效类型
+
+`environment_fact`（双重性质·方法部分补不回来，它才是承重结构） —— 删除后,agent 在临近 deadline 或想维持节奏达标形象的压力下,会把 overbooked 这类 warn 级超载警告当噪音忽略,硬着头皮继续推进而不是重切或移出成员。
+
+主体是 ccm cadence/iteration 的对象结构、命令签名与 ISO-8601 格式约束，属于本工具的具体事实。
+
+## 边界
+
+本条假定 iteration members 都在编排范围内可调整;若某个 member 强耦合外部团队或系统、既不能移出也不能重切,提前移出这一处置手段客观不可用,只能如实标注该轮无法如期收口并升级,而非调整范围内其它成员来凑数掩盖。
+
+## 失败形态
+
+iteration 收口时所有 members 确实都推到了 done+verified,硬闸顺利放行,但达成方式是在 deadline 前悄悄把原本认领的低把握 member 移出本轮且不写明原因,表面上如期交付,实际上是靠操纵范围而非真正按计划完成。

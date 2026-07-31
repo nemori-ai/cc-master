@@ -59,3 +59,17 @@ owner 容器节点的 `deps` 应该为空或只含真实的 board 级前置（�
 ---
 
 <!-- ccm:k:end point:ccm.board.parent-owner -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— parent指向容器owner、deps指向依赖上游、depth=1由工具强制、rollup只是软warn——这些都是这套board模型特有的字段语义与工具行为,模型无法从常识猜出,用错会产生错误的依赖图或误标完成。
+
+主体是 parent 容器边的方向、depth=1 不变式与 rollup lint 规则，属于本 board 模型的具体约束。
+
+## 边界
+
+parent只建模depth=1的容器关系,不支持多层嵌套(owner的子不能再有子是硬约束);需要更深层级的项目结构时,这套字段本身不覆盖,得靠项目自己的planning层来承载。
+
+## 失败形态
+
+把某个owner节点标成done,只因为直接子节点都done了,却从未真正跑过父节点自己的端点验收——lint只是软warn不会拦住这次误标,board快照看起来全绿,但rollup语义的第二个条件从未被满足过。

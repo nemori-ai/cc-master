@@ -14,7 +14,7 @@ point: dispatch.dataflow-and-mechanisms
 
 {{BACKGROUND_DISPATCH_EXECUTOR_MAPPING}}
 
-**分工**：本文教**派发判断 + 后台机制**——选哪个 executor / 用哪个机制真跑 / 怎么编排并行。`executor` 各值的**必填字段**（`subagent`/`workflow` 必给 handle、`external` 必给引用）与**选值决策树**是 board 字段机制，归 `using-ccm`（其 board 模型指南）——本文指过去、不复述。
+**分工**：本文教**派发判断 + 后台机制**——选哪个 executor / 用哪个机制真跑 / 怎么编排并行。`executor` 各值的**必填字段**（`subagent`/`workflow` 必给 handle、`external` 必给引用）与**选值决策树**是 board 字段机制——本文不复述。
 
 ---
 
@@ -45,7 +45,7 @@ point: dispatch.dataflow-and-mechanisms
 - 只有**非临界 float** 才是 pipeline / fan-out 能填的免费并行预算；
 - **一批同类子任务**（迁移 N 个文件、review N 条 finding）才是它的主场。
 
-顶层骨架是 dataflow DAG *调度*；`pipeline()` 只是项目恰好同构时它退化成的特例。在一条串行临界链上硬抓 fan-out 是经典的误套——T₁/T∞ ≈ 1 时，根本别 fan out。拓扑复杂、拿不准这条链到底是不是 T₁/T∞ ≈ 1（心算易错估）时，可 `ccm board graph` 机器读 `parallelism` 值佐证（何时机器算 vs 心算够用见 `decomposition.md` §3）；平凡图一眼看穿就别跑。
+顶层骨架是 dataflow DAG *调度*；`pipeline()` 只是项目恰好同构时它退化成的特例。在一条串行临界链上硬抓 fan-out 是经典的误套——T₁/T∞ ≈ 1 时，根本别 fan out。拓扑复杂、拿不准这条链到底是不是 T₁/T∞ ≈ 1（心算易错估）时，可 `ccm board graph` 机器读 `parallelism` 值佐证；平凡图一眼看穿就别跑。
 
 ---
 
@@ -65,8 +65,17 @@ point: dispatch.dataflow-and-mechanisms
 
 {{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}
 
-> **澄清（与 `async-hitl.md` 的「禁 busy-poll」并不矛盾）：** 那里禁的是**主线前台 busy-poll**——你在前台空转忙等。这里的后台 shell 轮询正交：轮询关进一个零 token 后台 shell、骑完成通知重入，主线腾出来去填等待窗口。后台等外部状态（荐）≠ 前台空等单个 agent（禁）。
+> **澄清（与「禁 busy-poll」并不矛盾）：** 那里禁的是**主线前台 busy-poll**——你在前台空转忙等。这里的后台 shell 轮询正交：轮询关进一个零 token 后台 shell、骑完成通知重入，主线腾出来去填等待窗口。后台等外部状态（荐）≠ 前台空等单个 agent（禁）。
 
 ---
-
 <!-- ccm:k:end point:dispatch.dataflow-and-mechanisms -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 模型不会自发想到把「谁负责执行」和「怎么真跑起来」拆成两层、并在多个高度上递归套用同一套就绪即派的调度心态，删掉后会退回逐项排队等待的默认直觉。
+
+主体是 dataflow 在宏观与微观两尺度自相似的调度框架（TFU、临界路径 vs pipeline 吞吐量），executor 具体取值明确指向 using-ccm 不在此复述。
+
+## 失败形态
+
+board 上执行归属字段填得规规矩矩（比如标了某个合法值），看起来「派发记录」完整合规，但实际操作上主线原地等这一个节点跑完才去看下一个——字段值填对了，行为却退化成同步阻塞，两层分离形同虚设。

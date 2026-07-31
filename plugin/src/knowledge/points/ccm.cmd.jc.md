@@ -107,3 +107,9 @@ ccm jc resolve <id> --status <upheld|overturned> [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.jc -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型无法正确构造 jc 命令，参数、flag、格式都会错。
+
+jc 的 category/severity/status 枚举与 add/resolve 参数是本 board 模型的具体字段。

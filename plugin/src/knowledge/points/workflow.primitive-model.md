@@ -24,3 +24,9 @@ model 重试。被用户跳过的 agent 返回 `null`，这就是到处都见 `.
 （完整 opts 见 `api-reference.md`。）
 
 <!-- ccm:k:end point:workflow.primitive-model -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺原始对象的准确语义（parallel 是 barrier、pipeline 非等齐、agent 返回类型、budget 共享），导致代码形式正确但行为与预期不符
+
+主体是本引擎 7 个 primitive 与 2 个注入对象的接口事实：各自语义、是否 barrier、schema 与跳过时的返回值。

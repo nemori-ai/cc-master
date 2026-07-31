@@ -25,3 +25,9 @@ point: workflow.api-agent
 | `agentType` | string | 改用一个自定义 subagent 类型，从与 Agent 工具同一个 registry 里解析。**改它会让 cache 失效。** |
 
 <!-- ccm:k:end point:workflow.api-agent -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型不知道这个项目里 agent() API 的确切 opts 参数、返回值形状和 schema 对 cache 的影响
+
+agent() 的返回语义与 opts 字段表是本框架的具体接口事实。

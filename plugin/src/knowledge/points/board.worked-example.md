@@ -33,3 +33,9 @@ point: board.worked-example
 }
 ```
 <!-- ccm:k:end point:board.worked-example -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型缺乏真实 board 的结构参考，会凭想象构造字段、漏掉 wakeup/observability 等关键块、或用错字段类型。
+
+删掉后失去本项目 board JSON 的具体字段形状与合法取值样例。

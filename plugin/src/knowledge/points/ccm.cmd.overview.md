@@ -124,3 +124,9 @@ ccm <alias> [args] [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.overview -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 顶层 CLI 架构的具体事实（28+ namespace、alias、global flag、exit code、JSON 信封）
+
+namespace 分工表、别名、全局 flag、--set scoping 与 exit code 表是 CLI 的顶层事实索引。

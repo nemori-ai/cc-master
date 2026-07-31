@@ -52,3 +52,9 @@ ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --membe
 
 全量命令、每个 flag、`--json` 输出形状 → [references/command-catalog.md](references/command-catalog.md)。
 <!-- ccm:k:end point:ccm.hotpath-flows -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后 agent 不知道这套 canonical flow 的具体命令与调用顺序,但这纯粹是命令速查表,不含超出命令面事实的独立判断。
+
+主体是 canonical 命令序列样板，删掉就不知道本项目怎么串起板/目标/派发/验收。

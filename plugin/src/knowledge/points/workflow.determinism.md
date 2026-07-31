@@ -27,3 +27,13 @@ run 分叉、journal 也就失去意义——cache 会悄悄变 stale。所以 r
 resume——脚本必须确定，最长未变前缀的 cache 才成立。
 
 <!-- ccm:k:end point:workflow.determinism -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后 agent 会在 workflow 脚本里正常使用这三类非确定性调用,不知道它们会被 fail-loud 拒绝、也不理解这是为了保护 resume 的重放一致性,遇到报错时可能误以为是 bug 而尝试绕过而非改用参数传入或 loop index。
+
+主体是本 runtime 会抛错的三个具体 API（Date.now/Math.random/无参 new Date）及其 resume 缘由与替代写法，属于工具事实。
+
+## 失败形态
+
+agent 确实没直接调用被禁的三个 API,却改用同样非确定的绕行手法(比如读一个每次运行都会变化的环境变量、或用文件 mtime 代替时间戳)达成同样效果——字面没触发禁令,实质仍引入了非确定性,resume 时依然会分叉。

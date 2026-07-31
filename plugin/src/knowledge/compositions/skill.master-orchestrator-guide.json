@@ -87,12 +87,11 @@
         "point:control.decision-program",
         "point:control.good-orchestration",
         "point:control.identity-mandate",
-        "point:control.navigation-map",
         "point:control.operating-lenses",
         "point:control.rationalization-guards",
         "point:control.role-consequences"
       ],
-      "reviewed_unbound_sha256": "997077657b0425430bfd8c73aea07b3d43f6f6a33332e2416e42411be86aa57c",
+      "reviewed_unbound_sha256": "b37b991ad9fd660714000d30177c4d38ebfe7b2715ed368b5d907b92a2898934",
       "reconciliations": [
         {
           "point": "point:conduct.deserting-podium",
@@ -111,37 +110,32 @@
         },
         {
           "point": "point:control.decision-program",
-          "point_sha256": "1639a3167706e60442d98c744a819174721a2be6328be3d8bc1e0d010be91d03",
+          "point_sha256": "43858997e708f87a6b7dce50210649000339e5491bca295e992f94d76bc410d8",
           "passage_sha256": "1639a3167706e60442d98c744a819174721a2be6328be3d8bc1e0d010be91d03"
         },
         {
           "point": "point:control.good-orchestration",
-          "point_sha256": "a9ee9674060be2bfa10833d4dd11d357cd0d81560b46add47cfa072027fc5d16",
+          "point_sha256": "8ed52b8e599741ed5a37c8cb0afe0b0bda89247d5fcda1dbc8d1e35b9dffee5a",
           "passage_sha256": "a9ee9674060be2bfa10833d4dd11d357cd0d81560b46add47cfa072027fc5d16"
         },
         {
           "point": "point:control.identity-mandate",
-          "point_sha256": "bd72d6e78d28a0ea3d5b3cb6399f5bfe6a35eb6e51cfd015d400ed19db65eaa6",
-          "passage_sha256": "bd72d6e78d28a0ea3d5b3cb6399f5bfe6a35eb6e51cfd015d400ed19db65eaa6"
-        },
-        {
-          "point": "point:control.navigation-map",
-          "point_sha256": "6d84015d15f56d529f2b6a0c00236f4d4abffd5d8df40b629f761461bae8c2ea",
-          "passage_sha256": "6d84015d15f56d529f2b6a0c00236f4d4abffd5d8df40b629f761461bae8c2ea"
+          "point_sha256": "6a84a77ffdef6a0427859b369879c1c70f1455148081deb3f1fa4a1917c6d1a2",
+          "passage_sha256": "3841c5f87907229d3c9c8a8c2a7f3b3f02b1a881c7db110ffb273471a7986122"
         },
         {
           "point": "point:control.operating-lenses",
-          "point_sha256": "aec7e52443d110f84380611bfc5670cca3537dc0c3b9710dd315d53f18efe060",
+          "point_sha256": "224774db1d44358d1b4d37c31397699b71115fc11a08fb5140cdfd2aa3d60029",
           "passage_sha256": "aec7e52443d110f84380611bfc5670cca3537dc0c3b9710dd315d53f18efe060"
         },
         {
           "point": "point:control.rationalization-guards",
-          "point_sha256": "d59e6d3191ca334694d29a274e348aa98cd60498e2d098a4557a1ec27d257e81",
+          "point_sha256": "604457fcc5926203f1ca36d141e119ae338ee37fd944d36d646be8a0ef63795b",
           "passage_sha256": "d59e6d3191ca334694d29a274e348aa98cd60498e2d098a4557a1ec27d257e81"
         },
         {
           "point": "point:control.role-consequences",
-          "point_sha256": "d1009f9d284ce5a4af0c27c016db10b4150f24dd94a7cd1c3973055d118b2930",
+          "point_sha256": "904e5f4c3eb4e823ca0699ee8a9b5c81c3739a5930c35a77af9c2c2c5ca4fb85",
           "passage_sha256": "d1009f9d284ce5a4af0c27c016db10b4150f24dd94a7cd1c3973055d118b2930"
         }
       ]
@@ -192,17 +186,17 @@
       "reconciliations": [
         {
           "point": "point:board.audit-and-graph",
-          "point_sha256": "4b659402493db5708ee42851287cce0542e616addab26165b419f897665a7df0",
+          "point_sha256": "c767936cad4035e858e1a7d8306cfb1f333c75fc3c4c37879c110be048d88c66",
           "passage_sha256": "4b659402493db5708ee42851287cce0542e616addab26165b419f897665a7df0"
         },
         {
           "point": "point:board.resume-and-interview",
-          "point_sha256": "ed482bf54c28629ab58ca43973870434214a51c106258f10c7430d0e9a8786c3",
+          "point_sha256": "228b4dbd7170edd05e8dcfd77df1d23f4ac95e5314cc254c217ba227aa37ee45",
           "passage_sha256": "ed482bf54c28629ab58ca43973870434214a51c106258f10c7430d0e9a8786c3"
         },
         {
           "point": "point:board.waist-and-write",
-          "point_sha256": "ed528f4f666eef86a1f7d37f25197e3f699476ca532ee961953b3aa38d428397",
+          "point_sha256": "fe318c7010498c53de5c1b9dc593729295ba05582b06fa91600d4d47b6f14103",
           "passage_sha256": "ed528f4f666eef86a1f7d37f25197e3f699476ca532ee961953b3aa38d428397"
         },
         {
@@ -216,20 +210,20 @@
       "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
       "coverage": "full",
       "point_ids": [
-        "point:capacity.account-switch-gate",
-        "point:capacity.account-switch-sequence"
+        "point:capacity.switch-is-not-your-lever",
+        "point:capacity.post-switch-continuity"
       ],
-      "reviewed_unbound_sha256": "e3e9d36894d77e6be4e9b1dd06d455b97e1f64a4f721a7dcad4ff8298d08dc22",
+      "reviewed_unbound_sha256": "a03960b5832018f310929a06311014d6792f892aab31a17c971aa900d6f09842",
       "reconciliations": [
         {
-          "point": "point:capacity.account-switch-gate",
-          "point_sha256": "a99d548f6e10f07f7613dd00fc1ea4d08db39d8a88c482806737ee1d05781761",
-          "passage_sha256": "a99d548f6e10f07f7613dd00fc1ea4d08db39d8a88c482806737ee1d05781761"
+          "point": "point:capacity.post-switch-continuity",
+          "point_sha256": "ba9b0af13fb6277c87f6ef03ef6c87a62a04addf9d62d46cdb743a16ceaef97c",
+          "passage_sha256": "ba9b0af13fb6277c87f6ef03ef6c87a62a04addf9d62d46cdb743a16ceaef97c"
         },
         {
-          "point": "point:capacity.account-switch-sequence",
-          "point_sha256": "cc068755b0c712c725a7fee46aa3e54e15a21a72fbdab3b13531c63eb35b21c2",
-          "passage_sha256": "cc068755b0c712c725a7fee46aa3e54e15a21a72fbdab3b13531c63eb35b21c2"
+          "point": "point:capacity.switch-is-not-your-lever",
+          "point_sha256": "e34a5cf60714a5eef3a26299efd18cf5dfeb99f35e4f974ed910a699f67d24d4",
+          "passage_sha256": "e34a5cf60714a5eef3a26299efd18cf5dfeb99f35e4f974ed910a699f67d24d4"
         }
       ]
     },
@@ -245,17 +239,17 @@
       "reconciliations": [
         {
           "point": "point:deadline.constraint-axes",
-          "point_sha256": "36dd25d0ff24cff8c435efa336aa317d490fed5c3c6db94e9ad14c90d7af567b",
+          "point_sha256": "225958ccc9d532953beaae7223b8c95175bf6310f32c6a9b876bc06c61ded348",
           "passage_sha256": "36dd25d0ff24cff8c435efa336aa317d490fed5c3c6db94e9ad14c90d7af567b"
         },
         {
           "point": "point:deadline.guards-and-boundary",
-          "point_sha256": "6982575500ffeb0626489b32ba3047ab2fdbe898578884eab75001d851a2d6e2",
+          "point_sha256": "6389ca78ae343d20f2f661b44790036f9757a6639c6a0c48d7f5a2cbc8bf9395",
           "passage_sha256": "6982575500ffeb0626489b32ba3047ab2fdbe898578884eab75001d851a2d6e2"
         },
         {
           "point": "point:deadline.nine-disciplines",
-          "point_sha256": "1a8ba458f7545e44226cc745a1b6bb6aa79e5582e5b3e3330c17a64c2639981c",
+          "point_sha256": "c44a019ff14f13dc057d6996b7b846fe69c7e1bdf777e63e0e27f194c386b1a6",
           "passage_sha256": "1a8ba458f7545e44226cc745a1b6bb6aa79e5582e5b3e3330c17a64c2639981c"
         }
       ]
@@ -272,7 +266,7 @@
       "reconciliations": [
         {
           "point": "point:scheduling.dag-and-critical-path",
-          "point_sha256": "10db4cf4619d64f78357a0ef7953ac707ab8e6e466765b86f170b579eb0c266a",
+          "point_sha256": "8ffd536e9f4229037fc7d66ba145d8ff1a3e493f023108cddc8b07d99b9189b7",
           "passage_sha256": "10db4cf4619d64f78357a0ef7953ac707ab8e6e466765b86f170b579eb0c266a"
         },
         {
@@ -300,7 +294,7 @@
       "reconciliations": [
         {
           "point": "point:dispatch.dataflow-and-mechanisms",
-          "point_sha256": "c41eedb23b1fae8ea7f4645111bc3fa65c3f76ff35329e225f7e16fee3164de5",
+          "point_sha256": "2ac1f64ecd01b90ab7f4219f474935b8d85210a148deab69a16666fceb9b0053",
           "passage_sha256": "c41eedb23b1fae8ea7f4645111bc3fa65c3f76ff35329e225f7e16fee3164de5"
         },
         {
@@ -310,7 +304,7 @@
         },
         {
           "point": "point:dispatch.routing-and-isolation",
-          "point_sha256": "334a6a8fc89a4c835f3ee275d06f8f52444289db79d8753d07f05291c897007b",
+          "point_sha256": "1ed06ef04529877c5cc2698ddb141bdf8f7aa45b5e6e38256110e54357f8ff4f",
           "passage_sha256": "334a6a8fc89a4c835f3ee275d06f8f52444289db79d8753d07f05291c897007b"
         },
         {
@@ -333,12 +327,12 @@
       "reconciliations": [
         {
           "point": "point:goal.alignment-checkpoints",
-          "point_sha256": "fb6e41fa73ea1b57eb5894249bee1a74d45a82fa15efb62c1ee9fe9c23094e6e",
+          "point_sha256": "b01fb71b4658fc9e8ae2db3ff796729c414649ee746b8a68bdc3662c93b62b25",
           "passage_sha256": "fb6e41fa73ea1b57eb5894249bee1a74d45a82fa15efb62c1ee9fe9c23094e6e"
         },
         {
           "point": "point:goal.deadline-and-brief",
-          "point_sha256": "2768623410baaceec13ba1f2be3088ddd9b4ba762a07010d2991fea19024f0bd",
+          "point_sha256": "6ee5dda3de79f9723d3571d42028725453bbee4d5b2f9134915c9711fa666bda",
           "passage_sha256": "2768623410baaceec13ba1f2be3088ddd9b4ba762a07010d2991fea19024f0bd"
         },
         {
@@ -391,7 +385,7 @@
       "reconciliations": [
         {
           "point": "point:capacity.ranking-and-contraction",
-          "point_sha256": "4009c45dbcfd236ff5a9bedccce3f31f943758f0508507cda3a095c88080864f",
+          "point_sha256": "5e01b050ba47c9d8d424c90fe77bd52a8b5a0b98735ce27591eb5015411b5c2e",
           "passage_sha256": "4009c45dbcfd236ff5a9bedccce3f31f943758f0508507cda3a095c88080864f"
         },
         {
@@ -453,12 +447,12 @@
       "reconciliations": [
         {
           "point": "point:outside.evidence-levels",
-          "point_sha256": "898baf9a49512b59640e37478b8e5653e4b7599d570346ead89c9398cfbef647",
+          "point_sha256": "56096d6d27b11193fa93bfd1f22e08e2fd70625ab5bd894beb38aac76590ca18",
           "passage_sha256": "898baf9a49512b59640e37478b8e5653e4b7599d570346ead89c9398cfbef647"
         },
         {
           "point": "point:outside.falsification-and-calibration",
-          "point_sha256": "6ed2116beb3a2df973b92f846d7bfb2b563d5572fc26305429a36a8a63082dba",
+          "point_sha256": "4f9090da76ae1aa09c8bbb4e804f13b36a84bde9177173fa087f95d807b2c976",
           "passage_sha256": "6ed2116beb3a2df973b92f846d7bfb2b563d5572fc26305429a36a8a63082dba"
         },
         {
@@ -568,8 +562,7 @@
         "point:routing.qualification-and-fallback",
         "point:routing.task-shape",
         "point:routing.workflow-boundary",
-        "point:verification.terminal-is-not-done",
-        "point:verification.terminal-summary"
+        "point:verification.terminal-is-not-done"
       ],
       "reviewed_unbound_sha256": "98503f154ad0ebab4bde68e8b1817fa0ae8598dc164cd25b83069508a1112eb9",
       "reconciliations": [
@@ -585,17 +578,17 @@
         },
         {
           "point": "point:routing.ordered-chain",
-          "point_sha256": "1ee45ade16b4eeaa9d6a6ef28b75441b758aec70b5e20bf00ad30c0bdd1bc538",
-          "passage_sha256": "6c60a51d92ba009544c8f5a11aa94b8715476b90816298943564eb3c61c4f019"
+          "point_sha256": "cfa720ca4f5d976bc57ed3f56965da04bc945a3f8a0a378590c7e118c0ab3bd3",
+          "passage_sha256": "1ee45ade16b4eeaa9d6a6ef28b75441b758aec70b5e20bf00ad30c0bdd1bc538"
         },
         {
           "point": "point:routing.owner-map",
-          "point_sha256": "d97d5a92f92cdd27c7dd0c8bce2306d25b7a884d9d701b681107bf3afa33c49a",
+          "point_sha256": "9a05b6c6dc319c22a4159e0588c805526d4f9de42ce76c916a8570b755986354",
           "passage_sha256": "d97d5a92f92cdd27c7dd0c8bce2306d25b7a884d9d701b681107bf3afa33c49a"
         },
         {
           "point": "point:routing.qualification-and-fallback",
-          "point_sha256": "12d3e0a58738c4fc028c82e525c77e0056fa3acbcb768a114b20644fb985ba4d",
+          "point_sha256": "f7a23a2da2761889da3a7b62decbb548d926f27bfd6ee331321a6f726284b13c",
           "passage_sha256": "12d3e0a58738c4fc028c82e525c77e0056fa3acbcb768a114b20644fb985ba4d"
         },
         {
@@ -605,18 +598,13 @@
         },
         {
           "point": "point:routing.workflow-boundary",
-          "point_sha256": "9453245d9338732a5d33a5a2399231d3d7bb1761d529a44955d6ef3f5de08284",
+          "point_sha256": "aca332c50600f8259fa8869515c5088581758c87ea3fcf60aaa270f60d315663",
           "passage_sha256": "9453245d9338732a5d33a5a2399231d3d7bb1761d529a44955d6ef3f5de08284"
         },
         {
           "point": "point:verification.terminal-is-not-done",
           "point_sha256": "b7507884395e50b3e78e19e8e1a253ecd8c48c30a3fec7260be1261bd248d4fe",
           "passage_sha256": "b7507884395e50b3e78e19e8e1a253ecd8c48c30a3fec7260be1261bd248d4fe"
-        },
-        {
-          "point": "point:verification.terminal-summary",
-          "point_sha256": "54be3843604bcec9ee4102752b3075a9dabd34a0b223a54f985f133da7c30df7",
-          "passage_sha256": "54be3843604bcec9ee4102752b3075a9dabd34a0b223a54f985f133da7c30df7"
         }
       ]
     }

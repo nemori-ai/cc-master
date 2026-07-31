@@ -20,3 +20,9 @@ point: workflow.resource-caps
 按你实际拥有的窗口来规划并行度，别按 item 数。
 
 <!-- ccm:k:end point:workflow.resource-caps -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 这几个具体数字（并发上限、总量上限、单次调用上限、脚本体积上限）不可能被推导出来，只能是被告知的事实；不知道就没法照着规划吞吐量。
+
+主体是本引擎的具体硬性数值：并发窗口、单次 run agent 总量、单次调用 item 上限、脚本大小上限。

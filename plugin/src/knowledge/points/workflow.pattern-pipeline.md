@@ -23,3 +23,13 @@ const out = await pipeline(items,
 ---
 
 <!-- ccm:k:end point:workflow.pattern-pipeline -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 模型已知流水线优于整批同步的通用道理，但不知道本项目把它设为多阶段默认策略、也不知道要调用哪个具体 API，会误用整批同步写法或调用不存在的接口。
+
+主体是「多阶段无须同步就用流式 pipeline、只有真需要整批才升级为 barrier」的选型判据。
+
+## 失败形态
+
+代码表面用了看似流式的写法——比如先把 stage 1 结果整批 `Promise.all` 收集成数组，再统一 map 进 stage 2——命名和外观像 pipeline，但实际语义是等全部 item 走完 stage 1 才进 stage 2：一个伪装成流水线的隐藏 barrier，没有任何 item 能提前进入下一阶段。

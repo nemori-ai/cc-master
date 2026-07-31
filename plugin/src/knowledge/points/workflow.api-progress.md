@@ -16,3 +16,17 @@ point: workflow.api-progress
 没重试、采样——免得这种悄悄的收窄被当成「full coverage」。
 
 <!-- ccm:k:end point:workflow.api-progress -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道有 phase()/log() API，写 workflow 时无法分组 progress、无法记录被丢掉的东西（采样、没重试、截断），用户看不到透明度。
+
+主体是 phase()/log() 两个 primitive 的签名与语义（title 必须匹配 meta.phases[].title、并发内改用 opts.phase），属于本 runtime 的接口事实；披露截断的用法只是附加条款。
+
+## 边界
+
+Workflow 的 progress instrumentation 工具。无例外。phase() 必须使用预声明的 title，log() 完全自由。
+
+## 失败形态
+
+隐蔽形态：agent 用了 phase() 但 title 没声明在 meta.phases 里（错 title 会 error）、或写了 log 但描述不清「采样 0.1% 只处理 1000 个」导致用户以为全部处理了。

@@ -198,3 +198,9 @@ ccm agent rm <id> [--yes] [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.agent -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道 ccm agent 的完整命令面（create/bind/amend/link/terminal/probe），生命周期状态机怎么转移，handle kind 有哪些。
+
+主体是 agent 九个 verb 的语法、状态机、exit code 与 probe 判活规则，都是本 CLI 的接口事实。

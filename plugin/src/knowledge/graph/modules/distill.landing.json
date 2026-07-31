@@ -48,45 +48,6 @@
   },
   "points": [
     {
-      "id": "point:distill.landing-preview",
-      "title": "落地手艺入口",
-      "point_kind": "reference",
-      "summary": "重要≠进 skill；落地手艺与反模式见 landing-craft。",
-      "recognition_cues": [
-        "得进 skill 才够重"
-      ],
-      "binding": {
-        "path": "plugin/src/knowledge/points/distill.landing-preview.md",
-        "marker": "point:distill.landing-preview",
-        "heading_hint": "落地手艺与反模式"
-      },
-      "authority": {
-        "role": "summary",
-        "subject": "subject:distill.landing-craft",
-        "canonical": "point:distill.landing-craft",
-        "review_policy": "review-on-canonical-change",
-        "reviewed_canonical_sha256": "a0ca9181bd466f457a3df927caad52c5b4a32200d79b82e45c22db9fcabbac8a"
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "point:distill.landing-preview"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.point.distill.landing-preview"
-          }
-        ]
-      }
-    },
-    {
       "id": "point:distill.landing-craft",
       "title": "按资产类型的落地手艺",
       "point_kind": "procedure",
@@ -160,38 +121,6 @@
     }
   ],
   "edges": [
-    {
-      "id": "edge:distill.preview-to-craft",
-      "type": "deepens_to",
-      "from": "point:distill.landing-preview",
-      "to": "point:distill.landing-craft",
-      "when": [
-        "需要按类型落地细则"
-      ],
-      "path_role": "next",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.preview-to-craft"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge.distill.preview-to-craft"
-          }
-        ]
-      },
-      "order": 1
-    },
     {
       "id": "edge:distill.craft-to-rat",
       "type": "contrasts_with",
@@ -286,37 +215,6 @@
       }
     },
     {
-      "id": "edge:distill.preview-to-evidence",
-      "type": "requires",
-      "from": "point:distill.landing-preview",
-      "to": "point:distill.evidence-fidelity",
-      "when": [
-        "落地预览接到硬约束"
-      ],
-      "path_role": "check",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.preview-to-evidence"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge:distill.preview-to-evidence"
-          }
-        ]
-      }
-    },
-    {
       "id": "edge:distill.rat-to-evidence",
       "type": "requires",
       "from": "point:distill.landing-rationalization",
@@ -374,37 +272,6 @@
           {
             "kind": "golden",
             "ref": "golden.edge:distill.craft-to-tree"
-          }
-        ]
-      }
-    },
-    {
-      "id": "edge:distill.hub-from.preview",
-      "type": "routes_to",
-      "from": "point:distill.landing-preview",
-      "to": "point:distill.routing-tree",
-      "when": [
-        "预览回决策树主点"
-      ],
-      "path_role": "route",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:distill.hub-from.preview"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge:distill.hub-from.preview"
           }
         ]
       }

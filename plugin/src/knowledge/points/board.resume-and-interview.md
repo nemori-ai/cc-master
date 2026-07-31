@@ -27,7 +27,7 @@ point: board.resume-and-interview
 
 ## `decision_package` 采访协议 —— awaiting-user 节点的采访式决策
 
-为「上下文缺失 / 决策依据缺失 / 时效性失效」三种把用户空投到失上下文决策点的失败形态而设的一对配套结构（采访包准备 + 消化两条纪律的**方法论**在 `async-hitl.md`；字段何时填什么、`BIZ-AWAITING` / `BIZ-DECISION-PACKAGE` lint 规则在 `using-ccm` §G/§N；此处只钉**协议叙事**——生命周期与两端逐字对齐的约束）。两者都是 agent-shaped / optional / **hook 一概不读**，narrow waist 完全不变。
+为「上下文缺失 / 决策依据缺失 / 时效性失效」三种把用户空投到失上下文决策点的失败形态而设的一对配套结构（此处只钉**协议叙事**——生命周期与两端逐字对齐的约束）。两者都是 agent-shaped / optional / **hook 一概不读**，narrow waist 完全不变。
 
 **`decision_package`**（挂在 `blocked_on:"user"` 节点上的柔性边）：master 在 idle / 创建 awaiting-user 节点时为该节点预备的一份采访包（on-board，webview 可直接渲染富决策卡）。canonical 字段：`prepared_at` / `inputs_hash` / `freshness` / `ask_type` / `context_md` / `question` / `what_i_need` / `why_it_matters` / `options[]` / `enter_cmd`。语义要点：
 
@@ -42,8 +42,21 @@ point: board.resume-and-interview
 
 **`<board-stem>--<node-id>--<STAMP>.decision.md` sidecar**（带外文档，写在 board home 同目录，**由独立 discuss session 写、绝不写 board**——保单写者纪律，避免与 orchestrator 的 board 写并发 torn-write）：discuss 谈完的产物。命名三段：`<board-stem>`（board 文件名去 `.board.json`·共享 home 下防不同板 sidecar 互相覆盖）+ `<node-id>`（须 path-safe·discuss 落盘前 guard 校验）+ `<STAMP>`（收尾那刻紧凑 UTC `YYYYMMDDTHHMMSSZ`·无 `:`·字典序即时间序）。**版本化 append-only**：每次 discuss 写一份**新** sidecar、绝不覆盖——「一个节点聊过 N 次」= 它名下 `*--<node-id>--*.decision.md` 文件数，全部历史可回溯；同秒碰撞给 STAMP 追 `-2`/`-3` 后缀去重。结构：frontmatter（`node_id` / `resolved_at` / `inputs_hash_at_decision` / `ask_type` / `round`）+ `## TL;DR` + `## 决策结论` + `## 完整决策文档` + `## 对话记录指针`。
 
-**消化闭环**：master 在 recon / idle 拾取 sidecar 消化（先 TL;DR 再全文 → replan → 把短摘要折进节点 `notes`（master 写、on-board）+ 清 `blocked_on:"user"`）——消化纪律见 `async-hitl.md`。
+**消化闭环**：master 在 recon / idle 拾取 sidecar 消化（先 TL;DR 再全文 → replan → 把短摘要折进节点 `notes`（master 写、on-board）+ 清 `blocked_on:"user"`）。
 
 ---
-
 <!-- ccm:k:end point:board.resume-and-interview -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— inputs_hash 必须在准备端与一个全新、不共享记忆的 discuss session 里逐字重算出同一结果;删掉这条算法细节,新 session 只能凭印象拼一个看起来差不多的哈希输入,导致 staleness 判断系统性出错。
+
+删掉后不知 heartbeat/session_id 武装语义、decision_package 字段与 inputs_hash/enter_cmd 的本工具约定。
+
+## 边界
+
+这套心智只对必须跨 session、跨 compaction 保持字节级一致的场景成立(如决策包续跑);同一上下文内一次性做的判断不需要这条规则,因为没有『下一个断开的上下文』要对齐。
+
+## 失败形态
+
+discuss 端在全新 session 里凭大概记得重新拼一遍 hash 输入,漏掉某个 dep 的长度前缀或算错顺序,算出的 sha256 与准备端不一致——系统判定 stale 强制重新沟通,看不出是算法级 bug;更隐蔽的是两串恰好因省略前缀而意外重合,把过期采访包误判成新鲜,形式上通过了校验,实质已经失真。

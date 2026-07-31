@@ -122,3 +122,17 @@ point: ccm.board.validation-rules
 ---
 
 <!-- ccm:k:end point:ccm.board.validation-rules -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道某个字段填什么值踩哪条 rule、severity 是 hard 还是 warn，只能反复试错撞 exit 3 / lint warning。
+
+主体是 FMT/GRAPH/BIZ 各条 lint 规则的 id、level 与触发条件，是本引擎的校验事实表。
+
+## 边界
+
+规则集与 lint 引擎演进、版本变化绑定。当前版本以 ccm/engine 的 board-lint-core.ts INVARIANTS 为权威（速-of-truth）。本表是用户提前避坑的快照，新 lint rule 出现时本表滞后。
+
+## 失败形态
+
+隐蔽形态：agent 按旧版本的规则表从容填 board 数据，新版本 lint 出现前所未有的 hard rule，agent 突然无法落盘，茫然不知是 bug 还是自己理解错。或 agent 混淆 severity，以为「hard 就必须满足」，其实 --force 可以越过，导致放弃本可以写的改动。

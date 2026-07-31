@@ -164,3 +164,9 @@ ccm estimate deadline-risk [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.estimate -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 二进制对 estimate namespace（show、forecast、evm 等六个子命令）的具体实现事实
+
+estimate 各 verb 的通道口径、降级取值与 flag 默认值是本引擎的接口事实，不是通用预测方法论。

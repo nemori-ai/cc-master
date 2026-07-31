@@ -22,3 +22,13 @@ leaf-shaped），且名字未知 / `scriptPath` 读不到 / child 语法错误�
 ---
 
 <!-- ccm:k:end point:workflow.pattern-nested-composition -->
+
+## 失效类型
+
+`environment_fact`（双重性质·方法部分补不回来，它才是承重结构） —— 压力下（快速迭代或追求代码优雅）agent 违反'只一层'约束，导致嵌套抛错或功能失败，或为复用把逻辑过度碎片化
+
+主体是 workflow() 这个 primitive 在本引擎里的具体语义：共享 cap/budget/abort、只允许一层嵌套、名字或语法出错会抛错。
+
+## 失败形态
+
+嵌套多于一层时 child 调用抛错导致 parent 失败；或 child 失败未 catch 导致整个 workflow 停止；或代码表面整齐，实则把关键逻辑碎片分散到多个 workflow 文件，增加追踪维护成本。

@@ -44,3 +44,17 @@ point: workflow.resource-index
 每个 bundled template 和 example 都是照 harness 契约写的，随便挑一个都是 known-good 的
 起点。
 <!-- ccm:k:end point:workflow.resource-index -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 维护者知道资源存在，但下个上下文全忘了这份索引的位置与内容，自己摸索或重复造 pattern；或新维护者不知道索引存在，错误地认为没有 bundled template/example 而独立设计
+
+主体是本 skill 里各 reference/template/example 文件的位置与各自该在什么时候读，属于本项目资产事实。
+
+## 边界
+
+只适用于『选择 workflow pattern 或学习 API』的场景。不适用于：某个 workflow 已经跑起来了、想要 debugging（应该读 mechanism.md 里的『为什么 Date.now() 会破坏 resume』这类）；或编写全新的 pattern（应该走压力测试与 bundled asset 同步）。
+
+## 失败形态
+
+维护者或开发者自己设计 pattern 或 template，无意中重复造了已有的车轮；或新增 example 时没有登记到索引，导致『知道有 12 个例子但只有 9 个在索引里』的信息分裂。文档离散、无人发现。最严重的是某次重构删了一个 pattern 但忘了从索引里删，导致下次参考时踩坑。

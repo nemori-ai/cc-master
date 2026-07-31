@@ -22,7 +22,7 @@ task shape
 把 agent terminal 当 task done，会绕过验收。
 任一承重证据是 unknown、stale、conflicting 或 deny，就停在对应硬门，不用感觉补值。
 
-你的 routing record 至少保留这些字段，字段怎么写入 board 则只查 `using-ccm`：
+你的 routing record 至少保留这些字段：
 
 ```yaml
 task_shape: <terminal-leaf | deterministic-sub-dag | orchestration-only | user-decision | external-tracking>
@@ -35,3 +35,17 @@ runtime_handle: <real recon-able handle>
 endpoint_verdict: <artifact + checks + acceptance evidence>
 ```
 <!-- ccm:k:end point:routing.ordered-chain -->
+
+## 失效类型
+
+`motivation_conflict`（主体：行为约束） —— 删掉后,派发者仍然知道这八步该按顺序走,但在想显得高效或已经很确信某个 target 会成功时,会选择跳步或事后补齐顺序——原文自带的三个反例(先看品牌、先排名、先写 in_flight)正是这种压力下的选择性失守。
+
+要求每次派发都完整按固定次序写出八段证据并给出理由，跳步与倒推是省力近路，规则本身不需额外方法即可遵守。
+
+## 为什么它随模型变强而更重要
+
+模型越强,'我已经很确信这个 target 能行'这种高置信度感受本身越容易被误当成资格核验已经发生过的证据;模型越强,写出的 routing record 也越擅长把跳步之后的结果包装成叙事通顺、看似完整走过八步的报告,让审阅者更难分辨这是真走过八步,还是高质量地编了一份八步说辞。
+
+## 失败形态
+
+routing record 是在派发已经成功之后才补写的——八个字段按顺序整整齐齐地出现,读起来像是真的按序收集了证据,但实际上这些字段是从已知结果反推出来的叙述,派发当时根本没有真的按这个顺序收集对应证据;任何'字段是否齐全、顺序是否正确'的检查都会判它通过。

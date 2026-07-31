@@ -44,10 +44,10 @@
   },
   "graph_metrics": {
     "module_count": 15,
-    "point_count": 68,
+    "point_count": 66,
     "internal_edge_count": 23,
-    "external_edge_count": 16,
-    "external_nav_edge_count": 16
+    "external_edge_count": 10,
+    "external_nav_edge_count": 10
   },
   "verdict": "admit",
   "witness": {
@@ -75,9 +75,9 @@
       "point:board.resume-and-interview",
       "point:board.waist-and-write",
       "point:board.worked-example",
-      "point:capacity.account-switch-gate",
-      "point:capacity.account-switch-sequence",
+      "point:capacity.post-switch-continuity",
       "point:capacity.ranking-and-contraction",
+      "point:capacity.switch-is-not-your-lever",
       "point:capacity.task-first-allocation",
       "point:conduct.deserting-podium",
       "point:conduct.never-play",
@@ -85,7 +85,6 @@
       "point:control.decision-program",
       "point:control.good-orchestration",
       "point:control.identity-mandate",
-      "point:control.navigation-map",
       "point:control.operating-lenses",
       "point:control.rationalization-guards",
       "point:control.role-consequences",
@@ -137,11 +136,10 @@
       "point:verification.loop-convergence",
       "point:verification.resume-takeover",
       "point:verification.terminal-is-not-done",
-      "point:verification.terminal-summary",
       "point:verification.user-understanding"
     ],
     "trigger_job_coherence": true,
-    "internal_cohesion": 0.338235,
+    "internal_cohesion": 0.348485,
     "external_cut_coupling": 0,
     "overlap_signature": {},
     "ssot_closure": true,
@@ -154,8 +152,8 @@
           "projected_directed_diameter": 3,
           "undirected_entry_distance_max": null,
           "directed_diameter": 3,
-          "directed_unreachable_pair_count": 4505,
-          "undirected_unreachable_count": 58
+          "directed_unreachable_pair_count": 4239,
+          "undirected_unreachable_count": 56
         },
         "policy": {
           "point_diameter_max": 3,
@@ -169,9 +167,9 @@
         "files": [
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
-            "utf8_bytes": 50577,
-            "lines": 346,
-            "estimated_tokens": 16859
+            "utf8_bytes": 50425,
+            "lines": 343,
+            "estimated_tokens": 16809
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md",
@@ -187,9 +185,9 @@
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/cost-decisions.md",
-            "utf8_bytes": 7918,
-            "lines": 37,
-            "estimated_tokens": 2640
+            "utf8_bytes": 4633,
+            "lines": 46,
+            "estimated_tokens": 1545
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/deadline-discipline.md",
@@ -253,19 +251,19 @@
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md",
-            "utf8_bytes": 15119,
-            "lines": 167,
-            "estimated_tokens": 5040
+            "utf8_bytes": 15007,
+            "lines": 165,
+            "estimated_tokens": 5003
           }
         ],
-        "utf8_bytes": 233179,
-        "estimated_lines": 2060,
+        "utf8_bytes": 229630,
+        "estimated_lines": 2064,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 77727,
+        "estimated_tokens": 76544,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }
@@ -285,7 +283,7 @@
         "point:verification.terminal-is-not-done"
       ],
       "authored_directed_diameter": null,
-      "authored_directed_unreachable_pair_count": 4505,
+      "authored_directed_unreachable_pair_count": 4239,
       "authored_directed_unreachable_sample": [
         {
           "from": "point:board.audit-and-graph",
@@ -301,15 +299,15 @@
         },
         {
           "from": "point:board.audit-and-graph",
-          "to": "point:capacity.account-switch-gate"
-        },
-        {
-          "from": "point:board.audit-and-graph",
-          "to": "point:capacity.account-switch-sequence"
+          "to": "point:capacity.post-switch-continuity"
         },
         {
           "from": "point:board.audit-and-graph",
           "to": "point:capacity.ranking-and-contraction"
+        },
+        {
+          "from": "point:board.audit-and-graph",
+          "to": "point:capacity.switch-is-not-your-lever"
         },
         {
           "from": "point:board.audit-and-graph",
@@ -367,13 +365,12 @@
         "point:board.resume-and-interview",
         "point:board.waist-and-write",
         "point:board.worked-example",
-        "point:capacity.account-switch-gate",
-        "point:capacity.account-switch-sequence",
+        "point:capacity.post-switch-continuity",
         "point:capacity.ranking-and-contraction",
+        "point:capacity.switch-is-not-your-lever",
         "point:capacity.task-first-allocation",
         "point:control.good-orchestration",
         "point:control.identity-mandate",
-        "point:control.navigation-map",
         "point:control.operating-lenses",
         "point:control.rationalization-guards",
         "point:control.role-consequences",
@@ -419,11 +416,10 @@
         "point:verification.hash-and-stale",
         "point:verification.heterogeneous-review",
         "point:verification.loop-convergence",
-        "point:verification.resume-takeover",
-        "point:verification.terminal-summary"
+        "point:verification.resume-takeover"
       ],
       "directed_diameter": 3,
-      "directed_unreachable_pair_count": 4505,
+      "directed_unreachable_pair_count": 4239,
       "directed_unreachable_sample": [
         {
           "from": "point:board.audit-and-graph",
@@ -439,15 +435,15 @@
         },
         {
           "from": "point:board.audit-and-graph",
-          "to": "point:capacity.account-switch-gate"
-        },
-        {
-          "from": "point:board.audit-and-graph",
-          "to": "point:capacity.account-switch-sequence"
+          "to": "point:capacity.post-switch-continuity"
         },
         {
           "from": "point:board.audit-and-graph",
           "to": "point:capacity.ranking-and-contraction"
+        },
+        {
+          "from": "point:board.audit-and-graph",
+          "to": "point:capacity.switch-is-not-your-lever"
         },
         {
           "from": "point:board.audit-and-graph",
@@ -466,10 +462,10 @@
     },
     "graph_metrics": {
       "module_count": 15,
-      "point_count": 68,
+      "point_count": 66,
       "internal_edge_count": 23,
-      "external_edge_count": 16,
-      "external_nav_edge_count": 16
+      "external_edge_count": 10,
+      "external_nav_edge_count": 10
     },
     "admission_gates": {
       "ok": true,

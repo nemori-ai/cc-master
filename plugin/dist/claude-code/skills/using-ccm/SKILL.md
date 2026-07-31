@@ -285,7 +285,7 @@ Knowledge navigation:
 - [references/command-catalog.md](references/command-catalog.md) —— 全量命令面:15 个 namespace（board/task/log/jc/cadence/watchdog/baseline/policy/peers/usage/estimate/account/statusline/harness/upgrade）每条命令的签名 / positional / flag 表 / 例子 / `--json` 输出形状。其中 `harness`（本机 supported harness inventory）、`upgrade`（自升级 ccm 二进制 + 插件）/ `statusline`（self-contained 状态行）是非 board 操作。
 - [references/account-pool.md](references/account-pool.md) —— 换号号池概念叙事:号池模型(指针 vs token 值)/ 录号 why / refreshToken 硬要求 / 选号方法论判据 / policy 硬闸 / vault 两形态 + 明文 floor 诚实局限。account 命令**怎么敲**看 command-catalog,**为什么这么设计**看这本。换号**决策**(何时换/谁拍板)归 master-orchestrator-guide。
 - [references/board-model-guide.md](references/board-model-guide.md) —— 面2·board 模型操作指南:领域概念(task 字段 / status 八态 / executor 五种 / judgment_call / cadence / parent / watchdog)解释 + 字段取值判断(acceptance / estimate / deps / executor 怎么选)+ 决策树 + **全部 FMT/GRAPH/BIZ 校验规则速查**(一次写对不撞 exit 3)+ footgun 深化。命令怎么敲看 command-catalog,字段填什么、概念是什么、会撞哪条规则看这本。
-- **master-orchestrator-guide** —— 决策层:该编排什么、怎么拆 DAG、何时阻塞等用户、何时换号。本 skill 是它的"手怎么动"。注:board 协议的权威定义在 `ccm` 引擎(enums / 字段元数据 / 不变式 / 状态机);本 skill 只给操作视图、不复述权威定义。
+- **master-orchestrator-guide** —— 决策层:该编排什么、怎么拆 DAG、何时阻塞等用户、配额到边界时该停还是该问。本 skill 是它的"手怎么动"。注:board 协议的权威定义在 `ccm` 引擎(enums / 字段元数据 / 不变式 / 状态机);本 skill 只给操作视图、不复述权威定义。
 - **authoring-workflows** —— 在 workflow 脚本里编排并行时怎么写(那是脚本 DSL,不是 ccm CLI)。
 - 实时真相永远以 `ccm <namespace> <cmd> --help` 为准——本文与 catalog 是地图,`--help` 是当前领土。
 <!-- ccm:k:end point:ccm.pointers-routing -->

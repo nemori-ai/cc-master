@@ -39,3 +39,17 @@ cc-master 对抗"过早停止"的确定性守卫是 **goal-hook**（`verify-boar
 因为 hook 是个 shell——它看到的是 board，不是对话——所以自检这件事得你自己来：让 board 的 `status` enum 保持诚实（依赖已满足、可派的标 `ready`，被卡住的标 `blocked`，做了但未验的标 `uncertain`），并把你的决策程序 step-6 ledger + 验收证据写进对话和 board 两边。hook 对 board 状态设闸；真正让一次 Stop 可信的，是你写下的那份自检。
 
 <!-- ccm:k:end point:hitl.decision-package -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后模型仍会准备一些材料、推进流程，但真正容易垮的是收尾那一刻——board 看起来已经"完成"，模型更容易只把状态摆成合规的样子就想停下，而不是老实做一次对照 goal 的自检并把证据写进 board。
+
+主体是 cc-master 特有的 decision_package/sidecar 协议与 goal-hook 行为（文件命名、enter_cmd 选择器、inputs_hash、hook 闸门），缺的是本项目具体事实。
+
+## 边界
+
+只在两类时刻生效——节点等待用户输入时的准备/消化，以及尝试停止时的自检；不涉及用户决策也未触发停止判断的常规推进节点不适用。没有能让自检打折扣的例外，时间紧张不构成豁免。
+
+## 失败形态
+
+最隐蔽的形态是"表面状态摆对了，自检其实是假的"——把未验证的节点悄悄标成完成态、让机械检查顺利放行，却没有真的对照 goal 核实过、也没把验收证据同步写进对话和 board；一切读起来正常，但这次停止从未被真正验证过。

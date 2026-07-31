@@ -49,7 +49,7 @@
       "reconciliations": [
         {
           "point": "point:devloop.converge",
-          "point_sha256": "4af66f5dfd94555eada068d818cb5c6493c371f1903933768d25256820f85ed1",
+          "point_sha256": "ddbf061f9e2a49fe958438721736536e070eef74dc615cfe0314541758dbf007",
           "passage_sha256": "4af66f5dfd94555eada068d818cb5c6493c371f1903933768d25256820f85ed1"
         },
         {
@@ -69,7 +69,7 @@
         },
         {
           "point": "point:devloop.instrument",
-          "point_sha256": "16f86f5536958fb327f81a88d045987011a93084a967b79bf947a17105f58c22",
+          "point_sha256": "cacdf11f421374a3bd809e91d2c117f16aa035c2c634a11522806fc4d73c564d",
           "passage_sha256": "16f86f5536958fb327f81a88d045987011a93084a967b79bf947a17105f58c22"
         },
         {
@@ -84,22 +84,22 @@
         },
         {
           "point": "point:devloop.objective",
-          "point_sha256": "ff603f7df1c8573aa4a45613901624395aa57c0dc3e5e7e923a0ac40c79928c9",
+          "point_sha256": "6967cbbd16d75dde31c59a630c7cf5bb1b223ead1eac9abdada64708b138252e",
           "passage_sha256": "ff603f7df1c8573aa4a45613901624395aa57c0dc3e5e7e923a0ac40c79928c9"
         },
         {
           "point": "point:devloop.plateau-restart",
-          "point_sha256": "21f1a98f187ca8d3e6cd1152c80f192ed5b4d0537a061df36d0810021d711c5f",
+          "point_sha256": "394d69c620f9908b59ed4c880bb7e9aed7362ffb9190c3ea31740ec58a8cf5e5",
           "passage_sha256": "21f1a98f187ca8d3e6cd1152c80f192ed5b4d0537a061df36d0810021d711c5f"
         },
         {
           "point": "point:devloop.regularize",
-          "point_sha256": "e26edb41d39bcaccb6fe9c9da2d3275f28d6b10c9a7a1e028478644e7182029a",
+          "point_sha256": "03962282821fab48bb1e146a603121c2ddc0893ba43669ea95365a73fdf33cb4",
           "passage_sha256": "e26edb41d39bcaccb6fe9c9da2d3275f28d6b10c9a7a1e028478644e7182029a"
         },
         {
           "point": "point:devloop.taste-and-cycle",
-          "point_sha256": "dfbb9088c7b079dc3797098683ce94221566dae44033cb3987d7209b696e784f",
+          "point_sha256": "c98daad803905b831c0865e79d7d9ee107417cf6eef2e4fd12740c3482f661d1",
           "passage_sha256": "dfbb9088c7b079dc3797098683ce94221566dae44033cb3987d7209b696e784f"
         },
         {
@@ -128,7 +128,7 @@
         },
         {
           "point": "point:devloop.ledger-ccm",
-          "point_sha256": "8fbb566c779a5771cfd107655f5494786d15643b82471a9b553e2190f7a909b6",
+          "point_sha256": "f1d325960af1812efe8f3c175c6e5ad6d4c8d1143240089d40beab7c1e090df6",
           "passage_sha256": "8fbb566c779a5771cfd107655f5494786d15643b82471a9b553e2190f7a909b6"
         },
         {
@@ -138,7 +138,7 @@
         },
         {
           "point": "point:devloop.ledger-what",
-          "point_sha256": "b6cde0b0d9c8f7cb7f85897967604ea386b75b060cdf5dad8d149ca3a7fe6808",
+          "point_sha256": "a289db9c01a5a1fa2fa7d1ef585e26165dc18f2c102fc0d2bf8f78775d579497",
           "passage_sha256": "b6cde0b0d9c8f7cb7f85897967604ea386b75b060cdf5dad8d149ca3a7fe6808"
         },
         {

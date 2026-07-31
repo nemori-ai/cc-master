@@ -27,3 +27,17 @@ point: handoff.procedure-and-drain
 ---
 
 <!-- ccm:k:end point:handoff.procedure-and-drain -->
+
+## 失效类型
+
+`motivation_conflict`（主体：行为约束） —— 删掉后 agent 在交接压力下容易把“子任务的执行 agent 已终止”直接等同于“父任务已完成”,跳过就地端点验收就写交接文档,或把 straggler 兜底当成整批不验的许可证。
+
+主体是交接时的纪律边界：先停派发、在当前 session 排空并亲验，甩给新 session 是更省力的近路。
+
+## 为什么它随模型变强而更重要
+
+模型越强,越能把“agent 进程已退出、产物文件存在”包装成一段听起来完整的验收叙事,却始终没有真正读 diff、跑闸——越会写故事,就越容易说服自己这就够了。
+
+## 失败形态
+
+六步流程走得规规矩矩、文档也写了,但某个标“done”的任务其实只是它的执行 agent 终止、产物文件存在,没人真正跑过验收闸或读过 diff——formatting 完全合规,验收环节已被悄悄空心化。

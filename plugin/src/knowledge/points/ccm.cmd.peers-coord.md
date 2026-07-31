@@ -129,3 +129,9 @@ ccm coordination arbitrate [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.peers-coord -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 二进制对 peers 与 coordination namespace（list、inbox、subscription、notify、arbitrate）的具体实现事实
+
+peers 花名册字段与 coordination inbox/notify/arbitrate 的 kind 闭集、写关卡行为是本项目数据模型事实。

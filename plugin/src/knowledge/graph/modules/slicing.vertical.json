@@ -188,68 +188,6 @@
       "order": 1
     },
     {
-      "id": "edge:slicing.vertical-to-example",
-      "type": "applies_to",
-      "from": "point:slicing.vertical-rule",
-      "to": "point:slicing.example-contrast",
-      "when": [
-        "需要具体横切/纵切对照"
-      ],
-      "path_role": "support",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:slicing.vertical-to-example"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge.slicing.vertical-to-example"
-          }
-        ]
-      }
-    },
-    {
-      "id": "edge:slicing.why-to-example",
-      "type": "applies_to",
-      "from": "point:slicing.why-cut",
-      "to": "point:slicing.example-contrast",
-      "when": [
-        "用样例证明切法杠杆"
-      ],
-      "path_role": "support",
-      "runtime": {
-        "enabled_by_default": true
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-24"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "edge:slicing.why-to-example"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "golden",
-            "ref": "golden.edge:slicing.why-to-example"
-          }
-        ]
-      }
-    },
-    {
       "id": "edge:slicing.vertical-to-why",
       "type": "routes_to",
       "from": "point:slicing.vertical-rule",
@@ -307,6 +245,68 @@
           {
             "kind": "golden",
             "ref": "golden.edge:slicing.hub-from.why-cut"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.vertical-to-example",
+      "type": "applies_to",
+      "from": "point:slicing.vertical-rule",
+      "to": "point:slicing.example-contrast",
+      "when": [
+        "需要具体横切/纵切对照"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.vertical-to-example"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.slicing.vertical-to-example"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:slicing.why-to-example",
+      "type": "applies_to",
+      "from": "point:slicing.why-cut",
+      "to": "point:slicing.example-contrast",
+      "when": [
+        "用样例证明切法杠杆"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "accepted",
+        "since": "2026-07-24"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "edge:slicing.why-to-example"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge:slicing.why-to-example"
           }
         ]
       }

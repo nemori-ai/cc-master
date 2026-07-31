@@ -46,3 +46,17 @@ ccm task block T9 --on user --decision @/abs/path/decision.json
 ---
 
 <!-- ccm:k:end point:ccm.board.blocked-on -->
+
+## 失效类型
+
+`environment_fact`（双重性质·方法部分补不回来，它才是承重结构） —— 删掉后 agent 仍然知道字段语法，但会在推进压力下把本该停下等用户拍板的 must-escalate 决定，包装成一条 judgment_call 径直做掉——没有任何 lint 能拦住这种语义层面的伪装。
+
+主体是 ccm 的 blocked_on 合法取值、unblock verb 与 decision_package 字段清单，缺了会写错本工具的具体字段而非缺方法。
+
+## 边界
+
+本点只管『要不要设 blocked_on、设成什么值』这一步的取舍规则与字段语法，不管 decision_package 里 context_md / question 写得够不够扎实、不管怎么和用户把决策谈透，也不管 ready/blocked 由 deps 自动门控的机制本身。
+
+## 失败形态
+
+最隐蔽的违反是『看起来很负责』：agent 没有报错也没有卡住，反而留下一条写得工整、理由充分的 judgment_call 记录，把一个理应交给用户拍板的决定悄悄执行了——board 状态和 log 都『合规』存在，唯独用户从未被真正问过。

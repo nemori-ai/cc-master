@@ -61,3 +61,13 @@ ccm jc add "选用 ICU MessageFormat 而非自研格式化" \
 ---
 
 <!-- ccm:k:end point:ccm.board.jc-judgment -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型不知道 jc 这套具体字段（category 四选一、severity 对应汇报口径）与何时该建 jc、何时该转 blocked_on:user 的边界，可能选错枚举或用错命令语法。
+
+主体是 ccm judgment_call 这个对象的建立判据、category/severity 枚举与生命周期，离开 ccm 就不存在。
+
+## 失败形态
+
+隐蔽违反：为避免引起用户注意，把实际影响架构或核心路径的决定标成 severity:low——技术上建了 jc、有审计记录，实质分级被压低，汇报时混在大量 low 条目里被忽略，等于变相隐瞒。

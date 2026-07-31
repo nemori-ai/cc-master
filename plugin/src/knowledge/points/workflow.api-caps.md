@@ -13,3 +13,9 @@ point: workflow.api-caps
 - 脚本大小：512 KB。
 
 <!-- ccm:k:end point:workflow.api-caps -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道 workflow 的并发上限、单次 run 最多多少 agent、脚本最大多少 KB，超了踩雷。
+
+并发/agent 总量/item 数/脚本大小的具体上限值是环境常量。

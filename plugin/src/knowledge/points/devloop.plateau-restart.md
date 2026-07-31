@@ -20,8 +20,21 @@ point: devloop.plateau-restart
 
 orchestrator 的 restart 不只是一句"继续试":可以换 hypothesis、拆小任务、派 instrumentation builder、换 evaluator、重切 acceptance、或把失败路径记成 artifact。重启是优化动作,不是失败遮羞。
 
-> **board 接地**:换方向不是"失败收场"、它是 board 状态机里的一档,显式记下来比闷头死磕诚实得多。别把"该 restart 的时刻"硬扛在 `in_flight` 里假装还在下降;用 `using-ccm` 选择正确状态转移,并把失败路径 / 新 hypothesis / 下一步 probe 写进 optimization ledger。
+> **board 接地**:换方向不是"失败收场"、它是 board 状态机里的一档,显式记下来比闷头死磕诚实得多。别把"该 restart 的时刻"硬扛在 `in_flight` 里假装还在下降;选择正确状态转移,并把失败路径 / 新 hypothesis / 下一步 probe 写进 optimization ledger。
 
 ---
-
 <!-- ccm:k:end point:devloop.plateau-restart -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后,agent 方案卡住时会倾向于继续在同一方案上打补丁,被已投入的时间和改动量绑架,而不识别该换方向的信号。
+
+主体是识别局部最小值的信号清单与 restart 的优化学解释，文本自己声明钻牛角尖不是道德缺陷而是没识别出该 restart 的时刻，缺的是判据。
+
+## 边界
+
+适用于单个任务/方案层面的迭代僵局判断;刚起步、还没积累『改了又改却不缩小差距』证据的探索阶段不该被误判成卡住。若已排除所有替代方案、restart 无处可去,这不算例外,应升级为向上 surface,而非继续硬撑。
+
+## 失败形态
+
+连续多轮改动记录都写着『修复了 XX 边界情况』『再调整一下 YY』,单条都合理、都在『进展』,但整体离验收的距离几乎没变,也没人在任何节点提出『要不要换方案』——披着『持续在动』外衣的 plateau 最难被识破。

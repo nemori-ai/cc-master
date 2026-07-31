@@ -16,3 +16,9 @@ point: workflow.pattern-pr-triage
 ---
 
 <!-- ccm:k:end point:workflow.pattern-pr-triage -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后,遇到'一批未知列表的 PR/issue 需要分类定优先级'时,不知道项目里已经有一份 scout-then-fanout + judge-panel 的组合配方和可运行示例脚本,只能临时现拼,还可能拼错顺序。
+
+主体是 scout-then-fanout 加 judge-panel 组合出 backlog triage 的复合形状方法。

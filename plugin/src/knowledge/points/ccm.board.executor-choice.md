@@ -54,3 +54,13 @@ point: ccm.board.executor-choice
 ---
 
 <!-- ccm:k:end point:ccm.board.executor-choice -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型会凭通用直觉猜 executor 该填什么值，可能选错枚举或漏填 external 必须的 issue 引用，导致 board 记录的执行方式与实际不符。
+
+主体是 executor 五个枚举值的语义、必填字段与 handle 关系，反模式是附加条款不改变接口事实的主体。
+
+## 失败形态
+
+隐蔽违反：任务已转 in_flight 且 handle 非空、能过 lint，但那个 handle 是编造或照抄他处格式，并非派发工具真实返回的句柄——形式合规，resume 时却按图索骥找不到真实任务。

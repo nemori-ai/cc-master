@@ -17,3 +17,9 @@ bump。这是带 `isolation: 'worktree'` 的 **discover → transform → verify
 ---
 
 <!-- ccm:k:end point:workflow.pattern-dep-upgrade -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 模型可能不知道如何将依赖隔离升级的 discover-transform-verify 形态与 worktree 隔离结合，保留仅通过 gate 的 bump
+
+主体是 discover→transform→verify 加 worktree 隔离的批量升级形状，是一套方法而非本项目事实。

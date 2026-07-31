@@ -36,3 +36,13 @@ point: handoff.rationale-and-guards
 
 > **违背字面就是违背精神。** handoff 文档的纪律是「叙事层 carries board 装不下的，绝不复抄 board 已装下的」——当你开始论证「这段 status 走查写成了英文所以算叙事」，那正是噪声穿叙事外衣的那一刻。
 <!-- ccm:k:end point:handoff.rationale-and-guards -->
+
+## 失效类型
+
+`motivation_conflict`（主体：行为约束） —— 知道 handoff 文档不该复抄 board、该只写 board 装不下的判断，但在“接手的人可能没法问我”的焦虑下，仍会倾向于把状态多写一点求稳。
+
+归档机制的解释之外，主体是 Rationalization Table 与 Red Flags——压力下会被合理化掉的交接纪律。
+
+## 为什么它随模型变强而更重要
+
+模型的文笔越流畅，越能把一段纯粹的 status 转写包装成读起来像是有独立判断的叙事，让接手者分辨不出这段话到底是在转述 board 还是真的提供了 board 之外的信息，以假乱真的门槛随文笔能力一起降低。

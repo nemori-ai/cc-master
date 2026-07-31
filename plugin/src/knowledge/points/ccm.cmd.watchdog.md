@@ -63,3 +63,9 @@ ccm watchdog status [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.watchdog -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型不知道这个项目里 ccm watchdog 命令的确切 flags、mechanism 枚举值和原子性规则
+
+主体是 ccm watchdog arm/disarm/status 的 flag、枚举与原子性事实，删掉就敲不对本工具的命令。

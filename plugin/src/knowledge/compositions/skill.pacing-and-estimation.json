@@ -63,7 +63,7 @@
       "reconciliations": [
         {
           "point": "point:pacing.machine-wide-first",
-          "point_sha256": "994aa1b391f1a5c483bb9f9feffcff0342a291dd6ec884dc3f1d6fe7f6389248",
+          "point_sha256": "f4fd21ff53c18f94dac17e387a1f966fa132a1de87f1e8edb8bdef29c3588808",
           "passage_sha256": "994aa1b391f1a5c483bb9f9feffcff0342a291dd6ec884dc3f1d6fe7f6389248"
         },
         {
@@ -93,7 +93,7 @@
       "reconciliations": [
         {
           "point": "point:pacing.selected-target-facts",
-          "point_sha256": "e417f1a97de257837d5c8f92b323e716e398ddd48d615c81a84d88680b93e56e",
+          "point_sha256": "922ed313881855f1a3f33d3f0a3e1f5687c7eb99c9859b4e07c1b1086555c8d7",
           "passage_sha256": "e417f1a97de257837d5c8f92b323e716e398ddd48d615c81a84d88680b93e56e"
         }
       ]
@@ -109,13 +109,13 @@
       "reconciliations": [
         {
           "point": "point:pacing.decision-vectors",
-          "point_sha256": "5611d76d9fb5eb4bbf058acc132a697e1f1aff8bee92e85739afc203952dd42f",
+          "point_sha256": "75c43f1b9645b81c25632cd2eea38bbaf85e43a2220ec898d93f31f3761d6f23",
           "passage_sha256": "5611d76d9fb5eb4bbf058acc132a697e1f1aff8bee92e85739afc203952dd42f"
         },
         {
           "point": "point:pacing.upper-bound-only",
-          "point_sha256": "3a935a4ffa3375f6dff507cecfa090b6d47d3e7a6cfc6033d6db7a012a183a82",
-          "passage_sha256": "3a935a4ffa3375f6dff507cecfa090b6d47d3e7a6cfc6033d6db7a012a183a82"
+          "point_sha256": "27eaece4d4d89c820d902b600937e66c886fef333c3a2db8ddc8b1aa382b7e4d",
+          "passage_sha256": "27eaece4d4d89c820d902b600937e66c886fef333c3a2db8ddc8b1aa382b7e4d"
         }
       ]
     },
@@ -131,12 +131,12 @@
       "reconciliations": [
         {
           "point": "point:pacing.own-row",
-          "point_sha256": "b2fa85c399ba5f054d8d19d0ab6fe38288bcfacc3a2580ef57e81f9569e35a2e",
-          "passage_sha256": "b2fa85c399ba5f054d8d19d0ab6fe38288bcfacc3a2580ef57e81f9569e35a2e"
+          "point_sha256": "0bde8028ab26bdaf24c6ffbd628fd7bcbae8b86c57e347ecd5c9e947a9f19b4d",
+          "passage_sha256": "2b2139bdbd862088c88c2c60cf33d7a36d60bc5feed3cde4467714bb8739aca4"
         },
         {
           "point": "point:pacing.pool-rationalization",
-          "point_sha256": "e0c925d149ae3c4b913593db12ffd5101c0c3d884348b4513539dda23b0ce7f0",
+          "point_sha256": "b29218ca3b7ea4322740b115a6791b2b2f40d494349638fb706dd87e5b0c739a",
           "passage_sha256": "e0c925d149ae3c4b913593db12ffd5101c0c3d884348b4513539dda23b0ce7f0"
         },
         {
@@ -160,17 +160,17 @@
       "reconciliations": [
         {
           "point": "point:pacing.baseline-precondition",
-          "point_sha256": "9804786e34d4f856b11fe105dc5a513080cfab53555ad4fb1253c455eedc698f",
+          "point_sha256": "22cc9fbbc8341ebdb12de466e6eada4f59df87c572ad24809ab1b3ebc3877440",
           "passage_sha256": "9804786e34d4f856b11fe105dc5a513080cfab53555ad4fb1253c455eedc698f"
         },
         {
           "point": "point:pacing.deadline-risk",
-          "point_sha256": "62ef0a6e08d3a9c42535437fefb92bc600fc839d1cc575fddcb17096ab7893ae",
+          "point_sha256": "e316b02fca8ca340c2df25c1aa228e186f2e25ba6b66e9264913ffba3183ed0a",
           "passage_sha256": "62ef0a6e08d3a9c42535437fefb92bc600fc839d1cc575fddcb17096ab7893ae"
         },
         {
           "point": "point:pacing.estimate-verbs",
-          "point_sha256": "7529b01fe67e7d44f6344a7f25f4b8b72511cde9b7da4da3a3d9dba5aa2807ad",
+          "point_sha256": "35a886ebf49316acb9e9da4afb0f124d7e9a7904b9d47815de8aa6133b1f78eb",
           "passage_sha256": "7529b01fe67e7d44f6344a7f25f4b8b72511cde9b7da4da3a3d9dba5aa2807ad"
         },
         {
@@ -180,7 +180,7 @@
         },
         {
           "point": "point:pacing.usage-estimate-tension",
-          "point_sha256": "f71627ec085081eba14ca794a16731117ced4f796e88220d24a1c954cd3c684d",
+          "point_sha256": "5f4598dd70d234877cb2ca4adb0aae7cf6537f260def84667bf6a8b20870d392",
           "passage_sha256": "f71627ec085081eba14ca794a16731117ced4f796e88220d24a1c954cd3c684d"
         }
       ]
@@ -195,7 +195,7 @@
       "reconciliations": [
         {
           "point": "point:pacing.model-tier-facts",
-          "point_sha256": "37c8128d55c921a12dc145243566fb0b4a7de64bb96a1cb5ab029062ae5a8f40",
+          "point_sha256": "8fca803d6721a50ba0e1a71646b2a7a7833da318b738f165e7a7b55874fa17a0",
           "passage_sha256": "37c8128d55c921a12dc145243566fb0b4a7de64bb96a1cb5ab029062ae5a8f40"
         }
       ]

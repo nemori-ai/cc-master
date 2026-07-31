@@ -2,29 +2,30 @@
   "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
   "kind": "module",
   "id": "module:capacity.account-switch",
-  "title": "账号切换决策锚",
-  "intent": "仅在订阅账号池语义存在时守住换号 lever 的授权 gate 与切后重验序列。",
+  "title": "换号不归编排器",
+  "intent": "守住「哪份配额在用由后台机器层统管、编排器既不决策也不执行」这条边界，并说明后台切换发生后编排器该做与不该做什么。",
   "recognition_cues": [
     "selected target hard quota 烧穿",
-    "考虑换账号",
-    "需要重验 payer/quota binding"
+    "想换账号绕过容量边界",
+    "收到账号已切换的通报"
   ],
   "boundary": {
     "includes": [
-      "换号触发条件",
-      "用户授权边界",
-      "切换后 recon"
+      "配额到边界时编排器的合法动作",
+      "换号为何不在编排器的 lever 清单里",
+      "后台切换后的连续性与不该做的过度反应"
     ],
     "excludes": [
       "account CLI 实现",
-      "不支持订阅号池的 host"
+      "选号算法与凭证机制",
+      "后台容量管控层自身的调度策略"
     ]
   },
   "access": {
     "class": "on_demand",
     "relevant_entries": [],
     "primary_points": [],
-    "rationale": "仅在 host 支持订阅账号池且真实触发换号 lever 时 drill。"
+    "rationale": "仅在 selected target 逼近硬边界、或收到后台换号通报时 drill。"
   },
   "lifecycle": {
     "state": "accepted",
@@ -46,32 +47,33 @@
   },
   "points": [
     {
-      "id": "point:capacity.account-switch-gate",
-      "title": "换号 lever 授权 gate",
+      "id": "point:capacity.switch-is-not-your-lever",
+      "title": "换号不在你的 lever 清单里",
       "point_kind": "boundary",
-      "summary": "仅在 selected target 窗口确实烧穿、备号存在且 policy/用户授权允许时考虑换号。",
+      "summary": "配额吃紧时编排器只能在同一份配额内腾挪；换哪份配额由后台机器层统管，除非用户直接命令，否则既不判断也不执行，更不给自己放权。",
       "recognition_cues": [
         "想换账号绕过容量",
-        "selected target hard boundary"
+        "selected target hard boundary",
+        "池子里还有备号所以先切一个"
       ],
       "binding": {
-        "path": "plugin/src/knowledge/points/capacity.account-switch-gate.md",
-        "marker": "point:capacity.account-switch-gate",
-        "heading_hint": "换号 lever"
+        "path": "plugin/src/knowledge/points/capacity.switch-is-not-your-lever.md",
+        "marker": "point:capacity.switch-is-not-your-lever",
+        "heading_hint": "换号不归你"
       },
       "authority": {
         "role": "canonical",
-        "subject": "subject:capacity.account-switch-gate"
+        "subject": "subject:capacity.switch-is-not-your-lever"
       },
       "lifecycle": {
         "state": "accepted",
-        "since": "2026-07-24"
+        "since": "2026-07-30"
       },
       "admission": {
         "evidence": [
           {
             "kind": "canonical-prose",
-            "ref": "cost-decisions.md gate"
+            "ref": "cost-decisions.md 容量边界"
           }
         ],
         "verifiers": [
@@ -83,31 +85,32 @@
       }
     },
     {
-      "id": "point:capacity.account-switch-sequence",
-      "title": "换号决策序列",
-      "point_kind": "procedure",
-      "summary": "先停派与 surface，再经 policy 执行，切后重验 payer/quota binding。",
+      "id": "point:capacity.post-switch-continuity",
+      "title": "后台换号后的连续性",
+      "point_kind": "boundary",
+      "summary": "收到换号通报只需刷新配速读数；看板、在飞作业与会话都未受影响，不要重建或重派，也不要把它读成自己获得了这根 lever。",
       "recognition_cues": [
-        "换号已获明确授权"
+        "收到账号已切换的通报",
+        "换号后要不要重派在飞任务"
       ],
       "binding": {
-        "path": "plugin/src/knowledge/points/capacity.account-switch-sequence.md",
-        "marker": "point:capacity.account-switch-sequence",
-        "heading_hint": "编排决策序列"
+        "path": "plugin/src/knowledge/points/capacity.post-switch-continuity.md",
+        "marker": "point:capacity.post-switch-continuity",
+        "heading_hint": "换号之后"
       },
       "authority": {
         "role": "canonical",
-        "subject": "subject:capacity.account-switch-sequence"
+        "subject": "subject:capacity.post-switch-continuity"
       },
       "lifecycle": {
         "state": "accepted",
-        "since": "2026-07-24"
+        "since": "2026-07-30"
       },
       "admission": {
         "evidence": [
           {
             "kind": "canonical-prose",
-            "ref": "cost-decisions.md sequence"
+            "ref": "cost-decisions.md 切后连续性"
           }
         ],
         "verifiers": [
@@ -123,10 +126,10 @@
     {
       "id": "edge:account-switch-gate-to-policy-vault",
       "type": "routes_to",
-      "from": "point:capacity.account-switch-gate",
+      "from": "point:capacity.switch-is-not-your-lever",
       "to": "point:ccm.account-policy-vault",
       "when": [
-        "换号决策已经作出，要知道机制层的硬闸与凭证是怎么回事"
+        "用户直接命令换号，要照他的话跑一条命令，需要知道机制层的硬闸与凭证是怎么回事"
       ],
       "path_role": "route",
       "runtime": {
@@ -140,7 +143,7 @@
         "evidence": [
           {
             "kind": "canonical-prose",
-            "ref": "master-orchestrator-guide/canonical/references/cost-decisions.md：机制层另有一道硬闸兜底"
+            "ref": "master-orchestrator-guide/canonical/references/cost-decisions.md：用户直接命令时怎么执行"
           }
         ],
         "verifiers": [
@@ -154,10 +157,10 @@
     {
       "id": "edge:account-switch-gate-to-decision-vectors",
       "type": "routes_to",
-      "from": "point:capacity.account-switch-gate",
+      "from": "point:capacity.switch-is-not-your-lever",
       "to": "point:pacing.decision-vectors",
       "when": [
-        "在动最重的换号 lever 之前，要先看轻 lever 还够不够"
+        "配额吃紧，要在同一份配额之内找还能动的 lever"
       ],
       "path_role": "route",
       "runtime": {
@@ -171,7 +174,7 @@
         "evidence": [
           {
             "kind": "canonical-prose",
-            "ref": "master-orchestrator-guide/canonical/references/cost-decisions.md：减速侧轻 lever 在同一份配额内腾挪"
+            "ref": "master-orchestrator-guide/canonical/references/cost-decisions.md：你手上的 lever 全都落在同一份配额之内"
           }
         ],
         "verifiers": [

@@ -19,3 +19,17 @@ point: workflow.api-budget
   `remaining()` 就是 `Infinity`，loop 会一路冲到 1,000-agent 的 cap。
 
 <!-- ccm:k:end point:workflow.api-budget -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型不知道硬上限守卫的具体形式，会写出 `while (budget.remaining() > 50_000)` 这样的漏洞，在 total=null 时无限扩张。
+
+budget 对象的字段语义、共享范围与守卫写法是本框架的接口事实。
+
+## 边界
+
+仅适用于循环次数不可预测的 workflow 模式（如发现循环、条件逐步细化）；固定迭代次数的 workflow 不需要此守卫。
+
+## 失败形态
+
+loop 条件写法从 `while (budget.total && budget.remaining() > THRESHOLD)` 变成 `while (budget.remaining() > THRESHOLD)`，在 total=null 时无限扩张；或条件整个被删除。

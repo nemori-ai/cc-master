@@ -41,3 +41,13 @@ point: ccm.status-state-machine
 | "我赶时间,`task update --status done` 一条搞定,省得 start 再 done 两步。" | `task update` 没有 `--status` flag(exit 2),`ready→done` 也非法(exit 3)——这条"省一步"两次都会失败,反而更慢。`start` 再 `done` 才是真正的两步到位。 |
 | "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 只给非 native-active 的真异常态留逃生口、会记 log；重跑 stale/failed/escalated 有 `task retry`，native-active projection 则在 mutation boundary 明确拒绝 `--force`。正常完成用它跳过 `in_flight`，等于亲手制造一个没 `started_at` 的 "done"——你在伪造审计轨迹。 |
 <!-- ccm:k:end point:ccm.status-state-machine -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型知道也记得要走状态机 verb，但在报错或赶时间时会说服自己用字段赋值或 --force 抄近道更快，删掉这条会让这种「这次特殊情况」式抄近道失去唯一的正面拦截。
+
+主体是 status 状态机的合法转移表、生命周期 verb 与自动门控规则，是接口事实；末尾 Rationalization Table 是附加条款。
+
+## 失败形态
+
+用 --force 顶过一次不合法转移后，board 上呈现的完成态字段齐全、终态检查形式上通过，但这个 task 从未真正经历过中间运行态，时序字段是伪造出的完成假象——审计链已经断裂，却难以从静态快照看出。

@@ -41,3 +41,9 @@ point: ccm.cmd.account
 ---
 
 <!-- ccm:k:end point:ccm.cmd.account -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm account 各命令的准确 flag 和 option，agent 会敲出语法错误命令或选错参数组合
+
+主体是 account namespace 的命令语法与 flag 清单，纯 CLI grammar 事实。

@@ -17,3 +17,17 @@ point: scheduling.node-contract
 
 > **字段怎么落进 board**（`acceptance` / `estimate` / `deps` / `executor` 怎么写、撞哪条校验规则）见 {{USING_CCM_BOARD_MODEL_POINTER}}——本文只给排期判断，不教 ccm 命令与字段取值。
 <!-- ccm:k:end point:scheduling.node-contract -->
+
+## 失效类型
+
+`capability_gap`（双重性质·方法部分补不回来，它才是承重结构） —— 删掉后,orchestrator 在时间压力下仍然会派发,但会跳过完整定义五个契约字段,直接用一句模糊指令派工,分歧要到交付才暴露。
+
+主体是节点契约五要素（deps/schema/success predicate/budget/escalation）的设计框架。
+
+## 边界
+
+适用于跨越执行边界被派发的节点(subagent/workflow/后台任务);orchestrator 自己执行的原子协调动作(如读一次状态、写一次字段)不构成'派发的节点',不需要这五项契约。
+
+## 失败形态
+
+五个字段表面填满、通过'有没有写全'的形式检查,但 escalation condition 写成'遇到困难及时上报'这类没有可判定阈值的套话——它永不会真的触发,执行者会在同一方案上反复重试到耗尽预算,而不是在该停的时刻停下。

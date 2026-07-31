@@ -73,3 +73,13 @@ verified = true   ← 端点验收通过
 ---
 
 <!-- ccm:k:end point:ccm.board.artifact-verified -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 模型不知道 verified 是与 status 正交的独立布尔且有硬校验把关，可能想当然地认为 status=done 就代表已验收，或不知道重跑要靠 task retry 重置。
+
+删掉后不知 references/artifact/verified 字段语义与 BIZ-DONE-VERIFIED 等本项目约定。
+
+## 失败形态
+
+隐蔽违反：artifact 字段非空、能过 lint，但链接指向的是自动生成的日志或占位文件，并非真正被端点验收过的产出——形式满足'非空'，实质没有人看过。

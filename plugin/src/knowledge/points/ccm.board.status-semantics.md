@@ -96,3 +96,9 @@ stale      → ready
 ---
 
 <!-- ccm:k:end point:ccm.board.status-semantics -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉后，agent 不知道这个工具具体的 8 态语义、自动门控规则与 --force 的代价，会手改出不一致状态或滥用逃生口伪造进度。
+
+主体是八个 status 的语义、合法转移表与 reconcileGating 行为，--force 那句是附加条款。

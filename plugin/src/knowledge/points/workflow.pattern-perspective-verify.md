@@ -26,3 +26,17 @@ const verdicts = await parallel(LENSES.map((lens) => () =>
 ---
 
 <!-- ccm:k:end point:workflow.pattern-perspective-verify -->
+
+## 失效类型
+
+`environment_fact`（双重性质·方法部分补不回来，它才是承重结构） —— 模型知道多角度验证有价值，但耗时，压力下会跳过某些 lens、或用不完整的角度组合验证
+
+多 lens 验证的想法通用，但承重的是本框架 parallel()+label 的写法与它与 review 示例 DIMENSIONS 的对应关系。
+
+## 边界
+
+系统性改动（refactor / migration / security patch）需要多面向验证；小的 bug fix 或新增单一模块可能过度防卫
+
+## 失败形态
+
+各个 lens 验证深度不对等（深度验证某一面，草率验证其他面）；或某些 lens 验证时带着确认偏差；或 lens 组合不全，漏掉会影响决策的某一面

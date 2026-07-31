@@ -69,3 +69,13 @@ handle，最后重新 arm。legacy 缺 handle 只触发 `FMT-WATCHDOG` warn，�
 ---
 
 <!-- ccm:k:end point:ccm.board.watchdog -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删除后,agent 在真实调度机制(如 cron job)还没配好、但又想尽快让 arm 命令跑通时,会用占位符填满必填的 job_id,而不是先建好真实机制再 arm,watchdog 名义上 armed 实际没人会来唤醒。
+
+主体是 watchdog 的 arm 判据、字段含义与 disarm/self-heal 命令，属于本工具的具体机制事实。
+
+## 失败形态
+
+job_id 字段填了一个语法合法但语义为假的值(如复制上次的 id、填 pending),FMT 校验只查非空会直接放行,直到 fire_at 到期无人唤醒,静默失败盲区才暴露。

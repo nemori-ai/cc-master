@@ -51,7 +51,7 @@
       "reconciliations": [
         {
           "point": "point:workflow.admission",
-          "point_sha256": "5c44386f769bf5d9229c1fa65c9b7f40a8210d2154a38472ce77cba31da4cbbd",
+          "point_sha256": "fefd1e92246b1a05575ab0fb9cc40ea26c2550a54952942db3a8d5cc48100276",
           "passage_sha256": "5c44386f769bf5d9229c1fa65c9b7f40a8210d2154a38472ce77cba31da4cbbd"
         },
         {
@@ -277,7 +277,7 @@
         },
         {
           "point": "point:workflow.pattern-migration",
-          "point_sha256": "2a956c894cf7501dfefabe93600231e601c4b77f08bd1304cc408e46697dde08",
+          "point_sha256": "85febca6a00e01d7fe8d11c7eda37027c51cca97f16e70fb25ce9e1147109133",
           "passage_sha256": "2a956c894cf7501dfefabe93600231e601c4b77f08bd1304cc408e46697dde08"
         },
         {

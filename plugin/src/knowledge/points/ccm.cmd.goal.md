@@ -97,3 +97,9 @@ ccm goal deadline show [--json]
 - exit：0 成功·2 用法错（非 ISO / precision=day 缺 tz-input / amend 缺 reason）·3 校验拒绝（confirm 缺 --user-authorized / set 已 confirmed / 写后 FMT-DEADLINE）。
 
 <!-- ccm:k:end point:ccm.cmd.goal -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm goal namespace 的具体命令、flag、exit code，模型按旧文档或猜测敲命令会踩 exit 2/3
+
+Goal Contract 与 deadline 子命令的必填 flag、四态状态机和 exit code 是本项目专属写入面。

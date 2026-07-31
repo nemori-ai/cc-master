@@ -37,8 +37,8 @@
     "module_count": 6,
     "point_count": 16,
     "internal_edge_count": 38,
-    "external_edge_count": 3,
-    "external_nav_edge_count": 3
+    "external_edge_count": 2,
+    "external_nav_edge_count": 2
   },
   "verdict": "admit",
   "witness": {
@@ -117,15 +117,15 @@
           },
           {
             "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md",
-            "utf8_bytes": 2258,
+            "utf8_bytes": 2318,
             "lines": 33,
-            "estimated_tokens": 753
+            "estimated_tokens": 773
           },
           {
             "path": "plugin/src/skills/pacing-and-estimation/canonical/references/pool-aware-advice.md",
-            "utf8_bytes": 4156,
+            "utf8_bytes": 4193,
             "lines": 48,
-            "estimated_tokens": 1386
+            "estimated_tokens": 1398
           },
           {
             "path": "plugin/src/skills/pacing-and-estimation/canonical/references/estimation.md",
@@ -140,14 +140,14 @@
             "estimated_tokens": 670
           }
         ],
-        "utf8_bytes": 25449,
+        "utf8_bytes": 25546,
         "estimated_lines": 273,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 8483,
+        "estimated_tokens": 8516,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }
@@ -224,8 +224,8 @@
       "module_count": 6,
       "point_count": 16,
       "internal_edge_count": 38,
-      "external_edge_count": 3,
-      "external_nav_edge_count": 3
+      "external_edge_count": 2,
+      "external_nav_edge_count": 2
     },
     "admission_gates": {
       "ok": true,

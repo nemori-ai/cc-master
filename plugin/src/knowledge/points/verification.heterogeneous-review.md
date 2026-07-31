@@ -42,3 +42,17 @@ point: verification.heterogeneous-review
 ---
 
 <!-- ccm:k:end point:verification.heterogeneous-review -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后，agent 拿到第二视角 verdict 容易走捷径——把 approve 当自动通过、把 needs-attention 当自动 replan，或因对方模型档位较弱就整体略过，'第二双眼睛'变成没有约束力的仪式。
+
+主体是异构二审的原则（换族不换壳、收益不对称）与 finding 四档 reconcile 判据，是一套方法。
+
+## 边界
+
+当前 host 客观上只有单一模型族可调用（没有第二家族的验收工具/账号）时，这条约束因资源不可得而无法满足，只能退化为同族复核并显式标注局限，不能假装已完成异构复核。
+
+## 失败形态
+
+隐蔽违反：四档 RECONCILE 表面每条都归了类，但落进 noise 的理由是空洞套话（只写'reviewer 缺上下文'不说缺什么），形式上完成了归类，实质没有真的对着产物核对。

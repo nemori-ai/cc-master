@@ -137,3 +137,9 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.misc-ns -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 缺 ccm 二进制对 statusline、attempt、harness、upgrade 四个 namespace 的具体实现事实
+
+attempt/harness/upgrade 三个 namespace 的探测语义、surface descriptor 与版本解析规则都是本机本项目的事实。

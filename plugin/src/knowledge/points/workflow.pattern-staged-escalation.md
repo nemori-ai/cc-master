@@ -16,3 +16,17 @@ point: workflow.pattern-staged-escalation
 
 **由谁演示：** `assets/examples/staged-escalation.js`。
 <!-- ccm:k:end point:workflow.pattern-staged-escalation -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉这条，模型不知道「先廉价、条件短路、才升级强模型」这个特定模式，倾向一上来就用强模型或无条件双阶段。
+
+主体是先便宜 pass、按信心阈值有条件升级到强模型这一成本分配方法。
+
+## 边界
+
+仅用于廉价模型的信心度和错误率都足以作为门控条件的场景；信心阈值设定需要通过试跑验证，不能凭猜测。
+
+## 失败形态
+
+Escalation 分支在 resume 时因 model 改了而被视为新 cache key 被 live 重跑；或 stage 1 的短路条件写反导致无条件上升级；或没有实现「stage 1 命中高信心则原样返回」的短路。

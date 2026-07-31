@@ -24,6 +24,20 @@ point: pacing.selected-target-facts
 任何承重事实 unknown、stale、conflicting 或 tight 都保持 `insufficient` 并交给决策层 fail closed；不要在这里
 启动、停止或验收 worker，也不要解释 worker 的执行终态与副作用。
 
-目标 agent command 的真实 help 与调用语法只查 `using-ccm`。本页不复制 provider CLI flags、model
+本页不复制 provider CLI flags、model
 catalog 或 model/effort 参数，也不把易腐的 provider 命令面改写成 ccm 标准参数。
 <!-- ccm:k:end point:pacing.selected-target-facts -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删除后,agent 在某一项事实 unknown/stale 时,会倾向于拼凑不同候选、不同时点的其它证据凑出一个看起来完整的 eligible 结论,而不是老实判 insufficient 交给决策层 fail closed。
+
+主体是 surface/model/quota/binding 四类证据在本项目的具体语义与命令面（fresh≠entitlement、available≠headroom），fail-closed 只是附加条款。
+
+## 边界
+
+唯一客观成立的例外是系统里当下只存在一个候选(没有其它 target 可供误拼),此时跨候选拼接的风险本身不存在,binding 要求天然满足,不需要额外交叉核验同一 freshness。
+
+## 失败形态
+
+输出的 eligible 结论格式上齐全——附了 provenance、freshness,每个字段单独看都不为空,但细究会发现 surface 取自候选 X 的最新读数、quota 却是候选 Y 几分钟前的缓存,两者从未在同一 freshness 时点共同成立。

@@ -117,7 +117,7 @@
 
 - `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
 - `meta.contracts.task_planning` + `meta.contracts.agent_routing`——routing contract 的成对 activation marker，只用 `ccm board enable-contract` 写；两者都缺表示 legacy，成对精确启用才是 enabled，部分写入 / 版本不匹配 / activation 元数据坏会触发 `FMT-CONTRACTS` hard。`--preflight` 只读列 gap；启用时精确 grandfather 已 terminal 的历史 subagent attempt，terminal 后 retry 会失去豁免。不要用 `board update --set-json meta...` 绕 dedicated writer。
-- `policy`——`autonomous_account_switch ∈ {allow,deny}`；用 `ccm policy show / set` 维护，写入视为用户所有，agent 绝不自行添加 `--user-authorized`。形状坏触发 `FMT-POLICY` warn。
+- `policy`——`autonomous_account_switch ∈ {allow,deny}`，是用户对**后台自动换号**的开关、不是 agent 的自主权；用 `ccm policy show / set` 维护，写入视为用户所有，agent 绝不自行添加 `--user-authorized`。形状坏触发 `FMT-POLICY` warn。
 - `delivery_contract`——declared-mode v1 的 target 声明与冻结 snapshot。用 `ccm target set/show/refresh` 维护；缺失的历史 board 逐字保持现有 dependency/ready/reconcile 行为。当前唯一可持久化 mode 是 `declared`；`strict` 只存在于只读 `--strict-dry-run` preview，不能写板。Git target 只用本地 objects，artifact target 绑定 immutable manifest digest；branch/worktree 只定位 repository，不是交付证据。
 - `coordination`——多 orchestrator 协调**感知**块，让 M 个并行 orchestrator 互相看见、各自独立配速（**hook 不读**·跨板只读读侧是 `ccm peers`）。可扩展对象，字段全 optional：
   - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是跨板协调的裁决主轴 + 机械 fair-share 权重源（用户声明的协调 hint·不喂引擎的板内任务调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。

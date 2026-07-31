@@ -85,12 +85,12 @@
         },
         {
           "point": "point:craft.shared-spine",
-          "point_sha256": "ca0708f046c77ba03188f3a0a8e7fdfd5f328b4d87a769f9f756fe9c3c00c606",
+          "point_sha256": "3ca37bd0ee38c57cd392c839303cec98dfc849fc8f3d9dee9446b4844adf0f21",
           "passage_sha256": "ca0708f046c77ba03188f3a0a8e7fdfd5f328b4d87a769f9f756fe9c3c00c606"
         },
         {
           "point": "point:craft.stage-handoff",
-          "point_sha256": "3b40403e70b0cb48b3c2ed892275d1eb79e3bb25bb607841165d57a15ce37de7",
+          "point_sha256": "599f6b125f4fc8857b40f27ae1af6f54e9c0ed5bb866d3672540f36825de03fc",
           "passage_sha256": "3b40403e70b0cb48b3c2ed892275d1eb79e3bb25bb607841165d57a15ce37de7"
         }
       ]
@@ -303,7 +303,7 @@
         },
         {
           "point": "point:tdd.loop-boundary",
-          "point_sha256": "42fff02d1b957697ded21c1fafd5b0169c876ca0323237484d4bf0901d304f94",
+          "point_sha256": "db65883b35d7d8cebcba8755bf86f37f41dd91f1443bcd15b24ed9134e67635b",
           "passage_sha256": "42fff02d1b957697ded21c1fafd5b0169c876ca0323237484d4bf0901d304f94"
         },
         {

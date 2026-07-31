@@ -812,7 +812,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -832,7 +832,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -852,7 +852,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [
@@ -872,7 +872,7 @@
           "source_file": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
           "binding": {
             "kind": "marker",
-            "value": "point:distill.routing-overview"
+            "value": "point:distill.boundary"
           },
           "surface_kind": "skill_entry",
           "targets": [

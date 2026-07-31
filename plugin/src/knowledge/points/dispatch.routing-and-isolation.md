@@ -5,13 +5,13 @@ point: dispatch.routing-and-isolation
 ## 权威陈述
 
 <!-- ccm:k:start point:dispatch.routing-and-isolation -->
-executor 不按数量选，harness × model 也不是默认值。完整顺序只有一份：[`worker-routing.md`](worker-routing.md#一条不可换序的路由链) 的「任务形状 → executor → target surface → effect floor → exact qualification → 同档排序/fallback → 真实 handle → 端点验收」。本页只展开其中并行与 runtime 机制，不另写 executor 决策树或模型资格表。
+executor 不按数量选，harness × model 也不是默认值。完整顺序只有一份：「任务形状 → executor → target surface → effect floor → exact qualification → 同档排序/fallback → 真实 handle → 端点验收」。本页只展开其中并行与 runtime 机制，不另写 executor 决策树或模型资格表。
 
 ---
 
 ## 派前取证 —— harness × model 不是默认值
 
-派前资格硬门、same-floor fallback 与证据留存以 [`worker-routing.md`](worker-routing.md#做-exact-qualification) 为准；动态 provider/model/quota 事实继续由 `pacing-and-estimation` 持有。这里只提醒一件 runtime 相关的事：最终 model / effort 必须进入真实 provider argv，不能只写在计划文字里让 CLI 默默吃默认值。
+这里只提醒一件 runtime 相关的事：最终 model / effort 必须进入真实 provider argv，不能只写在计划文字里让 CLI 默默吃默认值。
 
 ---
 
@@ -27,8 +27,25 @@ executor 不按数量选，harness × model 也不是默认值。完整顺序只
 
 ## 跨 harness 的当前最小闭环
 
-origin 不是 worker pool 边界；target surface、真实 help、资格硬门、provider argv、handle gate 与端点收口都按 [`worker-routing.md`](worker-routing.md#executor-不等于-target-surface) 做。本文不再维护第二条 cross-harness 热路径。你在这里继续关心的是机制层：并行 writer 的隔离、workflow 生命周期耦合、escalation、admission 与派发卫生。
+origin 不是 worker pool 边界。本文不再维护第二条 cross-harness 热路径。你在这里继续关心的是机制层：并行 writer 的隔离、workflow 生命周期耦合、escalation、admission 与派发卫生。
 
 ---
-
 <!-- ccm:k:end point:dispatch.routing-and-isolation -->
+
+## 失效类型
+
+`motivation_conflict`（主体：行为约束） —— 清楚并行写者需要隔离工作树，但当任务列表显示各写者预计改动不同文件时，容易把『大概率不冲突』当成可以省掉建独立工作树这一步的理由，尤其在赶时间或嫌搭建麻烦时。
+
+主体是「没有独立隔离工作树就不要并行派 writer」这条硬纪律，共享一棵树省事得多，动机完美的执行者知道了就会先建隔离或改串行。
+
+## 边界
+
+只适用于真实并发写（同一时间窗口内多个写者同时活跃）；对严格串行执行（一个完成合并后再派下一个），不存在并发写风险，此时不必单独建树——这不是省事而是并发窗口本身不存在。
+
+## 为什么它随模型变强而更重要
+
+强模型更擅长论证『这次预判过了、文件不重叠、风险可控』这类看似经过分析的理由，把跳过隔离步骤包装成一次深思熟虑的判断而非省事，讲得越细致越像真的做过风险评估。
+
+## 失败形态
+
+每个写者确实各自声称改了不同文件，端点验收时也各自报了产出，但因为共用同一个工作目录，索引/构建缓存/未提交的中间态互相污染过——最终结果表面对得上号，问题出在过程中谁都无法保证读到的是干净状态。

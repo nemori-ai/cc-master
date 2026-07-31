@@ -35,38 +35,14 @@
       "path": "plugin/src/skills/distilling-lessons-into-assets/canonical/SKILL.md",
       "coverage": "full",
       "point_ids": [
-        "point:distill.taxonomy-quick",
-        "point:distill.routing-overview",
-        "point:distill.evidence-hard-line",
-        "point:distill.landing-preview",
         "point:distill.boundary"
       ],
-      "reviewed_unbound_sha256": "84ed39afac9973d1dc13d3ccac2d2cd3fd009d85a961b0d11384a2e76f10d478",
+      "reviewed_unbound_sha256": "9b4791736ac2da5289c619b696891956c084891150ef999ca020c5c98e8e61ff",
       "reconciliations": [
         {
           "point": "point:distill.boundary",
           "point_sha256": "39ceb19771c999f4bb29da17810dc8cb5c837b80da5f15bdec998233a9e6425f",
           "passage_sha256": "39ceb19771c999f4bb29da17810dc8cb5c837b80da5f15bdec998233a9e6425f"
-        },
-        {
-          "point": "point:distill.evidence-hard-line",
-          "point_sha256": "3dcf65fbd31b37756981fb61422e7cfcbedbacb53c5a287b2fc74ca887a85013",
-          "passage_sha256": "3dcf65fbd31b37756981fb61422e7cfcbedbacb53c5a287b2fc74ca887a85013"
-        },
-        {
-          "point": "point:distill.landing-preview",
-          "point_sha256": "591229eff05c53bd46bddb421b9b782e3fbde149ff45575bbe77727b965f767d",
-          "passage_sha256": "591229eff05c53bd46bddb421b9b782e3fbde149ff45575bbe77727b965f767d"
-        },
-        {
-          "point": "point:distill.routing-overview",
-          "point_sha256": "26d60157c8ff8fb2091bafbb8ca5242398428f2425afdf3534c052e203c0fdd5",
-          "passage_sha256": "26d60157c8ff8fb2091bafbb8ca5242398428f2425afdf3534c052e203c0fdd5"
-        },
-        {
-          "point": "point:distill.taxonomy-quick",
-          "point_sha256": "4cb80f0e90ce2fa1c3db524d63576c61c17298512bee0bc94aa79ba741f8c20d",
-          "passage_sha256": "4cb80f0e90ce2fa1c3db524d63576c61c17298512bee0bc94aa79ba741f8c20d"
         }
       ]
     },

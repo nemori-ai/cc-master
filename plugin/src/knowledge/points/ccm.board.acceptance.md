@@ -7,7 +7,7 @@ point: ccm.board.acceptance
 <!-- ccm:k:start point:ccm.board.acceptance -->
 ## D. acceptance 怎么写好
 
-`acceptance` 是这个 task 的「目标函数」——什么情况算完成。acceptance 哲学（验收 = ML 优化目标函数的设计）属于 `dev-as-ml-loop` skill；这里只给**操作侧：怎么填好这个字段**。
+`acceptance` 是这个 task 的「目标函数」——什么情况算完成。acceptance 哲学（验收 = ML 优化目标函数的设计）。这里只给**操作侧：怎么填好这个字段**。
 
 **两种形式：**
 
@@ -48,5 +48,14 @@ ccm task update T3 --set-json 'acceptance={"criteria":[
 **acceptance object 里的 `criteria[].status`：** 每条 criterion 有自己的 `status`（`pending / met / failed`）。`acceptanceConverged`（ccm 内部谓词）= criteria 全 `met` 且非空，才算目标函数收敛。你在验收时逐条把 `status` 更新到 `met` / `failed`（`task update --set-json`），视图里的 acceptance 灯就会随之更新。
 
 ---
-
 <!-- ccm:k:end point:ccm.board.acceptance -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 概念上知道验收标准该可判断，但不知道这个工具里两种具体写法（一句话 DoD vs 结构化 criteria）的字段名、语法和哪些 task type 强制要求，会写错语法或漏填必填项。
+
+删掉后不知 acceptance 填法、ccm 命令形态与 BIZ-ACCEPTANCE 等本工具字段约定。
+
+## 失败形态
+
+acceptance 字段结构完整、criteria 也逐条标了 met，通过了存在性 lint 检查——但从未真的跑过对应的 check 命令，met 是手动拍上去的；字段形状合规，但它记录的不是一次真实验证的结果，只是让 lint 满意的空壳。

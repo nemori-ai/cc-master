@@ -265,3 +265,9 @@ projection 再返回。
 ---
 
 <!-- ccm:k:end point:ccm.cmd.worker-quota -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删了这条，agent 不知道 ccm worker run 有哪些 flag（如 --sandbox、provider argv 怎么透传）、quota 的 namespace 和参数形状。易腐 CLI 事实。
+
+主体是 worker/provider/model-policy/orchestrator/route/quota 各命名空间的具体语法、schema 字段与返回合同，属本工具的接口事实。

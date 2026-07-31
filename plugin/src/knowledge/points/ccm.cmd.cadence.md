@@ -93,3 +93,9 @@ ccm cadence status [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.cadence -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型无法正确调用 cadence 命令，不知道 update/open/ship/status 的参数和行为。
+
+cadence update/open/ship/status 的参数名与 iteration 收口条件是本工具专属约定，无法从通用知识推出。

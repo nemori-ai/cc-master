@@ -122,45 +122,6 @@
       }
     },
     {
-      "id": "point:verification.terminal-summary",
-      "title": "routing 链中的 terminal 提醒",
-      "point_kind": "reference",
-      "summary": "在路由链中提醒：把 agent terminal 当 task done 会绕过验收。",
-      "recognition_cues": [
-        "只需 routing record 中的简短 terminal 提醒"
-      ],
-      "binding": {
-        "path": "plugin/src/knowledge/points/verification.terminal-summary.md",
-        "marker": "point:verification.terminal-summary",
-        "heading_hint": "一条不可换序的路由链"
-      },
-      "authority": {
-        "role": "summary",
-        "subject": "subject:verification.terminal-is-not-done",
-        "canonical": "point:verification.terminal-is-not-done",
-        "review_policy": "review-on-canonical-change",
-        "reviewed_canonical_sha256": "b7507884395e50b3e78e19e8e1a253ecd8c48c30a3fec7260be1261bd248d4fe"
-      },
-      "lifecycle": {
-        "state": "accepted",
-        "since": "2026-07-23"
-      },
-      "admission": {
-        "evidence": [
-          {
-            "kind": "canonical-prose",
-            "ref": "worker-routing.md compact reminder"
-          }
-        ],
-        "verifiers": [
-          {
-            "kind": "review",
-            "ref": "summary-directly-targets-canonical"
-          }
-        ]
-      }
-    },
-    {
       "id": "point:verification.hash-and-stale",
       "title": "content hash 与 stale",
       "point_kind": "procedure",

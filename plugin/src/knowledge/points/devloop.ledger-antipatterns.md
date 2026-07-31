@@ -16,3 +16,17 @@ point: devloop.ledger-antipatterns
 | "等 compact 前再总结一次。" | 你通常不能预知 compact。持续写 board 才是跨 compact 保护。 |
 | "compaction 后我大概记得。" | 记忆不是协议。写 handoff 是把优化状态从短期上下文提升到 board。 |
 <!-- ccm:k:end point:devloop.ledger-antipatterns -->
+
+## 失效类型
+
+`prosthetic`（双重性质·方法部分补不回来，它才是承重结构） —— 删掉后 agent 会在压力下真的按表中列出的借口去做——把细节留在聊天上下文、把测试原始输出整段贴进 log、做完再补 board——因为这些借口在当下听起来都合理。
+
+主体是聊天上下文会被压缩、board 才是跨 compaction 的 durable memory，针对的正是跨边界失忆。
+
+## 边界
+
+只覆盖“该不该写进 board ledger”这一层判断;具体该写哪些字段内容不在此列。无真实例外。
+
+## 失败形态
+
+agent 确实往 log 里写了字,格式看起来正常,但内容是“已完成大部分工作,细节见对话历史”这种指回聊天上下文的占位句——写了 board,却没写下任何真正扛得住 compact 的信息。

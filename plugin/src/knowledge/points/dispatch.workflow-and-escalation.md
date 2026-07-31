@@ -39,3 +39,17 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 ---
 
 <!-- ccm:k:end point:dispatch.workflow-and-escalation -->
+
+## 失效类型
+
+`capability_gap`（双重性质·方法部分补不回来，它才是承重结构） —— 删除后,一个发现自己其实是子 DAG 的 subagent 会在压力下自我提拔或自行 fan out 去处理,而不是 STOP 并交出 escalation 结果,绕开了 orchestrator 的可见性与 admission control。
+
+主体是按生命周期耦合而非数量决定 workflow 分组的判据、escalation 的协议形状与 admission control 的并发上限算法，缺的是编排方法。
+
+## 边界
+
+唯一站得住脚的例外是执行环境本身不支持任何中途返回结果的机制(纯同步阻塞批处理、无法产出中间 checkpoint),此时只能在最终报告里补记识别到子 DAG 但环境不支持中途 escalate。
+
+## 失败形态
+
+subagent 没有显式 spawn 子 agent,而是把探索出的子任务全部塞进自己一次超长 turn 顺序做完,最终只交一份看起来顺利完成的完整结果——形式上没有违规,实质上越过了 checkpoint、admission control 与预算复核。

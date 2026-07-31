@@ -83,8 +83,6 @@ Knowledge navigation:
 ## Member points
 
 - [按资产类型的落地手艺](./landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
-- [summary: 落地手艺入口](../SKILL.md#ccm-k-point-distill-landing-preview)
-- [canonicalize → 按资产类型的落地手艺](./landing-craft-by-asset-type.md#ccm-k-point-distill-landing-craft)
 - [落地合理化表](./landing-craft-by-asset-type.md#ccm-k-point-distill-landing-rationalization)
 
 ## Back to atlas

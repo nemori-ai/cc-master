@@ -50,3 +50,13 @@ point: hitl.inflight-and-user
 ---
 
 <!-- ccm:k:end point:hitl.inflight-and-user -->
+
+## 失效类型
+
+`capability_gap`（主体：事实方法） —— 删掉后,orchestrator 仍然理解'该并行就并行'的道理,但在稠密前台对话与 compaction 之后会真实忘记还有独立后台活没派——原文明确把这归为'念头蒸发'而非单次判断失误。
+
+主体是一套调度方法与判据（p95 hedge/degrade、把用户建模成异步依赖、prefetch 决策、合法等待、前台∥后台的先派后序），缺的是框架而非事实或记忆。
+
+## 失败形态
+
+orchestrator 在前台回复里写下'稍后会派 XX 任务'这类意图声明,并把写下这句话本身当成已完成的动作收尾,却从未真正调用派发工具或建任务记录;随后 context 继续增长,这句声明和它指代的活一起沉入下一次 compaction,不再有人回头核对是否真的执行了。

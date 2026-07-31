@@ -83,3 +83,9 @@ ccm baseline reset [flags]
 ---
 
 <!-- ccm:k:end point:ccm.cmd.baseline -->
+
+## 失效类型
+
+`environment_fact`（主体：事实方法） —— 删掉这条，模型无法正确调用 baseline 命令，不知道各参数含义和行为差异（snapshot vs show vs reset）。
+
+主体是 baseline 三个 verb 的语法、flag 与已存在时的 exit 3 行为，纯命令事实。
