@@ -178,6 +178,9 @@
     "behavioral_evidence_status": {
       "$ref": "#/$defs/behavioralEvidenceStatus"
     },
+    "failure_mode_profile": {
+      "$ref": "#/$defs/failureModeProfile"
+    },
     "improvement_claim": {
       "type": "string",
       "minLength": 1
@@ -1008,6 +1011,101 @@
             },
             "governance_meta_skill_is_runtime": {
               "const": false
+            }
+          }
+        }
+      }
+    },
+    "failureModeCounts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "capability_gap",
+          "environment_fact",
+          "prosthetic",
+          "motivation_conflict"
+        ]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "failureModePercentages": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "capability_gap",
+          "environment_fact",
+          "prosthetic",
+          "motivation_conflict"
+        ]
+      },
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      }
+    },
+    "failureModeProfile": {
+      "description": "报告侧画像：每个点按 failure_mode 分桶的构成，全图一份、每个消费它的 skill 一份。用途是让「这个 skill 主要在补环境事实，还是在立护栏」一眼可见。计数逐字取自 point.failure_mode，不在此处推导。",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_points",
+        "overall",
+        "by_skill"
+      ],
+      "properties": {
+        "total_points": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "counts",
+            "percentages"
+          ],
+          "properties": {
+            "counts": {
+              "$ref": "#/$defs/failureModeCounts"
+            },
+            "percentages": {
+              "$ref": "#/$defs/failureModePercentages"
+            }
+          }
+        },
+        "by_skill": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "skill_id",
+              "total",
+              "counts",
+              "percentages"
+            ],
+            "properties": {
+              "skill_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^skill:[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "counts": {
+                "$ref": "#/$defs/failureModeCounts"
+              },
+              "percentages": {
+                "$ref": "#/$defs/failureModePercentages"
+              }
             }
           }
         }
