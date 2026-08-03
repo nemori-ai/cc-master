@@ -89,7 +89,8 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'lineage',
     'projection',
   ]);
-  assert.equal(body.invariants.length, 23);
+  assert.equal(body.invariants.length, 24);
+  assert.equal(body.invariants.at(-1), 'K-I24');
   assert.equal(body.exit_codes.capability_not_implemented, 10);
   assert.equal(
     body.schemas.output,

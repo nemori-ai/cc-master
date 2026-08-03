@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { HARDENING_CONTRACT } from './contracts.mjs';
+import { FAILURE_MODES, HARDENING_CONTRACT } from './contracts.mjs';
 import { diagnostic } from './diagnostics.mjs';
 import {
   canonicalGraphHash,
@@ -29,6 +29,8 @@ const NAV_EDGE_TYPES = new Set([
 ]);
 
 const HOSTS = new Set(HARDENING_CONTRACT.C9.hosts);
+
+const FAILURE_MODE_SET = new Set(FAILURE_MODES);
 
 /** Maintainer-side canonical prose root. Repo-only; never enters a host tree. */
 const POINTS_ROOT = 'plugin/src/knowledge/points';
@@ -111,6 +113,54 @@ export function buildAndValidateGraph({
     else if (document.kind === 'composition') compositions.push(document);
     else if (document.kind === 'candidate_analysis') analyses.push(document);
     else if (document.kind === 'change') changes.push(document);
+  }
+
+  // Every point declares its failure mode (K-I24).
+  // Deliberately iterates the raw loaded documents rather than the schema_ok-filtered
+  // `modules`: a module that trips the schema validator is dropped from the graph, so
+  // running after the filter would make this invariant unreachable for exactly the
+  // documents it must judge. Running before it means an unannotated point is always
+  // named — point id, module id and the allowed set — instead of vanishing behind a
+  // generic per-file schema blob or behind a stale/unavailable standalone validator.
+  for (const document of loaded.documents) {
+    if (document.kind !== 'module') continue;
+    const moduleId = document.data?.id ?? null;
+    for (const point of document.data?.points ?? []) {
+      const pointId = point?.id ?? null;
+      const failureMode = point?.failure_mode;
+      if (failureMode === undefined || failureMode === null) {
+        pushError(diagnostics, {
+          code: 'SKG-POINT-FAILURE-MODE-MISSING',
+          message: `Point does not declare a failure mode: ${pointId ?? '<unidentified point>'}`,
+          location: document.path,
+          witness: {
+            point: pointId,
+            module: moduleId,
+            allowed: [...FAILURE_MODES],
+          },
+          remediation:
+            'Declare point.failure_mode with the ordered filter: capability_gap → environment_fact → prosthetic → motivation_conflict.',
+          exitCode: 4,
+        });
+        continue;
+      }
+      if (!FAILURE_MODE_SET.has(failureMode)) {
+        pushError(diagnostics, {
+          code: 'SKG-POINT-FAILURE-MODE-INVALID',
+          message: `Point declares an unknown failure mode: ${pointId ?? '<unidentified point>'}`,
+          location: document.path,
+          witness: {
+            point: pointId,
+            module: moduleId,
+            failure_mode: failureMode,
+            allowed: [...FAILURE_MODES],
+          },
+          remediation:
+            'Use one of the four closed-set failure modes; do not invent a fifth without amending the schema and K-I24.',
+          exitCode: 4,
+        });
+      }
+    }
   }
 
   // Graph-first compositions become skill product views only when lifecycle=accepted

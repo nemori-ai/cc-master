@@ -564,6 +564,7 @@ finalize。任何一步失败都不落半张图。Git 保留跨进程与 reviewe
 | `K-I21` | finalized change 的 base/result/parent hash 形成一条连续 immutable chain，scope hashes 与 materialized diff 一致 |
 | `K-I22` | canonical graph/span/budget 计算使用已声明算法版本且同输入确定性相同 |
 | `K-I23` | structural status 与 behavioral evidence 分轨；缺行为证据时不得产生 improvement claim |
+| `K-I24` | 每个 point 声明合法 `failure_mode`（`capability_gap` / `environment_fact` / `prosthetic` / `motivation_conflict` 四值闭集）；在 schema 过滤之前判定，缺标或非法值都点名到 point |
 
 每个错误必须带 stable code、node/edge/change ID、source location、witness 和修复建议。
 
