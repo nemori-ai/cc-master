@@ -109,9 +109,18 @@ bash run-tests.sh --list       # 只打印本次会选中的单元（可与任�
 
 两份清单语义别混：`heavy-tests.txt` 收「跑得慢但测试是好的」，`quarantine.txt` 收「测试已经红了」。同一个文件不许同时进两份，脚本会硬报错。往任一清单加条目都要在 PR 描述里说明理由；加进隔离清单的还要附「这条在 main 上已经红」的独立复核证据。
 
-所以 before-PR 仍然跑那三条**不带 flag** 的命令。`--fast` 绿只说明快层绿；碰了投影 /
-overlay / knowledge 编译 / attestation 这类重型层覆盖的东西，等 nightly 是把回归放进 main
-之后才发现——自己先跑一遍 `--heavy`。
+**before-PR 跑什么，按你的改动落点定：**
+
+| 你改了什么 | 跑什么 |
+|---|---|
+| 只碰快层覆盖的（hook / command / 测试 / 文档 / schema） | `run-tests.sh --fast` + `check-plugin-dist-sync.sh` + `claude plugin validate` |
+| 碰了投影 / overlay / knowledge 编译 / attestation | 上面三条，**再加** `--heavy`（或至少手跑受影响的那几个文件） |
+| 发版 | 全跑，且 `--quarantine` 报出的隔离数要能逐条交代清楚 |
+
+**为什么不是「一律跑完整」**：那句听着严格，实际做不到——重型层本地跑不完（单文件实测
+50 分钟未完成），而承诺一道跑不动的门，等于又造一道假门，正是 issue #213 要根治的病。
+`--fast` 绿依然不等于全套绿；变的只是「什么时候必须补上另一半」从「永远」收窄成
+「改动确实触及它时」。碰了重型层却只跑快层，等 nightly 就是等回归先进 main。
 
 重型测试的收录判据写在 `tests/heavy-tests.txt` 卷首。新增重型测试必须登记在那里，否则会悄悄
 拖慢每个 PR 的快门；清单里列了但仓库里不存在的文件名会让 `run-tests.sh` 直接报错退出（防清单腐烂）。
