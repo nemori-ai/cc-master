@@ -70,8 +70,17 @@ done
 echo "== codex project skill projection =="
 bash scripts/sync-codex-skills.sh --check || fail=1
 
-echo "== codex runtime skill adapter projection =="
-bash scripts/sync-plugin-dist.sh --host codex --skills-only || fail=1
+# NOTE(2026-07-31): a `sync-plugin-dist.sh --host codex --skills-only` step used to sit here.
+# It was removed, for two independent reasons:
+#   1. It was not a test. That script has no --check mode; it *performs* the projection, writing
+#      plugin/dist and taking a lock under plugin/dist/.codex.trusted-projection.lock/. A test
+#      suite that mutates the tree it is testing can invalidate its own later assertions, and it
+#      collides with any concurrent projection.
+#   2. It was strictly redundant. Gate 2 (scripts/check-plugin-dist-sync.sh) already projects all
+#      four hosts in full and fails on any resulting diff — codex --skills-only is a subset of it.
+# Measured cost of the removed line alone: >10 minutes. The three gates now have disjoint jobs —
+# this one tests behaviour and content contracts and never writes plugin/dist; gate 2 owns
+# projection sync; gate 3 (claude plugin validate) owns artifact validity.
 
 echo "== hook parity matrix sync (HOOKPAR-DEC / ADR-028) =="
 bash scripts/gen-hook-parity-matrix.sh --check || fail=1
