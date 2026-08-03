@@ -466,6 +466,7 @@ test('SKG-K3-00-R08: multi-composition shared module derives reverse consumers o
       id,
       title: id,
       point_kind: 'principle',
+      failure_mode: 'motivation_conflict',
       summary: id,
       recognition_cues: [id],
       // The knowledge is authored in its mother file; the skill article only
@@ -957,6 +958,7 @@ test('SKG-K3-00-R09: ownerless module+composition+analysis typed change begin/va
           id: 'point:demo.one',
           title: 'demo.one',
           point_kind: 'principle',
+          failure_mode: 'motivation_conflict',
           summary: 'demo one',
           recognition_cues: ['demo one'],
           binding: { path: markdownPath, marker: 'point:demo.one' },

@@ -36,6 +36,7 @@ function point(id, subject, marker = id) {
     id,
     title: id,
     point_kind: 'principle',
+    failure_mode: 'motivation_conflict',
     summary: `${id} summary`,
     recognition_cues: [`recognize ${id}`],
     binding: { path: 'plugin/src/skills/demo/canonical/SKILL.md', marker },

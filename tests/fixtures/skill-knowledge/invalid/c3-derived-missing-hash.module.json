@@ -53,6 +53,7 @@
       "id": "point:verification.terminal-is-not-done",
       "title": "runtime terminal 不等于 task done",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "运行时停止只终结 agent runtime；父任务只有独立验收通过后才能 done/verified。",
       "recognition_cues": [
         "child process 或 agent 已停止",
@@ -90,6 +91,7 @@
       "id": "point:verification.endpoint-procedure",
       "title": "端点验收 procedure",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "在自己的端点收割 artifact，核对 diff、tests、acceptance 与必要的异构第二视角。",
       "recognition_cues": [
         "要实际执行 artifact、diff、tests 或 hash 验收",
@@ -129,6 +131,7 @@
       "id": "point:verification.terminal-summary",
       "title": "worker routing 中的 terminal 提醒",
       "point_kind": "reference",
+      "failure_mode": "motivation_conflict",
       "summary": "在 routing 入口提醒 terminal 只是一条待验收信号。",
       "recognition_cues": [
         "只需要 routing record 中的简短 terminal 提醒"
