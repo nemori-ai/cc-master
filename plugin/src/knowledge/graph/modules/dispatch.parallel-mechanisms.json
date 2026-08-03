@@ -52,6 +52,7 @@
       "id": "point:dispatch.dataflow-and-mechanisms",
       "title": "dataflow 与后台机制",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "executor 值与启动机制分离；在 task/agent/attempt 三层按 ready dataflow 推进。",
       "recognition_cues": [
         "把 executor 当工具名",
@@ -89,6 +90,7 @@
       "id": "point:dispatch.routing-and-isolation",
       "title": "路由取证与 writer 隔离",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "派前取证真实 surface，并给每个并行 writer 独立 worktree 与可追踪 handle。",
       "recognition_cues": [
         "多个 worker 要写文件",
@@ -126,6 +128,7 @@
       "id": "point:dispatch.workflow-and-escalation",
       "title": "workflow 生命周期与 escalation",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "按生命周期耦合判 intra/inter workflow，靠证据 escalation 重定位并做 admission control。",
       "recognition_cues": [
         "需要 fan-out/join",
@@ -163,6 +166,7 @@
       "id": "point:dispatch.hygiene-and-liveness",
       "title": "派发卫生与 liveness",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "记录 handle、stderr、cwd 与清理责任，并用 watchdog 补静默失败盲区。",
       "recognition_cues": [
         "真实并行开始后",

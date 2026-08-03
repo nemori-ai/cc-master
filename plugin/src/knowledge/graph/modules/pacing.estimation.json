@@ -56,6 +56,7 @@
       "id": "point:pacing.estimate-verbs",
       "title": "六 estimate verb 消费映射",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "forecast/evm/velocity/risk/cost-to-complete/deadline-risk：何时查→读字段→决策输入。",
       "recognition_cues": [
         "要估 ETA",
@@ -93,6 +94,7 @@
       "id": "point:pacing.deadline-risk",
       "title": "交付 DDL 风险消费",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "读 risk_band/on_time_probability/margin/诚实字段；unknown 不当绿。",
       "recognition_cues": [
         "板上有 deadline"
@@ -129,6 +131,7 @@
       "id": "point:pacing.baseline-precondition",
       "title": "baseline 是 EVM 前置",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "has_baseline:false 时 CPI/SPI 无从算；写入归 using-ccm。",
       "recognition_cues": [
         "evm 不可用"
@@ -165,6 +168,7 @@
       "id": "point:pacing.honest-fields",
       "title": "估算诚实字段",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "coverage/confidence/source/interval/5% 硬墙命中即降权；用区间不用点估。",
       "recognition_cues": [
         "冷启动预测",
@@ -202,6 +206,7 @@
       "id": "point:pacing.usage-estimate-tension",
       "title": "usage⊗estimate 张力",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "throttle/硬停 vs 长 ETA/装不下 cost-to-complete → 列张力交编排决策。",
       "recognition_cues": [
         "配额不够装完活"

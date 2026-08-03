@@ -50,6 +50,7 @@
       "id": "point:distill.taxonomy",
       "title": "四类资产定义与判据",
       "point_kind": "reference",
+      "failure_mode": "capability_gap",
       "summary": "纪律文档/skill/workflow/subagent 的适合与不适合完整定义。",
       "recognition_cues": [
         "资产类型定义"

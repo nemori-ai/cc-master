@@ -50,6 +50,7 @@
       "id": "point:ccm.cmd.cross-harness-facts",
       "title": "跨 harness 目标事实查询",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "跨 harness 目标事实查询（易腐 CLI 事实）。",
       "recognition_cues": [
         "跨 harness",
@@ -87,6 +88,7 @@
       "id": "point:ccm.cmd.worker-quota",
       "title": "worker/provider/model-policy/orchestrator/route/quota",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "worker/provider/model-policy/orchestrator/route/quota（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace worker",
@@ -124,6 +126,7 @@
       "id": "point:ccm.cmd.capability-deps",
       "title": "capability/target/delivery/dependency",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "capability/target/delivery/dependency（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace capability",
@@ -161,6 +164,7 @@
       "id": "point:ccm.cmd.peers-coord",
       "title": "peers/coordination",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "peers/coordination（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace peers",
@@ -198,6 +202,7 @@
       "id": "point:ccm.cmd.usage",
       "title": "namespace usage",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace usage（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace usage",
@@ -235,6 +240,7 @@
       "id": "point:ccm.cmd.ops-surfaces",
       "title": "status-report/web-viewer/monitor/services/runtime",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "status-report/web-viewer/monitor/services/runtime（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace status-report",
@@ -272,6 +278,7 @@
       "id": "point:ccm.cmd.estimate",
       "title": "namespace estimate",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace estimate（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace estimate",
@@ -309,6 +316,7 @@
       "id": "point:ccm.cmd.calibration",
       "title": "namespace calibration",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace calibration（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace calibration",
@@ -346,6 +354,7 @@
       "id": "point:ccm.cmd.misc-ns",
       "title": "statusline/attempt/harness/upgrade",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "statusline/attempt/harness/upgrade（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace statusline",

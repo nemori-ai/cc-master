@@ -52,6 +52,7 @@
       "id": "point:outside.evidence-levels",
       "title": "外部有效性与证据等级",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "内部共识不等于外部验证；按可复核强度把假设与证据落进 board。",
       "recognition_cues": [
         "只有内部推断",
@@ -89,6 +90,7 @@
       "id": "point:outside.falsification-and-calibration",
       "title": "可证伪检查与校准阶梯",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "先问哪项外部事实最可能推翻假设，再选能落定它的最低成本手段。",
       "recognition_cues": [
         "要扩大不可逆投入",
@@ -126,6 +128,7 @@
       "id": "point:outside.unknown-and-amendment",
       "title": "未知、可逆实验与 amendment",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "无外部通道时诚实记 unknown 并做有限实验；外部事实改义则显式修订 Goal Contract。",
       "recognition_cues": [
         "没有外部验证通道",
@@ -163,6 +166,7 @@
       "id": "point:outside.low-risk-exception",
       "title": "低风险可逆豁免",
       "point_kind": "boundary",
+      "failure_mode": "motivation_conflict",
       "summary": "低风险、可逆且事实充分的小动作可直接推进；高杠杆与不可逆判断不得借用豁免。",
       "recognition_cues": [
         "担心过度求证",

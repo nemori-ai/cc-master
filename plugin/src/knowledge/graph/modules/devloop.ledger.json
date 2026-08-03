@@ -55,6 +55,7 @@
       "id": "point:devloop.ledger-when",
       "title": "何时必须写 ledger",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "长程/跨 compact/plateau/多 hypothesis 时必须把优化状态落 board。",
       "recognition_cues": [
         "长程任务不写 board"
@@ -91,6 +92,7 @@
       "id": "point:devloop.ledger-what",
       "title": "ledger 写什么",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "只写改变下一轮方向的 objective/instrument/hypothesis/gradient/plateau/restart/validation。",
       "recognition_cues": [
         "把全部测试输出贴进 log"
@@ -127,6 +129,7 @@
       "id": "point:devloop.ledger-ccm",
       "title": "用 ccm 管住优化目标",
       "point_kind": "procedure",
+      "failure_mode": "prosthetic",
       "summary": "写入前先问 objective/instrument/hypothesis/gradient/restart/收敛是否变了。",
       "recognition_cues": [
         "把 ccm 当事后文书"
@@ -163,6 +166,7 @@
       "id": "point:devloop.ledger-handoff",
       "title": "持续 handoff",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "load-bearing 变化立刻写回；合格 handoff 含六行优化状态。",
       "recognition_cues": [
         "等 compact 前再总结"
@@ -199,6 +203,7 @@
       "id": "point:devloop.ledger-antipatterns",
       "title": "ledger 反模式",
       "point_kind": "check",
+      "failure_mode": "prosthetic",
       "summary": "聊天当记忆、堆原始日志、做完再补 board、把 restart 当 failed 遮羞。",
       "recognition_cues": [
         "board 有任务状态就够了"

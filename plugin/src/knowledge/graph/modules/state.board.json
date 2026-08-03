@@ -51,6 +51,7 @@
       "id": "point:board.waist-and-write",
       "title": "窄腰与读写纪律",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "board 是单一真相源；窄腰稳定，状态变更与 flush 经受控入口。",
       "recognition_cues": [
         "想直接编辑 board",
@@ -88,6 +89,7 @@
       "id": "point:board.audit-and-graph",
       "title": "审计、lint 与图 advisory",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "用显式 supersession、append-only log、lint 与只读图分析保持状态可审计。",
       "recognition_cues": [
         "需要审计历史",
@@ -125,6 +127,7 @@
       "id": "point:board.resume-and-interview",
       "title": "续跑信号与采访协议",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "heartbeat/session_id 帮助续跑，decision_package 保留用户决策上下文。",
       "recognition_cues": [
         "resume 旧 board",
@@ -162,6 +165,7 @@
       "id": "point:board.worked-example",
       "title": "Worked board 全字段样例",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "用完整样例展示长程 board 的任务、owner、log、decision 与 wakeup 形状。",
       "recognition_cues": [
         "需要对照完整 board 样例"

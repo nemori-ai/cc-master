@@ -53,6 +53,7 @@
       "id": "point:sdd.admission",
       "title": "SDD 适用性判断",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "按跨边界、多消费者、稳定性、并行与不变式密度决定是否值得 spec-first。",
       "recognition_cues": [
         "需要SDD 适用性判断"
@@ -89,6 +90,7 @@
       "id": "point:sdd.alignment",
       "title": "Spec、实现与测试对齐",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "实现满足 spec，测试以 spec 为 oracle，禁止实现反向定义真相。",
       "recognition_cues": [
         "需要Spec、实现与测试对齐"
@@ -125,6 +127,7 @@
       "id": "point:sdd.change-order",
       "title": "先改 spec 的变更顺序",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "新增、修改、删除行为都先更新合约，再写红测与实现。",
       "recognition_cues": [
         "需要先改 spec 的变更顺序"
@@ -161,6 +164,7 @@
       "id": "point:sdd.core-belief",
       "title": "Spec 先于实现",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "以先于实现达成的外部标准作为正确性裁判。",
       "recognition_cues": [
         "需要Spec 先于实现"
@@ -197,6 +201,7 @@
       "id": "point:sdd.drift-red-line",
       "title": "Spec 漂移红线",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "实现偏离 spec 而不更新合约就是对消费者的契约谎言。",
       "recognition_cues": [
         "需要Spec 漂移红线"
@@ -233,6 +238,7 @@
       "id": "point:sdd.implementation-gate",
       "title": "实现前 Spec 硬闸",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "值得 SDD 且没有已认可 spec 时停止写产码，先固定关键决策。",
       "recognition_cues": [
         "需要实现前 Spec 硬闸"
@@ -269,6 +275,7 @@
       "id": "point:sdd.practice-anchors",
       "title": "SDD 当代实践锚",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "用 contract-first、schema-first、consumer contract、可执行 spec 与类型说明落地形态。",
       "recognition_cues": [
         "需要SDD 当代实践锚"
@@ -305,6 +312,7 @@
       "id": "point:sdd.spec-boundary",
       "title": "Spec 的职责边界",
       "point_kind": "boundary",
+      "failure_mode": "capability_gap",
       "summary": "界定接口、schema、错误、不变式、示例与领域语言属于 spec，私有实现细节不属于。",
       "recognition_cues": [
         "需要Spec 的职责边界"
@@ -341,6 +349,7 @@
       "id": "point:sdd.theory-handoff",
       "title": "SDD 与 DDD/OOP/TDD 接力",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "把领域成果形式化成合约，再由对象实现并由测试验收。",
       "recognition_cues": [
         "需要SDD 与 DDD/OOP/TDD 接力"

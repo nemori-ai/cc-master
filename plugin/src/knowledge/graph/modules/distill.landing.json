@@ -51,6 +51,7 @@
       "id": "point:distill.landing-craft",
       "title": "按资产类型的落地手艺",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "套文风、带 why、触发描述、只固化结构、角色边界。",
       "recognition_cues": [
         "怎么写进资产"
@@ -87,6 +88,7 @@
       "id": "point:distill.landing-rationalization",
       "title": "落地合理化表",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "堵住“得进 skill才够重”等跨类自我说服。",
       "recognition_cues": [
         "合理化落地选择"

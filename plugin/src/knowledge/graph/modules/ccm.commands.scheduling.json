@@ -49,6 +49,7 @@
       "id": "point:ccm.cmd.jc",
       "title": "namespace jc",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace jc 命令面（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace jc",
@@ -86,6 +87,7 @@
       "id": "point:ccm.cmd.cadence",
       "title": "namespace cadence",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace cadence 命令面（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace cadence",
@@ -123,6 +125,7 @@
       "id": "point:ccm.cmd.watchdog",
       "title": "namespace watchdog",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace watchdog 命令面（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace watchdog",
@@ -160,6 +163,7 @@
       "id": "point:ccm.cmd.agent",
       "title": "namespace agent",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace agent 命令面（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace agent",
@@ -197,6 +201,7 @@
       "id": "point:ccm.cmd.baseline",
       "title": "namespace baseline",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace baseline 命令面（易腐 CLI 事实）。",
       "recognition_cues": [
         "namespace baseline",

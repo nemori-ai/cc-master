@@ -51,6 +51,7 @@
       "id": "point:devloop.two-scale",
       "title": "外层编排与内层下降",
       "point_kind": "boundary",
+      "failure_mode": "capability_gap",
       "summary": "orchestrator 拥有优化系统；执行 agent 做单任务下降。",
       "recognition_cues": [
         "handoff 写成 work order"
@@ -87,6 +88,7 @@
       "id": "point:devloop.ml-components",
       "title": "subagents as ML components",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "按优化组件（objective/instrument/hypothesis/optimizer/evaluator/regularizer/restart）调度，不是只派写代码。",
       "recognition_cues": [
         "只问谁来写代码"

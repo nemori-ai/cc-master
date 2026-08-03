@@ -54,6 +54,7 @@
       "id": "point:pacing.machine-wide-first",
       "title": "先全局再下钻",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "先 machine-wide quota status，再下钻 selected-target usage；unknown 不补成 healthy。",
       "recognition_cues": [
         "读配额从哪开始"
@@ -90,6 +91,7 @@
       "id": "point:pacing.refresh-hint",
       "title": "refresh_hint 恢复边界",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "available:false+recoverable 是 token 过期不是耗尽；照 hint 恢复，不当地 stop。",
       "recognition_cues": [
         "available false",
@@ -127,6 +129,7 @@
       "id": "point:pacing.window-contracts",
       "title": "四类 harness 窗口合同",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "各 target 承重窗口与独立池合同；不可跨 surface 拼接。",
       "recognition_cues": [
         "Codex 有没有 5h",
@@ -164,6 +167,7 @@
       "id": "point:pacing.signal-ceiling",
       "title": "信号诚实天花板",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "只有百分比与 reset，无绝对 token 分母；账户 pacing ⊥ 节点 telemetry。",
       "recognition_cues": [
         "想精确收敛 used%"

@@ -53,6 +53,7 @@
       "id": "point:ccm.account-pool-model",
       "title": "号池模型（指针 vs token）",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "registry 零凭证；vault 存指针；home 不跟随 CLAUDE_CONFIG_DIR。",
       "recognition_cues": [
         "accounts.json",
@@ -91,6 +92,7 @@
       "id": "point:ccm.account-enroll-why",
       "title": "录号机制 why + refreshToken 硬要求",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "keychain 直读完整 blob；无 refreshToken 不能无重启换号。",
       "recognition_cues": [
         "account add",
@@ -129,6 +131,7 @@
       "id": "point:ccm.account-select-method",
       "title": "选号方法论判据",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "双窗口硬闸 + 恢复度二值推算 + 信任分级；全池耗尽 surface 用户。",
       "recognition_cues": [
         "选哪个号",
@@ -167,6 +170,7 @@
       "id": "point:ccm.account-policy-vault",
       "title": "policy 硬闸 + vault/token-blind",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "switch 前读 policy；vault 两形态局限；token 永不进 agent context。",
       "recognition_cues": [
         "exit 7 policy-deny",
@@ -205,6 +209,7 @@
       "id": "point:ccm.cmd.account",
       "title": "namespace account 命令面",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "account add/refresh/delete/list/switch 机械命令事实（易腐）。",
       "recognition_cues": [
         "ccm account switch",

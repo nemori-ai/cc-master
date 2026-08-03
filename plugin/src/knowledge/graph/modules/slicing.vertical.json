@@ -51,6 +51,7 @@
       "id": "point:slicing.why-cut",
       "title": "切是高杠杆决策",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "怎么切定死并行度与反馈天花板；先切对再排派。",
       "recognition_cues": [
         "急着排期",
@@ -88,6 +89,7 @@
       "id": "point:slicing.vertical-rule",
       "title": "纵切不要横切硬规则",
       "point_kind": "decision_rule",
+      "failure_mode": "motivation_conflict",
       "summary": "薄端到端纵向增量；不要按技术层横切。",
       "recognition_cues": [
         "先做 schema 层",

@@ -54,6 +54,7 @@
       "id": "point:ccm.hotpath-flows",
       "title": "热路径 canonical flows",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "建板→Goal→派发→true-done→review/delivery/block/调度/jc·cadence·watchdog 热路径。",
       "recognition_cues": [
         "起步建板",
@@ -92,6 +93,7 @@
       "id": "point:ccm.footgun-table",
       "title": "footgun 速查表",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "常见拒写/假绿/遗留证据/native projection 等踩坑对照表。",
       "recognition_cues": [
         "exit 3 不懂原因",
@@ -130,6 +132,7 @@
       "id": "point:ccm.exit-codes",
       "title": "Exit code 速记（指针）",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "退出码速记；完整命令面与 schema 以 command-catalog / --help 为准。",
       "recognition_cues": [
         "exit 2/3/4/7",
@@ -167,6 +170,7 @@
       "id": "point:ccm.pointers-routing",
       "title": "深度指针路由",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "命令面→catalog；字段取值→board-model；决策→master-orchestrator-guide。",
       "recognition_cues": [
         "该读哪个 reference",

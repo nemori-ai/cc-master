@@ -51,6 +51,7 @@
       "id": "point:distill.evidence-fidelity",
       "title": "泛化 vs 收窄细则",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "脱离证据的泛化长什么样、怎么收窄、弱证据如何托底不丢弃。",
       "recognition_cues": [
         "措辞写通用",

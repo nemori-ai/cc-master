@@ -54,6 +54,7 @@
       "id": "point:distill.boundary",
       "title": "与其他判断力边界",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "不管工程手艺/切 DAG/执行循环/命令手册/是否新建 skill 的治理判断。",
       "recognition_cues": [
         "是不是该用本 skill"
@@ -90,6 +91,7 @@
       "id": "point:distill.routing-tree",
       "title": "归宿判断决策树完整体",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "三问展开、陷阱与默认落点（skill 默认、subagent 需论证）。",
       "recognition_cues": [
         "完整决策树"
@@ -126,6 +128,7 @@
       "id": "point:distill.dual-dest",
       "title": "允许双落点",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "纪律文档指针 + skill 细节可并存，显式标注双落点。",
       "recognition_cues": [
         "既是事实又是判断力"
@@ -162,6 +165,7 @@
       "id": "point:distill.fallback-no-drop",
       "title": "不确定绝不丢弃",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "判不清或基建缺失→纪律文档托底并标注，经验不得蒸发。",
       "recognition_cues": [
         "归宿不确定",

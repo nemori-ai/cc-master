@@ -53,6 +53,7 @@
       "id": "point:workflow.authoring-contract",
       "title": "起草与 launch 契约",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "从 known-good 资产起草，遵守 meta、determinism、sandbox、thunk 与 cap，再以 harness 报错修复。",
       "recognition_cues": [
         "需要起草与 launch 契约"
@@ -89,6 +90,7 @@
       "id": "point:workflow.background-contract",
       "title": "后台执行契约",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "Workflow 以 task ID 后台运行、完成自动唤醒，且启动后没有 mid-run 输入。",
       "recognition_cues": [
         "需要后台执行契约"
@@ -125,6 +127,7 @@
       "id": "point:workflow.barrier-vs-streaming",
       "title": "Barrier 与 streaming 判断",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "多阶段默认 pipeline，只有下游需要整批集合时才引入 parallel barrier。",
       "recognition_cues": [
         "需要Barrier 与 streaming 判断"
@@ -161,6 +164,7 @@
       "id": "point:workflow.contract-vs-internals",
       "title": "契约与内部机制分界",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "只依赖 first-party 行为契约，不把 sandbox、journal 与 cache 内部猜测当地基。",
       "recognition_cues": [
         "需要契约与内部机制分界"
@@ -197,6 +201,7 @@
       "id": "point:workflow.determinism",
       "title": "Determinism 三禁",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "禁止墙钟与随机控制流，用 args 或稳定 index 保住 resume。",
       "recognition_cues": [
         "需要Determinism 三禁"
@@ -233,6 +238,7 @@
       "id": "point:workflow.execution-model",
       "title": "确定性协调器本质",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "让确定性脚本协调 leaf agent，并把中间结果留在脚本变量而非主 context。",
       "recognition_cues": [
         "需要确定性协调器本质"
@@ -269,6 +275,7 @@
       "id": "point:workflow.primitive-model",
       "title": "Primitive 与注入对象模型",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "说明 agent、parallel、pipeline、phase、log、workflow、args 与 budget 的真实语义。",
       "recognition_cues": [
         "需要Primitive 与注入对象模型"
@@ -305,6 +312,7 @@
       "id": "point:workflow.resource-caps",
       "title": "Workflow 资源上限",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "按并发、总 agent、单调用 item 与脚本大小硬上限设计吞吐。",
       "recognition_cues": [
         "需要Workflow 资源上限"
@@ -341,6 +349,7 @@
       "id": "point:workflow.resume-prefix",
       "title": "最长未变前缀 Resume",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "按 agent 调用序列复用未变前缀，第一个变化点之后全部 live 重跑。",
       "recognition_cues": [
         "需要最长未变前缀 Resume"
@@ -377,6 +386,7 @@
       "id": "point:workflow.api-agent",
       "title": "agent API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义 fresh-context agent 的返回、结构化 schema、跳过语义与 opts。",
       "recognition_cues": [
         "需要agent API"
@@ -413,6 +423,7 @@
       "id": "point:workflow.api-args",
       "title": "args 注入",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "要求传真实 JSON 值而非 stringify 后的字符串。",
       "recognition_cues": [
         "需要args 注入"
@@ -449,6 +460,7 @@
       "id": "point:workflow.api-budget",
       "title": "共享 budget API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义 total、spent、remaining、硬上限与有 total 守卫的预算循环。",
       "recognition_cues": [
         "需要共享 budget API"
@@ -485,6 +497,7 @@
       "id": "point:workflow.api-cache-key",
       "title": "Resume cache key",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "以 prompt、schema、model、isolation 与 agentType 决定调用身份，排除装饰字段。",
       "recognition_cues": [
         "需要Resume cache key"
@@ -521,6 +534,7 @@
       "id": "point:workflow.api-caps",
       "title": "API 硬 caps",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "速查并发、run 总量、单次 item 与脚本尺寸上限。",
       "recognition_cues": [
         "需要API 硬 caps"
@@ -557,6 +571,7 @@
       "id": "point:workflow.api-composition",
       "title": "workflow 组合 API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义一层 child workflow、共享资源与 catch-and-degrade。",
       "recognition_cues": [
         "需要workflow 组合 API"
@@ -593,6 +608,7 @@
       "id": "point:workflow.api-failure",
       "title": "Workflow failure 语义",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "汇总 skip、thunk、stage、child、budget 与 determinism 的失败形态。",
       "recognition_cues": [
         "需要Workflow failure 语义"
@@ -629,6 +645,7 @@
       "id": "point:workflow.api-meta",
       "title": "meta 脚本头",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "第一条语句必须是纯字面量 meta，并由 harness 做权威校验。",
       "recognition_cues": [
         "需要meta 脚本头"
@@ -665,6 +682,7 @@
       "id": "point:workflow.api-parallel",
       "title": "parallel API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义 thunk barrier、null 槽位、输入顺序与单次上限。",
       "recognition_cues": [
         "需要parallel API"
@@ -701,6 +719,7 @@
       "id": "point:workflow.api-pipeline",
       "title": "pipeline API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义 item 流式 stages、回调参数、失败降级与单次上限。",
       "recognition_cues": [
         "需要pipeline API"
@@ -737,6 +756,7 @@
       "id": "point:workflow.api-progress",
       "title": "phase 与 log API",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "定义 progress group、并发 phase 归属和显式记录收窄。",
       "recognition_cues": [
         "需要phase 与 log API"

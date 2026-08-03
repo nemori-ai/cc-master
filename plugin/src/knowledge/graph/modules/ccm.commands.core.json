@@ -51,6 +51,7 @@
       "id": "point:ccm.cmd.overview",
       "title": "ccm 顶层结构与 namespaces",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "ccm 顶层结构与 namespaces（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "顶层结构",
@@ -89,6 +90,7 @@
       "id": "point:ccm.cmd.board",
       "title": "namespace board 命令面",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace board 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "namespace board",
@@ -127,6 +129,7 @@
       "id": "point:ccm.cmd.goal",
       "title": "namespace goal 命令面",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace goal 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "namespace goal",
@@ -165,6 +168,7 @@
       "id": "point:ccm.cmd.task",
       "title": "namespace task 命令面",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace task 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "namespace task",
@@ -203,6 +207,7 @@
       "id": "point:ccm.cmd.log",
       "title": "namespace log 命令面",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "namespace log 命令面（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "namespace log",
@@ -241,6 +246,7 @@
       "id": "point:ccm.cmd.json-shape",
       "title": "--json 输出形状",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "--json 输出形状（易腐 CLI 事实；以本 catalog 段 + ccm --help 为权威）。",
       "recognition_cues": [
         "--json 输出形状",

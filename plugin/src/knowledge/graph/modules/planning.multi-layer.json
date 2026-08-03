@@ -51,6 +51,7 @@
       "id": "point:multilayer.orthogonality",
       "title": "Board 与项目 planning 正交",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "board 管跨节点编排，项目 planning 文档管单节点内部纵深，不互相替代。",
       "recognition_cues": [
         "想把项目内部计划写进 board",
@@ -88,6 +89,7 @@
       "id": "point:multilayer.handoff-contract",
       "title": "项目 planning handoff contract",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "派发时要求 worker 发现并遵循项目 planning 规范，返回计划位置与进度证据。",
       "recognition_cues": [
         "派一个复杂节点",
@@ -125,6 +127,7 @@
       "id": "point:multilayer.admission-and-escalation",
       "title": "多层 planning 准入与 escalation 边界",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "只让足够复杂且内部耦合的节点使用项目层；跨节点依赖或 owner 变化才升级到顶层。",
       "recognition_cues": [
         "判断节点是否值得单独 plan",
@@ -162,6 +165,7 @@
       "id": "point:multilayer.maintenance",
       "title": "计划文档维护责任",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "执行者维护项目计划，orchestrator 只追踪位置与证据；项目计划不替代端点验收。",
       "recognition_cues": [
         "需要决定谁维护内部计划",
@@ -199,6 +203,7 @@
       "id": "point:multilayer.deviation-notes",
       "title": "偏离留痕",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "够格的大节点在派发契约里加一条偏离记录要求，写清偏离什么、为什么、放弃了什么、要不要复核；留痕不能把该升级的语义变更变成既成事实。",
       "recognition_cues": [
         "执行者在实现中撞上未预料的边界情形",
