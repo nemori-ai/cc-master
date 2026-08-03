@@ -1,0 +1,38 @@
+# 重型测试清单 —— 不进每 PR 快门，由 nightly 覆盖
+#
+# 收录判据是两维的，不是单纯的「慢」：
+#
+#   耗时 × 边际信息量
+#
+# 一个 hook 测试跑 90 秒也留在快门里，因为它测的是运行时核心行为，回归代价最高。
+# 而下面这些每个用例都要建一座隔离仓、跑一遍全量四 host 投影 —— 同一套投影逻辑被
+# 反复验证几十遍，第 N 次的边际信息量已经趋近于零，却让每个用例付出数分钟。
+#
+# 这也是本仓测试时长与知识图规模呈超线性关系的根源：图每长一个 module，下面每一个
+# 用例都变慢一点。清单越长，越说明该动手做的是 fixture 复用，而不是继续往 nightly 搬。
+#
+# 实测（2026-07-31，每文件 90 秒上限）：107 个测试文件里 55 个跑不到 3 秒，
+# 而下面这 17 个全部撞满上限；单独抽三个不设限跑，50 分钟仍未跑完。
+#
+# 新增重型测试必须登记在此。不登记的后果是快门被悄悄拖慢而无人察觉 —— 那正是
+# 本清单要防的事。
+#
+# 格式：<文件名><TAB><为什么重>
+
+attestation-regen-convergence.test.mjs	重跑整条 attestation 流水线直到收敛
+cross-harness-bootstrap-identity-surfaces.test.mjs	跨 host 各建隔离仓验身份面
+cursor-dual-surface-guidance.test.mjs	cursor 双面投影，5 处隔离仓
+provider-guidance-attestation.test.mjs	17 处隔离仓，每个恶意变体各跑一次投影
+skill-knowledge-change-candidate-runtime.test.mjs	候选 runtime 编译，单用例可达 6 分钟
+skill-knowledge-change-codex-review-fixes.test.mjs	同上，codex 审查修复的产物级验证
+skill-knowledge-host-compile.test.mjs	全量四 host 编译，投影调用点 69 处
+skill-knowledge-k3-00-reviewer-mutations.test.mjs	15 处隔离仓，逐个变异后重跑校验
+skill-overlay-bridge-path-escape.test.mjs	7 处隔离仓验路径逃逸
+skill-overlay-graph-atomic-publish.test.mjs	原子发布，建仓后跑真实发布
+skill-overlay-helper.test.mjs	overlay 辅助层，走同一投影入口
+skill-overlay-marker-strictness.test.mjs	标记严格性，21 处投影调用
+skill-overlay-v10-candidate-entry-trust.test.mjs	候选入口信任链，5 处隔离仓
+skill-overlay-v11-candidate-root-boundary.test.mjs	候选根边界
+skill-overlay-v3-containment-safe-read.test.mjs	10 处隔离仓验安全读
+skill-overlay-v3-skills-swap-commit.test.mjs	skills 交换提交语义
+skill-overlay-v9-whole-host-atomic.test.mjs	整 host 原子性，6 处隔离仓

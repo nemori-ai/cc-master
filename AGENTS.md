@@ -207,7 +207,20 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 三道门（与 [`CONTRIBUTING.md`](CONTRIBUTING.md) 同步，本文不复述命令细节，只立纪律）：`bash run-tests.sh` 必须以 `ALL TESTS PASSED` 收尾 + `bash scripts/check-plugin-dist-sync.sh` 不留下 `plugin/dist` diff + `claude plugin validate plugin/dist/claude-code` 无错。
 
-> **⚠️ CI 不替你跑这三道门。** main 的 required check `build-and-check` 是 `ccm-ci.yml` 里的聚合 job，它只聚合 **ccm 门** + **`plugin-contracts` 精选四步**（scaffold 契约测试 / `check --stage K0` / release knowledge boundary / package+bundle 契约）；**完整 `run-tests.sh` 不在任何 workflow 里**。所以本地端点这一跑是唯一的网——跳过或窄化它，红就会静默落进分支（[[Finding #114]]：一条真回归据此被藏了两天）。
+> **⚠️ CI 只替你跑第一道门的一半，另外两道门完全没有 CI。** 分层现状（issue #213 后）：
+>
+> | 门 | 谁跑 | 说明 |
+> |---|---|---|
+> | `bash run-tests.sh --fast` | **CI（required）** | main 的 required check `build-and-check` 聚合 **ccm 门** + **`plugin-contracts`**，后者现在跑整个快层：全部 hook / script 测试 + 投影与矩阵 check + skill-lint + 除重型清单外的全部 content 测试 |
+> | `bash run-tests.sh --heavy` | **nightly，非 required** | `tests/heavy-tests.txt` 登记的重型 content 测试（每个都建隔离仓跑全量四 host 投影，单文件动辄数分钟）由 `.github/workflows/nightly-heavy-tests.yml` 每晚跑一次 + 可 `workflow_dispatch` 手动触发。**PR 上不跑**——它红了不会 block merge |
+> | `bash run-tests.sh --quarantine` | **nightly，非 required** | `tests/quarantine.txt` 登记的**已知失败**。它跑的是**反向检查**——任何一条变绿了却还留在清单上就是硬错误，以此保证清单只许变短 |
+> | `check-plugin-dist-sync.sh` / `claude plugin validate` | **没有任何 CI** | 只有本地端点 + `.githooks/` 的 pre-push |
+>
+> **⚠️ `ALL TESTS PASSED` 不再等于「所有测试文件都跑了」。** 不带 flag 的完整跑**也**跳过 `tests/quarantine.txt` 登记的已知失败——否则本地端点门永远红，这句承诺永远拿不到。代价是它不再字面等于全集，所以收尾行会打印隔离数（`· N quarantined`）。**看见那个数字就去读清单**：那是这个仓库当前欠着的、有名有姓的债，不是背景噪音。
+>
+> 所以：**改了重型层覆盖的东西（投影 / overlay / knowledge 编译 / attestation），或改了 `plugin/dist`，本地端点这一跑仍是唯一的网**——跳过或窄化它，红就会静默落进分支（[[Finding #114]]：一条真回归据此被藏了两天）。发版 / 端点验收一律跑不带 flag 的完整 `bash run-tests.sh`，`--fast` 绿不等于全套绿。
+
+- **两份清单，语义别混**——`tests/heavy-tests.txt` 收「跑得慢但测试本身是好的」，`tests/quarantine.txt` 收「测试本身已经红了」。一个文件不许同时进两份（脚本会硬报错），否则它从任何一层都跑不到。往任一清单加条目都要在 PR 描述里说明理由；隔离清单还要附 main 上已红的独立复核证据，防止把本次改动引入的红塞进去蒙混过关。
 
 - **测试只保 correctness，不保 quality**——`run-tests.sh`（hook 行为 + content 结构）回答"语义合不合 spec/contract"；quality（指导对不对、效率拉没拉满）靠 §9 dogfood + §7 端点验收独立守护。
 - **并行后端点必跑全套**（Finding #12）——sub-agent / workflow fan-out 之后，orchestrator 在端点亲跑一次完整 `run-tests.sh` + `plugin validate`，不信各 leaf 的自报。
