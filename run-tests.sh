@@ -90,13 +90,13 @@ if [ -n "$q_missing" ]; then
 fi
 quarantine_node_tests=$(printf '%s' "$quarantine_node_tests" | sed '/^$/d' | sort)
 
+# 一个文件可以既慢又红——最初这里有条「不许重叠」的硬检查，那是个错误假设，它把唯一正确的
+# 表达方式给堵死了（实测就有两个文件既在重型层、又有既有失败）。两份清单回答的是不同问题：
+#   heavy      回答「什么时候跑」
+#   quarantine 回答「跑不跑」
+# 所以隔离优先：已知红的文件无论快慢一律跳过，直到修好为止。重叠不是错误，是如实描述。
 overlap=$(comm -12 <(printf '%s\n' "$heavy_node_tests") <(printf '%s\n' "$quarantine_node_tests") | sed '/^$/d')
-if [ -n "$overlap" ]; then
-  echo "run-tests.sh: these files are in BOTH the heavy and quarantine registries:" >&2
-  printf '  - %s\n' $overlap >&2
-  echo "Pick one — otherwise no layer ever runs them." >&2
-  exit 2
-fi
+heavy_node_tests=$(comm -23 <(printf '%s\n' "$heavy_node_tests") <(printf '%s\n' "$quarantine_node_tests") | sed '/^$/d')
 
 quarantine_count=$(printf '%s\n' "$quarantine_node_tests" | sed '/^$/d' | wc -l | tr -d ' ')
 
@@ -118,6 +118,10 @@ fi
 
 if [ "$LIST_ONLY" -eq 1 ]; then
   echo "mode: $MODE"
+  if [ -n "$overlap" ]; then
+    echo "-- in BOTH registries; quarantine wins, so no layer runs these until they are fixed:"
+    printf '   %s\n' $overlap
+  fi
   if [ "$run_fast_sections" -eq 1 ]; then
     for t in tests/hooks/test_*.sh tests/scripts/test_*.sh; do
       if [ -e "$t" ]; then echo "$t"; fi
