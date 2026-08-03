@@ -26,14 +26,21 @@
 #
 # 2026-07-31 独立复核：在 main(0a3b0aeb) 的干净 worktree 上逐个跑过，失败数与诊断一致。
 #
-# 下列前三项是同一种病：**测试假设的输入已经不存在了**。生产代码没问题，是测试与代码
+# 下列前两项是同一种病：**测试假设的输入已经不存在了**。生产代码没问题，是测试与代码
 # 演进脱节 —— 它们早就测不到任何东西，只是在 ENOENT。换句话说这些测试已经死了，只是
 # 还没人埋。埋还是救（fixture 修复 vs 删除），要逐个判断它本来该测的能力现在是否已由
 # 别处覆盖，那是独立议题，不在引入分层这次改动的边界内。
 #
+# 2026-08-03 skill-knowledge-k1-pilot-query.test.mjs 已按上面这道判断出清，结论是**救**
+# 不是埋：它那六条的能力逐条查过 tests/ 全域（含 buildAndValidateGraph 直调）与 scripts/，
+# 没有一条在别处有正向覆盖 —— 删了就是把死覆盖换成零覆盖。改用
+# helpers/skill-knowledge-isolated-repo.mjs 在克隆仓里原地造反例后六条全绿，故摘牌。
+# 一个例外单独说明：PILOT-07 里的 SKG-OWNERSHIP-MULTIPLY 断言是删掉而非修好的，因为
+# 那条规则已被有意推翻（一个 module 现在允许被多个 composition 消费，诊断码在实现里
+# 已不存在）—— 那不是坏掉的脚手架，是测试在向引擎追认一条已废弃的旧约束。
+#
 # 格式：<文件名><TAB><失败数><TAB><诊断>
 
-skill-knowledge-k1-pilot-query.test.mjs	6	copyPilotSource 读 skills/master-orchestrator-guide/skill.json 报 ENOENT——fixture 期待的文件在仓库里已不存在
 skill-knowledge-behavior-eval.test.mjs	2	buildEvalSurface 抛 Missing claude-code compiled knowledge router——期待的编译产物不存在
 provider-guidance-v2-attestation-attack.test.mjs	5	ATTACK-02/03/07/13/14；攻击变体的预期拒因与当前 attestation 层的实际拒因不再吻合
 release-metadata.test.mjs	1	tag-gated release attachment 断言在非 tag 环境下仍执行——它本该 skip 而不是 fail

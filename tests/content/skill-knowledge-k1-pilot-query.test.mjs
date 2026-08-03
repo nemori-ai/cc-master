@@ -48,43 +48,67 @@ function withTempSource(callback) {
   return result;
 }
 
-function displayRepoPath(target, root = repoRoot) {
-  const relative = path.relative(root, target);
-  if (relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..') {
-    return relative.split(path.sep).join('/');
+// Adversarial scenarios below mutate authored knowledge, so they cannot run
+// against a copied-out source root: manifests are repo-relative, and a bare
+// copy makes every ref dangle at once — the graph fails for the wrong reason
+// and the mutation under test proves nothing. They run inside a full isolated
+// repo clone instead (the same helper PILOT-08 uses), mutating in place.
+const KNOWLEDGE_ROOT = 'plugin/src/knowledge';
+const PORTFOLIO_JSON = `${KNOWLEDGE_ROOT}/portfolio.json`;
+const GUIDE_COMPOSITION_JSON = `${KNOWLEDGE_ROOT}/compositions/skill.master-orchestrator-guide.json`;
+const ENDPOINT_MODULE_JSON = `${KNOWLEDGE_ROOT}/graph/modules/verification.endpoint.json`;
+const POINTS_DIR = `${KNOWLEDGE_ROOT}/points`;
+
+const readSourceJson = (root, relative) =>
+  JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
+
+const writeSourceJson = (root, relative, doc) =>
+  fs.writeFileSync(path.join(root, relative), `${JSON.stringify(doc, null, 2)}\n`);
+
+/**
+ * Apply one adversarial mutation, run `body`, then put the touched files back.
+ *
+ * Restoring is what lets a single clone host several independent scenarios: a
+ * test that asserts "this mutation trips that diagnostic" is only honest if the
+ * graph was otherwise healthy, so a neighbour's leftovers must never survive
+ * into the next scenario.
+ *
+ * @param {string} root isolated repo root
+ * @param {string[]} files repo-relative paths the mutation will overwrite
+ */
+function withMutation(root, files, mutate, body) {
+  const saved = files.map((relative) => [
+    relative,
+    fs.readFileSync(path.join(root, relative), 'utf8'),
+  ]);
+  try {
+    mutate();
+    return body();
+  } finally {
+    for (const [relative, text] of saved) {
+      fs.writeFileSync(path.join(root, relative), text);
+    }
   }
-  return path.resolve(target);
 }
 
-function copyPilotSource(targetRoot, sourceRepoRoot = repoRoot) {
-  const sourceRoot = path.join(sourceRepoRoot, 'plugin/src/knowledge');
-  const walk = (from, to) => {
-    fs.mkdirSync(to, { recursive: true });
-    for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-      const src = path.join(from, entry.name);
-      const dest = path.join(to, entry.name);
-      if (entry.isDirectory()) walk(src, dest);
-      else if (entry.name.endsWith('.json')) fs.copyFileSync(src, dest);
-    }
-  };
-  walk(sourceRoot, targetRoot);
+/** Run `check --stage K1` in the clone and return the parsed body + error codes. */
+function checkK1(runCli, label) {
+  const result = runCli(['check', '--stage', 'K1', '--json']);
+  const body = parseJson(result);
+  assertValidCliOutput(body, label);
+  const codes = (body.diagnostics ?? [])
+    .filter((item) => item.severity === 'error')
+    .map((item) => item.code);
+  return { result, body, codes };
+}
 
-  // Rewrite manifest refs so ownership checks resolve against the temp loaded shards.
-  const portfolioPath = path.join(targetRoot, 'portfolio.json');
-  const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-  for (const ref of portfolio.skills ?? []) {
-    const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-    ref.manifest = displayRepoPath(path.join(targetRoot, suffix), sourceRepoRoot);
-  }
-  fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-
-  const skillPath = path.join(targetRoot, 'skills/master-orchestrator-guide/skill.json');
-  const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-  for (const ref of skill.modules ?? []) {
-    const suffix = String(ref.manifest).replace(/^plugin\/src\/knowledge\//, '');
-    ref.manifest = displayRepoPath(path.join(targetRoot, suffix), sourceRepoRoot);
-  }
-  fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
+/** Assert the mutation failed closed on `code`, and hand back that diagnostic. */
+function assertFailsClosed({ result, body, codes }, code, label) {
+  assert.equal(result.status, 4, `${label} must exit 4, got ${result.status}: ${result.stdout}`);
+  assert.equal(body.ok, false, `${label} must report ok:false`);
+  const hit = (body.diagnostics ?? []).find((item) => item.code === code);
+  assert.ok(hit, `${label} must raise ${code}, got ${JSON.stringify([...new Set(codes)])}`);
+  return hit;
 }
 
 test('SKG-PILOT-01: check loads full portfolio inventory with stable graph hash', () => {
@@ -234,351 +258,211 @@ test('SKG-PILOT-03: explain returns authority/binding/witness for points and fai
   assert.equal(missingBody.diagnostics[0].code, 'SKG-QUERY-NOT-FOUND');
 });
 
-test('SKG-PILOT-04: stale inventory and dangling edges fail closed with remediation', () =>
-  withTempSource((sourceRoot) => {
-    copyPilotSource(sourceRoot);
-    const skillPath = path.join(
-      sourceRoot,
-      'skills/master-orchestrator-guide/skill.json',
-    );
-    const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-    skill.canonical_source_inventory[0].reviewed_unbound_sha256 =
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
-
-    const stale = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-    assert.equal(stale.status, 4);
-    const staleBody = parseJson(stale);
-    assertValidCliOutput(staleBody, 'stale inventory check');
-    assert.ok(
-      staleBody.diagnostics.some((item) => item.code === 'SKG-INVENTORY-STALE-UNBOUND'),
-    );
-    assert.ok(
-      staleBody.diagnostics.find((item) => item.code === 'SKG-INVENTORY-STALE-UNBOUND')
-        .remediation,
-    );
-
-    copyPilotSource(sourceRoot);
-    const modulePath = path.join(
-      sourceRoot,
-      'skills/master-orchestrator-guide/modules/verification.endpoint.json',
-    );
-    const module = JSON.parse(fs.readFileSync(modulePath, 'utf8'));
-    module.edges.push({
-      id: 'edge:verification.dangling',
-      type: 'next',
-      from: 'point:verification.terminal-is-not-done',
-      to: 'point:does-not-exist',
-      when: ['fixture dangling'],
-      path_role: 'support',
-      runtime: { enabled_by_default: true },
-      lifecycle: { state: 'accepted', since: '2026-07-23' },
-      admission: {
-        evidence: [{ kind: 'design', ref: 'fixture' }],
-        verifiers: [{ kind: 'review', ref: 'fixture' }],
-      },
+test('SKG-PILOT-04: stale inventory and dangling edges fail closed with remediation', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    // An inventory entry that no longer attests the prose it claims to cover.
+    withMutation(root, [GUIDE_COMPOSITION_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.canonical_source_inventory[0].reviewed_unbound_sha256 = 'a'.repeat(64);
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+    }, () => {
+      const stale = checkK1(isoCli, 'stale inventory check');
+      const hit = assertFailsClosed(stale, 'SKG-INVENTORY-STALE-UNBOUND', 'stale inventory');
+      assert.ok(hit.remediation, 'stale inventory must tell the maintainer how to re-attest');
     });
-    fs.writeFileSync(modulePath, `${JSON.stringify(module, null, 2)}\n`);
-    const dangling = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-    assert.equal(dangling.status, 4, dangling.stdout);
-    const danglingBody = parseJson(dangling);
-    assertValidCliOutput(danglingBody, 'dangling edge check');
-    assert.ok(
-      danglingBody.diagnostics.some((item) => item.code === 'SKG-EDGE-ENDPOINT-MISSING'),
-    );
-  }));
 
-test('SKG-PILOT-05: critical pin budget overflow fails closed', () =>
-  withTempSource((sourceRoot) => {
-    copyPilotSource(sourceRoot);
-    const portfolioPath = path.join(sourceRoot, 'portfolio.json');
-    const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-    // 1 critical / 3 modules ≈ 0.333 > 0.1 → hard fail without breaking schema mins.
-    portfolio.critical_pin_budget = { max_modules: 2, max_fraction: 0.1 };
-    fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-    const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-    assert.equal(result.status, 4, result.stdout);
-    const body = parseJson(result);
-    assertValidCliOutput(body, 'budget overflow check');
-    assert.ok(body.diagnostics.some((item) => item.code === 'SKG-BUDGET-CRITICAL-PIN'));
-    assert.ok(
-      body.diagnostics.find((item) => item.code === 'SKG-BUDGET-CRITICAL-PIN').witness,
-    );
-  }));
-
-test('SKG-PILOT-06: entity explain requires built.ok; SKG diagnostic channel remains', () =>
-  withTempSource(async (sourceRoot) => {
-    copyPilotSource(sourceRoot);
-    const skillPath = path.join(
-      sourceRoot,
-      'skills/master-orchestrator-guide/skill.json',
-    );
-    const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-    skill.canonical_source_inventory[0].reviewed_unbound_sha256 =
-      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-    fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
-
-    const staleEntity = runCli([
-      'explain',
-      'point:conduct.never-play',
-      '--source',
-      sourceRoot,
-      '--json',
-    ]);
-    assert.notEqual(staleEntity.status, 0);
-    const staleEntityBody = parseJson(staleEntity);
-    assertValidCliOutput(staleEntityBody, 'explain under stale inventory');
-    assert.equal(staleEntityBody.ok, false);
-    assert.ok(
-      staleEntityBody.diagnostics.some((item) => item.code === 'SKG-INVENTORY-STALE-UNBOUND'),
-    );
-
-    const staleCode = runCli([
-      'explain',
-      'SKG-INVENTORY-STALE-UNBOUND',
-      '--source',
-      sourceRoot,
-      '--json',
-    ]);
-    assert.equal(staleCode.status, 0);
-    const staleCodeBody = parseJson(staleCode);
-    assertValidCliOutput(staleCodeBody, 'explain SKG diagnostic under stale');
-    assert.equal(staleCodeBody.ok, true);
-    assert.equal(staleCodeBody.entity.kind, 'diagnostic');
-
-    copyPilotSource(sourceRoot);
-    const modulePath = path.join(
-      sourceRoot,
-      'skills/master-orchestrator-guide/modules/verification.endpoint.json',
-    );
-    const module = JSON.parse(fs.readFileSync(modulePath, 'utf8'));
-    module.edges.push({
-      id: 'edge:verification.dangling-explain',
-      type: 'next',
-      from: 'point:verification.terminal-is-not-done',
-      to: 'point:does-not-exist',
-      when: ['fixture dangling explain'],
-      path_role: 'support',
-      runtime: { enabled_by_default: true },
-      lifecycle: { state: 'accepted', since: '2026-07-23' },
-      admission: {
-        evidence: [{ kind: 'design', ref: 'fixture' }],
-        verifiers: [{ kind: 'review', ref: 'fixture' }],
-      },
+    // An edge whose target point does not exist anywhere in the graph.
+    withMutation(root, [ENDPOINT_MODULE_JSON], () => {
+      const module = readSourceJson(root, ENDPOINT_MODULE_JSON);
+      module.edges.push({
+        ...structuredClone(module.edges[0]),
+        id: 'edge:verification.dangling',
+        to: 'point:does-not-exist',
+      });
+      writeSourceJson(root, ENDPOINT_MODULE_JSON, module);
+    }, () => {
+      const dangling = checkK1(isoCli, 'dangling edge check');
+      assertFailsClosed(dangling, 'SKG-EDGE-ENDPOINT-MISSING', 'dangling edge');
     });
-    fs.writeFileSync(modulePath, `${JSON.stringify(module, null, 2)}\n`);
+  });
+});
 
-    const danglingEntity = runCli([
-      'explain',
-      'point:verification.terminal-is-not-done',
-      '--source',
-      sourceRoot,
-      '--json',
-    ]);
-    assert.notEqual(danglingEntity.status, 0);
-    const danglingEntityBody = parseJson(danglingEntity);
-    assertValidCliOutput(danglingEntityBody, 'explain under dangling edge');
-    assert.equal(danglingEntityBody.ok, false);
-    assert.ok(
-      danglingEntityBody.diagnostics.some((item) => item.code === 'SKG-EDGE-ENDPOINT-MISSING'),
-    );
+test('SKG-PILOT-05: critical pin budget overflow fails closed', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    withMutation(root, [PORTFOLIO_JSON], () => {
+      const portfolio = readSourceJson(root, PORTFOLIO_JSON);
+      // Squeeze the budget below what the live portfolio already pins, so the
+      // overflow comes from a real critical-module count rather than a fixture.
+      portfolio.critical_pin_budget = { max_modules: 1, max_fraction: 0.001 };
+      writeSourceJson(root, PORTFOLIO_JSON, portfolio);
+    }, () => {
+      const result = checkK1(isoCli, 'budget overflow check');
+      const hit = assertFailsClosed(result, 'SKG-BUDGET-CRITICAL-PIN', 'pin budget overflow');
+      assert.ok(hit.witness, 'budget overflow must carry a witness');
+    });
+  });
+});
 
-    const danglingCode = runCli([
-      'explain',
-      'SKG-EDGE-ENDPOINT-MISSING',
-      '--source',
-      sourceRoot,
-      '--json',
-    ]);
-    assert.equal(danglingCode.status, 0);
-    const danglingCodeBody = parseJson(danglingCode);
-    assertValidCliOutput(danglingCodeBody, 'explain SKG diagnostic under dangling');
-    assert.equal(danglingCodeBody.entity.kind, 'diagnostic');
-  }));
-
-test('SKG-PILOT-07: ownership tree rejects bad refs, orphans, multiply-owned, and broken entry chains', () =>
-  withTempSource((sourceRoot) => {
-    copyPilotSource(sourceRoot);
-    const portfolioPath = path.join(sourceRoot, 'portfolio.json');
-    const skillPath = path.join(sourceRoot, 'skills/master-orchestrator-guide/skill.json');
-
-    // Wrong skill id on portfolio ref (manifest still points at real skill shard).
-    {
-      copyPilotSource(sourceRoot);
-      const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-      portfolio.skills[0].id = 'skill:does-not-match';
-      fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-      const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(result.status, 4, result.stdout);
-      const body = parseJson(result);
-      assertValidCliOutput(body, 'ownership skill ref mismatch');
+test('SKG-PILOT-06: entity explain requires built.ok; SKG diagnostic channel remains', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    /**
+     * Under a broken graph, explaining an *entity* must refuse (an entity answer
+     * drawn from an invalid graph would be a confident lie), while explaining the
+     * *diagnostic code* must still work — that channel is how a maintainer finds
+     * out what broke.
+     */
+    const assertExplainChannels = (entityId, code, label) => {
+      const entity = isoCli(['explain', entityId, '--json']);
+      assert.notEqual(entity.status, 0, `${label}: entity explain must not succeed`);
+      const entityBody = parseJson(entity);
+      assertValidCliOutput(entityBody, `explain entity under ${label}`);
+      assert.equal(entityBody.ok, false);
       assert.ok(
-        body.diagnostics.some((item) => item.code === 'SKG-OWNERSHIP-REF'),
+        entityBody.diagnostics.some((item) => item.code === code),
+        `${label}: entity explain must surface ${code}`,
       );
-    }
 
-    // Wrong module id on skill.modules ref.
-    {
-      copyPilotSource(sourceRoot);
-      const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-      skill.modules[0].id = 'module:wrong-id';
-      fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
-      const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(result.status, 4, result.stdout);
-      const body = parseJson(result);
-      assertValidCliOutput(body, 'ownership module ref mismatch');
-      assert.ok(body.diagnostics.some((item) => item.code === 'SKG-OWNERSHIP-REF'));
-    }
+      const byCode = isoCli(['explain', code, '--json']);
+      assert.equal(byCode.status, 0, `${label}: explain ${code} must still succeed`);
+      const byCodeBody = parseJson(byCode);
+      assertValidCliOutput(byCodeBody, `explain ${code} under ${label}`);
+      assert.equal(byCodeBody.ok, true);
+      assert.equal(byCodeBody.entity.kind, 'diagnostic');
+      assert.equal(byCodeBody.entity.id, code);
+    };
 
-    // Orphan module shard: present on disk but not owned by any skill.modules ref.
-    {
-      copyPilotSource(sourceRoot);
-      const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-      skill.modules = skill.modules.filter((ref) => ref.id !== 'module:conduct.never-play');
-      skill.entry_modules = skill.entry_modules.filter(
+    withMutation(root, [GUIDE_COMPOSITION_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.canonical_source_inventory[0].reviewed_unbound_sha256 = 'b'.repeat(64);
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+    }, () => {
+      assertExplainChannels(
+        'point:conduct.never-play',
+        'SKG-INVENTORY-STALE-UNBOUND',
+        'stale inventory',
+      );
+    });
+
+    withMutation(root, [ENDPOINT_MODULE_JSON], () => {
+      const module = readSourceJson(root, ENDPOINT_MODULE_JSON);
+      module.edges.push({
+        ...structuredClone(module.edges[0]),
+        id: 'edge:verification.dangling-explain',
+        to: 'point:does-not-exist',
+      });
+      writeSourceJson(root, ENDPOINT_MODULE_JSON, module);
+    }, () => {
+      assertExplainChannels(
+        'point:verification.terminal-is-not-done',
+        'SKG-EDGE-ENDPOINT-MISSING',
+        'dangling edge',
+      );
+    });
+  });
+});
+
+// A multiply-owned-module scenario used to live here, asserting a
+// `SKG-OWNERSHIP-MULTIPLY` diagnostic when a second skill claimed a module that
+// another skill already owned. It was deleted rather than repaired: the rule it
+// asserted has been deliberately reversed. A module may now be consumed by
+// several compositions (one module, one SSOT, many consumers), the diagnostic
+// code no longer exists anywhere in the implementation, and `explain
+// module:<id>` reports a *list* of consumers. Restoring the assertion would be
+// making the test dictate an abandoned constraint back to the engine.
+test('SKG-PILOT-07: ownership tree rejects bad refs, orphans, and broken entry chains', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    // Portfolio ref declares an id the referenced composition does not carry.
+    withMutation(root, [PORTFOLIO_JSON], () => {
+      const portfolio = readSourceJson(root, PORTFOLIO_JSON);
+      portfolio.skills[0].id = 'skill:does-not-match';
+      writeSourceJson(root, PORTFOLIO_JSON, portfolio);
+    }, () => {
+      const result = checkK1(isoCli, 'ownership skill ref mismatch');
+      assertFailsClosed(result, 'SKG-OWNERSHIP-REF', 'portfolio skill ref mismatch');
+    });
+
+    // Composition module ref keeps its id but points its manifest at a different
+    // shard. Swapping the *manifest* (not the id) is what isolates the ref check:
+    // a wrong id also derails candidate analysis, and the composition would then
+    // be dropped for non-admission before ownership is ever examined.
+    withMutation(root, [GUIDE_COMPOSITION_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.consumes.modules[0].manifest = `${KNOWLEDGE_ROOT}/graph/modules/conduct.never-play.json`;
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+    }, () => {
+      const result = checkK1(isoCli, 'ownership module ref mismatch');
+      assertFailsClosed(result, 'SKG-OWNERSHIP-REF', 'composition module ref mismatch');
+    });
+
+    // Orphan module shard: on disk, but consumed by no composition.
+    withMutation(root, [GUIDE_COMPOSITION_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.consumes.modules = composition.consumes.modules.filter(
+        (ref) => ref.id !== 'module:conduct.never-play',
+      );
+      composition.entry_modules = (composition.entry_modules ?? []).filter(
         (id) => id !== 'module:conduct.never-play',
       );
-      fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
-      const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(result.status, 4, result.stdout);
-      const body = parseJson(result);
-      assertValidCliOutput(body, 'ownership orphan module');
-      assert.ok(body.diagnostics.some((item) => item.code === 'SKG-OWNERSHIP-ORPHAN'));
-    }
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+    }, () => {
+      const result = checkK1(isoCli, 'ownership orphan module');
+      assertFailsClosed(result, 'SKG-OWNERSHIP-ORPHAN', 'orphan module');
+    });
 
-    // Multiply-owned module: second skill claims the same module.
-    {
-      copyPilotSource(sourceRoot);
-      const secondSkillDir = path.join(sourceRoot, 'skills/second-owner');
-      fs.mkdirSync(secondSkillDir, { recursive: true });
-      const primarySkill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-      const secondSkill = {
-        ...primarySkill,
-        id: 'skill:second-owner',
-        name: 'second-owner',
-        modules: [
-          {
-            id: 'module:verification.endpoint',
-            manifest: primarySkill.modules[0].manifest,
-          },
-        ],
-        entry_modules: ['module:verification.endpoint'],
-        canonical_source_inventory: primarySkill.canonical_source_inventory,
-      };
-      const secondSkillPath = path.join(secondSkillDir, 'skill.json');
-      fs.writeFileSync(secondSkillPath, `${JSON.stringify(secondSkill, null, 2)}\n`);
-      const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-      portfolio.skills.push({
-        id: 'skill:second-owner',
-        manifest: displayRepoPath(secondSkillPath),
+    // Entry target chain: missing skill / wrong module / cross-module point.
+    for (const { label, breakTarget } of [
+      { label: 'missing skill', breakTarget: (target) => { target.skill = 'skill:missing'; } },
+      // point stays verification.*, which belongs to verification.endpoint
+      { label: 'wrong module', breakTarget: (target) => { target.module = 'module:conduct.never-play'; } },
+      { label: 'cross-module point', breakTarget: (target) => { target.point = 'point:conduct.never-play'; } },
+    ]) {
+      withMutation(root, [PORTFOLIO_JSON], () => {
+        const portfolio = readSourceJson(root, PORTFOLIO_JSON);
+        breakTarget(portfolio.entries[0].surfaces[0].targets[0]);
+        writeSourceJson(root, PORTFOLIO_JSON, portfolio);
+      }, () => {
+        const result = checkK1(isoCli, `entry ${label}`);
+        assertFailsClosed(result, 'SKG-ENTRY-TARGET-CHAIN', `entry ${label}`);
       });
-      fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-      const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(result.status, 4, result.stdout);
-      const body = parseJson(result);
-      assertValidCliOutput(body, 'ownership multiply-owned module');
-      assert.ok(body.diagnostics.some((item) => item.code === 'SKG-OWNERSHIP-MULTIPLY'));
     }
+  });
+});
 
-    // Entry target: missing skill / wrong module / cross-module point.
-    {
-      copyPilotSource(sourceRoot);
-      const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-      const target = portfolio.entries[0].surfaces[0].targets[0];
-      target.skill = 'skill:missing';
-      fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
-      const missingSkill = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(missingSkill.status, 4);
-      const missingSkillBody = parseJson(missingSkill);
-      assertValidCliOutput(missingSkillBody, 'entry missing skill');
-      assert.ok(
-        missingSkillBody.diagnostics.some((item) => item.code === 'SKG-ENTRY-TARGET-CHAIN'),
-      );
+test('SKG-PILOT-08: a point marker declared in two mother files fails closed', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    // Mother files under plugin/src/knowledge/points/ are the SSOT: exactly one
+    // ccm:k marker pair per point, at binding.path. Copying a point's marker
+    // pair verbatim into a second mother file gives the knowledge two homes,
+    // which is the ambiguity this invariant exists to refuse.
+    const pointsDir = path.join(root, POINTS_DIR);
+    const motherFiles = fs
+      .readdirSync(pointsDir)
+      .filter((name) => name.endsWith('.md'))
+      .sort();
+    const donor = 'conduct.never-play.md';
+    assert.ok(motherFiles.includes(donor), `expected mother file ${donor}`);
+    const host = motherFiles.find((name) => name !== donor);
+    assert.ok(host, 'need a second mother file to host the duplicate');
 
-      copyPilotSource(sourceRoot);
-      const portfolio2 = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-      const target2 = portfolio2.entries[0].surfaces[0].targets[0];
-      target2.module = 'module:conduct.never-play';
-      // point still verification.* which belongs to verification.endpoint
-      fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio2, null, 2)}\n`);
-      const wrongModule = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(wrongModule.status, 4);
-      const wrongModuleBody = parseJson(wrongModule);
-      assertValidCliOutput(wrongModuleBody, 'entry wrong module/point chain');
-      assert.ok(
-        wrongModuleBody.diagnostics.some((item) => item.code === 'SKG-ENTRY-TARGET-CHAIN'),
-      );
-
-      copyPilotSource(sourceRoot);
-      const portfolio3 = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-      const target3 = portfolio3.entries[0].surfaces[0].targets[0];
-      target3.point = 'point:conduct.never-play';
-      fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio3, null, 2)}\n`);
-      const crossPoint = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(crossPoint.status, 4);
-      const crossPointBody = parseJson(crossPoint);
-      assertValidCliOutput(crossPointBody, 'entry cross-module point');
-      assert.ok(
-        crossPointBody.diagnostics.some((item) => item.code === 'SKG-ENTRY-TARGET-CHAIN'),
-      );
-    }
-  }));
-
-test('SKG-PILOT-08: cross-inventory duplicate point markers fail closed even after unbound refresh', async () => {
-  await withIsolatedSkillKnowledgeRepo(async ({ repoRoot: isoRoot, runCli: isoCli }) => {
-    const inventory = await import('../../scripts/skill-knowledge/inventory.mjs');
-    const markers = await import('../../scripts/skill-knowledge/markers.mjs');
-    const skillMdPath = path.join(
-      isoRoot,
-      'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md',
+    const donorText = fs.readFileSync(path.join(pointsDir, donor), 'utf8');
+    const pair = donorText.match(
+      /<!-- ccm:k:start (point:\S+) -->[\s\S]*?<!-- ccm:k:end \1 -->/,
     );
-    const otherPath = path.join(
-      isoRoot,
-      'plugin/src/skills/master-orchestrator-guide/canonical/references/async-hitl.md',
-    );
-    const skillText = fs.readFileSync(skillMdPath, 'utf8');
-    const extracted = markers.extractMarkers(skillText, 'SKILL.md');
-    assert.equal(extracted.ok, true);
-    const span = extracted.spans.find((item) => item.point_id === 'point:conduct.never-play');
-    assert.ok(span);
+    assert.ok(pair, `no ccm:k marker pair found in ${donor}`);
 
-    await withTempSource(async (sourceRoot) => {
-      copyPilotSource(sourceRoot, isoRoot);
-      const duplicateBlock = [
-        '',
-        '<!-- ccm:k:start point:conduct.never-play -->',
-        span.content.trimEnd(),
-        '<!-- ccm:k:end point:conduct.never-play -->',
-        '',
-      ].join('\n');
-      const originalOther = fs.readFileSync(otherPath, 'utf8');
-      fs.writeFileSync(otherPath, `${originalOther.trimEnd()}\n${duplicateBlock}`);
-
-      const skillPath = path.join(
-        sourceRoot,
-        'skills/master-orchestrator-guide/skill.json',
+    withMutation(root, [`${POINTS_DIR}/${host}`], () => {
+      const hostPath = path.join(pointsDir, host);
+      const hostText = fs.readFileSync(hostPath, 'utf8');
+      fs.writeFileSync(hostPath, `${hostText.trimEnd()}\n\n${pair[0]}\n`);
+    }, () => {
+      const result = checkK1(isoCli, 'duplicate marker check');
+      const hit = assertFailsClosed(
+        result,
+        'SKG-MARKER-DUPLICATE-GLOBAL',
+        'duplicate mother marker',
       );
-      const skill = JSON.parse(fs.readFileSync(skillPath, 'utf8'));
-      const otherEntry = skill.canonical_source_inventory.find(
-        (entry) => entry.path === displayRepoPath(otherPath, isoRoot),
-      );
-      assert.ok(otherEntry);
-      const otherText = fs.readFileSync(otherPath, 'utf8');
-      const otherMarkers = markers.extractMarkers(otherText, otherEntry.path);
-      assert.equal(otherMarkers.ok, true);
-      otherEntry.reviewed_unbound_sha256 = inventory.hashUnboundRegions(
-        otherText,
-        otherMarkers.spans.filter((item) => (otherEntry.point_ids ?? []).includes(item.point_id)),
-      );
-      fs.writeFileSync(skillPath, `${JSON.stringify(skill, null, 2)}\n`);
-
-      const result = isoCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-      assert.equal(result.status, 4, result.stdout);
-      const body = parseJson(result);
-      assertValidCliOutput(body, 'duplicate marker check');
-      assert.ok(
-        body.diagnostics.some((item) => item.code === 'SKG-MARKER-DUPLICATE-GLOBAL'),
-      );
+      assert.equal(hit.witness.point, pair[1]);
+      assert.equal(hit.witness.spans.length, 2, 'witness must name both declaring files');
     });
   });
 });
@@ -713,35 +597,32 @@ test('SKG-PILOT-10: report/path/explain failure envelopes omit counts and stay s
   );
 });
 
-test('SKG-PILOT-11: duplicate entry ids fail K-I01 even when bodies differ', () =>
-  withTempSource((sourceRoot) => {
-    copyPilotSource(sourceRoot);
-    const portfolioPath = path.join(sourceRoot, 'portfolio.json');
-    const portfolio = JSON.parse(fs.readFileSync(portfolioPath, 'utf8'));
-    const original = portfolio.entries[0];
-    assert.equal(original.id, 'entry:master-orchestrator');
-    const duplicate = {
-      ...structuredClone(original),
-      label: 'Adversarial duplicate entry label',
-      recognition_cues: ['不同 cue A', '不同 cue B'],
-    };
-    portfolio.entries.push(duplicate);
-    fs.writeFileSync(portfolioPath, `${JSON.stringify(portfolio, null, 2)}\n`);
+test('SKG-PILOT-11: duplicate entry ids fail K-I01 even when bodies differ', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    withMutation(root, [PORTFOLIO_JSON], () => {
+      const portfolio = readSourceJson(root, PORTFOLIO_JSON);
+      const original = portfolio.entries[0];
+      assert.equal(original.id, 'entry:master-orchestrator');
+      // Same id, deliberately different body: the id is what must collide, so a
+      // schema-level "identical object" dedup would not catch this.
+      portfolio.entries.push({
+        ...structuredClone(original),
+        label: 'Adversarial duplicate entry label',
+        recognition_cues: ['不同 cue A', '不同 cue B'],
+      });
+      writeSourceJson(root, PORTFOLIO_JSON, portfolio);
 
-    const validateSource = require('../../scripts/skill-knowledge/validators/validate-source.cjs');
-    assert.equal(
-      Boolean(validateSource(portfolio)),
-      true,
-      `duplicate-entry portfolio must remain schema-valid: ${JSON.stringify(validateSource.errors ?? [])}`,
-    );
-
-    const result = runCli(['check', '--source', sourceRoot, '--stage', 'K1', '--json']);
-    assert.notEqual(result.status, 0, result.stdout);
-    const body = parseJson(result);
-    assertValidCliOutput(body, 'duplicate entry id check');
-    assert.equal(body.ok, false);
-    assert.ok(body.diagnostics.some((item) => item.code === 'SKG-ID-DUPLICATE'));
-    const duplicateDiag = body.diagnostics.find((item) => item.code === 'SKG-ID-DUPLICATE');
-    assert.equal(duplicateDiag.witness.id, 'entry:master-orchestrator');
-    assert.ok(duplicateDiag.remediation);
-  }));
+      const validateSource = require('../../scripts/skill-knowledge/validators/validate-source.cjs');
+      assert.equal(
+        Boolean(validateSource(portfolio)),
+        true,
+        `duplicate-entry portfolio must remain schema-valid: ${JSON.stringify(validateSource.errors ?? [])}`,
+      );
+    }, () => {
+      const result = checkK1(isoCli, 'duplicate entry id check');
+      const hit = assertFailsClosed(result, 'SKG-ID-DUPLICATE', 'duplicate entry id');
+      assert.equal(hit.witness.id, 'entry:master-orchestrator');
+      assert.ok(hit.remediation);
+    });
+  });
+});
