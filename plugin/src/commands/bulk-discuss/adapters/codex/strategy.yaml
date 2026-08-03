@@ -1,0 +1,11 @@
+host: codex
+command: bulk-discuss
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_conversational_guidance
+  user_prompt: plugin/src/skills/cc-master-bulk-discuss/canonical/SKILL.md
+  summary: "Walk every awaiting-user decision_package on the current board in plain language, collect the user's calls, then reconcile them into the board in one pass."
+notes:
+  - Codex has no plugin-distributed /cc-master:* slash command; the adapter entry is `$cc-master-bulk-discuss`.
+  - Option cards render as numbered text; Codex has no native option picker.

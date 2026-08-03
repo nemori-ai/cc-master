@@ -1,0 +1,11 @@
+host: cursor
+command: bulk-discuss
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/bulk-discuss.md
+notes:
+  - Cursor plugin commands map to /bulk-discuss in Agent chat (no plugin: namespace).
+  - Body adapted from Claude Code host_native; path tokens removed; Shell not Bash.
+  - Option cards fall back to numbered text when the host has no native picker.

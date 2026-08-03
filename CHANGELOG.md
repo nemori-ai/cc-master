@@ -24,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New command `bulk-discuss`** (Claude Code `/cc-master:bulk-discuss`, Cursor
+  `/bulk-discuss`, Codex `$cc-master-bulk-discuss`, kimi-code
+  `cc-master:bulk-discuss`) — walks every decision waiting on the user in one
+  sitting, inside the orchestrator's own session. Each package is retold in
+  plain language (bare node ids are expanded into what that work actually is,
+  and the background must answer how we got to the fork, who is blocked, and
+  what happens after), then offered as option cards. Answers are held in
+  context and summarised for a final look — where a later choice invalidating
+  an earlier one is called out rather than left to contradict itself — and only
+  then reconciled into the board in a single pass. Nodes parked on a user gate
+  *without* a prepared package are listed separately, since that gap is the
+  orchestrator's own debt. `--list-only` shows just the queue.
+  This is a prompt shortcut, not a second decision channel: it writes no files
+  and keeps board writes on the `ccm` path. `discuss` remains the deep,
+  single-node interview for when the orchestrator is *not* in the room.
 - `master-orchestrator-guide` gains a new on-demand reference,
   `references/user-unknowns.md`, covering how to surface what a user cannot
   articulate: the four kinds of unknowns as an internal routing axis, which

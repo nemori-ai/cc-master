@@ -1,0 +1,11 @@
+host: kimi-code
+command: bulk-discuss
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/bulk-discuss.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:bulk-discuss in the agent chat.
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell.
+  - Option cards fall back to numbered text when the host has no native picker.

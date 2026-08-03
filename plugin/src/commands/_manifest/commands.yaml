@@ -8,6 +8,14 @@ commands:
       claude-code: implemented
       codex: prompt_prefix_hook
       cursor: host_native
+  - id: bulk-discuss
+    required: true
+    intent: walk_all_awaiting_user_decisions_in_plain_language
+    argument_contract: "[<node-id>...] [--board <path>] [--home <dir>] [--list-only]"
+    host_coverage:
+      claude-code: implemented
+      codex: conversational_guidance
+      cursor: host_native
   - id: discuss
     required: true
     intent: discuss_awaiting_user_decision
