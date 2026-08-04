@@ -55,6 +55,10 @@ if (!skillName) {
 const RUNS = Number(flag('runs', '3'));
 const LIMIT = flag('limit', null) ? Number(flag('limit')) : null;
 const JSON_OUT = flag('json', null);
+// 每条 query 要等一次完整的 claude -p 往返（实测约 1.3 分钟）。串行跑 235 条要 5 小时，
+// 而这些调用彼此独立、各自在自己的临时项目里判定，没有任何共享状态需要串起来。并发不增加
+// 总调用数（配额消耗不变），只是把墙钟时间压成 1/N。默认 4：够快，又不至于把限流打出来。
+const CONCURRENCY = Number(flag('concurrency', '4'));
 
 // ── 解析 claude 到稳定真实路径（见头部第 3 条）────────────────────────────────────────────
 function resolveClaude() {
@@ -183,35 +187,26 @@ if (!canaryOk) {
 process.stderr.write('[self-check] OK —— 装置能触发，进入全量\n\n');
 
 // ── 全量 ────────────────────────────────────────────────────────────────────────────────────
-const results = [];
-for (const [i, q] of queries.entries()) {
+/** 判定一条 query（含其 RUNS 次重复）。装置级失败向上抛，整批中止。 */
+async function judge(q) {
   let hits = 0;
   let ok = 0;
   let errs = 0;
   for (let r = 0; r < RUNS; r += 1) {
-    const res = await runQuery(q.query); // 装置级失败仍会抛出，整批中止
+    const res = await runQuery(q.query);
     if (res.error) errs += 1;
     else {
       ok += 1;
       hits += res.triggered ? 1 : 0;
     }
   }
-  // 一条 query 的全部 run 都超时 → 它没有可用观测，剔出分母而不是猜一个值
+  // 全部 run 都超时 → 没有可用观测，剔出分母而不是猜一个值
   if (ok === 0) {
-    results.push({
-      query: q.query,
-      should_trigger: q.should_trigger === true,
-      error: 'timeout',
-      counted: false,
-    });
-    process.stderr.write(
-      `[${String(i + 1).padStart(3)}/${queries.length}] 超时(剔出分母) ${q.query.slice(0, 34)}…\n`,
-    );
-    continue;
+    return { query: q.query, should_trigger: q.should_trigger === true, error: 'timeout', counted: false };
   }
   const rate = hits / ok;
   const predicted = rate >= 0.5;
-  results.push({
+  return {
     query: q.query,
     should_trigger: q.should_trigger === true,
     trigger_rate: rate,
@@ -219,12 +214,30 @@ for (const [i, q] of queries.entries()) {
     pass: predicted === (q.should_trigger === true),
     counted: true,
     ...(errs ? { partial_timeouts: errs } : {}),
-  });
-  process.stderr.write(
-    `[${String(i + 1).padStart(3)}/${queries.length}] ${predicted ? '触发' : '未触发'} ` +
-      `(期望 ${q.should_trigger ? '触发' : '未触发'}) ${q.query.slice(0, 36)}…\n`,
-  );
+  };
 }
+
+// 固定大小的并发池，按原序回填结果（顺序稳定，diff 才可读）。
+const results = new Array(queries.length);
+let cursor = 0;
+let done = 0;
+async function worker() {
+  for (;;) {
+    const i = cursor;
+    cursor += 1;
+    if (i >= queries.length) return;
+    const r = await judge(queries[i]); // 抛出即整批中止（装置级）
+    results[i] = r;
+    done += 1;
+    const tag = r.counted ? (r.predicted ? '触发  ' : '未触发') : '超时剔除';
+    process.stderr.write(
+      `[${String(done).padStart(3)}/${queries.length}] ${tag} ` +
+        `(期望 ${r.should_trigger ? '触发' : '未触发'}) ${r.query.slice(0, 34)}…\n`,
+    );
+  }
+}
+process.stderr.write(`[并发 ${CONCURRENCY}] 开跑 ${queries.length} 条 × ${RUNS} run\n`);
+await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queries.length) }, worker));
 
 // ── 统计 ────────────────────────────────────────────────────────────────────────────────────
 const counted = results.filter((r) => r.counted);
