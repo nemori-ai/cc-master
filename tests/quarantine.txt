@@ -1,0 +1,64 @@
+# 隔离清单 —— 已知失败，快门跳过，但债必须还
+#
+# 这个清单与 tests/heavy-tests.txt 语义不同，别混用：
+#   heavy-tests.txt  收「跑得慢」的，测试本身是好的
+#   quarantine.txt   收「已经红了」的，测试本身有问题
+#
+# ── 为什么要有这个清单 ────────────────────────────────────────────────────────────
+#
+# issue #213 把 run-tests.sh 的快层接进了每 PR 的 required check。门一旦成真，第一件事
+# 就是撞上早已存在的红：下列各条在 main 上红了很久，只是此前没有任何 CI 会跑到它们。
+# 当前合计 13 条（2 + 5 + 1 + 5）。这个数字只应下降；它上升时，PR 描述里必须有理由。
+#
+# 处置有三条路：当场修（与引入门的改动无关，scope 爆炸）、让 CI 不 required（门又假了）、
+# 或者登记。选登记，因为它是唯一同时满足「门是真的」与「债是可见的」的选项。
+#
+# ── 这个清单为什么不会变成垃圾桶 ──────────────────────────────────────────────────
+#
+# 因为它有反向检查：`bash run-tests.sh --quarantine` 会真跑清单里的文件，任何一个
+# **变绿**了却还留在清单上，就是硬错误。清单只许变短。nightly 每天执行这道检查。
+#
+# 收录门槛（比 heavy 严）：
+#   1. 必须是 main 上已存在的失败，附独立复核证据 —— 不许把本次改动引入的红塞进来
+#   2. 必须写明失败的**诊断**，不能只写「红了」。写不出诊断说明还没看懂，那就先看懂
+#   3. 新增一条，必须在 PR 描述里说明为什么不能当场修
+#
+# ── 已登记 ────────────────────────────────────────────────────────────────────────
+#
+# 2026-07-31 独立复核：在 main(0a3b0aeb) 的干净 worktree 上逐个跑过，失败数与诊断一致。
+#
+# 四条各有各的病因，别当成一类处理：
+#   behavior-eval        期待的编译产物不存在（脚手架与代码演进脱节）
+#   attestation-attack   攻击变体的预期拒因与当前 attestation 层的实际拒因不再吻合
+#   release-metadata     tag-gated 断言在非 tag 环境下仍执行——它本该 skip 而非 fail
+#   host-compile         两个断言互相打架，见下方「一类值得单独认出来的病」
+#
+# 曾假设它们有共同根因（隔离仓 helper 统一脱节），**已证伪**：它们用的 helper 组合各不
+# 相同，没有「修一个修一批」的捷径。逐条判断「埋还是救」是唯一的路，判据是它本来该测的
+# 能力现在是否已由别处覆盖 —— 覆盖了才能删，否则删掉就是把死覆盖换成零覆盖。
+#
+# 2026-08-03 skill-knowledge-k1-pilot-query.test.mjs 已按上面这道判断出清，结论是**救**
+# 不是埋：它那六条的能力逐条查过 tests/ 全域（含 buildAndValidateGraph 直调）与 scripts/，
+# 没有一条在别处有正向覆盖 —— 删了就是把死覆盖换成零覆盖。改用
+# helpers/skill-knowledge-isolated-repo.mjs 在克隆仓里原地造反例后六条全绿，故摘牌。
+# 一个例外单独说明：PILOT-07 里的 SKG-OWNERSHIP-MULTIPLY 断言是删掉而非修好的，因为
+# 那条规则已被有意推翻（一个 module 现在允许被多个 composition 消费，诊断码在实现里
+# 已不存在）—— 那不是坏掉的脚手架，是测试在向引擎追认一条已废弃的旧约束。
+#
+# ── 一类值得单独认出来的病 ──────────────────────────────────────────────────────
+#
+# skill-knowledge-host-compile 那 5 条，与 issue #213 原文点名的是同一种自相矛盾：
+# 一个断言要求 plugin/dist/<host>/knowledge/ **存在**，而 check-release-knowledge-boundary.mjs
+# 的全部职责是保证它**不存在**（knowledge/ 是 repo-only，禁止进 dist）。issue 举的例子是
+# skill-overlay-v9，这里是第三个宿主。
+#
+# 两个互相打架的断言能长期共存，恰恰因为从来没有任何 CI 会同时跑到它们 —— 这就是「门是
+# 假的」的代价。修它需要先定一件事：dist 下到底该不该有 knowledge/。那是设计决策，不是
+# 测试修补，所以不在引入分层这次改动的边界内。
+#
+# 格式：<文件名><TAB><失败数><TAB><诊断>
+
+skill-knowledge-behavior-eval.test.mjs	2	buildEvalSurface 抛 Missing claude-code compiled knowledge router——期待的编译产物不存在
+provider-guidance-v2-attestation-attack.test.mjs	5	ATTACK-02/03/07/13/14；攻击变体的预期拒因与当前 attestation 层的实际拒因不再吻合
+release-metadata.test.mjs	1	tag-gated release attachment 断言在非 tag 环境下仍执行——它本该 skip 而不是 fail
+skill-knowledge-host-compile.test.mjs	5	COMPILE-02/05/09/10/12；warmHosts 读 plugin/dist/<host>/knowledge/atlas.md 报 ENOENT——断言要求 dist 下有 knowledge/，而 release knowledge boundary 保证没有。需先定「dist 该不该有 knowledge/」这个设计问题，非测试修补

@@ -53,6 +53,7 @@
       "id": "point:devloop.core-thesis",
       "title": "dev work 是优化过程",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "开发是带测量的迭代优化，不是一次成型写对。",
       "recognition_cues": [
         "想一次性写一大坨",
@@ -90,6 +91,7 @@
       "id": "point:devloop.objective",
       "title": "验收标准 = 目标函数",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "先把 DoD/acceptance 看清楚再下降；模糊先锐化。",
       "recognition_cues": [
         "验收模糊",
@@ -127,6 +129,7 @@
       "id": "point:devloop.iterate",
       "title": "小步迭代优化",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "propose→测量→读梯度→调整；每轮要有可证伪 hypothesis。",
       "recognition_cues": [
         "写一大坨再跑",
@@ -164,6 +167,7 @@
       "id": "point:devloop.instrument",
       "title": "测试是测量仪器",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "先架仪器再下降；失败是梯度，假梯度先校准。",
       "recognition_cues": [
         "没有测试就改",
@@ -201,6 +205,7 @@
       "id": "point:devloop.explore-exploit",
       "title": "explore vs exploit",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "早期探索买信息，接近验收再精修；过早 exploit 是反模式。",
       "recognition_cues": [
         "一上来就精修未验证方案"
@@ -237,6 +242,7 @@
       "id": "point:devloop.plateau-restart",
       "title": "plateau 则 restart",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "局部最小值时换方向，不沿同一沟再打补丁。",
       "recognition_cues": [
         "钻牛角尖",
@@ -274,6 +280,7 @@
       "id": "point:devloop.converge",
       "title": "收敛即停",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "验收达标就停；别 gold-plating / 过拟合噪声。",
       "recognition_cues": [
         "还能更完美",
@@ -311,6 +318,7 @@
       "id": "point:devloop.fit-intent",
       "title": "拟合意图非用例",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "hard-code 过检查是过拟合；要满足真实意图。",
       "recognition_cues": [
         "特判让测试变绿"
@@ -347,6 +355,7 @@
       "id": "point:devloop.regularize",
       "title": "简单性正则",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "同样达标选最简单方案；复杂度是未奖励的长期成本。",
       "recognition_cues": [
         "为复杂而复杂"
@@ -383,6 +392,7 @@
       "id": "point:devloop.taste-and-cycle",
       "title": "好 loop 手感与一图流",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "稳定训练的手感 + 一轮优化循环图。",
       "recognition_cues": [
         "判断 loop 好不好",

@@ -1015,6 +1015,7 @@
         "id",
         "title",
         "point_kind",
+        "failure_mode",
         "summary",
         "recognition_cues",
         "binding",
@@ -1038,6 +1039,15 @@
             "boundary",
             "example",
             "reference"
+          ]
+        },
+        "failure_mode": {
+          "description": "删掉这一条会发生什么，按顺序过滤器判定：模型不知道怎么做（capability_gap）→ 知道但缺本项目/本工具的具体事实做不对（environment_fact）→ 知道也做得对但下一个 context 里全忘了（prosthetic）→ 知道、做得对、也记得，但压力下选择不做（motivation_conflict）。决定这条知识随模型变强是消亡还是增值。",
+          "enum": [
+            "capability_gap",
+            "environment_fact",
+            "prosthetic",
+            "motivation_conflict"
           ]
         },
         "summary": {

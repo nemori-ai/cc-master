@@ -53,6 +53,7 @@
       "id": "point:conduct.never-play",
       "title": "指挥不演奏原则",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "拆图 / 派发 / 验收 / 整合；绝不亲手实现或 review。",
       "recognition_cues": [
         "想亲自实现或 review",
@@ -90,6 +91,7 @@
       "id": "point:conduct.red-lines",
       "title": "红线完整体",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "红线含唯一例外（端点验收本身暴露的 micro-fixup）与 gate-green ≠ passed 等牙齿。",
       "recognition_cues": [
         "准备跨红线",
@@ -127,6 +129,7 @@
       "id": "point:conduct.deserting-podium",
       "title": "离席四向命名",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "坏编排姿态都是离席：向下 / 向内 / 向前 / 向虚。",
       "recognition_cues": [
         "抓到自己正在滑",

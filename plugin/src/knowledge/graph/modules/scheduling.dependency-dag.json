@@ -51,6 +51,7 @@
       "id": "point:scheduling.dag-and-critical-path",
       "title": "DAG、临界路径与机器 graph",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "默认并行、逐边举证，用 CPM/float 或 ccm graph 找当前增量的临界链。",
       "recognition_cues": [
         "需要删假依赖",
@@ -88,6 +89,7 @@
       "id": "point:scheduling.parallelism-and-granularity",
       "title": "并行度与粒度",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "用 work/span 估 lane，避免把假并行或过细协调成本画进 board。",
       "recognition_cues": [
         "不知道开多少 lane",
@@ -125,6 +127,7 @@
       "id": "point:scheduling.node-contract",
       "title": "派发前节点契约",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "每个节点先给 objective、acceptance、artifact、constraints、estimate 与 stop/restart 条件。",
       "recognition_cues": [
         "准备派 dev worker",

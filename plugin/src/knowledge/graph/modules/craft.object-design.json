@@ -53,6 +53,7 @@
       "id": "point:oop.abstraction-cost",
       "title": "抽象成本审计",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "用 near-decomposability 与删除测试判断新抽象是否挣到开销。",
       "recognition_cues": [
         "需要抽象成本审计"
@@ -89,6 +90,7 @@
       "id": "point:oop.composition-over-inheritance",
       "title": "组合优于继承",
       "point_kind": "decision_rule",
+      "failure_mode": "motivation_conflict",
       "summary": "继承只留给三种稳定骨架，其余通过合约组合协作者。",
       "recognition_cues": [
         "需要组合优于继承"
@@ -125,6 +127,7 @@
       "id": "point:oop.encapsulation-vocabulary",
       "title": "封装即词汇",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "让聚合根以领域动词持有守卫、状态翻转与副作用。",
       "recognition_cues": [
         "需要封装即词汇"
@@ -161,6 +164,7 @@
       "id": "point:oop.failure-radar",
       "title": "OOP 反模式雷达",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "定位贫血模型、God class、继承滥用、共享可变状态等失败。",
       "recognition_cues": [
         "需要OOP 反模式雷达"
@@ -197,6 +201,7 @@
       "id": "point:oop.four-pillars",
       "title": "OOP 四柱",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "同时从可辩护设计、平台存活、生产安全与艺术优雅审视类。",
       "recognition_cues": [
         "需要OOP 四柱"
@@ -233,6 +238,7 @@
       "id": "point:oop.red-lines",
       "title": "OOP 红线",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "禁止 silent failure、裸 catch-all、不可信执行、idle wrapper 与异步阻塞。",
       "recognition_cues": [
         "需要OOP 红线"
@@ -269,6 +275,7 @@
       "id": "point:oop.shared-root-links",
       "title": "OOP 与共享根接缝",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "把对象设计判断回连到不变式、组合与分层三条 canonical 根。",
       "recognition_cues": [
         "需要OOP 与共享根接缝"
@@ -305,6 +312,7 @@
       "id": "point:oop.solid-judgment",
       "title": "SOLID 判断法",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "把 SRP/OCP/LSP/ISP/DIP 用作具体接缝与约束判断，而非口号。",
       "recognition_cues": [
         "需要SOLID 判断法"

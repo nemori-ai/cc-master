@@ -61,32 +61,43 @@ jobs:
       - name: Test
         run: pnpm -C ccm run test
 
+  # plugin-contracts 跑 AGENTS.md §10 第一道门的**快层**：`bash run-tests.sh --fast` = 全部 hook /
+  # script 测试 + 投影与矩阵 check + skill-lint + 除 tests/heavy-tests.txt 登记者外的全部 content
+  # 测试。此前这里只精选 4 步，于是「文档声称的门」远宽于「机制执行的门」，真回归被漏过（issue #213）。
+  # 重型层（tests/heavy-tests.txt）不在 PR 上跑——单文件动辄数分钟，由 nightly-heavy-tests.yml 覆盖。
   plugin-contracts:
     name: plugin-contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
 
-      - name: Skill knowledge scaffold contract tests
-        run: node --test tests/content/skill-knowledge-scaffold.test.mjs
+      # run-tests.sh 会 `pnpm -C ccm build` 出 dev-bin shim，让 hook 测试真走 ccm 进程边界路径
+      # （缺 pnpm 时它软失败退回 require path）。先装依赖以确保走的是真路径而非降级路径。
+      - name: Install ccm deps
+        working-directory: ccm
+        run: pnpm install --frozen-lockfile
 
-      - name: Skill knowledge K0 source check
-        run: node scripts/skill-knowledge.mjs check --stage K0 --json
+      - name: Fast gate (run-tests.sh --fast)
+        run: bash run-tests.sh --fast
 
+      # 保留：唯一一处对**真实 plugin/dist 树**扫描 repo-only knowledge 的断言。
+      # trusted-release-bundle.test.mjs 只用合成输入测这个纯函数，不扫真树。
       - name: Final dist knowledge boundary
         run: node scripts/check-release-knowledge-boundary.mjs
-
-      - name: Package and archive knowledge boundary
-        run: >-
-          node --test
-          tests/content/plugin-release-package-contract.test.mjs
-          tests/content/trusted-release-bundle.test.mjs
 
   # Branch protection depends on this exact job id. Keep it as the stable aggregate instead of
   # renaming the required check every time an independent product/plugin gate is added.

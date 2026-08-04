@@ -52,6 +52,7 @@
       "id": "point:verification.terminal-is-not-done",
       "title": "runtime terminal 不等于 task done",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "运行时停止只终结 agent runtime；父任务只有独立验收通过后才能 done/verified。",
       "recognition_cues": [
         "child process 或 agent 已停止",
@@ -89,6 +90,7 @@
       "id": "point:verification.endpoint-procedure",
       "title": "端点验收 procedure",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "在自己的端点收割 artifact，核对 diff、tests、acceptance 与必要的异构第二视角。",
       "recognition_cues": [
         "要实际执行 artifact、diff、tests 或 hash 验收"
@@ -125,6 +127,7 @@
       "id": "point:verification.terminal-summary",
       "title": "routing 链中的 terminal 提醒",
       "point_kind": "reference",
+      "failure_mode": "motivation_conflict",
       "summary": "在路由链中提醒：把 agent terminal 当 task done 会绕过验收。",
       "recognition_cues": [
         "只需 routing record 中的简短 terminal 提醒"
@@ -164,6 +167,7 @@
       "id": "point:verification.hash-and-stale",
       "title": "content hash 与 stale",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "用 action-key 式 content hash 判断可复用结果，并在依赖变化时显式标 stale。",
       "recognition_cues": ["resume 时判断能否跳过", "上游 artifact 发生变化"],
       "binding": {
@@ -182,6 +186,7 @@
       "id": "point:verification.resume-takeover",
       "title": "resume 接管基线",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "先进入 board worktree、核对干净基线，再 probe/attach/验收或重派孤儿 runtime。",
       "recognition_cues": ["新 session 接管旧 board", "存在 orphaned in_flight"],
       "binding": {
@@ -200,6 +205,7 @@
       "id": "point:verification.heterogeneous-review",
       "title": "异构族系第二视角",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "对高杠杆或临界 correctness-critical 结果换模型族复核，并逐条 reconcile finding。",
       "recognition_cues": ["高杠杆裁决", "临界 correctness-critical done"],
       "binding": {
@@ -218,6 +224,7 @@
       "id": "point:verification.loop-convergence",
       "title": "Loop 收敛闸",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "只在 FinalResponse 与带诊断 Replan 之间做结构化选择，并设置 max-rounds 与 dedup。",
       "recognition_cues": ["执行图依赖未知中间结果", "review loop 可能无界"],
       "binding": {

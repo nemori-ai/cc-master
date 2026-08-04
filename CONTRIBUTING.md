@@ -86,6 +86,45 @@ claude plugin validate plugin/dist/claude-code
 must leave no `plugin/dist` diff, and `claude plugin validate plugin/dist/claude-code`
 must report no errors.
 
+### 测试分层：CI 保哪一层、你自己保哪一层
+
+`run-tests.sh` 分层跑，收尾行各不相同（看日志能分清跑的是哪层）：
+
+```bash
+bash run-tests.sh              # 全套 → "ALL TESTS PASSED · N quarantined"
+bash run-tests.sh --fast       # 跳过 tests/heavy-tests.txt 登记的重型 content 测试 → "FAST TESTS PASSED"
+bash run-tests.sh --heavy      # 只跑那些重型测试 → "HEAVY TESTS PASSED"
+bash run-tests.sh --quarantine # 反向检查 tests/quarantine.txt 的已知失败（变绿即报错）
+bash run-tests.sh --list       # 只打印本次会选中的单元（可与任一 flag 组合），不真跑
+```
+
+| 层 | 谁保 |
+|---|---|
+| 快层（`--fast`） | **CI required check** —— `ccm-ci.yml` 的 `plugin-contracts` job 跑它，聚合进 `build-and-check` |
+| 重层（`--heavy`） | **nightly，非 required** —— `.github/workflows/nightly-heavy-tests.yml`（`schedule` + `workflow_dispatch`）。**PR 上不跑，红了不 block merge** |
+| 隔离层（`--quarantine`） | **nightly 的反向检查** —— 已知失败清单；某条变绿了却还留在清单上就报错，保证清单只许变短 |
+| `check-plugin-dist-sync.sh` / `claude plugin validate` | **没有 CI**，只有你本地 + `.githooks/` 的 pre-push |
+
+**注意 `ALL TESTS PASSED` 的准确含义**：不带 flag 的全套**也**跳过 `tests/quarantine.txt` 里的已知失败（否则这句话永远拿不到）。所以它后面会跟一个 `· N quarantined`——那是本仓当前欠着的、有名有姓的债，看见就去读清单，别当背景噪音。
+
+两份清单语义别混：`heavy-tests.txt` 收「跑得慢但测试是好的」，`quarantine.txt` 收「测试已经红了」。同一个文件不许同时进两份，脚本会硬报错。往任一清单加条目都要在 PR 描述里说明理由；加进隔离清单的还要附「这条在 main 上已经红」的独立复核证据。
+
+**before-PR 跑什么，按你的改动落点定：**
+
+| 你改了什么 | 跑什么 |
+|---|---|
+| 只碰快层覆盖的（hook / command / 测试 / 文档 / schema） | `run-tests.sh --fast` + `check-plugin-dist-sync.sh` + `claude plugin validate` |
+| 碰了投影 / overlay / knowledge 编译 / attestation | 上面三条，**再加** `--heavy`（或至少手跑受影响的那几个文件） |
+| 发版 | 全跑，且 `--quarantine` 报出的隔离数要能逐条交代清楚 |
+
+**为什么不是「一律跑完整」**：那句听着严格，实际做不到——重型层本地跑不完（单文件实测
+50 分钟未完成），而承诺一道跑不动的门，等于又造一道假门，正是 issue #213 要根治的病。
+`--fast` 绿依然不等于全套绿；变的只是「什么时候必须补上另一半」从「永远」收窄成
+「改动确实触及它时」。碰了重型层却只跑快层，等 nightly 就是等回归先进 main。
+
+重型测试的收录判据写在 `tests/heavy-tests.txt` 卷首。新增重型测试必须登记在那里，否则会悄悄
+拖慢每个 PR 的快门；清单里列了但仓库里不存在的文件名会让 `run-tests.sh` 直接报错退出（防清单腐烂）。
+
 ### PR 中按需请求真实 macOS 证据
 
 普通 PR 不再自动分配昂贵的 macOS runner。只有改动 Darwin SEA 构建、安装/卸载、

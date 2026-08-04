@@ -52,6 +52,7 @@
       "id": "point:workflow.admission",
       "title": "Workflow 准入",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "只有几十到几百 agent 且中间结果必须留在 context 外时才升级到 Workflow。",
       "recognition_cues": [
         "需要Workflow 准入"
@@ -88,6 +89,7 @@
       "id": "point:workflow.shape-tree",
       "title": "Workflow 形状决策树",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "按 barrier、streaming、未知数量或未知 work-list 选择 primitive 与入口形状。",
       "recognition_cues": [
         "需要Workflow 形状决策树"
@@ -124,6 +126,7 @@
       "id": "point:workflow.resource-index",
       "title": "Workflow 资源路由",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "把具体机制、API、pattern、template 与完整 example 路由到唯一深度材料。",
       "recognition_cues": [
         "需要Workflow 资源路由"

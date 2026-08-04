@@ -52,6 +52,7 @@
       "id": "point:goal.fresh-contract",
       "title": "Fresh Goal Contract",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "先从需求证据形成 outcome、acceptance、constraints、non-goals 与 revision，再切 DAG。",
       "recognition_cues": [
         "fresh 开工",
@@ -89,6 +90,7 @@
       "id": "point:goal.deadline-and-brief",
       "title": "DDL lifecycle 与 Goal Brief",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "识别/确认/过期交付 DDL，并在目标复杂时用 brief 保存证据与边界。",
       "recognition_cues": [
         "用户提到截止日期",
@@ -126,6 +128,7 @@
       "id": "point:goal.trace-and-delta",
       "title": "Goal trace 与 delta 分类",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "每个节点回指 acceptance；新发现按 clarification、scope change 或 amendment 分类。",
       "recognition_cues": [
         "工作中怀疑 scope 漂移",
@@ -163,6 +166,7 @@
       "id": "point:goal.alignment-checkpoints",
       "title": "六个目标对齐检查点",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "在 framing、切分、派发、replan、HITL 与收口六处复核当前 Goal Contract。",
       "recognition_cues": [
         "准备 replan",

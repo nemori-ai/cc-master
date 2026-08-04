@@ -50,6 +50,7 @@
       "id": "point:capacity.switch-is-not-your-lever",
       "title": "换号不在你的 lever 清单里",
       "point_kind": "boundary",
+      "failure_mode": "motivation_conflict",
       "summary": "配额吃紧时编排器只能在同一份配额内腾挪；换哪份配额由后台机器层统管，除非用户直接命令，否则既不判断也不执行，更不给自己放权。",
       "recognition_cues": [
         "想换账号绕过容量",
@@ -88,6 +89,7 @@
       "id": "point:capacity.post-switch-continuity",
       "title": "后台换号后的连续性",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "收到换号通报只需刷新配速读数；看板、在飞作业与会话都未受影响，不要重建或重派，也不要把它读成自己获得了这根 lever。",
       "recognition_cues": [
         "收到账号已切换的通报",

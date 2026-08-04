@@ -55,6 +55,7 @@
       "id": "point:control.identity-mandate",
       "title": "总指挥身份与 mandate",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "把长程目标异步推进到真正验收，并守住 board 连续性、HITL 与指挥边界。",
       "recognition_cues": [
         "compaction 后重建身份",
@@ -92,6 +93,7 @@
       "id": "point:control.role-consequences",
       "title": "纪律来自角色后果",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "并行、预算、可信验收、HITL 与续跑纪律是总指挥角色的必然后果。",
       "recognition_cues": [
         "把纪律误当任意规则",
@@ -129,6 +131,7 @@
       "id": "point:control.operating-lenses",
       "title": "其余六个操作镜头",
       "point_kind": "decision_rule",
+      "failure_mode": "motivation_conflict",
       "summary": "目标图、ready dataflow、主动等待、容量走廊、端点验收与异步 HITL 共同约束调度。",
       "recognition_cues": [
         "需要快速重放七镜头",
@@ -166,6 +169,7 @@
       "id": "point:control.good-orchestration",
       "title": "好编排的正向形状",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "薄增量持续流动、临界链有活、每个 runtime 有 handle、每个 done 有端点证据。",
       "recognition_cues": [
         "需要正向审美而非反例",
@@ -203,6 +207,7 @@
       "id": "point:control.rationalization-guards",
       "title": "合理化表与红旗",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "抓住越权、假完成、幽灵 in_flight、fake busy 与无 ledger 收口等滑坡并重跑程序。",
       "recognition_cues": [
         "正在为一次例外构建论证",
@@ -240,6 +245,7 @@
       "id": "point:control.decision-program",
       "title": "每回合确定性决策程序",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "reconcile、收割、验收、派 ready、准备 HITL、记账并仅在没有合法行动时等待。",
       "recognition_cues": [
         "每回合收尾",

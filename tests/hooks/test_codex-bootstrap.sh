@@ -101,7 +101,10 @@ assert_no_file "$H/noop-home/boards" "codex bootstrap no-op creates no board dir
 RESET_HOME="$H/reset-home"
 RESET_BOARD="$RESET_HOME/boards/reset.board.json"
 mkdir -p "$RESET_HOME/boards"
-CC_MASTER_HOME="$RESET_HOME" ccm --board "$RESET_BOARD" board init --goal "Reset stop release" --json --no-input >/dev/null
+# 走 CCM_BIN 而非裸 ccm：开发机上 ccm 常在 PATH 里，CI runner 上不在——run-tests.sh 只导出
+# CCM_BIN 指向 dev-bin shim。写死裸 ccm 会让这一句在 CI 上 command not found，随后 board
+# 文件不存在、断言以一个与真实缺陷无关的 ENOENT 收场。
+CC_MASTER_HOME="$RESET_HOME" "${CCM_BIN:-ccm}" --board "$RESET_BOARD" board init --goal "Reset stop release" --json --no-input >/dev/null
 node - "$RESET_BOARD" <<'NODE'
 const fs = require('fs');
 const boardPath = process.argv[2];

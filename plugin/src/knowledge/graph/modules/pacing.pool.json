@@ -52,6 +52,7 @@
       "id": "point:pacing.own-row",
       "title": "读 pool own_row",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "按 kind 读相对分配：yield/claim/throttle/switch/stop/hold。",
       "recognition_cues": [
         "多板同池",
@@ -89,6 +90,7 @@
       "id": "point:pacing.pool-vs-usage",
       "title": "pool 相对轴 vs usage 绝对轴",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "usage 是绝对压力；own_row 是同池相对分配；单板时退化。",
       "recognition_cues": [
         "hold 是否忽略 sibling"
@@ -125,6 +127,7 @@
       "id": "point:pacing.pool-rationalization",
       "title": "pool 合理化表与消费顺序",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "堵通吃/强制扩张借口；按通知→own_row→决策层顺序消费。",
       "recognition_cues": [
         "我是 urgent 可吃完池"

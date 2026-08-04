@@ -1,0 +1,64 @@
+# nightly-heavy-tests —— 每 PR 快门跑不到的两层：重型层与隔离层。
+#
+# 为什么单独一条 workflow：这些用例每个都要建隔离仓、跑全量四 host 投影，单文件动辄数分钟，
+# 挂进每 PR 的 required check 会让 CI 不可用。于是分层——快层（run-tests.sh --fast）进
+# ccm-ci.yml 的 plugin-contracts，重层每晚在这里跑一次。
+#
+# 这条 workflow **不是** required check，红了不 block PR merge；它的作用是让重型层的回归
+# 在一天之内被看见，而不是等到有人手动跑全套时才发现。
+name: nightly-heavy-tests
+
+on:
+  schedule:
+    # 每日 UTC 18:00（北京时间次日 02:00）——避开工作时段的 runner 争用。
+    - cron: '0 18 * * *'
+  # 手动触发：改了重型测试或 tests/heavy-tests.txt 之后不必等到夜里。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  heavy:
+    name: heavy
+    runs-on: ubuntu-latest
+    # 实测串行全套 ~40min 且其中 18 个文件撞满 90s 上限（真实值更高）；重层不设人为上限，
+    # 给足预算，超时即视为需要人来看的信号。
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
+
+      - name: Install ccm deps
+        working-directory: ccm
+        run: pnpm install --frozen-lockfile
+
+      # 先把待跑清单打出来，日志上就能看清这一夜到底覆盖了哪些文件。
+      - name: List heavy layer
+        run: bash run-tests.sh --heavy --list
+
+      - name: Heavy gate (run-tests.sh --heavy)
+        run: bash run-tests.sh --heavy
+
+      # 隔离层的反向检查。tests/quarantine.txt 登记的是「已知红」，快门和本地端点门都跳过它们；
+      # 若无人守着，一条债还清了也没人知道，清单只会越来越长。这一步让「变绿」成为错误信号，
+      # 从而保证清单只许变短。它排在重型层之后、且 always() —— 重型层红不该掩盖隔离层的进展。
+      - name: Quarantine reverse-check (run-tests.sh --quarantine)
+        if: always()
+        run: bash run-tests.sh --quarantine

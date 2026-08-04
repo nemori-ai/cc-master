@@ -1,8 +1,8 @@
 /**
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json
- * Source-schema-sha256: 4b1328b2d741acea9ce9758c7eab2223d30d684bc47d7ef7bd996f4fc5967a8b
- * Schema-fingerprint: 2af9996d60c4dfed00b736faf34eced4f5c7ffbf1699931189d418bbbcdd12a0
+ * Source-schema-sha256: b5693463afb1087460e8cb4a6915e186ad8422184f4eeafd9e3f1d449284fcf4
+ * Schema-fingerprint: d9e3197184af9012a4cc19edb862241d6edc55d34938682d92e0a41c80b6cec3
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";
@@ -3368,7 +3368,7 @@ function validate48(data, { instancePath = "", parentData, parentDataProperty, r
   return errors === 0;
 }
 validate48.evaluated = { "props": true, "dynamicProps": false, "dynamicItems": false };
-var schema76 = { "type": "object", "additionalProperties": false, "required": ["id", "title", "point_kind", "summary", "recognition_cues", "binding", "authority", "lifecycle", "admission"], "properties": { "id": { "$ref": "#/$defs/pointId" }, "title": { "$ref": "#/$defs/nonEmptyString" }, "point_kind": { "enum": ["principle", "decision_rule", "procedure", "check", "boundary", "example", "reference"] }, "summary": { "$ref": "#/$defs/nonEmptyString" }, "recognition_cues": { "$ref": "#/$defs/uniqueStringList", "minItems": 1 }, "binding": { "$ref": "#/$defs/binding" }, "authority": { "$ref": "#/$defs/authority" }, "lifecycle": { "$ref": "#/$defs/lifecycle" }, "admission": { "$ref": "#/$defs/admission" } } };
+var schema76 = { "type": "object", "additionalProperties": false, "required": ["id", "title", "point_kind", "failure_mode", "summary", "recognition_cues", "binding", "authority", "lifecycle", "admission"], "properties": { "id": { "$ref": "#/$defs/pointId" }, "title": { "$ref": "#/$defs/nonEmptyString" }, "point_kind": { "enum": ["principle", "decision_rule", "procedure", "check", "boundary", "example", "reference"] }, "failure_mode": { "description": "\u5220\u6389\u8FD9\u4E00\u6761\u4F1A\u53D1\u751F\u4EC0\u4E48\uFF0C\u6309\u987A\u5E8F\u8FC7\u6EE4\u5668\u5224\u5B9A\uFF1A\u6A21\u578B\u4E0D\u77E5\u9053\u600E\u4E48\u505A\uFF08capability_gap\uFF09\u2192 \u77E5\u9053\u4F46\u7F3A\u672C\u9879\u76EE/\u672C\u5DE5\u5177\u7684\u5177\u4F53\u4E8B\u5B9E\u505A\u4E0D\u5BF9\uFF08environment_fact\uFF09\u2192 \u77E5\u9053\u4E5F\u505A\u5F97\u5BF9\u4F46\u4E0B\u4E00\u4E2A context \u91CC\u5168\u5FD8\u4E86\uFF08prosthetic\uFF09\u2192 \u77E5\u9053\u3001\u505A\u5F97\u5BF9\u3001\u4E5F\u8BB0\u5F97\uFF0C\u4F46\u538B\u529B\u4E0B\u9009\u62E9\u4E0D\u505A\uFF08motivation_conflict\uFF09\u3002\u51B3\u5B9A\u8FD9\u6761\u77E5\u8BC6\u968F\u6A21\u578B\u53D8\u5F3A\u662F\u6D88\u4EA1\u8FD8\u662F\u589E\u503C\u3002", "enum": ["capability_gap", "environment_fact", "prosthetic", "motivation_conflict"] }, "summary": { "$ref": "#/$defs/nonEmptyString" }, "recognition_cues": { "$ref": "#/$defs/uniqueStringList", "minItems": 1 }, "binding": { "$ref": "#/$defs/binding" }, "authority": { "$ref": "#/$defs/authority" }, "lifecycle": { "$ref": "#/$defs/lifecycle" }, "admission": { "$ref": "#/$defs/admission" } } };
 function validate54(data, { instancePath = "", parentData, parentDataProperty, rootData = data, dynamicAnchors = {} } = {}) {
   let vErrors = null;
   let errors = 0;
@@ -3850,8 +3850,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.summary === void 0) {
-      const err3 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "summary" }, message: "must have required property 'summary'" };
+    if (data.failure_mode === void 0) {
+      const err3 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "failure_mode" }, message: "must have required property 'failure_mode'" };
       if (vErrors === null) {
         vErrors = [err3];
       } else {
@@ -3859,8 +3859,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.recognition_cues === void 0) {
-      const err4 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "recognition_cues" }, message: "must have required property 'recognition_cues'" };
+    if (data.summary === void 0) {
+      const err4 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "summary" }, message: "must have required property 'summary'" };
       if (vErrors === null) {
         vErrors = [err4];
       } else {
@@ -3868,8 +3868,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.binding === void 0) {
-      const err5 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "binding" }, message: "must have required property 'binding'" };
+    if (data.recognition_cues === void 0) {
+      const err5 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "recognition_cues" }, message: "must have required property 'recognition_cues'" };
       if (vErrors === null) {
         vErrors = [err5];
       } else {
@@ -3877,8 +3877,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.authority === void 0) {
-      const err6 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "authority" }, message: "must have required property 'authority'" };
+    if (data.binding === void 0) {
+      const err6 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "binding" }, message: "must have required property 'binding'" };
       if (vErrors === null) {
         vErrors = [err6];
       } else {
@@ -3886,8 +3886,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.lifecycle === void 0) {
-      const err7 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "lifecycle" }, message: "must have required property 'lifecycle'" };
+    if (data.authority === void 0) {
+      const err7 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "authority" }, message: "must have required property 'authority'" };
       if (vErrors === null) {
         vErrors = [err7];
       } else {
@@ -3895,8 +3895,8 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
-    if (data.admission === void 0) {
-      const err8 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "admission" }, message: "must have required property 'admission'" };
+    if (data.lifecycle === void 0) {
+      const err8 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "lifecycle" }, message: "must have required property 'lifecycle'" };
       if (vErrors === null) {
         vErrors = [err8];
       } else {
@@ -3904,13 +3904,22 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
       errors++;
     }
+    if (data.admission === void 0) {
+      const err9 = { instancePath, schemaPath: "#/required", keyword: "required", params: { missingProperty: "admission" }, message: "must have required property 'admission'" };
+      if (vErrors === null) {
+        vErrors = [err9];
+      } else {
+        vErrors.push(err9);
+      }
+      errors++;
+    }
     for (const key0 in data) {
       if (!func1.call(schema76.properties, key0)) {
-        const err9 = { instancePath, schemaPath: "#/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key0 }, message: "must NOT have additional properties" };
+        const err10 = { instancePath, schemaPath: "#/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key0 }, message: "must NOT have additional properties" };
         if (vErrors === null) {
-          vErrors = [err9];
+          vErrors = [err10];
         } else {
-          vErrors.push(err9);
+          vErrors.push(err10);
         }
         errors++;
       }
@@ -3919,20 +3928,20 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       let data0 = data.id;
       if (typeof data0 === "string") {
         if (!pattern12.test(data0)) {
-          const err10 = { instancePath: instancePath + "/id", schemaPath: "#/$defs/pointId/pattern", keyword: "pattern", params: { pattern: "^point:[a-z0-9][a-z0-9.-]*$" }, message: 'must match pattern "^point:[a-z0-9][a-z0-9.-]*$"' };
+          const err11 = { instancePath: instancePath + "/id", schemaPath: "#/$defs/pointId/pattern", keyword: "pattern", params: { pattern: "^point:[a-z0-9][a-z0-9.-]*$" }, message: 'must match pattern "^point:[a-z0-9][a-z0-9.-]*$"' };
           if (vErrors === null) {
-            vErrors = [err10];
+            vErrors = [err11];
           } else {
-            vErrors.push(err10);
+            vErrors.push(err11);
           }
           errors++;
         }
       } else {
-        const err11 = { instancePath: instancePath + "/id", schemaPath: "#/$defs/pointId/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        const err12 = { instancePath: instancePath + "/id", schemaPath: "#/$defs/pointId/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
-          vErrors = [err11];
+          vErrors = [err12];
         } else {
-          vErrors.push(err11);
+          vErrors.push(err12);
         }
         errors++;
       }
@@ -3941,28 +3950,16 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       let data1 = data.title;
       if (typeof data1 === "string") {
         if (func3(data1) < 1) {
-          const err12 = { instancePath: instancePath + "/title", schemaPath: "#/$defs/nonEmptyString/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+          const err13 = { instancePath: instancePath + "/title", schemaPath: "#/$defs/nonEmptyString/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
-            vErrors = [err12];
+            vErrors = [err13];
           } else {
-            vErrors.push(err12);
+            vErrors.push(err13);
           }
           errors++;
         }
       } else {
-        const err13 = { instancePath: instancePath + "/title", schemaPath: "#/$defs/nonEmptyString/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-        if (vErrors === null) {
-          vErrors = [err13];
-        } else {
-          vErrors.push(err13);
-        }
-        errors++;
-      }
-    }
-    if (data.point_kind !== void 0) {
-      let data2 = data.point_kind;
-      if (!(data2 === "principle" || data2 === "decision_rule" || data2 === "procedure" || data2 === "check" || data2 === "boundary" || data2 === "example" || data2 === "reference")) {
-        const err14 = { instancePath: instancePath + "/point_kind", schemaPath: "#/properties/point_kind/enum", keyword: "enum", params: { allowedValues: schema76.properties.point_kind.enum }, message: "must be equal to one of the allowed values" };
+        const err14 = { instancePath: instancePath + "/title", schemaPath: "#/$defs/nonEmptyString/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
           vErrors = [err14];
         } else {
@@ -3971,20 +3968,22 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
         errors++;
       }
     }
-    if (data.summary !== void 0) {
-      let data3 = data.summary;
-      if (typeof data3 === "string") {
-        if (func3(data3) < 1) {
-          const err15 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/nonEmptyString/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-          if (vErrors === null) {
-            vErrors = [err15];
-          } else {
-            vErrors.push(err15);
-          }
-          errors++;
+    if (data.point_kind !== void 0) {
+      let data2 = data.point_kind;
+      if (!(data2 === "principle" || data2 === "decision_rule" || data2 === "procedure" || data2 === "check" || data2 === "boundary" || data2 === "example" || data2 === "reference")) {
+        const err15 = { instancePath: instancePath + "/point_kind", schemaPath: "#/properties/point_kind/enum", keyword: "enum", params: { allowedValues: schema76.properties.point_kind.enum }, message: "must be equal to one of the allowed values" };
+        if (vErrors === null) {
+          vErrors = [err15];
+        } else {
+          vErrors.push(err15);
         }
-      } else {
-        const err16 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/nonEmptyString/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        errors++;
+      }
+    }
+    if (data.failure_mode !== void 0) {
+      let data3 = data.failure_mode;
+      if (!(data3 === "capability_gap" || data3 === "environment_fact" || data3 === "prosthetic" || data3 === "motivation_conflict")) {
+        const err16 = { instancePath: instancePath + "/failure_mode", schemaPath: "#/properties/failure_mode/enum", keyword: "enum", params: { allowedValues: schema76.properties.failure_mode.enum }, message: "must be equal to one of the allowed values" };
         if (vErrors === null) {
           vErrors = [err16];
         } else {
@@ -3993,19 +3992,41 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
         errors++;
       }
     }
-    if (data.recognition_cues !== void 0) {
-      let data4 = data.recognition_cues;
-      if (!validate25(data4, { instancePath: instancePath + "/recognition_cues", parentData: data, parentDataProperty: "recognition_cues", rootData, dynamicAnchors })) {
-        vErrors = vErrors === null ? validate25.errors : vErrors.concat(validate25.errors);
-        errors = vErrors.length;
-      }
-      if (Array.isArray(data4)) {
-        if (data4.length < 1) {
-          const err17 = { instancePath: instancePath + "/recognition_cues", schemaPath: "#/properties/recognition_cues/minItems", keyword: "minItems", params: { limit: 1 }, message: "must NOT have fewer than 1 items" };
+    if (data.summary !== void 0) {
+      let data4 = data.summary;
+      if (typeof data4 === "string") {
+        if (func3(data4) < 1) {
+          const err17 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/nonEmptyString/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
           if (vErrors === null) {
             vErrors = [err17];
           } else {
             vErrors.push(err17);
+          }
+          errors++;
+        }
+      } else {
+        const err18 = { instancePath: instancePath + "/summary", schemaPath: "#/$defs/nonEmptyString/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        if (vErrors === null) {
+          vErrors = [err18];
+        } else {
+          vErrors.push(err18);
+        }
+        errors++;
+      }
+    }
+    if (data.recognition_cues !== void 0) {
+      let data5 = data.recognition_cues;
+      if (!validate25(data5, { instancePath: instancePath + "/recognition_cues", parentData: data, parentDataProperty: "recognition_cues", rootData, dynamicAnchors })) {
+        vErrors = vErrors === null ? validate25.errors : vErrors.concat(validate25.errors);
+        errors = vErrors.length;
+      }
+      if (Array.isArray(data5)) {
+        if (data5.length < 1) {
+          const err19 = { instancePath: instancePath + "/recognition_cues", schemaPath: "#/properties/recognition_cues/minItems", keyword: "minItems", params: { limit: 1 }, message: "must NOT have fewer than 1 items" };
+          if (vErrors === null) {
+            vErrors = [err19];
+          } else {
+            vErrors.push(err19);
           }
           errors++;
         }
@@ -4036,11 +4057,11 @@ function validate52(data, { instancePath = "", parentData, parentDataProperty, r
       }
     }
   } else {
-    const err18 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+    const err20 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
     if (vErrors === null) {
-      vErrors = [err18];
+      vErrors = [err20];
     } else {
-      vErrors.push(err18);
+      vErrors.push(err20);
     }
     errors++;
   }

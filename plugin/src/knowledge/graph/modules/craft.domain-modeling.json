@@ -53,6 +53,7 @@
       "id": "point:ddd.admission-question",
       "title": "DDD 准入问题",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "先问是否真有值得保护的不变式或语言，避免把 CRUD 仪式化。",
       "recognition_cues": [
         "需要DDD 准入问题"
@@ -89,6 +90,7 @@
       "id": "point:ddd.aggregate-ownership",
       "title": "Aggregate 与不变式所有权",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "按生命周期、原子性和最小可持有者划一致性边界。",
       "recognition_cues": [
         "需要Aggregate 与不变式所有权"
@@ -125,6 +127,7 @@
       "id": "point:ddd.application-derivation",
       "title": "应用层推导",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "从 event storming 与生产者/消费者矩阵推导应用服务、policy 与 saga。",
       "recognition_cues": [
         "需要应用层推导"
@@ -161,6 +164,7 @@
       "id": "point:ddd.design-focus",
       "title": "设计阶段焦点",
       "point_kind": "boundary",
+      "failure_mode": "capability_gap",
       "summary": "区分设计阶段必须固定的承重决定与应推迟的实现细节。",
       "recognition_cues": [
         "需要设计阶段焦点"
@@ -197,6 +201,7 @@
       "id": "point:ddd.failure-radar",
       "title": "DDD 反模式雷达",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "识别贫血模型、aggregate 膨胀、语言漂移、空洞包装等结构性失败。",
       "recognition_cues": [
         "需要DDD 反模式雷达"
@@ -233,6 +238,7 @@
       "id": "point:ddd.red-lines",
       "title": "DDD 红线",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "守住依赖方向、跨 BC 边界、提交后发事件、forward-only 与幂等。",
       "recognition_cues": [
         "需要DDD 红线"
@@ -269,6 +275,7 @@
       "id": "point:ddd.strategic-boundaries",
       "title": "战略边界与语言",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "用语言变化、能力、本体轴、context mapping 与 ubiquitous language 发现 BC。",
       "recognition_cues": [
         "需要战略边界与语言"

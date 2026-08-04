@@ -44,8 +44,20 @@ export const PLANES = Object.freeze([
   'projection',
 ]);
 export const INVARIANTS = Object.freeze(
-  Array.from({ length: 23 }, (_, index) => `K-I${String(index + 1).padStart(2, '0')}`),
+  Array.from({ length: 24 }, (_, index) => `K-I${String(index + 1).padStart(2, '0')}`),
 );
+
+/**
+ * Closed set of point failure modes (K-I24). Mirrors `$defs.point.properties.failure_mode`
+ * in design_docs/skill-knowledge-graph/schemas/knowledge-source.schema.json, which stays
+ * the normative SSOT; the graph invariant re-asserts it with point-level witnesses.
+ */
+export const FAILURE_MODES = Object.freeze([
+  'capability_gap',
+  'environment_fact',
+  'prosthetic',
+  'motivation_conflict',
+]);
 
 export const HARDENING_CONTRACT = Object.freeze({
   C1: Object.freeze({

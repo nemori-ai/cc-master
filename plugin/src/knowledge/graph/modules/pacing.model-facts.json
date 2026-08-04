@@ -49,6 +49,7 @@
       "id": "point:pacing.model-tier-facts",
       "title": "模型档位事实三层",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "hard_facts / project_role_evidence / community_advisory 分开；缺 payer 标 unknown。",
       "recognition_cues": [
         "有哪些模型候选",

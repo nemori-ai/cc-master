@@ -53,6 +53,7 @@
       "id": "point:tdd.completion-gate",
       "title": "完成证据闸",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "最后一次编辑后重跑回归、质量闸并只报告观察到的事实。",
       "recognition_cues": [
         "需要完成证据闸"
@@ -89,6 +90,7 @@
       "id": "point:tdd.constraint-parity",
       "title": "Constraint parity",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "test double 必须与真实后端执行相同约束，关键约束须在真后端验证。",
       "recognition_cues": [
         "需要Constraint parity"
@@ -125,6 +127,7 @@
       "id": "point:tdd.design-feedback",
       "title": "测试困难是设计反馈",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "把庞大 setup、全面 mock 与难测接口当成耦合或边界错误的证据。",
       "recognition_cues": [
         "需要测试困难是设计反馈"
@@ -161,6 +164,7 @@
       "id": "point:tdd.iron-law",
       "title": "TDD 铁律",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "没有亲眼验证会因预期原因失败的测试，就不写产品代码。",
       "recognition_cues": [
         "需要TDD 铁律"
@@ -197,6 +201,7 @@
       "id": "point:tdd.loop-boundary",
       "title": "TDD 与执行循环边界",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "TDD 拥有 test-first 手艺，dev loop 只拥有迭代优化形状。",
       "recognition_cues": [
         "需要TDD 与执行循环边界"
@@ -233,6 +238,7 @@
       "id": "point:tdd.rationalizations",
       "title": "TDD 合理化与红旗",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "识别事后补测、沉没成本、手测替代和未重验全绿等谈判信号。",
       "recognition_cues": [
         "需要TDD 合理化与红旗"
@@ -269,6 +275,7 @@
       "id": "point:tdd.red-evidence",
       "title": "验证 RED 原因",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "区分预期失败、测试自身错误与危险的首次通过。",
       "recognition_cues": [
         "需要验证 RED 原因"
@@ -305,6 +312,7 @@
       "id": "point:tdd.red-green-loop",
       "title": "红绿重构循环",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "依次完成最小 RED、验证失败、最小 GREEN、验证回归与绿上重构。",
       "recognition_cues": [
         "需要红绿重构循环"

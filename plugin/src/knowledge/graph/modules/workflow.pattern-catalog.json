@@ -52,6 +52,7 @@
       "id": "point:workflow.pattern-adversarial-verify",
       "title": "Adversarial verify",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "让 skeptic 尝试推翻 finding，证据不足默认淘汰。",
       "recognition_cues": [
         "需要Adversarial verify"
@@ -88,6 +89,7 @@
       "id": "point:workflow.pattern-bug-hunt",
       "title": "Bug hunt loop",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "组合 dry discovery 与 adversarial verification，同时追求完整性和低误报。",
       "recognition_cues": [
         "需要Bug hunt loop"
@@ -124,6 +126,7 @@
       "id": "point:workflow.pattern-completeness-critic",
       "title": "Completeness critic",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "完成后专门寻找未扫角度、未核实主张与未读来源。",
       "recognition_cues": [
         "需要Completeness critic"
@@ -160,6 +163,7 @@
       "id": "point:workflow.pattern-dep-upgrade",
       "title": "Dependency upgrade sweep",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "逐依赖隔离升级并只保留通过 gate 的 bump。",
       "recognition_cues": [
         "需要Dependency upgrade sweep"
@@ -196,6 +200,7 @@
       "id": "point:workflow.pattern-fan-out",
       "title": "Fan-out + synthesize",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "独立任务必须收齐整批结果后综合时使用 parallel barrier。",
       "recognition_cues": [
         "需要Fan-out + synthesize"
@@ -232,6 +237,7 @@
       "id": "point:workflow.pattern-judge-panel",
       "title": "Judge panel",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "并行生成多方案、独立评分并从胜者与亚军综合。",
       "recognition_cues": [
         "需要Judge panel"
@@ -268,6 +274,7 @@
       "id": "point:workflow.pattern-loop-budget",
       "title": "Loop until budget",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "深度随显式 token budget 伸缩并保留 reserve 与 total 守卫。",
       "recognition_cues": [
         "需要Loop until budget"
@@ -304,6 +311,7 @@
       "id": "point:workflow.pattern-loop-count",
       "title": "Loop until count",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "目标数量明确时循环到 count 并保留硬停。",
       "recognition_cues": [
         "需要Loop until count"
@@ -340,6 +348,7 @@
       "id": "point:workflow.pattern-loop-dry",
       "title": "Loop until dry",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "未知规模发现用 seen 去重，连续 dry rounds 后停止。",
       "recognition_cues": [
         "需要Loop until dry"
@@ -376,6 +385,7 @@
       "id": "point:workflow.pattern-migration",
       "title": "Discover-transform-verify 迁移",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "先固定改动 spec，再在隔离 worktree 中逐 site transform 与 gate。",
       "recognition_cues": [
         "需要Discover-transform-verify 迁移"
@@ -412,6 +422,7 @@
       "id": "point:workflow.pattern-multimodal-sweep",
       "title": "Multi-modal sweep",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "从多个独立角度扫全来源，整批去重后再 deep-read。",
       "recognition_cues": [
         "需要Multi-modal sweep"
@@ -448,6 +459,7 @@
       "id": "point:workflow.pattern-nested-composition",
       "title": "Nested workflow composition",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "复用一层 child workflow，共享资源并对单项失败降级。",
       "recognition_cues": [
         "需要Nested workflow composition"
@@ -484,6 +496,7 @@
       "id": "point:workflow.pattern-perspective-verify",
       "title": "Perspective-diverse verify",
       "point_kind": "example",
+      "failure_mode": "environment_fact",
       "summary": "用不同 lens 验证同一 finding，覆盖单一评委看不到的失败模式。",
       "recognition_cues": [
         "需要Perspective-diverse verify"
@@ -520,6 +533,7 @@
       "id": "point:workflow.pattern-pipeline",
       "title": "Pipeline by default",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "多阶段且无跨 item 同步依赖时默认流式 pipeline。",
       "recognition_cues": [
         "需要Pipeline by default"
@@ -556,6 +570,7 @@
       "id": "point:workflow.pattern-pr-triage",
       "title": "PR/issue triage",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "scout backlog、逐项分类，再用 judge 排优先级。",
       "recognition_cues": [
         "需要PR/issue triage"
@@ -592,6 +607,7 @@
       "id": "point:workflow.pattern-scout-fanout",
       "title": "Scout then fan-out",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "work-list 未知时先让 scout 枚举，再按 item 流式或并发处理。",
       "recognition_cues": [
         "需要Scout then fan-out"
@@ -628,6 +644,7 @@
       "id": "point:workflow.pattern-self-repair",
       "title": "Self-repair loop",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "围绕结构化 gate 迭代单个 artifact，成功或到 attempt cap 停止。",
       "recognition_cues": [
         "需要Self-repair loop"
@@ -664,6 +681,7 @@
       "id": "point:workflow.pattern-staged-escalation",
       "title": "Staged escalation",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "先用廉价 pass，只在低信心项上升级更强模型。",
       "recognition_cues": [
         "需要Staged escalation"
@@ -700,6 +718,7 @@
       "id": "point:workflow.pattern-test-repair",
       "title": "Test generation and repair",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "批量生成测试，并把失败 suite 在有界 attempts 内修到绿。",
       "recognition_cues": [
         "需要Test generation and repair"
@@ -736,6 +755,7 @@
       "id": "point:workflow.pattern-tournament",
       "title": "Tournament bracket",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "候选很多且相对比较更可靠时用两两淘汰选胜者。",
       "recognition_cues": [
         "需要Tournament bracket"

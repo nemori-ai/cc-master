@@ -47,7 +47,12 @@ function resetStopAllowUntil(home) {
   const boardPath = process.env.CC_MASTER_BOARD || '';
   if (!boardPath || !path.isAbsolute(boardPath) || !boardPath.endsWith('.board.json')) return false;
   try {
-    const res = spawnSync('ccm', [
+    // 必须走 ccmCommand()，不能写死裸 'ccm'。这是本文件里唯一漏掉它的调用点：其余路径都经
+    // run()（它内部会把 'ccm' 解析成 ccmCommand()），只有这里直接 spawnSync 了字面量。生产
+    // 环境 ccm 在 PATH 上，所以这个缺陷不可见；而 dev/test 只导出 CCM_BIN 指向 shim，于是
+    // 重置在测试环境里静默失效——claude-code 侧同一位置一直是对的（CCM_CMD="${CCM_BIN:-ccm}"），
+    // 这里是对齐它，不是引入新分叉。
+    const res = spawnSync(ccmCommand(), [
       'board',
       'set-param',
       'stop_allow_until',

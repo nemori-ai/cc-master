@@ -53,6 +53,7 @@
       "id": "point:slicing.walking-skeleton",
       "title": "walking skeleton",
       "point_kind": "procedure",
+      "failure_mode": "capability_gap",
       "summary": "第一片是最薄端到端线；共享核心最小化，schema 增量生长。",
       "recognition_cues": [
         "一次定全地基"
@@ -89,6 +90,7 @@
       "id": "point:slicing.grain",
       "title": "粒度为并行与验收",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "能并行 + 有清爽 DoD；太粗太细都病。",
       "recognition_cues": [
         "任务粒度",
@@ -126,6 +128,7 @@
       "id": "point:slicing.value-risk",
       "title": "价值×风险排序",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "先做最早可用与最险集成；常合于 walking skeleton。",
       "recognition_cues": [
         "先做哪片"
@@ -162,6 +165,7 @@
       "id": "point:slicing.board-landing",
       "title": "落到 board",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "一片一 task、脊椎最少前置、远期粗粒度、近期可路由画像、cadence 收口。",
       "recognition_cues": [
         "怎么写进 board"
@@ -198,6 +202,7 @@
       "id": "point:slicing.antipatterns",
       "title": "切分反模式速查",
       "point_kind": "check",
+      "failure_mode": "capability_gap",
       "summary": "横切、大爆炸、吞 cadence、瀑布、镀金地基、过度切碎、假串行边。",
       "recognition_cues": [
         "对照切坏了没有"

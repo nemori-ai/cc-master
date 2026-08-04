@@ -89,7 +89,8 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'lineage',
     'projection',
   ]);
-  assert.equal(body.invariants.length, 23);
+  assert.equal(body.invariants.length, 24);
+  assert.equal(body.invariants.at(-1), 'K-I24');
   assert.equal(body.exit_codes.capability_not_implemented, 10);
   assert.equal(
     body.schemas.output,
@@ -975,5 +976,19 @@ test('SKG-CI-01: required build-and-check is an aggregator over ccm and plugin c
   assert.match(workflow, /^  plugin-contracts:/m);
   assert.match(workflow, /^  build-and-check:/m);
   assert.match(workflow, /needs:\s*\[ccm, plugin-contracts\]/);
-  assert.match(workflow, /node scripts\/skill-knowledge\.mjs check --stage K0 --json/);
+  // plugin-contracts 这条腿不再是几个精选步骤，而是 AGENTS.md §10 第一道门的整个快层
+  // （issue #213：文档声称的门必须等于机制执行的门）。K0 source check 仍在 CI 里跑——
+  // 它现在由本文件的 SKG-K0 用例在快层内对真实仓库执行，不再是 workflow 里的一行字面。
+  assert.match(workflow, /bash run-tests\.sh --fast/);
+  // 重型层不在 required check 上，由独立的 nightly workflow 覆盖；两者都必须存在，否则
+  // 重型层就成了只靠人自觉的空门。
+  const nightly = fs.readFileSync(
+    path.join(repoRoot, '.github', 'workflows', 'nightly-heavy-tests.yml'),
+    'utf8',
+  );
+  assert.match(nightly, /bash run-tests\.sh --heavy/);
+  assert.match(nightly, /^on:/m);
+  assert.match(nightly, /schedule:/);
+  assert.match(nightly, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /run-tests\.sh --heavy/);
 });

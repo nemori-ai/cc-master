@@ -91,9 +91,61 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
     },
     behavioral_evidence_status: behavioralEvidence,
     capabilities: { ...CAPABILITIES },
+    ...(built.graph ? { failure_mode_profile: buildFailureModeProfile(built.graph) } : {}),
     diagnostics: publicDiagnostics(diagnostics),
   });
   return { exitCode, body };
+}
+
+// Buckets every authored point (each point carries exactly one `failure_mode`,
+// K-I24) by that field, both globally and per consuming skill, so a reader can
+// see at a glance whether a skill is mostly patching an environment gap,
+// mostly guarding against motivation conflicts, etc. Reads point.failure_mode
+// verbatim off the built graph — never re-derives or infers it.
+function buildFailureModeProfile(graph) {
+  const moduleSkillById = new Map(
+    graph.modules.map((module) => [module.id, module.consumers?.[0] ?? null]),
+  );
+  const totalsByMode = {};
+  const bySkill = {};
+  let total = 0;
+
+  for (const point of graph.points) {
+    const mode = point.failure_mode;
+    totalsByMode[mode] = (totalsByMode[mode] ?? 0) + 1;
+    total += 1;
+
+    const skillId = moduleSkillById.get(point.module_id) ?? null;
+    const skillKey = skillId ?? 'unassigned';
+    if (!bySkill[skillKey]) {
+      bySkill[skillKey] = { skill_id: skillId, total: 0, counts: {}, percentages: {} };
+    }
+    bySkill[skillKey].counts[mode] = (bySkill[skillKey].counts[mode] ?? 0) + 1;
+    bySkill[skillKey].total += 1;
+  }
+
+  const round1 = (num) => Math.round(num * 10) / 10;
+
+  const overallPercentages = {};
+  for (const [mode, count] of Object.entries(totalsByMode)) {
+    overallPercentages[mode] = total > 0 ? round1((count / total) * 100) : 0;
+  }
+
+  const perSkill = Object.values(bySkill)
+    .map((entry) => {
+      const percentages = {};
+      for (const [mode, count] of Object.entries(entry.counts)) {
+        percentages[mode] = entry.total > 0 ? round1((count / entry.total) * 100) : 0;
+      }
+      return { ...entry, percentages };
+    })
+    .sort((left, right) => compareCodePoint(left.skill_id ?? '', right.skill_id ?? ''));
+
+  return {
+    total_points: total,
+    overall: { counts: totalsByMode, percentages: overallPercentages },
+    by_skill: perSkill,
+  };
 }
 
 export function runPath({

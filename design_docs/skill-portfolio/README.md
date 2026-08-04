@@ -36,8 +36,8 @@
 | 级 | 内容 | 轴 | 为什么在这个位置 | 状态 |
 |---|---|---|---|---|
 | **L0** | 采纳翻正 + 建本目录 | — | — | ✅ 完成 |
-| **L1** | 放宽 `external_edge_policy`（`routes_to` / `contrasts_with` 允许跨界）+ 把散文层间引用落成 typed 边 | 结构 | 零点位移动、可逆；且是 M12 的硬前置；顺带把红线「八 skill 互不重叠」从人审升为机检 | 待做 |
-| **L2** | `failure_mode` 单轴落 schema + 标注 36 个 `check` 点 + `report` 分桶 | 内容 | 第 0 步对账已完成（81% 通过，`altitude` 被否证砍掉），可直接落 schema | 待做 |
+| **L1** | 放宽 `external_edge_policy`（`routes_to` / `contrasts_with` 允许跨界）+ 把散文层间引用落成 typed 边 | 结构 | 零点位移动、可逆；且是 M12 的硬前置；顺带把红线「八 skill 互不重叠」从人审升为机检 | ✅ 完成（实测：`plugin/src/knowledge/portfolio.json` 的 `candidate_admission.external_edge_policy.allowed_types` = `["contrasts_with","routes_to"]`；图上已有 24 条跨 skill typed 边 = 10 条 `routes_to` + 14 条 `contrasts_with`）|
+| **L2** | `failure_mode` 单轴落 schema + `report` 分桶 | 内容 | 第 0 步对账已完成（81% 通过，`altitude` 被否证砍掉）+ 全量标注已落地 | ✅ 完成（`failure_mode` 已是点的必填 schema 字段，250 条判定零重判迁入 47 个模块；实测分布 `environment_fact` 110 / `capability_gap` 86 / `motivation_conflict` 51 / `prosthetic` 3。配套：不变式 **K-I24** 拦漏标的新点，`report` 出全图与逐 skill 的分桶画像，母本散文标签与字段之间上了双向对账。散文副本**有意保留**——删掉它只会把约 18 条「标签与理由自相矛盾」藏起来，见宪章 §6.3.1 与 §4.2）|
 | **L3** | M1 校准回路断环 | 内容 | 它在全仓唯一的痕迹就在 S1 要删的那份文件里——**先于 S1 是必要条件，不是偏好** | 待做 |
 | **L4** | M8 放弃目标的品味 + M9/M10 过交付道层原则 + `preference.*` 五点 + M13/M14/M15 | 内容 | 护栏侧缺口随模型变强而放大，必须先拿到能承受删减的底盘 | 待做 |
 | **L5** | M3 假 replan 闸 + M12 断链接通 | 内容 | M12 依赖 L1 | 待做 |

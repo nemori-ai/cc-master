@@ -49,6 +49,7 @@
       "id": "point:slicing.example-contrast",
       "title": "横切 vs 纵切对照样例",
       "point_kind": "example",
+      "failure_mode": "capability_gap",
       "summary": "记账 app 横切病灶与 walking skeleton 纵切收益对照。",
       "recognition_cues": [
         "脑中只有先 schema/API/UI"

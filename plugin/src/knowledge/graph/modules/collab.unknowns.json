@@ -59,6 +59,7 @@
       "id": "point:unknowns.four-quadrants",
       "title": "四类未知与地图/地形差",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "表示不是工作本身，二者之差即未知；模型越强这个差越危险，四类未知是你的内部分派轴而非对用户的话术。",
       "recognition_cues": [
         "推进得异常顺畅却说不出验证过什么",
@@ -97,6 +98,7 @@
       "id": "point:unknowns.technique-routing",
       "title": "按未知类型分派发现手法",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "扫描地形治未知的未知、造多方向的物治未知的已知、提问治已知的未知；四类都不缺就直接推进不加仪式。",
       "recognition_cues": [
         "不确定该扫描、造物还是直接问",
@@ -135,6 +137,7 @@
       "id": "point:unknowns.interview-discipline",
       "title": "提问纪律与停止判据",
       "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
       "summary": "一次一个问题，按会不会改变架构、数据模型、流程、范围或验收排序，每答一次重选下一问；剩余未知不再改变方案形状就停。",
       "recognition_cues": [
         "准备向用户提问",
@@ -173,6 +176,7 @@
       "id": "point:unknowns.frame-before-spec",
       "title": "用户没有判断框架时先建框架",
       "point_kind": "decision_rule",
+      "failure_mode": "capability_gap",
       "summary": "用户答不出什么样算好时，先讲清取舍轴并给对照实例帮他定位，绝不反复把需求抛回给一个还没有判断框架的人。",
       "recognition_cues": [
         "用户在这个领域缺乏经验",
@@ -211,6 +215,7 @@
       "id": "point:unknowns.artifact-over-prose",
       "title": "具体物优于散文描述",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "给能被指着说不对的具体物而不是描述，向用户与向执行者都适用；载体按 host 实际能力选，底线是真实代码加可跑样例。",
       "recognition_cues": [
         "准备用一段文字描述想要的效果",

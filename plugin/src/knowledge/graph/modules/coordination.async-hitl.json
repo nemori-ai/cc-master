@@ -51,6 +51,7 @@
       "id": "point:hitl.inflight-and-user",
       "title": "in-flight 与用户异步依赖",
       "point_kind": "principle",
+      "failure_mode": "capability_gap",
       "summary": "追踪在飞任务，把用户当特殊 async worker，并先派不依赖回答的后台活。",
       "recognition_cues": [
         "需要同时处理前台问答与后台派发"
@@ -87,6 +88,7 @@
       "id": "point:hitl.decision-package",
       "title": "采访式 decision package",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "预取决策依据、处理 sidecar 与 freshness，再让 goal hook 机械检查漏项。",
       "recognition_cues": [
         "准备 surface 用户决策",
@@ -124,6 +126,7 @@
       "id": "point:hitl.step6-ledger",
       "title": "step-6 ledger 固定形态",
       "point_kind": "check",
+      "failure_mode": "motivation_conflict",
       "summary": "等待或收口前逐条记录每条 path 的真实状态与证据。",
       "recognition_cues": [
         "准备 Stop",
@@ -161,6 +164,7 @@
       "id": "point:hitl.watchdog",
       "title": "等待前 watchdog",
       "point_kind": "procedure",
+      "failure_mode": "prosthetic",
       "summary": "仅为可能静默失败的后台路径 arm 自唤醒，ceiling 触发 recon 而非直接判死。",
       "recognition_cues": [
         "后台可能 hang",

@@ -50,6 +50,7 @@
       "id": "point:pacing.selected-target-facts",
       "title": "selected target 事实绑定",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "Surface/Model/Quota/Binding 必须同一候选同一 freshness；unknown/stale→insufficient。",
       "recognition_cues": [
         "跨 harness 解释 envelope"

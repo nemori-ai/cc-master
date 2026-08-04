@@ -53,6 +53,7 @@
       "id": "point:ccm.when-to-open",
       "title": "何时翻开 using-ccm",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "任何 board 读写都走 ccm；按问题选 command-catalog 或 board-model-guide。",
       "recognition_cues": [
         "要对 board 读写",
@@ -90,6 +91,7 @@
       "id": "point:ccm.write-gate",
       "title": "ccm 是 board 写入关卡",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "动 board 首选 ccm：持锁、校验、守状态机、守 attempt 边界；勿手改 JSON。",
       "recognition_cues": [
         "想 Write/Edit/sed 改 board",
@@ -127,6 +129,7 @@
       "id": "point:ccm.status-state-machine",
       "title": "status 是状态机不是赋值字段",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "status 只能经生命周期 verb 转移；ready→done 非法；有 blocked_on 豁免自动门控。",
       "recognition_cues": [
         "想 --set status",
@@ -165,6 +168,7 @@
       "id": "point:ccm.field-tiers",
       "title": "三档字段操作规则",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "🔒 专属命令；普通 ✎ 用 --set；合约 ✎ 走 domain verb；👁 走具名 flag。",
       "recognition_cues": [
         "--set 被拒",
@@ -203,6 +207,7 @@
       "id": "point:ccm.single-write-path",
       "title": "board 变更唯一写路径",
       "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
       "summary": "ccm 硬前置 + board-guard；瞬态失败也暂停写、绝不手改。",
       "recognition_cues": [
         "ccm 抽风",
@@ -241,6 +246,7 @@
       "id": "point:ccm.planning-opt-in",
       "title": "planning/routing 是 opt-in 合同",
       "point_kind": "boundary",
+      "failure_mode": "environment_fact",
       "summary": "set-routing 不选中/不 spawn；缺合同 legacy 保持原行为。",
       "recognition_cues": [
         "set-routing 写完以为会自动派发",

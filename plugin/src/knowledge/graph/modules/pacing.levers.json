@@ -51,6 +51,7 @@
       "id": "point:pacing.upper-bound-only",
       "title": "只在上界收紧",
       "point_kind": "principle",
+      "failure_mode": "environment_fact",
       "summary": "无欠用加速侧；healthy≠放行其他门；按 target 解读 verdict。",
       "recognition_cues": [
         "额度空闲就加速"
@@ -87,6 +88,7 @@
       "id": "point:pacing.decision-vectors",
       "title": "决策影响向量",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "模型/effort、WIP、high-float 是输入不是动作；动作交回编排决策层。",
       "recognition_cues": [
         "throttle 后改什么"

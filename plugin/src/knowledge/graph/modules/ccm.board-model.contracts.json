@@ -54,6 +54,7 @@
       "id": "point:ccm.board.planning-routing",
       "title": "planning/routing 合同判断",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "planning/routing 合同判断",
       "recognition_cues": [
         "set-planning",
@@ -92,6 +93,7 @@
       "id": "point:ccm.board.agents-registry",
       "title": "agents[] 登记簿语义",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "agents[] 登记簿语义",
       "recognition_cues": [
         "agent create/bind/terminal",
@@ -129,6 +131,7 @@
       "id": "point:ccm.board.jc-judgment",
       "title": "jc 何时建与 severity",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "jc 何时建与 severity",
       "recognition_cues": [
         "judgment_call",
@@ -166,6 +169,7 @@
       "id": "point:ccm.board.cadence",
       "title": "cadence/iteration 节奏",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "cadence/iteration 节奏",
       "recognition_cues": [
         "开 iteration",
@@ -203,6 +207,7 @@
       "id": "point:ccm.board.parent-owner",
       "title": "parent/owner 嵌套语义",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "parent/owner 嵌套语义",
       "recognition_cues": [
         "owner 容器",
@@ -240,6 +245,7 @@
       "id": "point:ccm.board.watchdog",
       "title": "watchdog 何时 arm",
       "point_kind": "procedure",
+      "failure_mode": "environment_fact",
       "summary": "watchdog 何时 arm",
       "recognition_cues": [
         "arm watchdog",
@@ -277,6 +283,7 @@
       "id": "point:ccm.board.artifact-verified",
       "title": "artifact/verified 真完成",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "artifact/verified 真完成",
       "recognition_cues": [
         "BIZ-DONE-VERIFIED",
@@ -314,6 +321,7 @@
       "id": "point:ccm.board.antipatterns",
       "title": "决策树与反模式深化",
       "point_kind": "check",
+      "failure_mode": "environment_fact",
       "summary": "决策树与反模式深化",
       "recognition_cues": [
         "反模式",
@@ -351,6 +359,7 @@
       "id": "point:ccm.board.validation-rules",
       "title": "FMT/GRAPH/BIZ 规则速查（操作视图）",
       "point_kind": "reference",
+      "failure_mode": "environment_fact",
       "summary": "FMT/GRAPH/BIZ 规则速查（操作视图）",
       "recognition_cues": [
         "撞了哪条规则",
@@ -388,6 +397,7 @@
       "id": "point:ccm.board.deadline-ddl",
       "title": "交付 DDL 四态判断",
       "point_kind": "decision_rule",
+      "failure_mode": "environment_fact",
       "summary": "交付 DDL 四态判断",
       "recognition_cues": [
         "deadline_pending",
