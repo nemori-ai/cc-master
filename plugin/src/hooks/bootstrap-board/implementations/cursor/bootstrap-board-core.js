@@ -69,7 +69,10 @@ function resetStopAllowUntil(home) {
   const boardPath = process.env.CC_MASTER_BOARD || '';
   if (!boardPath || !path.isAbsolute(boardPath) || !boardPath.endsWith('.board.json')) return false;
   try {
-    const res = spawnSync('ccm', [
+    // 必须走 ccmCommand()，不能写死裸 'ccm'——本文件其余调用点都经 run() 解析，只有这里
+    // 直接 spawnSync 了字面量。生产环境 ccm 在 PATH 上所以看不出问题；dev/test 只导出
+    // CCM_BIN 指向 shim，裸调用会静默失效，重置随之无声跳过。
+    const res = spawnSync(ccmCommand(), [
       'board',
       'set-param',
       'stop_allow_until',

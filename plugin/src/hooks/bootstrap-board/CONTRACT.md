@@ -162,6 +162,18 @@ proves their host-native projections without broadening registration beyond the 
 
 ## 降级行为
 
+> **2026-08-04 记一次「消除分叉」而非声明分叉。** codex 侧 `resetStopAllowUntil()` 曾直接
+> `spawnSync('ccm', …)`，绕开了本文件里统一的 `ccmCommand()`（`process.env.CCM_BIN || 'ccm'`）。
+> 该文件其余调用点都经 `run()`，由它把字面量 `'ccm'` 解析成 `ccmCommand()`，只有这一处漏了。
+> claude-code 侧同一位置**一直是对的**（`CCM_CMD="${CCM_BIN:-ccm}"`），所以这不是两端的设计
+> 分歧，是单侧遗漏，已让 codex 对齐 claude-code，下表无需新增条目。
+>
+> 值得记的是它**为什么能长期隐身**：生产环境里 `ccm` 装在 PATH 上，裸调用照样能跑通；只有
+> dev/test 走 `CCM_BIN` 指向 shim、PATH 上没有 `ccm` 时才失效。而 hook 测试此前从不在 CI 上跑
+> （`plugin-contracts` 只跑四个精选步骤），本机开发者的 PATH 里又几乎总有 `ccm`——**两层遮蔽
+> 叠在一起，缺陷就有了一个谁都碰不到的藏身处**。它是在 issue #213 把 hook 层接进 CI 之后的
+> 第一次运行里暴露的。凡「只在没装 ccm 的环境才现形」的缺陷，都该假定它还有同类潜伏。
+
 ```yaml
 - rule: bootstrap-slash-command-expansion
   kind: protocol-capability-gap
