@@ -103,6 +103,24 @@ process.on('exit', () => fs.rmSync(projectRoot, { recursive: true, force: true }
 const QUERY_TIMEOUT_MS = 240_000;
 
 /**
+ * 触发信号：Skill 工具**真实调用**时入参里的这一串。
+ *
+ * 曾经写成 `buf.includes(skillName)` —— 那是错的，而且错得非常隐蔽。claude 启动时会把可用
+ * 命令列表注入流里（`"slash_commands":["<skillName>", …]`），于是**每一条 query 的流里都有
+ * skill 名**，无论它是否被调用。结果是 recall 1.000 / TN 0：235 条全判触发，包括 119 条
+ * near-miss 负例。accuracy 0.494，等于"永远判触发"。
+ *
+ * 这和它取代的旧装置是同一个病的镜像 —— 那个永远判不触发，这个永远判触发，两者的 accuracy
+ * 都在随机线附近，都看着像"description 有问题"。
+ *
+ * 实测对比（同一 skill，正例 vs 负例）：
+ *   正例  {"type":"tool_use","name":"Skill","input":{"skill":"<name>"}}   ← 真调用
+ *   负例  "slash_commands":["<name>", …]                                 ← 仅列表注入
+ * 故锚定 `"skill":"<name>"`：它只出现在真实调用的入参里，不会出现在列表数组中。
+ */
+const TRIGGER_MARK = `"skill":"${skillName}"`;
+
+/**
  * 跑一条 query。返回 `{ triggered }` 或 `{ error }`。
  *
  * **两类失败必须分开，这是这个装置最容易写错的地方。** 初版把它们混为一谈——任何异常都
@@ -132,8 +150,7 @@ function runQuery(query) {
     }, QUERY_TIMEOUT_MS);
     child.stdout.on('data', (c) => {
       buf += c.toString('utf8');
-      // 触发信号：流里出现被测 skill 的名字（Skill 工具的入参或工具名）
-      if (!triggered && buf.includes(skillName)) triggered = true;
+      if (!triggered && buf.includes(TRIGGER_MARK)) triggered = true;
     });
     child.on('error', (e) => {
       clearTimeout(timer);
@@ -164,27 +181,40 @@ async function didTrigger(query) {
 // ── 装置自检（见头部第 1 条）───────────────────────────────────────────────────────────────
 // canary 取语料里第一条 should_trigger=true 的 query。它若不触发，要么装置坏了，要么这个
 // skill 连自己最典型的正例都接不住 —— 两种都不该继续烧配额跑全量，先让人来看。
-const canary = queries.find((q) => q.should_trigger === true);
-if (!canary) {
-  console.error('eval-trigger: 语料里没有 should_trigger=true 的 query，无法自检');
+// **双向自检**：正例必须触发，负例必须不触发。两条都过才算装置可用。
+//
+// 上一版只跑正例。那只能证明"能触发"，证明不了"能区分" —— 于是检测逻辑的假阳性（把启动时
+// 的可用命令列表当成调用）全程隐形，直到全量跑完看见 TN=0 才暴露，白烧一整轮。
+//
+// 一个只会说"是"的探针，和一个只会说"否"的探针，都不是探针。
+const posCanary = queries.find((q) => q.should_trigger === true);
+const negCanary = queries.find((q) => q.should_trigger === false);
+if (!posCanary || !negCanary) {
+  console.error('eval-trigger: 语料需同时含 should_trigger 的正例与负例才能双向自检');
   process.exit(1);
 }
-process.stderr.write(`[self-check] canary: ${canary.query.slice(0, 46)}…\n`);
-let canaryOk = false;
+let posOk;
+let negOk;
 try {
-  canaryOk = await didTrigger(canary.query);
+  process.stderr.write(`[self-check +] ${posCanary.query.slice(0, 44)}…\n`);
+  posOk = await didTrigger(posCanary.query);
+  process.stderr.write(`[self-check -] ${negCanary.query.slice(0, 44)}…\n`);
+  negOk = !(await didTrigger(negCanary.query));
 } catch (e) {
   console.error(`eval-trigger: ABORT — 装置自检时调用失败：${e.message}`);
   process.exit(1);
 }
-if (!canaryOk) {
+if (!posOk || !negOk) {
   console.error(
-    'eval-trigger: ABORT — canary 正例未触发。装置或 description 有一个是坏的，先查清再跑全量，\n' +
-      '不要拿一份"全零"报告当 baseline（上一版装置就是这么产出假数据的）。',
+    `eval-trigger: ABORT — 双向自检未通过（正例触发=${posOk} 负例拒绝=${negOk}）。\n` +
+      (!posOk
+        ? '  正例不触发：装置或 description 坏了一个。\n'
+        : '  负例也触发：检测逻辑有假阳性，跑下去只会得到一份"全触发"的假报告。\n') +
+      '  先查清再跑全量——这一步存在的全部理由，就是别让整轮配额烧在假数据上。',
   );
   process.exit(1);
 }
-process.stderr.write('[self-check] OK —— 装置能触发，进入全量\n\n');
+process.stderr.write('[self-check] OK —— 正例触发、负例拒绝，装置能区分，进入全量\n\n');
 
 // ── 全量 ────────────────────────────────────────────────────────────────────────────────────
 /** 判定一条 query（含其 RUNS 次重复）。装置级失败向上抛，整批中止。 */
