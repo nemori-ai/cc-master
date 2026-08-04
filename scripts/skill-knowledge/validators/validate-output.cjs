@@ -1,8 +1,8 @@
 /**
  * Generated standalone Draft 2020-12 validator (bundled).
  * Source: design_docs/skill-knowledge-graph/schemas/knowledge-cli-output.schema.json
- * Source-schema-sha256: a268d6fdc43629396450c1e6f969c7ef8d0eae46681c0702fe7c8d2cdd2cc47d
- * Schema-fingerprint: d9e3197184af9012a4cc19edb862241d6edc55d34938682d92e0a41c80b6cec3
+ * Source-schema-sha256: 27d6b303ea7cc010f9243134f75d2dca8812cf9bb96168fbeccf82eaf076233c
+ * Schema-fingerprint: fc42638cf00ed04c411fc555b58cd9564216a72fa72b3c0cfb064c340ca19b8b
  * Regenerate: node scripts/skill-knowledge/generate-validators.mjs
  */
 "use strict";
@@ -90,19 +90,21 @@ var require_equal = __commonJS({
 // raw/validate-output.cjs
 module.exports = validate20;
 module.exports.default = validate20;
-var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "compile", "materialize", "report", "change", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "compile_mode": { "enum": ["write", "check"] }, "hosts": { "$ref": "#/$defs/stringSet" }, "host_results": { "type": "array", "items": { "$ref": "#/$defs/compileHostResult" } }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "modules", "compositions", "analyses"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "modules": { "$ref": "#/$defs/repoPath" }, "compositions": { "$ref": "#/$defs/repoPath" }, "analyses": { "$ref": "#/$defs/repoPath" } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "failure_mode_profile": { "$ref": "#/$defs/failureModeProfile" }, "improvement_claim": { "type": "string", "minLength": 1 }, "action": { "enum": ["begin", "validate", "apply"] }, "workspace": { "$ref": "#/$defs/repoPath" }, "ledger_path": { "$ref": "#/$defs/repoPath" }, "result_graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "validation": { "type": "object" }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "change" } }, "required": ["result_kind"] }, "then": { "required": ["action", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "compile" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["compile_mode", "hosts", "host_results", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "hopGate": { "type": "object", "additionalProperties": false, "required": ["ok", "witness", "remediation"], "properties": { "ok": { "type": "boolean" }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } }, "compileHostResult": { "type": "object", "additionalProperties": false, "required": ["host", "ok", "mode", "artifacts", "enabled_edges", "point_anchors", "hop_report", "budgets", "executed_checks"], "properties": { "host": { "type": "string", "minLength": 1 }, "ok": { "type": "boolean" }, "mode": { "type": "string", "minLength": 1 }, "artifacts": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "bytes"], "properties": { "path": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 0 } } } }, "enabled_edges": { "type": "integer", "minimum": 0 }, "point_anchors": { "type": "integer", "minimum": 0 }, "hop_report": { "type": "object", "additionalProperties": false, "required": ["H1", "H2", "H3", "H4"], "properties": { "H1": { "$ref": "#/$defs/hopGate" }, "H2": { "$ref": "#/$defs/hopGate" }, "H3": { "$ref": "#/$defs/hopGate" }, "H4": { "$ref": "#/$defs/hopGate" } } }, "budgets": { "type": "object" }, "executed_checks": { "$ref": "#/$defs/stringSet" } } }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields", "candidate_admission"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "module", "composition", "candidate_analysis"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] }, "candidate_admission": { "type": "object", "additionalProperties": false, "required": ["inventory_max_utf8_bytes", "inventory_max_lines", "inventory_max_tokens", "min_internal_cohesion", "max_external_edge_count", "external_edge_policy", "max_overlap_shared_modules", "require_ssot_closure", "require_four_host_denominator", "reject_all_hosts_unsupported", "require_declared_projection", "hop_gate"], "properties": { "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 }, "inventory_max_lines": { "type": "integer", "minimum": 1 }, "inventory_max_tokens": { "type": "integer", "minimum": 1 }, "min_internal_cohesion": { "type": "number", "minimum": 0, "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)." }, "max_external_edge_count": { "type": "integer", "minimum": 0 }, "external_edge_policy": { "type": "object", "additionalProperties": false, "required": ["allowed_types"], "properties": { "allowed_types": { "type": "array", "uniqueItems": true, "items": { "enum": ["contrasts_with", "routes_to"] } } } }, "max_overlap_shared_modules": { "type": "integer", "minimum": 0, "description": "Max modules shared with any other accepted composition peer." }, "require_ssot_closure": { "type": "boolean" }, "require_four_host_denominator": { "type": "boolean" }, "reject_all_hosts_unsupported": { "type": "boolean" }, "require_declared_projection": { "type": "boolean", "description": "Declared full/partial host_coverage must pass planSkillProjection at that level." }, "hop_gate": { "const": "directed_projection_topology", "description": "Admission uses directed projection topology (SCC=1 + diameter). Undirected is observational only." } } } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "failureModeCounts": { "type": "object", "propertyNames": { "enum": ["capability_gap", "environment_fact", "prosthetic", "motivation_conflict"] }, "additionalProperties": { "type": "integer", "minimum": 0 } }, "failureModePercentages": { "type": "object", "propertyNames": { "enum": ["capability_gap", "environment_fact", "prosthetic", "motivation_conflict"] }, "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 } }, "failureModeProfile": { "description": "\u62A5\u544A\u4FA7\u753B\u50CF\uFF1A\u6BCF\u4E2A\u70B9\u6309 failure_mode \u5206\u6876\u7684\u6784\u6210\uFF0C\u5168\u56FE\u4E00\u4EFD\u3001\u6BCF\u4E2A\u6D88\u8D39\u5B83\u7684 skill \u4E00\u4EFD\u3002\u7528\u9014\u662F\u8BA9\u300C\u8FD9\u4E2A skill \u4E3B\u8981\u5728\u8865\u73AF\u5883\u4E8B\u5B9E\uFF0C\u8FD8\u662F\u5728\u7ACB\u62A4\u680F\u300D\u4E00\u773C\u53EF\u89C1\u3002\u8BA1\u6570\u9010\u5B57\u53D6\u81EA point.failure_mode\uFF0C\u4E0D\u5728\u6B64\u5904\u63A8\u5BFC\u3002", "type": "object", "additionalProperties": false, "required": ["total_points", "overall", "by_skill"], "properties": { "total_points": { "type": "integer", "minimum": 0 }, "overall": { "type": "object", "additionalProperties": false, "required": ["counts", "percentages"], "properties": { "counts": { "$ref": "#/$defs/failureModeCounts" }, "percentages": { "$ref": "#/$defs/failureModePercentages" } } }, "by_skill": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["skill_id", "total", "counts", "percentages"], "properties": { "skill_id": { "type": ["string", "null"], "pattern": "^skill:[a-z0-9]+(-[a-z0-9]+)*$" }, "total": { "type": "integer", "minimum": 0 }, "counts": { "$ref": "#/$defs/failureModeCounts" }, "percentages": { "$ref": "#/$defs/failureModePercentages" } } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "anchor_path": { "type": ["string", "null"] }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "composition": { "type": "integer", "minimum": 0 }, "candidate_analysis": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
+var schema31 = { "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://cc-master.dev/schemas/skill-knowledge-cli-output-v1alpha1.json", "title": "cc-master skill knowledge CLI output", "description": "Machine-readable envelope for contract, check, usage, and fail-closed capability results.", "type": "object", "unevaluatedProperties": false, "required": ["schema", "ok", "command", "result_kind", "contract_version"], "properties": { "schema": { "const": "cc-master/skill-knowledge-cli/v1alpha1" }, "ok": { "type": "boolean" }, "command": { "type": "string", "minLength": 1 }, "result_kind": { "enum": ["contract", "check", "compile", "materialize", "report", "change", "path", "explain", "diagnostic"] }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "compile_mode": { "enum": ["write", "check"] }, "hosts": { "$ref": "#/$defs/stringSet" }, "host_results": { "type": "array", "items": { "$ref": "#/$defs/compileHostResult" } }, "path_query": { "$ref": "#/$defs/pathQuery" }, "path_result": { "$ref": "#/$defs/pathResult" }, "explain_target": { "type": "string", "minLength": 1 }, "entity": { "$ref": "#/$defs/explainedEntity" }, "contract_version": { "const": "v1alpha1" }, "implemented_commands": { "$ref": "#/$defs/stringSet" }, "declared_commands": { "$ref": "#/$defs/stringSet" }, "operations": { "$ref": "#/$defs/stringSet" }, "planes": { "$ref": "#/$defs/stringSet" }, "invariants": { "$ref": "#/$defs/stringSet" }, "exit_codes": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 255 } }, "schemas": { "type": "object", "additionalProperties": false, "required": ["source", "change", "output", "cli"], "properties": { "source": { "$ref": "#/$defs/repoPath" }, "change": { "$ref": "#/$defs/repoPath" }, "output": { "$ref": "#/$defs/repoPath" }, "cli": { "$ref": "#/$defs/repoPath" } } }, "source_layout": { "type": "object", "additionalProperties": false, "required": ["root", "portfolio", "changes", "modules", "compositions", "analyses"], "properties": { "root": { "$ref": "#/$defs/repoPath" }, "portfolio": { "$ref": "#/$defs/repoPath" }, "changes": { "$ref": "#/$defs/repoPath" }, "modules": { "$ref": "#/$defs/repoPath" }, "compositions": { "$ref": "#/$defs/repoPath" }, "analyses": { "$ref": "#/$defs/repoPath" } } }, "stage": { "enum": ["K0", "K1", "K2", "K3"] }, "source_root": { "type": "string", "minLength": 1 }, "summary": { "$ref": "#/$defs/summary" }, "capabilities": { "$ref": "#/$defs/capabilities" }, "hardening_contract": { "$ref": "#/$defs/hardeningContract" }, "structural_status": { "$ref": "#/$defs/structuralStatus" }, "behavioral_evidence_status": { "$ref": "#/$defs/behavioralEvidenceStatus" }, "failure_mode_profile": { "$ref": "#/$defs/failureModeProfile" }, "unassigned_knowledge": { "$ref": "#/$defs/unassignedKnowledge" }, "improvement_claim": { "type": "string", "minLength": 1 }, "action": { "enum": ["begin", "validate", "apply"] }, "workspace": { "$ref": "#/$defs/repoPath" }, "ledger_path": { "$ref": "#/$defs/repoPath" }, "result_graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "validation": { "type": "object" }, "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } } }, "allOf": [{ "if": { "properties": { "result_kind": { "const": "change" } }, "required": ["result_kind"] }, "then": { "required": ["action", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "contract" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["implemented_commands", "declared_commands", "operations", "planes", "invariants", "exit_codes", "schemas", "source_layout", "capabilities", "hardening_contract"] } }, { "if": { "properties": { "result_kind": { "const": "report" } }, "required": ["result_kind"] }, "then": { "required": ["structural_status", "behavioral_evidence_status", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "path" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["path_query", "path_result", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "explain" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["explain_target", "entity", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "compile" }, "ok": { "const": true } }, "required": ["result_kind", "ok"] }, "then": { "required": ["compile_mode", "hosts", "host_results", "diagnostics"] } }, { "if": { "properties": { "result_kind": { "const": "check" } }, "required": ["result_kind"] }, "then": { "required": ["stage", "source_root", "summary", "capabilities", "diagnostics"] } }, { "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] }, "then": { "required": ["diagnostics"], "properties": { "diagnostics": { "minItems": 1 } } } }, { "if": { "required": ["improvement_claim"] }, "then": { "properties": { "behavioral_evidence_status": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] } }, "required": ["behavioral_evidence_status"] } }], "$defs": { "repoPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._<>/-]+$" }, "stringSet": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }, "hopGate": { "type": "object", "additionalProperties": false, "required": ["ok", "witness", "remediation"], "properties": { "ok": { "type": "boolean" }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } }, "compileHostResult": { "type": "object", "additionalProperties": false, "required": ["host", "ok", "mode", "artifacts", "enabled_edges", "point_anchors", "hop_report", "budgets", "executed_checks"], "properties": { "host": { "type": "string", "minLength": 1 }, "ok": { "type": "boolean" }, "mode": { "type": "string", "minLength": 1 }, "artifacts": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "bytes"], "properties": { "path": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 0 } } } }, "enabled_edges": { "type": "integer", "minimum": 0 }, "point_anchors": { "type": "integer", "minimum": 0 }, "hop_report": { "type": "object", "additionalProperties": false, "required": ["H1", "H2", "H3", "H4"], "properties": { "H1": { "$ref": "#/$defs/hopGate" }, "H2": { "$ref": "#/$defs/hopGate" }, "H3": { "$ref": "#/$defs/hopGate" }, "H4": { "$ref": "#/$defs/hopGate" } } }, "budgets": { "type": "object" }, "executed_checks": { "$ref": "#/$defs/stringSet" } } }, "capabilities": { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } }, "hardeningContract": { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields", "candidate_admission"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "module", "composition", "candidate_analysis"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] }, "candidate_admission": { "type": "object", "additionalProperties": false, "required": ["inventory_max_utf8_bytes", "inventory_max_lines", "inventory_max_tokens", "min_internal_cohesion", "max_external_edge_count", "external_edge_policy", "max_overlap_shared_modules", "require_ssot_closure", "require_four_host_denominator", "reject_all_hosts_unsupported", "require_declared_projection", "hop_gate"], "properties": { "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 }, "inventory_max_lines": { "type": "integer", "minimum": 1 }, "inventory_max_tokens": { "type": "integer", "minimum": 1 }, "min_internal_cohesion": { "type": "number", "minimum": 0, "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)." }, "max_external_edge_count": { "type": "integer", "minimum": 0 }, "external_edge_policy": { "type": "object", "additionalProperties": false, "required": ["allowed_types"], "properties": { "allowed_types": { "type": "array", "uniqueItems": true, "items": { "enum": ["contrasts_with", "routes_to"] } } } }, "max_overlap_shared_modules": { "type": "integer", "minimum": 0, "description": "Max modules shared with any other accepted composition peer." }, "require_ssot_closure": { "type": "boolean" }, "require_four_host_denominator": { "type": "boolean" }, "reject_all_hosts_unsupported": { "type": "boolean" }, "require_declared_projection": { "type": "boolean", "description": "Declared full/partial host_coverage must pass planSkillProjection at that level." }, "hop_gate": { "const": "directed_projection_topology", "description": "Admission uses directed projection topology (SCC=1 + diameter). Undirected is observational only." } } } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } }, "unassignedKnowledge": { "description": "\u56FE\u4E0A\u6709\u3001\u4F46\u5C1A\u672A\u8FDB\u5165\u4EFB\u4F55 skill \u7684\u77E5\u8BC6\uFF1Alifecycle.state \u4E3A draft \u4E14\u65E0\u6D88\u8D39\u8005\u7684\u6A21\u5757\u3002\u77E5\u8BC6\u7684\u5B58\u5728\u6027\u4E0E\u5B83\u662F\u5426\u88AB\u5206\u53D1\u662F\u4E24\u4EF6\u6B63\u4EA4\u7684\u4E8B\uFF0C\u6545\u8FD9\u7C7B\u6A21\u5757\u5408\u6CD5\uFF1B\u4F46\u300C\u5141\u8BB8\u5B58\u5728\u300D\u4E0D\u80FD\u6ED1\u6210\u300C\u5141\u8BB8\u88AB\u9057\u5FD8\u300D\uFF0C\u6240\u4EE5\u5B83\u5FC5\u987B\u5728\u62A5\u544A\u91CC\u6301\u7EED\u53EF\u89C1\u3002", "type": "object", "additionalProperties": false, "required": ["module_count", "point_count", "modules"], "properties": { "module_count": { "type": "integer", "minimum": 0 }, "point_count": { "type": "integer", "minimum": 0 }, "modules": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "title", "points", "since"], "properties": { "id": { "type": "string", "pattern": "^module:[a-z0-9][a-z0-9.-]*$" }, "title": { "type": ["string", "null"] }, "points": { "type": "integer", "minimum": 0 }, "since": { "type": ["string", "null"] } } } } } }, "failureModeCounts": { "type": "object", "propertyNames": { "enum": ["capability_gap", "environment_fact", "prosthetic", "motivation_conflict"] }, "additionalProperties": { "type": "integer", "minimum": 0 } }, "failureModePercentages": { "type": "object", "propertyNames": { "enum": ["capability_gap", "environment_fact", "prosthetic", "motivation_conflict"] }, "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 } }, "failureModeProfile": { "description": "\u62A5\u544A\u4FA7\u753B\u50CF\uFF1A\u6BCF\u4E2A\u70B9\u6309 failure_mode \u5206\u6876\u7684\u6784\u6210\uFF0C\u5168\u56FE\u4E00\u4EFD\u3001\u6BCF\u4E2A\u6D88\u8D39\u5B83\u7684 skill \u4E00\u4EFD\u3002\u7528\u9014\u662F\u8BA9\u300C\u8FD9\u4E2A skill \u4E3B\u8981\u5728\u8865\u73AF\u5883\u4E8B\u5B9E\uFF0C\u8FD8\u662F\u5728\u7ACB\u62A4\u680F\u300D\u4E00\u773C\u53EF\u89C1\u3002\u8BA1\u6570\u9010\u5B57\u53D6\u81EA point.failure_mode\uFF0C\u4E0D\u5728\u6B64\u5904\u63A8\u5BFC\u3002", "type": "object", "additionalProperties": false, "required": ["total_points", "overall", "by_skill"], "properties": { "total_points": { "type": "integer", "minimum": 0 }, "overall": { "type": "object", "additionalProperties": false, "required": ["counts", "percentages"], "properties": { "counts": { "$ref": "#/$defs/failureModeCounts" }, "percentages": { "$ref": "#/$defs/failureModePercentages" } } }, "by_skill": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["skill_id", "total", "counts", "percentages"], "properties": { "skill_id": { "type": ["string", "null"], "pattern": "^skill:[a-z0-9]+(-[a-z0-9]+)*$" }, "total": { "type": "integer", "minimum": 0 }, "counts": { "$ref": "#/$defs/failureModeCounts" }, "percentages": { "$ref": "#/$defs/failureModePercentages" } } } } } }, "structuralStatus": { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } }, "behavioralEvidenceStatus": { "type": "object", "additionalProperties": false, "required": ["state", "evidence"], "properties": { "state": { "enum": ["not_run", "baseline", "candidate", "holdout_verdict"] }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/repoPath" }, "uniqueItems": true }, "verdict": { "enum": ["improved", "regressed", "no_material_change", "inconclusive"] } }, "allOf": [{ "if": { "properties": { "state": { "const": "holdout_verdict" } }, "required": ["state"] }, "then": { "required": ["verdict"] } }] }, "pathQuery": { "type": "object", "additionalProperties": false, "required": ["from", "to", "host", "plane"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "host": { "type": "string", "minLength": 1 }, "plane": { "const": "navigation" } } }, "pathHop": { "type": "object", "additionalProperties": false, "required": ["from", "to", "edge_id", "type"], "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 }, "edge_id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 } } }, "pathResult": { "type": "object", "additionalProperties": false, "required": ["reachable", "hops", "witness"], "properties": { "reachable": { "type": "boolean" }, "hops": { "type": ["integer", "null"], "minimum": 0 }, "nodes": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "edges": { "type": "array", "items": { "$ref": "#/$defs/pathHop" } }, "witness": { "type": "object" } }, "allOf": [{ "if": { "properties": { "reachable": { "const": true } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "integer", "minimum": 0 } } } }, { "if": { "properties": { "reachable": { "const": false } }, "required": ["reachable"] }, "then": { "properties": { "hops": { "type": "null" } } } }] }, "explainedEntity": { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "anchor_path": { "type": ["string", "null"] }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } }, "summary": { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "composition": { "type": "integer", "minimum": 0 }, "candidate_analysis": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } }, "diagnostic": { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } } } };
 var schema42 = { "type": "object", "additionalProperties": false, "required": ["id", "kind"], "properties": { "id": { "type": "string", "minLength": 1 }, "kind": { "enum": ["portfolio", "skill", "module", "point", "edge", "entry", "diagnostic"] }, "module": { "type": "string", "minLength": 1 }, "authority": { "type": "object" }, "binding": { "type": "object" }, "anchor_path": { "type": ["string", "null"] }, "recognition_cues": { "type": "array", "items": { "type": "string" } }, "inbound": { "type": "array", "items": { "type": "string" } }, "outbound": { "type": "array", "items": { "type": "string" } }, "access": { "type": "object" }, "witness": { "type": "object" } } };
 var schema58 = { "type": "object", "additionalProperties": false, "required": ["documents", "portfolio", "skill", "module", "change", "errors", "debts"], "properties": { "documents": { "type": "integer", "minimum": 0 }, "portfolio": { "type": "integer", "minimum": 0 }, "skill": { "type": "integer", "minimum": 0 }, "module": { "type": "integer", "minimum": 0 }, "composition": { "type": "integer", "minimum": 0 }, "candidate_analysis": { "type": "integer", "minimum": 0 }, "change": { "type": "integer", "minimum": 0 }, "errors": { "type": "integer", "minimum": 0 }, "debts": { "type": "integer", "minimum": 0 } } };
 var schema59 = { "type": "object", "additionalProperties": false, "required": ["source_json_parse", "source_envelope_validation", "global_id_uniqueness", "full_json_schema_validation", "markdown_binding", "graph_invariants", "runtime_projection", "hop_analysis", "typed_change_transactions", "entry_surface_binding", "canonical_source_inventory", "derived_freshness", "canonical_graph_hash", "deterministic_budget_estimator", "host_portability_probe", "semantic_coverage", "behavioral_evidence_tracking"], "properties": { "source_json_parse": { "type": "boolean" }, "source_envelope_validation": { "type": "boolean" }, "global_id_uniqueness": { "type": "boolean" }, "full_json_schema_validation": { "type": "boolean" }, "markdown_binding": { "type": "boolean" }, "graph_invariants": { "type": "boolean" }, "runtime_projection": { "type": "boolean" }, "hop_analysis": { "type": "boolean" }, "typed_change_transactions": { "type": "boolean" }, "entry_surface_binding": { "type": "boolean" }, "canonical_source_inventory": { "type": "boolean" }, "derived_freshness": { "type": "boolean" }, "canonical_graph_hash": { "type": "boolean" }, "deterministic_budget_estimator": { "type": "boolean" }, "host_portability_probe": { "type": "boolean" }, "semantic_coverage": { "type": "boolean" }, "behavioral_evidence_tracking": { "type": "boolean" } } };
 var schema60 = { "type": "object", "additionalProperties": false, "required": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14"], "properties": { "C1": { "type": "object", "additionalProperties": false, "required": ["entry_surface_fields"], "properties": { "entry_surface_fields": { "const": ["host", "source_file", "binding", "surface_kind", "targets", "lifecycle"] } } }, "C2": { "type": "object", "additionalProperties": false, "required": ["coverage_states", "denominator"], "properties": { "coverage_states": { "const": ["full", "partial", "non_knowledge", "excluded"] }, "denominator": { "const": "git_canonical_markdown" } } }, "C3": { "type": "object", "additionalProperties": false, "required": ["derived_fields"], "properties": { "derived_fields": { "const": ["canonical", "review_policy", "reviewed_canonical_sha256"] } } }, "C4": { "type": "object", "additionalProperties": false, "required": ["accepted_skill_requires_admission"], "properties": { "accepted_skill_requires_admission": { "const": true } } }, "C5": { "type": "object", "additionalProperties": false, "required": ["change_workflow", "workspace_root"], "properties": { "change_workflow": { "const": ["begin", "validate", "apply"] }, "workspace_root": { "const": ".skill-knowledge/workspaces/<change-id>" } } }, "C6": { "type": "object", "additionalProperties": false, "required": ["algorithm", "authored_manifest_kinds", "change_head_digest_excludes", "identity_set_fields", "semantic_order_fields", "candidate_admission"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-canonical-graph-hash/v1" }, "authored_manifest_kinds": { "const": ["portfolio", "module", "composition", "candidate_analysis"] }, "change_head_digest_excludes": { "const": ["result_graph_sha256"] }, "identity_set_fields": { "const": ["skills", "modules", "points", "edges", "entries", "canonical_source_inventory", "inventory", "entry_modules", "relevant_entries", "primary_points", "point_ids"] }, "semantic_order_fields": { "const": ["operations", "when", "avoid_when", "recognition_cues", "includes", "excludes", "unresolved_coverage_debt", "evidence", "verifiers", "targets", "results", "edge_rewrites", "surfaces", "host_coverage", "runtime_hosts", "scope"] }, "candidate_admission": { "type": "object", "additionalProperties": false, "required": ["inventory_max_utf8_bytes", "inventory_max_lines", "inventory_max_tokens", "min_internal_cohesion", "max_external_edge_count", "external_edge_policy", "max_overlap_shared_modules", "require_ssot_closure", "require_four_host_denominator", "reject_all_hosts_unsupported", "require_declared_projection", "hop_gate"], "properties": { "inventory_max_utf8_bytes": { "type": "integer", "minimum": 1 }, "inventory_max_lines": { "type": "integer", "minimum": 1 }, "inventory_max_tokens": { "type": "integer", "minimum": 1 }, "min_internal_cohesion": { "type": "number", "minimum": 0, "description": "Minimum internal_edges/points ratio (single-node candidates are vacuously 1.0)." }, "max_external_edge_count": { "type": "integer", "minimum": 0 }, "external_edge_policy": { "type": "object", "additionalProperties": false, "required": ["allowed_types"], "properties": { "allowed_types": { "type": "array", "uniqueItems": true, "items": { "enum": ["contrasts_with", "routes_to"] } } } }, "max_overlap_shared_modules": { "type": "integer", "minimum": 0, "description": "Max modules shared with any other accepted composition peer." }, "require_ssot_closure": { "type": "boolean" }, "require_four_host_denominator": { "type": "boolean" }, "reject_all_hosts_unsupported": { "type": "boolean" }, "require_declared_projection": { "type": "boolean", "description": "Declared full/partial host_coverage must pass planSkillProjection at that level." }, "hop_gate": { "const": "directed_projection_topology", "description": "Admission uses directed projection topology (SCC=1 + diameter). Undirected is observational only." } } } } }, "C7": { "type": "object", "additionalProperties": false, "required": ["algorithm", "newline_normalization"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-markdown-span-hash/v1" }, "newline_normalization": { "const": "crlf-to-lf" } } }, "C8": { "type": "object", "additionalProperties": false, "required": ["algorithm", "formula"], "properties": { "algorithm": { "const": "cc-master/skill-knowledge-budget-estimator/v1" }, "formula": { "const": "ceil(utf8_bytes/3)" } } }, "C9": { "type": "object", "additionalProperties": false, "required": ["hosts", "worker_allowlist", "payload_modes", "anchor_form", "path_policy"], "properties": { "hosts": { "const": ["claude-code", "codex", "cursor", "kimi-code"] }, "worker_allowlist": { "const": ["codex", "cursor"] }, "payload_modes": { "const": ["canonical", "partial", "stub"] }, "anchor_form": { "const": "explicit-html-id" }, "path_policy": { "const": "relative-final-host-path" } } }, "C10": { "type": "object", "additionalProperties": false, "required": ["changed_scope_base_option", "immutable_chain"], "properties": { "changed_scope_base_option": { "const": "--base" }, "immutable_chain": { "const": true } } }, "C11": { "type": "object", "additionalProperties": false, "required": ["k2_allows_partial"], "properties": { "k2_allows_partial": { "const": false } } }, "C12": { "type": "object", "additionalProperties": false, "required": ["report_tracks"], "properties": { "report_tracks": { "const": ["structural_status", "behavioral_evidence_status"] } } }, "C13": { "type": "object", "additionalProperties": false, "required": ["research_supersession_required"], "properties": { "research_supersession_required": { "const": true } } }, "C14": { "type": "object", "additionalProperties": false, "required": ["runtime_skill_count", "governance_meta_skill_is_runtime"], "properties": { "runtime_skill_count": { "const": 8 }, "governance_meta_skill_is_runtime": { "const": false } } } } };
 var schema61 = { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "enum": ["pass", "fail", "debt", "not_run"] }, "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }, "graph_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } };
-var schema71 = { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } };
+var schema69 = { "description": "\u56FE\u4E0A\u6709\u3001\u4F46\u5C1A\u672A\u8FDB\u5165\u4EFB\u4F55 skill \u7684\u77E5\u8BC6\uFF1Alifecycle.state \u4E3A draft \u4E14\u65E0\u6D88\u8D39\u8005\u7684\u6A21\u5757\u3002\u77E5\u8BC6\u7684\u5B58\u5728\u6027\u4E0E\u5B83\u662F\u5426\u88AB\u5206\u53D1\u662F\u4E24\u4EF6\u6B63\u4EA4\u7684\u4E8B\uFF0C\u6545\u8FD9\u7C7B\u6A21\u5757\u5408\u6CD5\uFF1B\u4F46\u300C\u5141\u8BB8\u5B58\u5728\u300D\u4E0D\u80FD\u6ED1\u6210\u300C\u5141\u8BB8\u88AB\u9057\u5FD8\u300D\uFF0C\u6240\u4EE5\u5B83\u5FC5\u987B\u5728\u62A5\u544A\u91CC\u6301\u7EED\u53EF\u89C1\u3002", "type": "object", "additionalProperties": false, "required": ["module_count", "point_count", "modules"], "properties": { "module_count": { "type": "integer", "minimum": 0 }, "point_count": { "type": "integer", "minimum": 0 }, "modules": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "title", "points", "since"], "properties": { "id": { "type": "string", "pattern": "^module:[a-z0-9][a-z0-9.-]*$" }, "title": { "type": ["string", "null"] }, "points": { "type": "integer", "minimum": 0 }, "since": { "type": ["string", "null"] } } } } } };
+var schema72 = { "type": "object", "additionalProperties": false, "required": ["severity", "code", "message", "location", "witness", "remediation"], "properties": { "severity": { "enum": ["error", "warning", "debt", "info"] }, "code": { "type": "string", "pattern": "^SKG-[A-Z0-9-]+$" }, "message": { "type": "string", "minLength": 1 }, "location": { "type": "string", "minLength": 1 }, "witness": { "type": "object" }, "remediation": { "type": "string", "minLength": 1 } } };
 var func1 = require_ucs2length().default;
 var func3 = Object.prototype.hasOwnProperty;
 var func0 = require_equal().default;
 var pattern4 = new RegExp("^[a-f0-9]{64}$", "u");
 var pattern5 = new RegExp("^[A-Za-z0-9._<>/-]+$", "u");
-var pattern21 = new RegExp("^SKG-[A-Z0-9-]+$", "u");
+var pattern18 = new RegExp("^module:[a-z0-9][a-z0-9.-]*$", "u");
+var pattern22 = new RegExp("^SKG-[A-Z0-9-]+$", "u");
 var schema33 = { "type": "object", "additionalProperties": false, "required": ["host", "ok", "mode", "artifacts", "enabled_edges", "point_anchors", "hop_report", "budgets", "executed_checks"], "properties": { "host": { "type": "string", "minLength": 1 }, "ok": { "type": "boolean" }, "mode": { "type": "string", "minLength": 1 }, "artifacts": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "bytes"], "properties": { "path": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 0 } } } }, "enabled_edges": { "type": "integer", "minimum": 0 }, "point_anchors": { "type": "integer", "minimum": 0 }, "hop_report": { "type": "object", "additionalProperties": false, "required": ["H1", "H2", "H3", "H4"], "properties": { "H1": { "$ref": "#/$defs/hopGate" }, "H2": { "$ref": "#/$defs/hopGate" }, "H3": { "$ref": "#/$defs/hopGate" }, "H4": { "$ref": "#/$defs/hopGate" } } }, "budgets": { "type": "object" }, "executed_checks": { "$ref": "#/$defs/stringSet" } } };
 function validate21(data, { instancePath = "", parentData, parentDataProperty, rootData = data, dynamicAnchors = {} } = {}) {
   let vErrors = null;
@@ -3078,6 +3080,7 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
       props0.structural_status = true;
       props0.behavioral_evidence_status = true;
       props0.failure_mode_profile = true;
+      props0.unassigned_knowledge = true;
       props0.improvement_claim = true;
       props0.action = true;
       props0.workspace = true;
@@ -6724,11 +6727,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
         errors = vErrors.length;
       }
     }
-    if (data.improvement_claim !== void 0) {
-      let data167 = data.improvement_claim;
-      if (typeof data167 === "string") {
-        if (func1(data167) < 1) {
-          const err401 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+    if (data.unassigned_knowledge !== void 0) {
+      let data167 = data.unassigned_knowledge;
+      if (data167 && typeof data167 == "object" && !Array.isArray(data167)) {
+        if (data167.module_count === void 0) {
+          const err401 = { instancePath: instancePath + "/unassigned_knowledge", schemaPath: "#/$defs/unassignedKnowledge/required", keyword: "required", params: { missingProperty: "module_count" }, message: "must have required property 'module_count'" };
           if (vErrors === null) {
             vErrors = [err401];
           } else {
@@ -6736,200 +6739,206 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
-      } else {
-        const err402 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-        if (vErrors === null) {
-          vErrors = [err402];
-        } else {
-          vErrors.push(err402);
-        }
-        errors++;
-      }
-    }
-    if (data.action !== void 0) {
-      let data168 = data.action;
-      if (!(data168 === "begin" || data168 === "validate" || data168 === "apply")) {
-        const err403 = { instancePath: instancePath + "/action", schemaPath: "#/properties/action/enum", keyword: "enum", params: { allowedValues: schema31.properties.action.enum }, message: "must be equal to one of the allowed values" };
-        if (vErrors === null) {
-          vErrors = [err403];
-        } else {
-          vErrors.push(err403);
-        }
-        errors++;
-      }
-    }
-    if (data.workspace !== void 0) {
-      let data169 = data.workspace;
-      if (typeof data169 === "string") {
-        if (func1(data169) < 1) {
-          const err404 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+        if (data167.point_count === void 0) {
+          const err402 = { instancePath: instancePath + "/unassigned_knowledge", schemaPath: "#/$defs/unassignedKnowledge/required", keyword: "required", params: { missingProperty: "point_count" }, message: "must have required property 'point_count'" };
           if (vErrors === null) {
-            vErrors = [err404];
+            vErrors = [err402];
           } else {
-            vErrors.push(err404);
+            vErrors.push(err402);
           }
           errors++;
         }
-        if (!pattern5.test(data169)) {
-          const err405 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
+        if (data167.modules === void 0) {
+          const err403 = { instancePath: instancePath + "/unassigned_knowledge", schemaPath: "#/$defs/unassignedKnowledge/required", keyword: "required", params: { missingProperty: "modules" }, message: "must have required property 'modules'" };
           if (vErrors === null) {
-            vErrors = [err405];
+            vErrors = [err403];
           } else {
-            vErrors.push(err405);
+            vErrors.push(err403);
           }
           errors++;
         }
-      } else {
-        const err406 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-        if (vErrors === null) {
-          vErrors = [err406];
-        } else {
-          vErrors.push(err406);
-        }
-        errors++;
-      }
-    }
-    if (data.ledger_path !== void 0) {
-      let data170 = data.ledger_path;
-      if (typeof data170 === "string") {
-        if (func1(data170) < 1) {
-          const err407 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-          if (vErrors === null) {
-            vErrors = [err407];
-          } else {
-            vErrors.push(err407);
+        for (const key26 in data167) {
+          if (!(key26 === "module_count" || key26 === "point_count" || key26 === "modules")) {
+            const err404 = { instancePath: instancePath + "/unassigned_knowledge", schemaPath: "#/$defs/unassignedKnowledge/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key26 }, message: "must NOT have additional properties" };
+            if (vErrors === null) {
+              vErrors = [err404];
+            } else {
+              vErrors.push(err404);
+            }
+            errors++;
           }
-          errors++;
         }
-        if (!pattern5.test(data170)) {
-          const err408 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
-          if (vErrors === null) {
-            vErrors = [err408];
-          } else {
-            vErrors.push(err408);
+        if (data167.module_count !== void 0) {
+          let data168 = data167.module_count;
+          if (!(typeof data168 == "number" && (!(data168 % 1) && !isNaN(data168)))) {
+            const err405 = { instancePath: instancePath + "/unassigned_knowledge/module_count", schemaPath: "#/$defs/unassignedKnowledge/properties/module_count/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err405];
+            } else {
+              vErrors.push(err405);
+            }
+            errors++;
           }
-          errors++;
-        }
-      } else {
-        const err409 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-        if (vErrors === null) {
-          vErrors = [err409];
-        } else {
-          vErrors.push(err409);
-        }
-        errors++;
-      }
-    }
-    if (data.result_graph_sha256 !== void 0) {
-      let data171 = data.result_graph_sha256;
-      if (typeof data171 === "string") {
-        if (!pattern4.test(data171)) {
-          const err410 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
-          if (vErrors === null) {
-            vErrors = [err410];
-          } else {
-            vErrors.push(err410);
+          if (typeof data168 == "number") {
+            if (data168 < 0 || isNaN(data168)) {
+              const err406 = { instancePath: instancePath + "/unassigned_knowledge/module_count", schemaPath: "#/$defs/unassignedKnowledge/properties/module_count/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              if (vErrors === null) {
+                vErrors = [err406];
+              } else {
+                vErrors.push(err406);
+              }
+              errors++;
+            }
           }
-          errors++;
         }
-      } else {
-        const err411 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-        if (vErrors === null) {
-          vErrors = [err411];
-        } else {
-          vErrors.push(err411);
+        if (data167.point_count !== void 0) {
+          let data169 = data167.point_count;
+          if (!(typeof data169 == "number" && (!(data169 % 1) && !isNaN(data169)))) {
+            const err407 = { instancePath: instancePath + "/unassigned_knowledge/point_count", schemaPath: "#/$defs/unassignedKnowledge/properties/point_count/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+            if (vErrors === null) {
+              vErrors = [err407];
+            } else {
+              vErrors.push(err407);
+            }
+            errors++;
+          }
+          if (typeof data169 == "number") {
+            if (data169 < 0 || isNaN(data169)) {
+              const err408 = { instancePath: instancePath + "/unassigned_knowledge/point_count", schemaPath: "#/$defs/unassignedKnowledge/properties/point_count/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+              if (vErrors === null) {
+                vErrors = [err408];
+              } else {
+                vErrors.push(err408);
+              }
+              errors++;
+            }
+          }
         }
-        errors++;
-      }
-    }
-    if (data.validation !== void 0) {
-      let data172 = data.validation;
-      if (!(data172 && typeof data172 == "object" && !Array.isArray(data172))) {
-        const err412 = { instancePath: instancePath + "/validation", schemaPath: "#/properties/validation/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-        if (vErrors === null) {
-          vErrors = [err412];
-        } else {
-          vErrors.push(err412);
-        }
-        errors++;
-      }
-    }
-    if (data.diagnostics !== void 0) {
-      let data173 = data.diagnostics;
-      if (Array.isArray(data173)) {
-        const len11 = data173.length;
-        for (let i18 = 0; i18 < len11; i18++) {
-          let data174 = data173[i18];
-          if (data174 && typeof data174 == "object" && !Array.isArray(data174)) {
-            if (data174.severity === void 0) {
-              const err413 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
-              if (vErrors === null) {
-                vErrors = [err413];
-              } else {
-                vErrors.push(err413);
-              }
-              errors++;
-            }
-            if (data174.code === void 0) {
-              const err414 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
-              if (vErrors === null) {
-                vErrors = [err414];
-              } else {
-                vErrors.push(err414);
-              }
-              errors++;
-            }
-            if (data174.message === void 0) {
-              const err415 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
-              if (vErrors === null) {
-                vErrors = [err415];
-              } else {
-                vErrors.push(err415);
-              }
-              errors++;
-            }
-            if (data174.location === void 0) {
-              const err416 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
-              if (vErrors === null) {
-                vErrors = [err416];
-              } else {
-                vErrors.push(err416);
-              }
-              errors++;
-            }
-            if (data174.witness === void 0) {
-              const err417 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
-              if (vErrors === null) {
-                vErrors = [err417];
-              } else {
-                vErrors.push(err417);
-              }
-              errors++;
-            }
-            if (data174.remediation === void 0) {
-              const err418 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
-              if (vErrors === null) {
-                vErrors = [err418];
-              } else {
-                vErrors.push(err418);
-              }
-              errors++;
-            }
-            for (const key26 in data174) {
-              if (!(key26 === "severity" || key26 === "code" || key26 === "message" || key26 === "location" || key26 === "witness" || key26 === "remediation")) {
-                const err419 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key26 }, message: "must NOT have additional properties" };
-                if (vErrors === null) {
-                  vErrors = [err419];
-                } else {
-                  vErrors.push(err419);
+        if (data167.modules !== void 0) {
+          let data170 = data167.modules;
+          if (Array.isArray(data170)) {
+            const len11 = data170.length;
+            for (let i18 = 0; i18 < len11; i18++) {
+              let data171 = data170[i18];
+              if (data171 && typeof data171 == "object" && !Array.isArray(data171)) {
+                if (data171.id === void 0) {
+                  const err409 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/required", keyword: "required", params: { missingProperty: "id" }, message: "must have required property 'id'" };
+                  if (vErrors === null) {
+                    vErrors = [err409];
+                  } else {
+                    vErrors.push(err409);
+                  }
+                  errors++;
                 }
-                errors++;
-              }
-            }
-            if (data174.severity !== void 0) {
-              let data175 = data174.severity;
-              if (!(data175 === "error" || data175 === "warning" || data175 === "debt" || data175 === "info")) {
-                const err420 = { instancePath: instancePath + "/diagnostics/" + i18 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema71.properties.severity.enum }, message: "must be equal to one of the allowed values" };
+                if (data171.title === void 0) {
+                  const err410 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/required", keyword: "required", params: { missingProperty: "title" }, message: "must have required property 'title'" };
+                  if (vErrors === null) {
+                    vErrors = [err410];
+                  } else {
+                    vErrors.push(err410);
+                  }
+                  errors++;
+                }
+                if (data171.points === void 0) {
+                  const err411 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/required", keyword: "required", params: { missingProperty: "points" }, message: "must have required property 'points'" };
+                  if (vErrors === null) {
+                    vErrors = [err411];
+                  } else {
+                    vErrors.push(err411);
+                  }
+                  errors++;
+                }
+                if (data171.since === void 0) {
+                  const err412 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/required", keyword: "required", params: { missingProperty: "since" }, message: "must have required property 'since'" };
+                  if (vErrors === null) {
+                    vErrors = [err412];
+                  } else {
+                    vErrors.push(err412);
+                  }
+                  errors++;
+                }
+                for (const key27 in data171) {
+                  if (!(key27 === "id" || key27 === "title" || key27 === "points" || key27 === "since")) {
+                    const err413 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key27 }, message: "must NOT have additional properties" };
+                    if (vErrors === null) {
+                      vErrors = [err413];
+                    } else {
+                      vErrors.push(err413);
+                    }
+                    errors++;
+                  }
+                }
+                if (data171.id !== void 0) {
+                  let data172 = data171.id;
+                  if (typeof data172 === "string") {
+                    if (!pattern18.test(data172)) {
+                      const err414 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/id", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/id/pattern", keyword: "pattern", params: { pattern: "^module:[a-z0-9][a-z0-9.-]*$" }, message: 'must match pattern "^module:[a-z0-9][a-z0-9.-]*$"' };
+                      if (vErrors === null) {
+                        vErrors = [err414];
+                      } else {
+                        vErrors.push(err414);
+                      }
+                      errors++;
+                    }
+                  } else {
+                    const err415 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/id", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/id/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                    if (vErrors === null) {
+                      vErrors = [err415];
+                    } else {
+                      vErrors.push(err415);
+                    }
+                    errors++;
+                  }
+                }
+                if (data171.title !== void 0) {
+                  let data173 = data171.title;
+                  if (typeof data173 !== "string" && data173 !== null) {
+                    const err416 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/title", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/title/type", keyword: "type", params: { type: schema69.properties.modules.items.properties.title.type }, message: "must be string,null" };
+                    if (vErrors === null) {
+                      vErrors = [err416];
+                    } else {
+                      vErrors.push(err416);
+                    }
+                    errors++;
+                  }
+                }
+                if (data171.points !== void 0) {
+                  let data174 = data171.points;
+                  if (!(typeof data174 == "number" && (!(data174 % 1) && !isNaN(data174)))) {
+                    const err417 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/points", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/points/type", keyword: "type", params: { type: "integer" }, message: "must be integer" };
+                    if (vErrors === null) {
+                      vErrors = [err417];
+                    } else {
+                      vErrors.push(err417);
+                    }
+                    errors++;
+                  }
+                  if (typeof data174 == "number") {
+                    if (data174 < 0 || isNaN(data174)) {
+                      const err418 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/points", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/points/minimum", keyword: "minimum", params: { comparison: ">=", limit: 0 }, message: "must be >= 0" };
+                      if (vErrors === null) {
+                        vErrors = [err418];
+                      } else {
+                        vErrors.push(err418);
+                      }
+                      errors++;
+                    }
+                  }
+                }
+                if (data171.since !== void 0) {
+                  let data175 = data171.since;
+                  if (typeof data175 !== "string" && data175 !== null) {
+                    const err419 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18 + "/since", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/properties/since/type", keyword: "type", params: { type: schema69.properties.modules.items.properties.since.type }, message: "must be string,null" };
+                    if (vErrors === null) {
+                      vErrors = [err419];
+                    } else {
+                      vErrors.push(err419);
+                    }
+                    errors++;
+                  }
+                }
+              } else {
+                const err420 = { instancePath: instancePath + "/unassigned_knowledge/modules/" + i18, schemaPath: "#/$defs/unassignedKnowledge/properties/modules/items/type", keyword: "type", params: { type: "object" }, message: "must be object" };
                 if (vErrors === null) {
                   vErrors = [err420];
                 } else {
@@ -6938,118 +6947,114 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
                 errors++;
               }
             }
-            if (data174.code !== void 0) {
-              let data176 = data174.code;
-              if (typeof data176 === "string") {
-                if (!pattern21.test(data176)) {
-                  const err421 = { instancePath: instancePath + "/diagnostics/" + i18 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
-                  if (vErrors === null) {
-                    vErrors = [err421];
-                  } else {
-                    vErrors.push(err421);
-                  }
-                  errors++;
-                }
-              } else {
-                const err422 = { instancePath: instancePath + "/diagnostics/" + i18 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err422];
-                } else {
-                  vErrors.push(err422);
-                }
-                errors++;
-              }
-            }
-            if (data174.message !== void 0) {
-              let data177 = data174.message;
-              if (typeof data177 === "string") {
-                if (func1(data177) < 1) {
-                  const err423 = { instancePath: instancePath + "/diagnostics/" + i18 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-                  if (vErrors === null) {
-                    vErrors = [err423];
-                  } else {
-                    vErrors.push(err423);
-                  }
-                  errors++;
-                }
-              } else {
-                const err424 = { instancePath: instancePath + "/diagnostics/" + i18 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err424];
-                } else {
-                  vErrors.push(err424);
-                }
-                errors++;
-              }
-            }
-            if (data174.location !== void 0) {
-              let data178 = data174.location;
-              if (typeof data178 === "string") {
-                if (func1(data178) < 1) {
-                  const err425 = { instancePath: instancePath + "/diagnostics/" + i18 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-                  if (vErrors === null) {
-                    vErrors = [err425];
-                  } else {
-                    vErrors.push(err425);
-                  }
-                  errors++;
-                }
-              } else {
-                const err426 = { instancePath: instancePath + "/diagnostics/" + i18 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err426];
-                } else {
-                  vErrors.push(err426);
-                }
-                errors++;
-              }
-            }
-            if (data174.witness !== void 0) {
-              let data179 = data174.witness;
-              if (!(data179 && typeof data179 == "object" && !Array.isArray(data179))) {
-                const err427 = { instancePath: instancePath + "/diagnostics/" + i18 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
-                if (vErrors === null) {
-                  vErrors = [err427];
-                } else {
-                  vErrors.push(err427);
-                }
-                errors++;
-              }
-            }
-            if (data174.remediation !== void 0) {
-              let data180 = data174.remediation;
-              if (typeof data180 === "string") {
-                if (func1(data180) < 1) {
-                  const err428 = { instancePath: instancePath + "/diagnostics/" + i18 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
-                  if (vErrors === null) {
-                    vErrors = [err428];
-                  } else {
-                    vErrors.push(err428);
-                  }
-                  errors++;
-                }
-              } else {
-                const err429 = { instancePath: instancePath + "/diagnostics/" + i18 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
-                if (vErrors === null) {
-                  vErrors = [err429];
-                } else {
-                  vErrors.push(err429);
-                }
-                errors++;
-              }
-            }
           } else {
-            const err430 = { instancePath: instancePath + "/diagnostics/" + i18, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            const err421 = { instancePath: instancePath + "/unassigned_knowledge/modules", schemaPath: "#/$defs/unassignedKnowledge/properties/modules/type", keyword: "type", params: { type: "array" }, message: "must be array" };
             if (vErrors === null) {
-              vErrors = [err430];
+              vErrors = [err421];
             } else {
-              vErrors.push(err430);
+              vErrors.push(err421);
             }
             errors++;
           }
         }
       } else {
-        const err431 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
+        const err422 = { instancePath: instancePath + "/unassigned_knowledge", schemaPath: "#/$defs/unassignedKnowledge/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        if (vErrors === null) {
+          vErrors = [err422];
+        } else {
+          vErrors.push(err422);
+        }
+        errors++;
+      }
+    }
+    if (data.improvement_claim !== void 0) {
+      let data176 = data.improvement_claim;
+      if (typeof data176 === "string") {
+        if (func1(data176) < 1) {
+          const err423 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+          if (vErrors === null) {
+            vErrors = [err423];
+          } else {
+            vErrors.push(err423);
+          }
+          errors++;
+        }
+      } else {
+        const err424 = { instancePath: instancePath + "/improvement_claim", schemaPath: "#/properties/improvement_claim/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        if (vErrors === null) {
+          vErrors = [err424];
+        } else {
+          vErrors.push(err424);
+        }
+        errors++;
+      }
+    }
+    if (data.action !== void 0) {
+      let data177 = data.action;
+      if (!(data177 === "begin" || data177 === "validate" || data177 === "apply")) {
+        const err425 = { instancePath: instancePath + "/action", schemaPath: "#/properties/action/enum", keyword: "enum", params: { allowedValues: schema31.properties.action.enum }, message: "must be equal to one of the allowed values" };
+        if (vErrors === null) {
+          vErrors = [err425];
+        } else {
+          vErrors.push(err425);
+        }
+        errors++;
+      }
+    }
+    if (data.workspace !== void 0) {
+      let data178 = data.workspace;
+      if (typeof data178 === "string") {
+        if (func1(data178) < 1) {
+          const err426 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+          if (vErrors === null) {
+            vErrors = [err426];
+          } else {
+            vErrors.push(err426);
+          }
+          errors++;
+        }
+        if (!pattern5.test(data178)) {
+          const err427 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
+          if (vErrors === null) {
+            vErrors = [err427];
+          } else {
+            vErrors.push(err427);
+          }
+          errors++;
+        }
+      } else {
+        const err428 = { instancePath: instancePath + "/workspace", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        if (vErrors === null) {
+          vErrors = [err428];
+        } else {
+          vErrors.push(err428);
+        }
+        errors++;
+      }
+    }
+    if (data.ledger_path !== void 0) {
+      let data179 = data.ledger_path;
+      if (typeof data179 === "string") {
+        if (func1(data179) < 1) {
+          const err429 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+          if (vErrors === null) {
+            vErrors = [err429];
+          } else {
+            vErrors.push(err429);
+          }
+          errors++;
+        }
+        if (!pattern5.test(data179)) {
+          const err430 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/pattern", keyword: "pattern", params: { pattern: "^[A-Za-z0-9._<>/-]+$" }, message: 'must match pattern "^[A-Za-z0-9._<>/-]+$"' };
+          if (vErrors === null) {
+            vErrors = [err430];
+          } else {
+            vErrors.push(err430);
+          }
+          errors++;
+        }
+      } else {
+        const err431 = { instancePath: instancePath + "/ledger_path", schemaPath: "#/$defs/repoPath/type", keyword: "type", params: { type: "string" }, message: "must be string" };
         if (vErrors === null) {
           vErrors = [err431];
         } else {
@@ -7058,10 +7063,11 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
         errors++;
       }
     }
-    if (props0 !== true) {
-      for (const key27 in data) {
-        if (!props0 || !props0[key27]) {
-          const err432 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key27 }, message: "must NOT have unevaluated properties" };
+    if (data.result_graph_sha256 !== void 0) {
+      let data180 = data.result_graph_sha256;
+      if (typeof data180 === "string") {
+        if (!pattern4.test(data180)) {
+          const err432 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/pattern", keyword: "pattern", params: { pattern: "^[a-f0-9]{64}$" }, message: 'must match pattern "^[a-f0-9]{64}$"' };
           if (vErrors === null) {
             vErrors = [err432];
           } else {
@@ -7069,14 +7075,251 @@ function validate20(data, { instancePath = "", parentData, parentDataProperty, r
           }
           errors++;
         }
+      } else {
+        const err433 = { instancePath: instancePath + "/result_graph_sha256", schemaPath: "#/properties/result_graph_sha256/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+        if (vErrors === null) {
+          vErrors = [err433];
+        } else {
+          vErrors.push(err433);
+        }
+        errors++;
+      }
+    }
+    if (data.validation !== void 0) {
+      let data181 = data.validation;
+      if (!(data181 && typeof data181 == "object" && !Array.isArray(data181))) {
+        const err434 = { instancePath: instancePath + "/validation", schemaPath: "#/properties/validation/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+        if (vErrors === null) {
+          vErrors = [err434];
+        } else {
+          vErrors.push(err434);
+        }
+        errors++;
+      }
+    }
+    if (data.diagnostics !== void 0) {
+      let data182 = data.diagnostics;
+      if (Array.isArray(data182)) {
+        const len12 = data182.length;
+        for (let i19 = 0; i19 < len12; i19++) {
+          let data183 = data182[i19];
+          if (data183 && typeof data183 == "object" && !Array.isArray(data183)) {
+            if (data183.severity === void 0) {
+              const err435 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "severity" }, message: "must have required property 'severity'" };
+              if (vErrors === null) {
+                vErrors = [err435];
+              } else {
+                vErrors.push(err435);
+              }
+              errors++;
+            }
+            if (data183.code === void 0) {
+              const err436 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "code" }, message: "must have required property 'code'" };
+              if (vErrors === null) {
+                vErrors = [err436];
+              } else {
+                vErrors.push(err436);
+              }
+              errors++;
+            }
+            if (data183.message === void 0) {
+              const err437 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "message" }, message: "must have required property 'message'" };
+              if (vErrors === null) {
+                vErrors = [err437];
+              } else {
+                vErrors.push(err437);
+              }
+              errors++;
+            }
+            if (data183.location === void 0) {
+              const err438 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "location" }, message: "must have required property 'location'" };
+              if (vErrors === null) {
+                vErrors = [err438];
+              } else {
+                vErrors.push(err438);
+              }
+              errors++;
+            }
+            if (data183.witness === void 0) {
+              const err439 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "witness" }, message: "must have required property 'witness'" };
+              if (vErrors === null) {
+                vErrors = [err439];
+              } else {
+                vErrors.push(err439);
+              }
+              errors++;
+            }
+            if (data183.remediation === void 0) {
+              const err440 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/required", keyword: "required", params: { missingProperty: "remediation" }, message: "must have required property 'remediation'" };
+              if (vErrors === null) {
+                vErrors = [err440];
+              } else {
+                vErrors.push(err440);
+              }
+              errors++;
+            }
+            for (const key28 in data183) {
+              if (!(key28 === "severity" || key28 === "code" || key28 === "message" || key28 === "location" || key28 === "witness" || key28 === "remediation")) {
+                const err441 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/additionalProperties", keyword: "additionalProperties", params: { additionalProperty: key28 }, message: "must NOT have additional properties" };
+                if (vErrors === null) {
+                  vErrors = [err441];
+                } else {
+                  vErrors.push(err441);
+                }
+                errors++;
+              }
+            }
+            if (data183.severity !== void 0) {
+              let data184 = data183.severity;
+              if (!(data184 === "error" || data184 === "warning" || data184 === "debt" || data184 === "info")) {
+                const err442 = { instancePath: instancePath + "/diagnostics/" + i19 + "/severity", schemaPath: "#/$defs/diagnostic/properties/severity/enum", keyword: "enum", params: { allowedValues: schema72.properties.severity.enum }, message: "must be equal to one of the allowed values" };
+                if (vErrors === null) {
+                  vErrors = [err442];
+                } else {
+                  vErrors.push(err442);
+                }
+                errors++;
+              }
+            }
+            if (data183.code !== void 0) {
+              let data185 = data183.code;
+              if (typeof data185 === "string") {
+                if (!pattern22.test(data185)) {
+                  const err443 = { instancePath: instancePath + "/diagnostics/" + i19 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/pattern", keyword: "pattern", params: { pattern: "^SKG-[A-Z0-9-]+$" }, message: 'must match pattern "^SKG-[A-Z0-9-]+$"' };
+                  if (vErrors === null) {
+                    vErrors = [err443];
+                  } else {
+                    vErrors.push(err443);
+                  }
+                  errors++;
+                }
+              } else {
+                const err444 = { instancePath: instancePath + "/diagnostics/" + i19 + "/code", schemaPath: "#/$defs/diagnostic/properties/code/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err444];
+                } else {
+                  vErrors.push(err444);
+                }
+                errors++;
+              }
+            }
+            if (data183.message !== void 0) {
+              let data186 = data183.message;
+              if (typeof data186 === "string") {
+                if (func1(data186) < 1) {
+                  const err445 = { instancePath: instancePath + "/diagnostics/" + i19 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err445];
+                  } else {
+                    vErrors.push(err445);
+                  }
+                  errors++;
+                }
+              } else {
+                const err446 = { instancePath: instancePath + "/diagnostics/" + i19 + "/message", schemaPath: "#/$defs/diagnostic/properties/message/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err446];
+                } else {
+                  vErrors.push(err446);
+                }
+                errors++;
+              }
+            }
+            if (data183.location !== void 0) {
+              let data187 = data183.location;
+              if (typeof data187 === "string") {
+                if (func1(data187) < 1) {
+                  const err447 = { instancePath: instancePath + "/diagnostics/" + i19 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err447];
+                  } else {
+                    vErrors.push(err447);
+                  }
+                  errors++;
+                }
+              } else {
+                const err448 = { instancePath: instancePath + "/diagnostics/" + i19 + "/location", schemaPath: "#/$defs/diagnostic/properties/location/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err448];
+                } else {
+                  vErrors.push(err448);
+                }
+                errors++;
+              }
+            }
+            if (data183.witness !== void 0) {
+              let data188 = data183.witness;
+              if (!(data188 && typeof data188 == "object" && !Array.isArray(data188))) {
+                const err449 = { instancePath: instancePath + "/diagnostics/" + i19 + "/witness", schemaPath: "#/$defs/diagnostic/properties/witness/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+                if (vErrors === null) {
+                  vErrors = [err449];
+                } else {
+                  vErrors.push(err449);
+                }
+                errors++;
+              }
+            }
+            if (data183.remediation !== void 0) {
+              let data189 = data183.remediation;
+              if (typeof data189 === "string") {
+                if (func1(data189) < 1) {
+                  const err450 = { instancePath: instancePath + "/diagnostics/" + i19 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/minLength", keyword: "minLength", params: { limit: 1 }, message: "must NOT have fewer than 1 characters" };
+                  if (vErrors === null) {
+                    vErrors = [err450];
+                  } else {
+                    vErrors.push(err450);
+                  }
+                  errors++;
+                }
+              } else {
+                const err451 = { instancePath: instancePath + "/diagnostics/" + i19 + "/remediation", schemaPath: "#/$defs/diagnostic/properties/remediation/type", keyword: "type", params: { type: "string" }, message: "must be string" };
+                if (vErrors === null) {
+                  vErrors = [err451];
+                } else {
+                  vErrors.push(err451);
+                }
+                errors++;
+              }
+            }
+          } else {
+            const err452 = { instancePath: instancePath + "/diagnostics/" + i19, schemaPath: "#/$defs/diagnostic/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+            if (vErrors === null) {
+              vErrors = [err452];
+            } else {
+              vErrors.push(err452);
+            }
+            errors++;
+          }
+        }
+      } else {
+        const err453 = { instancePath: instancePath + "/diagnostics", schemaPath: "#/properties/diagnostics/type", keyword: "type", params: { type: "array" }, message: "must be array" };
+        if (vErrors === null) {
+          vErrors = [err453];
+        } else {
+          vErrors.push(err453);
+        }
+        errors++;
+      }
+    }
+    if (props0 !== true) {
+      for (const key29 in data) {
+        if (!props0 || !props0[key29]) {
+          const err454 = { instancePath, schemaPath: "#/unevaluatedProperties", keyword: "unevaluatedProperties", params: { unevaluatedProperty: key29 }, message: "must NOT have unevaluated properties" };
+          if (vErrors === null) {
+            vErrors = [err454];
+          } else {
+            vErrors.push(err454);
+          }
+          errors++;
+        }
       }
     }
   } else {
-    const err433 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
+    const err455 = { instancePath, schemaPath: "#/type", keyword: "type", params: { type: "object" }, message: "must be object" };
     if (vErrors === null) {
-      vErrors = [err433];
+      vErrors = [err455];
     } else {
-      vErrors.push(err433);
+      vErrors.push(err455);
     }
     errors++;
   }

@@ -398,16 +398,30 @@ export function buildAndValidateGraph({
     }
   }
 
+  // 知识的存在性与它是否被分发，是两件正交的事。
+  //
+  // 这里曾无条件要求「每个模块都必须被某个 admitted composition 消费」，于是因果是反的——
+  // 先有 skill，知识才被允许存在。那让图退化成 skill 的索引，而不是独立的知识库。做一道菜
+  // 可以备一批食材，不强制每样都用上。
+  //
+  // 但也不能一刀放开：**有意留作备料的知识，和忘了接线的知识，在图上长得一模一样**。全放开
+  // 就从过严掉进过松，将来谁加了模块忘了归属，没有任何东西会提醒。
+  //
+  // 故以 `lifecycle.state: "draft"` 作为「尚未分配给任何 skill」的显式声明：
+  //   draft    + 无消费者  → 合法备料，不报错；由 report 单列，保持可见
+  //   accepted + 无消费者  → 仍是错误：它自称已定稿，却没有任何 skill 分发它
+  // 备料是有意为之，遗忘不是，两者必须分得开。
   for (const moduleDoc of modules) {
     const consumers = moduleConsumers.get(moduleDoc.id) ?? [];
-    if (!skipCompositionAdmission && consumers.length === 0) {
+    const unassignedByDesign = moduleDoc.data?.lifecycle?.state === 'draft';
+    if (!skipCompositionAdmission && consumers.length === 0 && !unassignedByDesign) {
       pushError(diagnostics, {
-        code: 'SKG-OWNERSHIP-ORPHAN',
-        message: `Global module is not consumed by any admitted composition: ${moduleDoc.id}`,
+        code: 'SKG-MODULE-UNCONSUMED',
+        message: `Accepted module is not consumed by any admitted composition: ${moduleDoc.id}`,
         location: moduleDoc.path,
-        witness: { module: moduleDoc.id, path: moduleDoc.path },
+        witness: { module: moduleDoc.id, path: moduleDoc.path, lifecycle: moduleDoc.data?.lifecycle?.state ?? null },
         remediation:
-          'Add the module to an accepted composition.consumes.modules list with derived admit.',
+          'Either add the module to an accepted composition.consumes.modules list, or mark it lifecycle.state="draft" to declare it as intentionally unassigned knowledge.',
         exitCode: 4,
       });
     }
@@ -468,6 +482,10 @@ export function buildAndValidateGraph({
     }
   }
 
+  // 这条与上面那条模块检查曾共用 `SKG-OWNERSHIP-ORPHAN` 一个码，但它们管的是两件不同的事：
+  //   模块无消费者     = 备了食材没用上 —— 未必是错误（见上）
+  //   skill 未被引用   = 菜做好了没上桌 —— 确实是错误，保留
+  // 同码导致两者无法区分、无法分别处置，故上面那条已改用 SKG-MODULE-UNCONSUMED，本条保持原码。
   for (const skillDoc of skills) {
     const skill = skillDoc.data;
     if (!portfolioSkillRefs.has(skill.id)) {

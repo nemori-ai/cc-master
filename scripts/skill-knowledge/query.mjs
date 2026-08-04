@@ -92,9 +92,34 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
     behavioral_evidence_status: behavioralEvidence,
     capabilities: { ...CAPABILITIES },
     ...(built.graph ? { failure_mode_profile: buildFailureModeProfile(built.graph) } : {}),
+    ...(built.graph ? { unassigned_knowledge: buildUnassignedKnowledge(built.graph) } : {}),
     diagnostics: publicDiagnostics(diagnostics),
   });
   return { exitCode, body };
+}
+
+/**
+ * 图上有、但尚未进入任何 skill 的知识。
+ *
+ * 允许模块以 `lifecycle.state:"draft"` 无消费者地存在（知识的存在性与是否被分发是两件事），
+ * 但"允许存在"不能滑成"允许被遗忘"——所以它必须在这里持续可见。备料是有意为之，遗忘不是；
+ * 这一节就是把前者摆在明面上，让后者无处藏身。
+ */
+function buildUnassignedKnowledge(graph) {
+  const modules = (graph.modules ?? []).filter(
+    (m) => m.lifecycle?.state === 'draft' && (m.consumers ?? []).length === 0,
+  );
+  const pointCount = modules.reduce((sum, m) => sum + (m.points?.length ?? 0), 0);
+  return {
+    module_count: modules.length,
+    point_count: pointCount,
+    modules: modules.map((m) => ({
+      id: m.id,
+      title: m.title ?? null,
+      points: (m.points ?? []).length,
+      since: m.lifecycle?.since ?? null,
+    })),
+  };
 }
 
 // Buckets every authored point (each point carries exactly one `failure_mode`,

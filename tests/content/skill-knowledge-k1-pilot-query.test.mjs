@@ -57,6 +57,7 @@ const KNOWLEDGE_ROOT = 'plugin/src/knowledge';
 const PORTFOLIO_JSON = `${KNOWLEDGE_ROOT}/portfolio.json`;
 const GUIDE_COMPOSITION_JSON = `${KNOWLEDGE_ROOT}/compositions/skill.master-orchestrator-guide.json`;
 const ENDPOINT_MODULE_JSON = `${KNOWLEDGE_ROOT}/graph/modules/verification.endpoint.json`;
+const NEVER_PLAY_MODULE_JSON = `${KNOWLEDGE_ROOT}/graph/modules/conduct.never-play.json`;
 const POINTS_DIR = `${KNOWLEDGE_ROOT}/points`;
 
 const readSourceJson = (root, relative) =>
@@ -405,8 +406,37 @@ test('SKG-PILOT-07: ownership tree rejects bad refs, orphans, and broken entry c
       );
       writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
     }, () => {
-      const result = checkK1(isoCli, 'ownership orphan module');
-      assertFailsClosed(result, 'SKG-OWNERSHIP-ORPHAN', 'orphan module');
+      // 该模块仍是 lifecycle.state:"accepted" —— 自称已定稿却没有任何 skill 分发它，仍必须 fail closed。
+      // 诊断码由 SKG-OWNERSHIP-ORPHAN 改为 SKG-MODULE-UNCONSUMED：前者原本同时管「模块没被消费」
+      // 和「skill 产物没被 portfolio 引用」两件事，共用一码导致两者无法区分、无法分别处置。
+      const result = checkK1(isoCli, 'unconsumed accepted module');
+      assertFailsClosed(result, 'SKG-MODULE-UNCONSUMED', 'unconsumed accepted module');
+    });
+
+    // 反向：同样摘出模块，但把它标成 draft —— 这是"有意留作备料的知识"的显式声明，必须放行。
+    // 知识的存在性与它是否被分发是两件正交的事：做一道菜可以备一批食材，不强制每样都用上。
+    // 但放行不等于可以消失，所以 report 必须把它列进 unassigned_knowledge —— 备料是有意为之，
+    // 遗忘不是，两者必须分得开。这条用例守的就是这个区分；没有它，将来谁把豁免删掉都不会报警。
+    withMutation(root, [GUIDE_COMPOSITION_JSON, NEVER_PLAY_MODULE_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.consumes.modules = composition.consumes.modules.filter(
+        (ref) => ref.id !== 'module:conduct.never-play',
+      );
+      composition.entry_modules = (composition.entry_modules ?? []).filter(
+        (id) => id !== 'module:conduct.never-play',
+      );
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+      const moduleDoc = readSourceJson(root, NEVER_PLAY_MODULE_JSON);
+      moduleDoc.lifecycle.state = 'draft';
+      writeSourceJson(root, NEVER_PLAY_MODULE_JSON, moduleDoc);
+    }, () => {
+      const result = checkK1(isoCli, 'draft module may stay unconsumed');
+      const codes = (result.diagnostics ?? []).map((item) => item.code);
+      assert.equal(
+        codes.includes('SKG-MODULE-UNCONSUMED'),
+        false,
+        'a draft module declared as intentionally unassigned must not be reported as unconsumed',
+      );
     });
 
     // Entry target chain: missing skill / wrong module / cross-module point.
