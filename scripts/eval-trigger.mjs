@@ -96,7 +96,20 @@ fs.mkdirSync(skillDir, { recursive: true });
 fs.cpSync(canonical, skillDir, { recursive: true });
 process.on('exit', () => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
-/** 跑一条 query，返回是否触发被测 skill。spawn 失败 → 抛，绝不降级。 */
+const QUERY_TIMEOUT_MS = 240_000;
+
+/**
+ * 跑一条 query。返回 `{ triggered }` 或 `{ error }`。
+ *
+ * **两类失败必须分开，这是这个装置最容易写错的地方。** 初版把它们混为一谈——任何异常都
+ * 抛出去让整批 abort，结果一条 query 超时就废掉了已经跑完的 23/28。那是从"静默吞错误给
+ * 假数据"这个极端，跳到了"给不出数据"的另一个极端，两个都错。
+ *
+ *   spawn 起不来 / 进程报错  → 装置坏了，整批分母都脏 → 抛，硬失败
+ *   单条 query 超时          → 只是这一条慢，其余数据完好 → 记 error，剔出分母，继续
+ *
+ * 判据是「这次失败是否污染了别的条目」。污染了才有资格中止全批。
+ */
 function runQuery(query) {
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
@@ -108,10 +121,11 @@ function runQuery(query) {
     );
     let buf = '';
     let triggered = false;
+    let timedOut = false;
     const timer = setTimeout(() => {
+      timedOut = true;
       child.kill('SIGKILL');
-      reject(new Error(`timeout after 180s: ${query.slice(0, 40)}`));
-    }, 180_000);
+    }, QUERY_TIMEOUT_MS);
     child.stdout.on('data', (c) => {
       buf += c.toString('utf8');
       // 触发信号：流里出现被测 skill 的名字（Skill 工具的入参或工具名）
@@ -119,18 +133,28 @@ function runQuery(query) {
     });
     child.on('error', (e) => {
       clearTimeout(timer);
-      reject(e);
+      reject(e); // 装置级：claude 根本起不来
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      // 非零退出且完全没有输出 = 调用没起来，属硬失败
-      if (code !== 0 && buf.length === 0) {
-        reject(new Error(`claude exited ${code} with no output`));
+      if (timedOut) {
+        // 超时前若已观察到触发信号，那个信号是真的，照收
+        resolve(triggered ? { triggered: true } : { error: 'timeout' });
         return;
       }
-      resolve(triggered);
+      if (code !== 0 && buf.length === 0) {
+        reject(new Error(`claude exited ${code} with no output`)); // 装置级
+        return;
+      }
+      resolve({ triggered });
     });
   });
+}
+
+/** 只关心是否触发的场合（canary）。装置级失败仍会抛。 */
+async function didTrigger(query) {
+  const r = await runQuery(query);
+  return r.triggered === true;
 }
 
 // ── 装置自检（见头部第 1 条）───────────────────────────────────────────────────────────────
@@ -144,7 +168,7 @@ if (!canary) {
 process.stderr.write(`[self-check] canary: ${canary.query.slice(0, 46)}…\n`);
 let canaryOk = false;
 try {
-  canaryOk = await runQuery(canary.query);
+  canaryOk = await didTrigger(canary.query);
 } catch (e) {
   console.error(`eval-trigger: ABORT — 装置自检时调用失败：${e.message}`);
   process.exit(1);
@@ -162,10 +186,30 @@ process.stderr.write('[self-check] OK —— 装置能触发，进入全量\n\n'
 const results = [];
 for (const [i, q] of queries.entries()) {
   let hits = 0;
+  let ok = 0;
+  let errs = 0;
   for (let r = 0; r < RUNS; r += 1) {
-    hits += (await runQuery(q.query)) ? 1 : 0; // 抛出即整体失败，不吞
+    const res = await runQuery(q.query); // 装置级失败仍会抛出，整批中止
+    if (res.error) errs += 1;
+    else {
+      ok += 1;
+      hits += res.triggered ? 1 : 0;
+    }
   }
-  const rate = hits / RUNS;
+  // 一条 query 的全部 run 都超时 → 它没有可用观测，剔出分母而不是猜一个值
+  if (ok === 0) {
+    results.push({
+      query: q.query,
+      should_trigger: q.should_trigger === true,
+      error: 'timeout',
+      counted: false,
+    });
+    process.stderr.write(
+      `[${String(i + 1).padStart(3)}/${queries.length}] 超时(剔出分母) ${q.query.slice(0, 34)}…\n`,
+    );
+    continue;
+  }
+  const rate = hits / ok;
   const predicted = rate >= 0.5;
   results.push({
     query: q.query,
@@ -173,6 +217,8 @@ for (const [i, q] of queries.entries()) {
     trigger_rate: rate,
     predicted,
     pass: predicted === (q.should_trigger === true),
+    counted: true,
+    ...(errs ? { partial_timeouts: errs } : {}),
   });
   process.stderr.write(
     `[${String(i + 1).padStart(3)}/${queries.length}] ${predicted ? '触发' : '未触发'} ` +
@@ -181,22 +227,36 @@ for (const [i, q] of queries.entries()) {
 }
 
 // ── 统计 ────────────────────────────────────────────────────────────────────────────────────
-const tp = results.filter((r) => r.should_trigger && r.predicted).length;
-const fp = results.filter((r) => !r.should_trigger && r.predicted).length;
-const fn = results.filter((r) => r.should_trigger && !r.predicted).length;
-const tn = results.filter((r) => !r.should_trigger && !r.predicted).length;
+const counted = results.filter((r) => r.counted);
+const dropped = results.filter((r) => !r.counted);
+const tp = counted.filter((r) => r.should_trigger && r.predicted).length;
+const fp = counted.filter((r) => !r.should_trigger && r.predicted).length;
+const fn = counted.filter((r) => r.should_trigger && !r.predicted).length;
+const tn = counted.filter((r) => !r.should_trigger && !r.predicted).length;
 const ratio = (a, b) => (b === 0 ? null : Number((a / b).toFixed(4)));
+// 分母诚实：准确率永远相对 counted 而非 total。超时条目单列，不摊进任何一格。
+const dropRate = results.length ? dropped.length / results.length : 0;
 const summary = {
   skill: skillName,
   runs_per_query: RUNS,
-  total: results.length,
+  total_queries: results.length,
+  counted: counted.length,
+  dropped_timeout: dropped.length,
   tp, fp, fn, tn,
   precision: ratio(tp, tp + fp),
   recall: ratio(tp, tp + fn),
-  accuracy: ratio(tp + tn, results.length),
+  accuracy: ratio(tp + tn, counted.length),
+  // 掉太多就别假装这是一份可比的 baseline —— 分母都不一样了，跨版本对比会骗人
+  reliability: dropRate > 0.2 ? 'degraded' : 'ok',
   self_check: 'passed',
   claude_binary: CLAUDE,
 };
+if (summary.reliability === 'degraded') {
+  process.stderr.write(
+    `\n⚠️  ${dropped.length}/${results.length} 条超时被剔出分母（>20%）——这份结果标记为 degraded，\n` +
+      `   不要拿它跨版本对比：分母都不一样。\n`,
+  );
+}
 
 console.log(JSON.stringify({ summary, results }, null, 2));
 if (JSON_OUT) {
