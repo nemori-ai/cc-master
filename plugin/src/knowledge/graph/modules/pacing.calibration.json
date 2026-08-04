@@ -1,0 +1,90 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:pacing.calibration",
+  "title": "估算校准回路",
+  "intent": "教何时采集 predict-then-observe 语料，闭合估算校准的生产侧半环。",
+  "recognition_cues": [
+    "calibration_status 一直未校准",
+    "估算不可信"
+  ],
+  "boundary": {
+    "includes": [
+      "何时跑 calibration capture"
+    ],
+    "excludes": [
+      "校准数学本身",
+      "band 阈值如何推导"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:pacing-and-estimation"
+    ],
+    "primary_points": [
+      "point:pacing.calibration-capture"
+    ],
+    "rationale": "读到 calibration_status 未校准时按需召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-04",
+    "rationale": "知识先立、skill 后组：本模块承载的能力缺口已确认，但它归入哪个 skill 要等结构重排时统一决定，故显式声明为尚未分配。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:pacing.calibration"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.pacing.calibration"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:pacing.calibration-capture",
+      "title": "什么时候采集校准语料",
+      "point_kind": "procedure",
+      "failure_mode": "environment_fact",
+      "summary": "节奏收口时与任务到终态时跑 ccm calibration capture——那是预测与实际同时在手的仅有时刻。",
+      "recognition_cues": [
+        "估算一直未校准",
+        "calibration_status 是 uncalibrated"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/pacing.calibration-capture.md",
+        "marker": "point:pacing.calibration-capture",
+        "heading_hint": "什么时候采集校准语料"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:pacing.calibration-capture"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-04"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:pacing.calibration-capture"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.pacing.calibration-capture"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": []
+}
