@@ -67,6 +67,10 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'explain',
     'materialize',
     'path',
+    // refresh-analysis：重算候选分析的派生字段并写回。加它是为了解开一个结构性死锁——
+    // 图把 span 哈希 / 分析 witness / composition 准入都冻在源码里，却只提供校验、不提供
+    // 重算，于是任何对「已被 composition 消费的正文」的修改都收不了口（Finding #122）。
+    'refresh-analysis',
     'report',
   ]);
   assert.deepEqual(body.declared_commands, [
@@ -77,6 +81,10 @@ test('SKG-CLI-01: contract exposes the frozen K0 capability and vocabulary regis
     'explain',
     'materialize',
     'path',
+    // refresh-analysis：重算候选分析的派生字段并写回。加它是为了解开一个结构性死锁——
+    // 图把 span 哈希 / 分析 witness / composition 准入都冻在源码里，却只提供校验、不提供
+    // 重算，于是任何对「已被 composition 消费的正文」的修改都收不了口（Finding #122）。
+    'refresh-analysis',
     'report',
   ]);
   assert.deepEqual(body.operations, operationTypes);

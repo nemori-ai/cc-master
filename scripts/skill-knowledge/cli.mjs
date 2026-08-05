@@ -17,6 +17,7 @@ import {
   validateTransaction,
 } from './transactions.mjs';
 import { assertReportFormat, runExplain, runPath, runReport } from './query.mjs';
+import { runRefreshAnalysis } from './refresh-analysis.mjs';
 import { runMaterialize } from './graph-first.mjs';
 
 const help = `Usage: node scripts/skill-knowledge.mjs <command> [options]
@@ -29,6 +30,7 @@ Commands:
   change begin --op <${'add|wording|refine|move|split|merge|deprecate|retire'}> --scope <path...> --base <git-ref> [--json]
   change validate <workspace> [--json]
   change apply <workspace> [--json]
+  refresh-analysis [--composition <id>] [--write] [--json]
   report [--source <dir>] [--format json|markdown] [--host <host>] [--json]
   path --from <id> --to <id> --host <host> [--source <dir>] [--json]
   explain <id-or-code> [--source <dir>] [--json]
@@ -397,6 +399,18 @@ export function main(argv = process.argv.slice(2)) {
         ? validateTransaction({ repoRoot, workspace })
         : applyTransaction({ repoRoot, workspace });
     emit(publicTransactionResult(options.action, result, repoRoot), options.json);
+    return result.exitCode;
+  }
+
+  if (command === 'refresh-analysis') {
+    // 重算候选分析的**派生**字段并写回。只修陈旧派生值，绝不把真失败刷绿——
+    // 判定与拒绝理由见 refresh-analysis.mjs 卷首。
+    const rest = argv.slice(argv.indexOf(command) + 1);
+    const write = rest.includes('--write');
+    const ci = rest.indexOf('--composition');
+    const only = ci >= 0 ? rest[ci + 1] : null;
+    const result = runRefreshAnalysis({ repoRoot, composition: only ?? null, write });
+    emit(result.body, json || rest.includes('--json'));
     return result.exitCode;
   }
 

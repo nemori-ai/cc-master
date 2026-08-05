@@ -12,6 +12,7 @@ export const IMPLEMENTED_COMMANDS = Object.freeze([
   'explain',
   'materialize',
   'path',
+  'refresh-analysis',
   'report',
 ]);
 export const DECLARED_COMMANDS = Object.freeze([
@@ -22,6 +23,7 @@ export const DECLARED_COMMANDS = Object.freeze([
   'explain',
   'materialize',
   'path',
+  'refresh-analysis',
   'report',
 ]);
 export const OPERATIONS = Object.freeze([

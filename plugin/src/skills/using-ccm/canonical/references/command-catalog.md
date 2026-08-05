@@ -3287,38 +3287,13 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 
 ### task show（`ccm task show <id> --json`）
 
-`data` = 该 task 的实际存在字段（稀疏——只含已设字段）：
+形状查 `ccm task show --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
 
-```json
-{
-  "id": "T1",
-  "status": "ready",
-  "deps": [],
-  "title": "build framework",
-  "type": "development",
-  "executor": "subagent",
-  "handle": "sub-1",
-  "estimate": { "value": 3, "unit": "h" },
-  "created_at": "2026-06-25T07:07:07Z",
-  "started_at": "2026-06-25T07:07:11Z"
-}
-```
-
-id 不存在时 `data` = `null`，exit 0。
 
 ### board show（`ccm board show --json`）
 
-`data` = 摘要（非整板 JSON）：
+形状查 `ccm board show --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
 
-```json
-{
-  "goal": "catalog probe demo",
-  "owner": { "active": true, "session_id": "", "heartbeat": "2026-06-25T07:07:46Z" },
-  "taskCount": 2,
-  "statusCounts": { "ready": 2 },
-  "lint": { "ok": true, "errors": 0, "warnings": 3 }
-}
-```
 
 ### board init（`ccm board init --json`）
 
@@ -3361,17 +3336,8 @@ artifact。消费者应先用 `ccm board init --capabilities --json` 做兼容�
 
 ### board lint（`ccm board lint --json` / `ccm lint --json`）
 
-```json
-{
-  "ok": true,
-  "violations": [
-    { "rule": "BIZ-DEV-REFS", "level": "warn", "message": "…", "task": "T1" }
-  ],
-  "report": "cc-master board lint: PASS（…）\n\n[warn] …"
-}
-```
+形状查 `ccm board lint --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
 
-外层信封 `ok` 恒 true；lint 是否净看 `data.ok`（及进程 exit code，hard error 时 exit=3）。
 
 ### jc list（`ccm jc list --json`）
 
@@ -3625,26 +3591,8 @@ harness 短命 token 过期时带 `{reason, recoverable, command, remedy, rechec
 
 ### usage task-cost（`ccm usage task-cost [<id>] --json`）
 
-单任务（给 `<task-id>`）：
+形状查 `ccm usage task-cost --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
 
-```jsonc
-{ "task": "T2", "scope": "this-board", "found": true,
-  "tokens": { "input": 156000, "output": 39000, "total": 195000 },
-  "na": false, "source": "observability", "confidence": "high" }
-```
-
-无 observability / shell → `na:true`、`tokens.total:null`；不存在 → `found:false`。
-
-聚合（`--group-by`）：
-
-```jsonc
-{ "group_by": "executor", "scope": "this-board",
-  "groups": [ { "key": "subagent", "total": 504700, "n": 7, "na_count": 3 } ],
-  "total": 569500, "coverage_pct": 56, "history_n": 3,
-  "source": "observability", "confidence": "medium" }
-```
-
-`--scope`（默认 `this-board`）切语料范围：`this-board` 读本板全 tasks 的 observability（含非 done → 标 N/A）；`home` / `this-repo` 跨板聚归档 done 任务的 token（`this-repo` 过滤同 repo）。回显 `scope`。
 
 ### usage burn-rate（`ccm --harness <target> usage burn-rate --json`）
 
@@ -3688,38 +3636,13 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 
 ### estimate show（`ccm estimate show [<id>] --json`）
 
-```jsonc
-{ "scope": "home", "as_of": "ISO", "history_n": 40,
-  "tasks": [ {
-    "id": "T6", "raw_estimate_h": 3,
-    "calibration": { "multiplier": 1.287, "source": "calibrated", "level": "type", "history_n": 23 },
-    "calibrated_h": 3.86,
-    "interval": { "p50": 4.83, "p80": 5.96, "p95": 10.04 },   // 5% 硬墙·单调
-    "confidence": "high", "coverage_basis": "mondrian-group", "source": "calibrated"
-  } ] }
-```
+形状查 `ccm estimate show --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
+
 
 ### estimate forecast（`ccm estimate forecast --json`）
 
-```jsonc
-{ "forecast": { "p50": "ISO", "p80": "ISO", "p95": "ISO" },   // ETA·p95 = 5% 硬墙
-  "makespan": { "p50": {"value":16.16,"unit":"h"}, "p80": {...}, "p95": {...} },  // throughput-only mode → null
-  "throughput_days": { "p50": 4, "p80": 4, "p95": 5 },
-  "criticality_index": [ {"id":"T4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
-  "schedule_sensitivity": [ {"id":"T4","sensitivity":0.665} ],
-  "consistency": { "deviation": 0.495, "warning": true },     // ①②偏差>20% → warning
-  "mode": "both", "coverage_pct": 83, "confidence": "medium", "history_n": 40,
-  "scope": "home", "runs": 2000, "seed": 42, "effective_n": 1, "as_of": "ISO",
-  "source": "calibrated",
-  "deadline_risk": {                                          // 板有 asserted/confirmed DDL 时附·否则 null（不假绿）
-    "deadline": "ISO", "deadline_state": "confirmed",
-    "time_remaining_hours": 356.5, "risk_band": "at_risk", "strength": "strong",
-    "on_time_probability": 0.62,
-    "margin": { "p50_h": 40, "p80_h": 12.5, "p95_h": -6, "basis": "precedence-only-optimistic" } },
-  //   ↑ 相对 DDL 的 margin/风险摘要（复用 `estimate deadline-risk` verdict·不重算）·margin 负=越过 DDL·
-  //     无 DDL / state=none|pending → null；完整 verdict/通道/top_drivers 见 `estimate deadline-risk`
-  "notes": ["1 tasks unit-time fallback…"] }   // --effective-n N>1 → throughput_days ÷N + note（通道① makespan 不变）
-```
+形状查 `ccm estimate forecast --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
+
 
 ### estimate evm（`ccm estimate evm --json`）
 
@@ -3749,16 +3672,8 @@ token 过期时带 `{reason, recoverable, command, remedy, recheck}`，否则 `n
 
 ### estimate risk（`ccm estimate risk --json`）
 
-```jsonc
-{ "scope": "home",
-  "criticality_index": [ {"id":"T4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
-  "wip_aging": [ {"id":"T5","age_hours":49.43,"status":"critical","sle_p85":5.6,"sle_p95":9.18} ],
-  "ccpm": { "buffer_size_h": 1.97, "chain_mean_total_h": 16.61, "zone": "green",
-            "buffer_health": 0.333, "chain_progress_pct": 0.333 },
-  "sle": { "p85": 5.6, "p95": 9.18, "confidence": "high" },
-  "history_n": 40, "confidence": "medium", "source": "calibrated",
-  "as_of": "ISO", "seed": 42, "runs": 2000 }
-```
+形状查 `ccm estimate risk --schema`——它返回必有键与一份从真实输出捕获、并由 conformance 用例持续核对的样例。这里不再抄一份：抄本会过期，接口不会。
+
 
 ### estimate cost-to-complete（`ccm estimate cost-to-complete --json`）
 

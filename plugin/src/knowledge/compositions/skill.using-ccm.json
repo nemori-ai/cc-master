@@ -282,8 +282,8 @@
         },
         {
           "point": "point:ccm.cmd.json-shape",
-          "point_sha256": "2a48914f9b2fe8071127911148c0d506552ed859c3634028d3c5f9c09bf88221",
-          "passage_sha256": "2a48914f9b2fe8071127911148c0d506552ed859c3634028d3c5f9c09bf88221"
+          "point_sha256": "ba7b95137e0dad862d294ac08b2ec201e9b1fa043da4122bfcbae1b2ebfba061",
+          "passage_sha256": "ba7b95137e0dad862d294ac08b2ec201e9b1fa043da4122bfcbae1b2ebfba061"
         },
         {
           "point": "point:ccm.cmd.log",
