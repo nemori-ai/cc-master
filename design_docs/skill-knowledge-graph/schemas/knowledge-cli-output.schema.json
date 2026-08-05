@@ -1026,6 +1026,7 @@
       "required": [
         "module_count",
         "point_count",
+        "deferred_atlas_tokens",
         "modules"
       ],
       "properties": {
@@ -1034,6 +1035,11 @@
           "minimum": 0
         },
         "point_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deferred_atlas_tokens": {
+          "description": "这批备料现在不计入路由预算（不在任何 composition 里就不在任何 entry 的路由表上），但被 admit 时会全额计入。挂账在此，是为了让那笔延后的成本现在就可见，而不是在一批备料同时转正时表现为路由预算无预兆爆掉。",
           "type": "integer",
           "minimum": 0
         },

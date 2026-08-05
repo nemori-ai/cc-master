@@ -1049,9 +1049,22 @@ export function buildAndValidateGraph({
     }
 
     // Router budget soft check using deterministic estimator over cue/summary text.
+    //
+    // 只统计**真的会出现在路由面上**的模块。尚未分配给任何 skill 的备料（draft + 零消费者，
+    // 判据与上面 SKG-MODULE-UNCONSUMED 完全同一个）不进任何 composition，因而不进任何
+    // entry 的路由表——它的 cue 与 intent 现在一个 token 都不烧。把它算进来，量的是一笔
+    // 没人付的成本，还会让「知识先立、skill 后组」在攒到十几条时被一道假闸卡死。
+    //
+    // 这不是给备料开豁免：它被 admit 进 composition 的那一刻，成本就变成真的、立刻计入。
+    // 延后的那部分由 report 的 unassigned_knowledge 持续挂账，不会在阶段 C 突然冒出来。
+    const routableModules = modules.filter((item) => {
+      const unassignedByDesign = item.data?.lifecycle?.state === 'draft';
+      const consumers = moduleConsumers.get(item.id) ?? [];
+      return !(unassignedByDesign && consumers.length === 0);
+    });
     const atlasText = [
       ...(portfolio.entries ?? []).flatMap((entry) => entry.recognition_cues ?? []),
-      ...modules.flatMap((item) => [
+      ...routableModules.flatMap((item) => [
         item.data.intent,
         ...(item.data.recognition_cues ?? []),
       ]),

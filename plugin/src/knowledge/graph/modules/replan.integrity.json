@@ -1,0 +1,92 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:replan.integrity",
+  "title": "Replan 完整性闸",
+  "intent": "拦住目标字面不变但验收强度被稀释的那一类重编图，把它送进目标语义变更流程。",
+  "recognition_cues": [
+    "遇阻要重新编一张图",
+    "换个思路做",
+    "新方案比原来容易很多"
+  ],
+  "boundary": {
+    "includes": [
+      "新旧图对账三问",
+      "稀释即 scope 变更的判定"
+    ],
+    "excludes": [
+      "合法 replan 的做法",
+      "目标语义变更本身的分类与流程"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:replan.no-dilution"
+    ],
+    "rationale": "决定重编 DAG 之前召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：护栏缺口已确认，归入哪个 skill 待结构重排时统一决定。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:replan.integrity"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.replan.integrity"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:replan.no-dilution",
+      "title": "Replan 不能稀释验收",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "重编图前对三问——验收判据变弱、未完成的承重节点消失、代价骤降的原因；任一命中即 scope 变更，走目标语义变更流程。",
+      "recognition_cues": [
+        "重新规划任务图",
+        "新图看起来轻松多了"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/replan.no-dilution.md",
+        "marker": "point:replan.no-dilution",
+        "heading_hint": "Replan 不能稀释验收"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:replan.no-dilution"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:replan.no-dilution"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.replan.no-dilution"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": []
+}

@@ -9,7 +9,7 @@ import {
 import { loadPublishedBehaviorEvidence } from './behavior-eval.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
 import { buildAndValidateGraph, resolveEntityId, shortestPath } from './graph.mjs';
-import { compareCodePoint } from './hash.mjs';
+import { compareCodePoint, estimateBudget } from './hash.mjs';
 
 const HOSTS = new Set(HARDENING_CONTRACT.C9.hosts);
 const REPORT_FORMATS = new Set(['json', 'markdown']);
@@ -110,9 +110,17 @@ function buildUnassignedKnowledge(graph) {
     (m) => m.lifecycle?.state === 'draft' && (m.consumers ?? []).length === 0,
   );
   const pointCount = modules.reduce((sum, m) => sum + (m.points?.length ?? 0), 0);
+  // 这批知识现在不占路由预算（不在任何 composition 里，就不在任何 entry 的路由表上），
+  // 但被 admit 的那一刻会全额计入。挂在这里，是为了让阶段 C 的那笔账**现在就能看见**——
+  // 否则一批备料同时转正，会表现为路由预算毫无预兆地爆掉。
+  const deferredAtlasText = modules
+    .flatMap((m) => [m.intent, ...(m.recognition_cues ?? [])])
+    .filter(Boolean)
+    .join('\n');
   return {
     module_count: modules.length,
     point_count: pointCount,
+    deferred_atlas_tokens: estimateBudget(deferredAtlasText).estimated_tokens,
     modules: modules.map((m) => ({
       id: m.id,
       title: m.title ?? null,
