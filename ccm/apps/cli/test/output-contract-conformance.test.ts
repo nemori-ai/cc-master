@@ -23,29 +23,41 @@ import { REGISTRY } from '../src/registry.js';
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ccm.cjs');
 
-let home = '';
+// 两种板状态。一条键若只在其中一态出现，它就不是「必有键」——单态验证会把
+// 「这个状态下碰巧有」误判成「恒有」，声明出来仍是假 SSOT。两态都跑，过度声明当场红。
+const STATES = ['empty', 'rich'] as const;
+type State = (typeof STATES)[number];
+const homes: Record<State, string> = { empty: '', rich: '' };
 
-/** 跑一条真命令，返回解析后的信封。 */
-function run(args: string[]): { ok: boolean; data: unknown } {
+/** 在指定板状态下跑一条真命令，返回解析后的信封。 */
+function run(state: State, args: string[]): { ok: boolean; data: unknown } {
   const out = execFileSync(process.execPath, [CLI, ...args, '--json'], {
     encoding: 'utf8',
-    env: { ...process.env, CC_MASTER_HOME: home },
+    env: { ...process.env, CC_MASTER_HOME: homes[state] },
   });
   return JSON.parse(out);
 }
 
 before(() => {
-  home = mkdtempSync(join(tmpdir(), 'ccm-contract-'));
-  const env = { ...process.env, CC_MASTER_HOME: home };
-  const q = (args: string[]) =>
-    execFileSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env });
-  q(['board', 'init', '--goal', 'output contract conformance probe']);
-  // board init --goal 已经把 Goal Contract 立起来了，再 goal set 会被拒（already active）。
-  q(['task', 'add', 'T1', '--title', 'probe task']);
+  for (const state of STATES) {
+    const dir = mkdtempSync(join(tmpdir(), `ccm-contract-${state}-`));
+    homes[state] = dir;
+    const env = { ...process.env, CC_MASTER_HOME: dir };
+    const q = (args: string[]) =>
+      execFileSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env });
+    // board init --goal 已经立起 Goal Contract，再 goal set 会被拒（already active）。
+    q(['board', 'init', '--goal', `output contract conformance probe (${state})`]);
+    if (state === 'rich') {
+      q(['task', 'add', 'T1', '--title', 'probe task', '--estimate', '2h']);
+      q(['task', 'add', 'T2', '--title', 'downstream', '--deps', 'T1']);
+      q(['task', 'start', 'T1']);
+      q(['log', 'add', 'probe log', '--kind', 'note']);
+    }
+  }
 });
 
 after(() => {
-  if (home) rmSync(home, { recursive: true, force: true });
+  for (const dir of Object.values(homes)) if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
 /** 声明了 outputSchema 的 verb（noun/verb/spec 三元组）。 */
@@ -76,26 +88,29 @@ for (const row of declared()) {
   // 需要位置参数的 verb 在这里补上（种子板里 T1 必存在）。
   const positionals: Record<string, string[]> = { 'task show': ['T1'] };
   const key = `${row.noun} ${row.verb}`;
-  test(`输出契约与真实输出一致：${key}`, () => {
-    const env = run([row.noun, row.verb, ...(positionals[key] ?? [])]);
-    assert.equal(env.ok, true, `${key} 应成功返回`);
-    const payload = row.array
-      ? (env.data as unknown[])
-      : env.data === null
-        ? null
-        : [env.data as Record<string, unknown>];
-    if (payload === null) return; // nullable 的合法空结果，不参与键校验
-    assert.ok(Array.isArray(payload), `${key} 的 data 形状与 array 声明不符`);
-    if (payload.length === 0) return; // 空数组：无元素可校验，不算违约
-    for (const item of payload as Array<Record<string, unknown>>) {
-      for (const k of row.keys) {
-        assert.ok(
-          Object.hasOwn(item, k),
-          `${key} 声明必有键 "${k}"，真实输出里没有——声明与现实分家了，改声明或改实现`,
-        );
+  for (const state of STATES) {
+    // 需要位置参数的 verb 在空板上没有那个实体 → 合法空结果，nullable 分支会放行。
+    test(`输出契约与真实输出一致：${key}（${state} 板）`, () => {
+      const env = run(state, [row.noun, row.verb, ...(positionals[key] ?? [])]);
+      assert.equal(env.ok, true, `${key} 应成功返回`);
+      const payload = row.array
+        ? (env.data as unknown[])
+        : env.data === null
+          ? null
+          : [env.data as Record<string, unknown>];
+      if (payload === null) return; // nullable 的合法空结果，不参与键校验
+      assert.ok(Array.isArray(payload), `${key} 的 data 形状与 array 声明不符`);
+      if (payload.length === 0) return; // 空数组：无元素可校验，不算违约
+      for (const item of payload as Array<Record<string, unknown>>) {
+        for (const k of row.keys) {
+          assert.ok(
+            Object.hasOwn(item, k),
+            `${key} 声明必有键 "${k}"，真实输出里没有——声明与现实分家了，改声明或改实现`,
+          );
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 test('覆盖率是报告，不是闸——只记录当前有多少 verb 声明了契约', () => {
