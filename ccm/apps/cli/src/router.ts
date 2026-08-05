@@ -27,6 +27,7 @@
 
 import { parseArgs } from 'node:util';
 import type { QuotaEffectBoundary } from '@ccm/engine';
+import { OUTPUT_SAMPLES } from './generated/output-samples.js';
 import type {
   Ctx,
   NativeAttemptAdmissionBoundary,
@@ -535,6 +536,16 @@ export function runWithComposition(
                     array: !!decl.array,
                     nullable: !!decl.nullable,
                   },
+                  // 从真实输出捕获、并由 conformance 用例持续核对的样例。它承载
+                  // required_keys 传达不了的那一层：嵌套结构与字段类型。
+                  // 缺席不代表没有输出——只代表这条命令的输出随机器/环境变，
+                  // 捕不到确定性样例（见 generated/output-samples.ts 的排除说明）。
+                  ...(OUTPUT_SAMPLES[`${nounStr} ${resolvedVerb}`] !== undefined
+                    ? { sample: OUTPUT_SAMPLES[`${nounStr} ${resolvedVerb}`] }
+                    : {
+                        sample_unavailable:
+                          'output varies by machine/environment; no deterministic sample',
+                      }),
                 }
               : {
                   reason:
