@@ -186,6 +186,27 @@ test('renderTaskDetail json: 整 task 原样（裹壳）', () => {
   assert.equal(data.artifact, 'commit a1b2c3');
 });
 
+// 「读不到」是一个合法的查询结果，不是错误——但 data:null 与「字段确实是 null」在调用方
+// 看来一模一样。接口能陈述它做了什么，此前无法陈述它「什么都没查到」；这三条钉住那一侧。
+test('renderTaskDetail json: 查不到时带 not_found 标记，且 data 仍是 null（不破既有契约）', () => {
+  const raw = JSON.parse(R.renderTaskDetail(null, { json: true }));
+  assert.equal(raw.ok, true);
+  assert.equal(raw.data, null, 'data 必须仍是 null——既有调用方按 data === null 判断');
+  assert.equal(raw.not_found, true);
+});
+
+test('renderTaskDetail json: 查得到时不得出现 not_found（否则标记失去信息量）', () => {
+  const raw = JSON.parse(R.renderTaskDetail(sampleBoard().tasks[0], { json: true }));
+  assert.equal(raw.not_found, undefined);
+});
+
+test('renderTaskDetail human: 查不到时说出是哪个 id', () => {
+  const out = R.renderTaskDetail(null, { color: false, requestedId: 'T404' });
+  assert.match(out, /无此任务：T404/);
+  // 不给 requestedId 时退回无主语形态，不崩、不输出 undefined
+  assert.match(R.renderTaskDetail(null, { color: false }), /^\(无此任务\)$/);
+});
+
 test('renderTaskDetail human color=false: 无 ANSI + 含 id/status/deps/references', () => {
   const t = sampleBoard().tasks[0];
   t.references = [{ kind: 'spec', ref: '/repo/docs/spec.md' }];

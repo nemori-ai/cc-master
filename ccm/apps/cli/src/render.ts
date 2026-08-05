@@ -24,6 +24,9 @@ import { paint as ioPaint } from './io.js';
 interface RenderOpts {
   json?: boolean;
   color?: boolean;
+  // requestedId（read-by-id 详情专用·additive）：查不到时把「查的是哪个 id」说出来。
+  // 同时查多个 id 时，一句无主语的「(无此任务)」无从对应到具体请求。
+  requestedId?: string;
   lint?: { errors?: unknown[]; warnings?: unknown[] } | null;
   // boardPath（board init 专用·additive）：结构化创建结果携带实际写入路径，hook 不抓人类文本。
   // 其它 summary 消费方不传，因此既有 show --json 形状保持不变。
@@ -42,8 +45,8 @@ function paint(s: string, color: string, enabled: boolean): string {
 }
 
 // ── JSON 壳（与 io.jsonOk 同形；render 自带一份以独立可用·§4 统一壳 { ok:true, data:… }）──────────────
-export function jsonString(data: unknown): string {
-  return JSON.stringify({ ok: true, data }, null, 2);
+export function jsonString(data: unknown, extra?: Record<string, unknown>): string {
+  return JSON.stringify({ ok: true, data, ...(extra ?? {}) }, null, 2);
 }
 
 // ── 小工具：对齐表格（无边框·空格 pad）─────────────────────────────────────────────────────────────
@@ -217,10 +220,20 @@ export function renderTaskList(tasks: any, opts?: RenderOpts): string {
 //   json：整个 task 对象原样（裹壳）。null/缺 task → human 提示 / json data:null。
 export function renderTaskDetail(task: any, opts?: RenderOpts): string {
   opts = opts || {};
-  if (opts.json) return jsonString(task == null ? null : task);
+  const missing = task == null || typeof task !== 'object';
+  // 读一个不存在的 id 不是错误，是一个合法的查询结果——所以不改 ok/exit code。
+  // 但 `data:null` 与「字段确实是 null」「上游算错了」在调用方看来一模一样：**接口在这里
+  // 沉默，而沉默无法与「查到了空」区分**。加一个显式 not_found 标记，让这一侧可被陈述；
+  // data 仍是 null，既有按 `data === null` 判断的调用方不受影响（纯附加，不破契约）。
+  if (opts.json)
+    return jsonString(missing ? null : task, missing ? { not_found: true } : undefined);
 
   const color = !!opts.color;
-  if (!task || typeof task !== 'object') return paint('(无此任务)', 'dim', color);
+  // 人这一侧原本只说「(无此任务)」，不说是哪个 id——同时查多个时无从对应。带上它。
+  if (missing) {
+    const asked = opts.requestedId ? `：${opts.requestedId}` : '';
+    return paint(`(无此任务${asked})`, 'dim', color);
+  }
   const t = task;
   const lines: string[] = [];
   const label = (k: string) => paint(k, 'bold', color);

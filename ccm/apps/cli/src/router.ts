@@ -274,6 +274,7 @@ const GLOBAL_VALUE_FLAGS = (() => {
 interface ScanResult {
   positionals: Array<{ token: string; index: number }>;
   hasHelp: boolean;
+  hasSchema: boolean;
   hasVersion: boolean;
 }
 
@@ -283,6 +284,7 @@ interface ScanResult {
 function scanPositions(tokens: string[]): ScanResult {
   const positionals: Array<{ token: string; index: number }> = [];
   let hasHelp = false;
+  let hasSchema = false;
   let hasVersion = false;
   let afterDoubleDash = false;
   for (let i = 0; i < tokens.length; i++) {
@@ -297,6 +299,10 @@ function scanPositions(tokens: string[]): ScanResult {
     }
     if (t === '--help' || t === '-h') {
       hasHelp = true;
+      continue;
+    }
+    if (t === '--schema') {
+      hasSchema = true;
       continue;
     }
     if (t === '--version' || t === '-V') {
@@ -314,7 +320,7 @@ function scanPositions(tokens: string[]): ScanResult {
     // 非 flag token（`-` 也算 positional：stdin sentinel）。
     positionals.push({ token: t, index: i });
   }
-  return { positionals, hasHelp, hasVersion };
+  return { positionals, hasHelp, hasSchema, hasVersion };
 }
 
 function readGlobalStringFlag(tokens: string[], name: string): string | null {
@@ -508,6 +514,40 @@ export function runWithComposition(
 
   // hasOwnProperty 已保证 resolvedVerb 在 nounSpec·spec 必有值（窄断言·不改逻辑）。
   const spec: VerbSpec = nounSpec[resolvedVerb] as VerbSpec;
+
+  // `ccm <noun> <verb> --schema` → 打印该 verb `--json` 输出的 data 契约，不执行命令。
+  //   未声明的诚实返回 declared:false —— 一个骗人的 schema 比没有 schema 更糟。
+  if (scan.hasSchema && !wantsHelp) {
+    const decl = spec.outputSchema;
+    out(
+      JSON.stringify(
+        {
+          ok: true,
+          data: {
+            schema: 'ccm/output-contract/v1',
+            command: `${nounStr} ${resolvedVerb}`,
+            declared: !!decl,
+            ...(decl
+              ? {
+                  contract: {
+                    ...(decl.id ? { id: decl.id } : {}),
+                    required_keys: [...decl.keys],
+                    array: !!decl.array,
+                    nullable: !!decl.nullable,
+                  },
+                }
+              : {
+                  reason:
+                    'this command has no declared output contract yet; read the actual --json output instead of assuming a shape',
+                }),
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    return EXIT.OK;
+  }
 
   // `ccm <noun> <verb> --help` → verb 级 help（用解析后的 canonical verb）。
   if (wantsHelp) {

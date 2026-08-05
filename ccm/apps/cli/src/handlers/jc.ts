@@ -95,9 +95,13 @@ export function renderJcList(list: unknown, opts?: { json?: boolean; color?: boo
 //   human：逐字段竖排（标签: 值），跳过缺省字段。json：整个 jc 对象原样（裹壳）。null/缺 → human 提示 / data:null。
 export function renderJcDetail(jc: unknown, opts?: { json?: boolean; color?: boolean }): string {
   opts = opts || {};
-  if (opts.json) return render.jsonString(jc == null ? null : jc);
+  const missing = jc == null || typeof jc !== 'object';
+  // 与 renderTaskDetail 同型：读不到不是错误，但 data:null 无法与「查到了空」区分。
+  // 加显式 not_found 标记；data 仍为 null，既有调用方不受影响。
+  if (opts.json)
+    return render.jsonString(missing ? null : jc, missing ? { not_found: true } : undefined);
   const color = !!opts.color;
-  if (!jc || typeof jc !== 'object') return render.paint('(无此自决条目)', 'dim', color);
+  if (missing) return render.paint('(无此自决条目)', 'dim', color);
   const j = jc as JcLike;
   const lines: string[] = [];
   const label = (k: string) => render.paint(k, 'bold', color);
