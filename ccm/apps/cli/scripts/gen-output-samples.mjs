@@ -7,8 +7,15 @@
 // TS 副本——换个文件后缀不等于拿到 SSOT。捕获的样例**构造上就是真输出**，不存在
 // 「声明与现实分家」这回事；而持续核对由 output-contract-conformance.test.ts 承担。
 //
-// 确定性怎么保证：每条命令在**两块独立的新鲜板**上各跑一次，净化后不一致的直接**排除**
-// 并记下理由。宁可少收一条，不可收一条会飘的——一道会飘的闸很快会被人加 skip。
+// 确定性怎么保证：每条命令捕两次，**两次之间同时变化两个轴**——
+//   ① 板：两块独立的新鲜板（抓板内 id / 时刻 / 计数带来的差异）；
+//   ② 环境：一次带完整 PATH，一次把 PATH 抽空（抓「本机装了哪些 harness」这类**机器相关**差异）。
+// 净化后不一致的直接**排除**并记下理由。
+//
+// 第二个轴是补上来的：初版只变板、不变环境，于是 `harness list` / `harness current` 在本机
+// 稳定通过、一进 CI 就红——**同一台机器上跑两次，测不出机器与机器的差异**。这与本轮反复
+// 出现的根因同型：度量本身没错，只是对着错误的**轴**在测。
+// 宁可少收一条，不可收一条会飘的——一道会飘的闸很快会被人加 skip。
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,10 +31,11 @@ const { REGISTRY } = await import('../src/registry.ts');
 const { sanitizeSample } = await import('../src/output-sample-sanitize.ts');
 const { SAMPLE_SEED_STEPS, SAMPLE_POSITIONALS } = await import('../src/output-sample-seed.ts');
 
-/** 建一块带内容的新鲜板，返回它的 env。 */
-function seedBoard(tag) {
+/** 建一块带内容的新鲜板，返回它的 env。`barePath` 为真时抽空 PATH，用来暴露机器相关输出。 */
+function seedBoard(tag, barePath = false) {
   const home = mkdtempSync(join(tmpdir(), `ccm-sample-${tag}-`));
   const env = { ...process.env, CC_MASTER_HOME: home };
+  if (barePath) env.PATH = join(home, '.no-such-bin');
   const q = (a) => execFileSync(process.execPath, [CLI, ...a], { encoding: 'utf8', env });
   for (const step of SAMPLE_SEED_STEPS) q([...step]);
   return { env, home };
@@ -47,7 +55,7 @@ function capture(env, noun, verb, positionals) {
 }
 
 const a = seedBoard('a');
-const b = seedBoard('b');
+const b = seedBoard('b', true); // 第二次同时换板与换环境
 
 const samples = {};
 const excluded = [];
@@ -63,7 +71,7 @@ for (const [noun, verbs] of Object.entries(REGISTRY)) {
       continue;
     }
     if (JSON.stringify(s1) !== JSON.stringify(s2)) {
-      excluded.push([key, '两块独立板上净化后仍不一致（含未被净化的机器/环境相关值）']);
+      excluded.push([key, '换板或换环境后净化结果不一致（输出随本机装了什么 / 板内偶发值而变）']);
       continue;
     }
     samples[key] = s1;

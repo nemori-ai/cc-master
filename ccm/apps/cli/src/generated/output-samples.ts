@@ -10,7 +10,9 @@
 // 重新生成：node scripts/gen-output-samples.mjs
 //
 // 本次排除：
-//   peers list —— 两块独立板上净化后仍不一致（含未被净化的机器/环境相关值）
+//   peers list —— 换板或换环境后净化结果不一致（输出随本机装了什么 / 板内偶发值而变）
+//   harness list —— 换板或换环境后净化结果不一致（输出随本机装了什么 / 板内偶发值而变）
+//   harness current —— 换板或换环境后净化结果不一致（输出随本机装了什么 / 板内偶发值而变）
 
 export const OUTPUT_SAMPLES: Readonly<Record<string, unknown>> = Object.freeze({
   "capability list": {
@@ -516,76 +518,5 @@ export const OUTPUT_SAMPLES: Readonly<Record<string, unknown>> = Object.freeze({
     "registry": "<abs-path>",
     "count": 0,
     "accounts": []
-  },
-  "harness list": {
-    "current": "claude-code",
-    "installed": [
-      "codex"
-    ],
-    "installedSurfaces": [
-      "cursor-ide-plugin"
-    ],
-    "harnesses": [
-      {
-        "id": "codex",
-        "displayName": "Codex",
-        "installed": true,
-        "active": false,
-        "reason": null,
-        "cli": {
-          "name": "codex",
-          "path": "<abs-path>",
-          "available": true
-        },
-        "configPaths": [
-          "<abs-path>"
-        ],
-        "surfaces": [],
-        "capabilities": {
-          "accountPool": {
-            "supported": false,
-            "reason": "Codex support is currently limited to current-account usage signals; account-pool management and account switching remain unsupported."
-          },
-          "externalStatusline": {
-            "supported": false,
-            "reason": "Codex exposes configurable built-in footer items, not a Claude Code-style external statusLine.command hook."
-          },
-          "pluginDistribution": {
-            "supported": true,
-            "reason": "Codex installs cc-master through a local Codex marketplace/plugin registration and skill/hook delivery from that package."
-          }
-        }
-      }
-    ]
-  },
-  "harness current": {
-    "current": "claude-code",
-    "harness": {
-      "id": "claude-code",
-      "displayName": "Claude Code",
-      "installed": true,
-      "active": true,
-      "reason": null,
-      "cli": {
-        "name": "claude",
-        "path": "<abs-path>",
-        "available": true
-      },
-      "configPaths": [
-        "<abs-path>"
-      ],
-      "surfaces": [],
-      "capabilities": {
-        "accountPool": {
-          "supported": true
-        },
-        "externalStatusline": {
-          "supported": true
-        },
-        "pluginDistribution": {
-          "supported": true
-        }
-      }
-    }
   }
 });
