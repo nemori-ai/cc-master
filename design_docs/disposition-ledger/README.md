@@ -9,6 +9,7 @@
 | [`measurement-design.md`](measurement-design.md) | **方法**：要检验的命题、为什么逐点消融不成立（功效/多重比较）、四个效度威胁、测试类型→它能授权的决定、非对称决策规则、预注册模板、诚实边界 |
 | [`env-fact-migration-ledger.md`](env-fact-migration-ledger.md) | **判定**：112 条环境事实逐条判「迁 help / 留 skill / 需改行为」，判据是 Unix man 段落规约（单命令 → help，跨命令 → 技术文档） |
 | [`D-tier-run-log.md`](D-tier-run-log.md) | **证据与撤回记录**：确定性比对的实测输出，含**两条已撤回的错误论断**及其成因 |
+| [`output-contract-and-help-budget.md`](output-contract-and-help-budget.md) | **两个未决项的裁决**：`--help` 不分层改设预算闸（附 167 条 help 的体量实测）；新增 `--schema` 且必须带一致性闸 |
 
 ## 读之前先知道两件事
 

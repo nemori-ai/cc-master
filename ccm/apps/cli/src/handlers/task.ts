@@ -871,7 +871,8 @@ export function rm(ctx: Ctx): number {
   });
 }
 
-// ── task show：单任务详情（读 verb）。不存在 → renderTaskDetail 出「无此任务」占位（human）/ data:null（json）。
+// ── task show：单任务详情（读 verb）。不存在不是错误（rc 仍 0）：human 出「(无此任务：<id>)」，
+//   json 出 `data:null` + `not_found:true`——沉默本身要可陈述，否则调用方分不清「没这条」与「查到了空」。
 export function show(ctx: Ctx): number {
   return runRead(ctx, {
     compute: (board) => {
@@ -881,7 +882,11 @@ export function show(ctx: Ctx): number {
       return tasks.find((t) => t && t.id === id) || null;
     },
     render: (task, c) =>
-      render.renderTaskDetail(task, { json: !!c.flags.json, color: c.flags.color }),
+      render.renderTaskDetail(task, {
+        json: !!c.flags.json,
+        color: c.flags.color,
+        requestedId: ctx.positionals[0] as string,
+      }),
   });
 }
 

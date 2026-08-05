@@ -42,6 +42,27 @@ export interface Positional {
   name: string;
   required: boolean;
 }
+/**
+ * 该 verb `--json` 输出的 `data` 契约（可选·additive）。
+ *
+ * 为什么在这里：`data` 的形状此前只在 using-ccm 的 `--json 输出形状` 一节有集中陈述——
+ * 一份要靠人跟代码锁步的文档副本。把它挪进 registry 不会自动解决漂移（换个文件后缀不等于
+ * 拿到 SSOT），所以它必须配一致性测试：跑真命令、拿真输出对 `keys` 校验。
+ *
+ * 诚实边界：`keys` 只声明 `data` 的**必有顶层键**，不描述类型、不穷举可选键。它能抓到的是
+ * 「键被改名 / 被删」这类最常见的漂移，抓不到类型变化。声明弱一点但机械可验，好过声明得
+ * 漂亮却没人核对——后者正是 json-shape 现在的处境。
+ */
+export interface OutputSchemaSpec {
+  /** 该 payload 自带的 schema 常量（若有），如 'ccm/quota-status/v1'。 */
+  id?: string;
+  /** `data` 的必有顶层键。data 为数组时，声明其元素的必有键。 */
+  keys: readonly string[];
+  /** data 是数组时置 true（keys 描述元素而非 data 本身）。 */
+  array?: boolean;
+  /** 该 verb 存在合法的空结果（如 read-by-id 查不到）——此时 data 为 null，不参与 keys 校验。 */
+  nullable?: boolean;
+}
 export interface VerbSpec {
   summary: string;
   read: boolean;
@@ -49,6 +70,7 @@ export interface VerbSpec {
   options: Record<string, OptionSpec>;
   examples: string[];
   handler: string;
+  outputSchema?: OutputSchemaSpec;
 }
 export type NounSpec = Record<string, VerbSpec>;
 export type Registry = Record<string, NounSpec>;
@@ -73,6 +95,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm capability list --json'],
       handler: 'capability.list',
+      outputSchema: { keys: ['schema', 'ccm_version', 'capabilities'] },
     },
     negotiate: {
       summary: '与 consumer 声明的版本集协商某 capability 族的最高兼容兑现项',
@@ -200,6 +223,7 @@ export const REGISTRY: Registry = {
         'ccm quota status --machine-wide --refresh --json',
       ],
       handler: 'quota.status',
+      outputSchema: { keys: ['schema', 'available'] },
     },
     refresh: {
       summary: '显式刷新本机所有受支持 target scope，投影 decision edge 并 fan-out',
@@ -447,6 +471,10 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm board show', 'ccm board show --json'],
       handler: 'board.show',
+      outputSchema: {
+        // 五项均由渲染层构造，恒在。
+        keys: ['goal', 'owner', 'taskCount', 'statusCounts', 'lint'],
+      },
     },
     lint: {
       summary: '校验整板（FMT / GRAPH / BIZ 全规则）；有 hard error → 退出 3',
@@ -461,6 +489,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm lint', 'ccm board lint --json', 'ccm board lint --board <path> --raw --json'],
       handler: 'board.lint',
+      outputSchema: { keys: ['ok', 'violations', 'report'] },
     },
     graph: {
       summary: 'DAG 全量分析：拓扑 / 环 / readySet / 临界路径 / makespan',
@@ -471,6 +500,18 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm board graph', 'ccm board graph --json'],
       handler: 'board.graph',
+      outputSchema: {
+        keys: [
+          'topoOrder',
+          'cycle',
+          'readySet',
+          'criticalPath',
+          'parallelism',
+          'impact',
+          'rollup',
+          'nesting',
+        ],
+      },
     },
     'critical-path': {
       summary: '临界路径链 + makespan + 时长来源档',
@@ -481,6 +522,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm board critical-path', 'ccm board critical-path --json'],
       handler: 'board.criticalPath',
+      outputSchema: { keys: ['chain', 'makespan', 'weight_source'] },
     },
     next: {
       summary: 'readySet——现在能派发什么（别名 ccm next）',
@@ -669,6 +711,7 @@ export const REGISTRY: Registry = {
       options: { json: { type: 'boolean', desc: '结构化输出' } },
       examples: ['ccm goal show --json'],
       handler: 'goal.show',
+      outputSchema: { keys: ['board_path', 'summary', 'contract', 'brief_path'] },
     },
     check: {
       summary: '校验 Goal Contract 形状、Brief containment/存在性/hash',
@@ -677,6 +720,11 @@ export const REGISTRY: Registry = {
       options: { json: { type: 'boolean', desc: '结构化输出' } },
       examples: ['ccm goal check --json'],
       handler: 'goal.check',
+      outputSchema: {
+        id: 'ccm/goal-check/v1',
+        // 其余字段（brief_ref / deadline / …）随 Goal Contract 状态出现，不进声明。
+        keys: ['schema', 'verdict', 'reason'],
+      },
     },
     deadline: {
       summary:
@@ -962,6 +1010,11 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm task show T7', 'ccm task show T7 --json'],
       handler: 'task.show',
+      outputSchema: {
+        // 窄腰三件套恒在；title / created_at 等是可选字段，不进声明。
+        keys: ['id', 'status', 'deps'],
+        nullable: true, // 读不到 → data:null + not_found:true
+      },
     },
     list: {
       summary: '列出任务（可过滤）',
@@ -976,6 +1029,10 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm task ls --status ready', 'ccm task ls --executor subagent --json'],
       handler: 'task.list',
+      outputSchema: {
+        keys: ['id', 'status'],
+        array: true, // data 是 task 数组；keys 描述元素。空板 → []
+      },
     },
     update: {
       summary: '改字段 / 增删依赖',
@@ -1628,6 +1685,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm baseline show', 'ccm baseline show --json'],
       handler: 'baseline.show',
+      outputSchema: { keys: ['has_baseline', 'baseline'] },
     },
     reset: {
       summary: 're-baseline：旧快照进 history[]（只增不删）+ 建新（非 TTY 须 --yes）',
@@ -1655,6 +1713,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm policy show', 'ccm policy show --json'],
       handler: 'policy.show',
+      outputSchema: { keys: ['policy', 'effective'] },
     },
     set: {
       summary:
@@ -1791,6 +1850,7 @@ export const REGISTRY: Registry = {
       options: { json: { type: 'boolean', desc: '结构化输出' } },
       examples: ['ccm agent list', 'ccm agent list --board /abs/x.board.json --json'],
       handler: 'agent.list',
+      outputSchema: { keys: ['count', 'buckets', 'agents', 'stale_candidates'] },
     },
     show: {
       summary: '单 agent 钻取（record + attach 命令 + transcript 路径 + probe 新鲜度 + links）',
@@ -1829,6 +1889,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm peers', 'ccm peers --json', 'ccm peers --freshness-sec 300 --json'],
       handler: 'peers.list',
+      outputSchema: { keys: ['peers', 'pools', 'count', 'freshness_sec', 'as_of'] },
     },
   },
 
@@ -1949,6 +2010,21 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm usage show', 'ccm usage show --accounts current --json'],
       handler: 'usage.show',
+      outputSchema: {
+        keys: [
+          'available',
+          'accounts_scope',
+          'effective_n',
+          'agent_summary',
+          'current',
+          'accounts',
+          'registry_present',
+          'as_of',
+          'source',
+          'confidence',
+          'refresh_hint',
+        ],
+      },
     },
     advise: {
       summary: '单侧 verdict（hold|throttle|switch|stop_5h|stop_7d）+ lever + switch_candidate',
@@ -1960,6 +2036,27 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm usage advise', 'ccm usage advise --effective-n 3 --json'],
       handler: 'usage.advise',
+      outputSchema: {
+        keys: [
+          'verdict',
+          'reason',
+          'levers',
+          'strength',
+          'stop_dimension',
+          'nearest_reset',
+          'window_5h_pct',
+          'window_7d_pct',
+          'window_billing_period_pct',
+          'billing_period_resets_at',
+          'effective_n',
+          'switch_candidate',
+          'confidence',
+          'source',
+          'as_of',
+          'available',
+          'refresh_hint',
+        ],
+      },
     },
     'task-cost': {
       summary: '单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）',
@@ -1980,6 +2077,18 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm usage task-cost T7', 'ccm usage task-cost --group-by executor --json'],
       handler: 'usage.taskCost',
+      outputSchema: {
+        keys: [
+          'group_by',
+          'scope',
+          'groups',
+          'total',
+          'coverage_pct',
+          'history_n',
+          'source',
+          'confidence',
+        ],
+      },
     },
     'burn-rate': {
       summary: '配额%-burn-rate（Δused%/Δtime·账户权威·5h+7d·window-elapsed·%/h）',
@@ -1991,6 +2100,17 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm usage burn-rate', 'ccm usage burn-rate --json'],
       handler: 'usage.burnRate',
+      outputSchema: {
+        keys: [
+          'available',
+          'five_hour',
+          'seven_day',
+          'source',
+          'as_of',
+          'confidence',
+          'refresh_hint',
+        ],
+      },
     },
     runway: {
       summary: '配额% runway（剩余走廊 ÷ burn → 距触顶 vs 距 reset·偿付力 headroom）',
@@ -2002,6 +2122,17 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm usage runway', 'ccm usage runway --json'],
       handler: 'usage.runway',
+      outputSchema: {
+        keys: [
+          'available',
+          'five_hour',
+          'seven_day',
+          'source',
+          'as_of',
+          'confidence',
+          'refresh_hint',
+        ],
+      },
     },
   },
 
@@ -2361,6 +2492,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm estimate show T7', 'ccm estimate show --scope this-repo --json'],
       handler: 'estimate.show',
+      outputSchema: { keys: ['scope', 'as_of', 'history_n', 'tasks'] },
     },
     forecast: {
       summary: '双通道 MC（估算-DAG + 吞吐）→ P50/P80/P95 ETA + makespan + CI/CRI/SSI',
@@ -2388,6 +2520,28 @@ export const REGISTRY: Registry = {
         'ccm estimate forecast --mode both --runs 5000 --seed 42 --json',
       ],
       handler: 'estimate.forecast',
+      outputSchema: {
+        keys: [
+          'forecast',
+          'makespan',
+          'throughput_days',
+          'criticality_index',
+          'schedule_sensitivity',
+          'consistency',
+          'mode',
+          'coverage_pct',
+          'confidence',
+          'history_n',
+          'scope',
+          'runs',
+          'seed',
+          'effective_n',
+          'as_of',
+          'source',
+          'deadline_risk',
+          'notes',
+        ],
+      },
     },
     evm: {
       summary: 'EVM + Earned Schedule（PV/EV/AC → CPI/EAC + SPI(t)·消费 board.baseline）',
@@ -2404,6 +2558,30 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm estimate evm', 'ccm estimate evm --ac-source token --json'],
       handler: 'estimate.evm',
+      outputSchema: {
+        keys: [
+          'has_baseline',
+          'baseline_captured_at',
+          'as_of',
+          'pv',
+          'ev',
+          'ac',
+          'spi',
+          'cpi',
+          'spi_t',
+          'sv_t',
+          'es_hours',
+          'at_hours',
+          'eac',
+          'ieac_t',
+          'etc',
+          'bac',
+          'vac',
+          'confidence',
+          'warnings',
+          'source',
+        ],
+      },
     },
     velocity: {
       summary: '历史吞吐 + burn-down/up（P50/P80）+ SLE（cycle-time P85/P95）',
@@ -2421,6 +2599,20 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm estimate velocity', 'ccm estimate velocity --window 14 --json'],
       handler: 'estimate.velocity',
+      outputSchema: {
+        keys: [
+          'scope',
+          'window_days',
+          'velocity_tasks_per_day',
+          'backlog',
+          'eta_days',
+          'sle',
+          'history_n',
+          'confidence',
+          'source',
+          'as_of',
+        ],
+      },
     },
     risk: {
       summary: '综合风险（CI/CRI/SSI + WIP-aging SLE + CCPM buffer_health）',
@@ -2439,6 +2631,21 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm estimate risk', 'ccm estimate risk --scope this-repo --json'],
       handler: 'estimate.risk',
+      outputSchema: {
+        keys: [
+          'scope',
+          'criticality_index',
+          'wip_aging',
+          'ccpm',
+          'sle',
+          'history_n',
+          'confidence',
+          'source',
+          'as_of',
+          'seed',
+          'runs',
+        ],
+      },
     },
     'cost-to-complete': {
       summary:
@@ -2461,6 +2668,27 @@ export const REGISTRY: Registry = {
         'ccm estimate cost-to-complete --scope this-repo --seed 42 --json',
       ],
       handler: 'estimate.costToComplete',
+      outputSchema: {
+        keys: [
+          'cost_to_complete_pct',
+          'mean_pct',
+          'backlog',
+          'burn_pct_per_hour',
+          'burn_used_pct',
+          'burn_method',
+          'per_unit_samples',
+          'token_sizing',
+          'scope',
+          'runs',
+          'seed',
+          'as_of',
+          'source',
+          'confidence',
+          'available',
+          'history_n',
+          'notes',
+        ],
+      },
     },
     'deadline-risk': {
       summary:
@@ -2487,6 +2715,33 @@ export const REGISTRY: Registry = {
         'ccm estimate deadline-risk --scope this-board --seed 42 --json',
       ],
       handler: 'estimate.deadlineRisk',
+      outputSchema: {
+        keys: [
+          'deadline',
+          'deadline_state',
+          'as_of',
+          'time_remaining_hours',
+          'on_time_probability',
+          'on_time_probability_source',
+          'forecast',
+          'margin',
+          'risk_band',
+          'strength',
+          'channels',
+          'channel_disagreement',
+          'coverage_pct',
+          'confidence',
+          'history_n',
+          'scope',
+          'calibration_status',
+          'top_drivers',
+          'runs',
+          'rcpsp_runs',
+          'seed',
+          'source',
+          'notes',
+        ],
+      },
     },
   },
 
@@ -2595,6 +2850,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm account list', 'ccm account list --probe-keychain --json'],
       handler: 'account.list',
+      outputSchema: { keys: ['registry', 'count', 'accounts'] },
     },
     switch: {
       summary:
@@ -2684,6 +2940,7 @@ export const REGISTRY: Registry = {
         'ccm harness list --machine-wide --json',
       ],
       handler: 'harness.list',
+      outputSchema: { keys: ['current', 'installed', 'installedSurfaces', 'harnesses'] },
     },
     current: {
       summary:
@@ -2695,6 +2952,7 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm harness current', 'ccm --harness codex harness current --json'],
       handler: 'harness.current',
+      outputSchema: { keys: ['current', 'harness'] },
     },
   },
 
