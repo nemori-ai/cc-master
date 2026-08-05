@@ -95,7 +95,7 @@ function sameIdSet(left, right) {
   return a.every((value, index) => value === b[index]);
 }
 
-function deriveVerdict(scoresheet, metricGatesOk) {
+export function deriveVerdict(scoresheet, metricGatesOk) {
   if (!metricGatesOk) return 'reject';
   const d1 = scoresheet?.D1?.score;
   const d2 = scoresheet?.D2?.score;
