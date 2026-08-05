@@ -72,6 +72,8 @@ export {
   STATUS_ENUM,
   weaklyConnectedComponents,
 } from './board-lint-core.js';
+// ── board-lint-remediation（每条规则的兜底「怎么修」·emit() 在消息未自带修法时追加）──
+export { RULE_REMEDIATION } from './board-lint-remediation.js';
 export type { LockOptions } from './board-lock.js';
 // ── board-lock（acquire / release / withLock / isLocked / lockPathFor）──
 export {

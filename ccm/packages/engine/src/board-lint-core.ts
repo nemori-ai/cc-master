@@ -24,6 +24,7 @@
 //   静态 import；UMD 尾导出（module.exports / globalThis.__ccmBoardLintCore）已删除，换成命名导出。
 //   逻辑、规则码、报错文案、级别分流逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
+import { RULE_REMEDIATION } from './board-lint-remediation.js';
 import {
   durationHours,
   ENUMS,
@@ -117,7 +118,13 @@ export function lintBoard(text: string, opts?: { now?: number | string }): LintR
   const emit: Emit = (id, message, task) => {
     const lvl = levelOf(id) || 'hard';
     if (lvl === 'reserved') return;
-    const entry: LintEntry = task ? { rule: id, message, task } : { rule: id, message };
+    // 每条诊断都要能自己说清补救动作。单点特化的修法直接写在消息里（此处不覆盖）；
+    // 没写的由按规则码索引的兜底表补上。理由见 board-lint-remediation.ts 卷首：
+    // 「怎么修」原本的唯一陈述处是一份要靠人锁步维护的文档副本——接口不会过期，副本会。
+    const remediation = RULE_REMEDIATION[id];
+    const full =
+      message.includes('怎么修') || !remediation ? message : `${message}\n  怎么修：${remediation}`;
+    const entry: LintEntry = task ? { rule: id, message: full, task } : { rule: id, message: full };
     (lvl === 'warn' ? warnings : errors).push(entry);
   };
 
@@ -359,8 +366,8 @@ export function lintBoard(text: string, opts?: { now?: number | string }): LintR
     if (overdue.overdue) {
       const msg =
         overdue.kind === 'soft'
-          ? `软性交付 DDL（${overdue.at}）已过期而交付未验收完成——提示但不阻断：建议向用户同步当前进度/剩余交付物，可继续推进（软目标超期不强制停派）。`
-          : `交付 DDL（${overdue.at}）已过期而全局 acceptance 未完成；先向用户报告当前状态/剩余交付物/方案，再由用户裁决延期（\`ccm goal deadline amend --user-authorized\`）/缩范围（\`ccm goal amend\`）/分阶段/终止——不得为按期静默降低验收或伪造完成。`;
+          ? `软性交付 DDL（${overdue.at}）已过期而交付未验收完成——提示但不阻断。\n  怎么修：向用户同步当前进度与剩余交付物后可继续推进；软目标超期不强制停派，也不得为按期静默降低验收。`
+          : `交付 DDL（${overdue.at}）已过期而全局 acceptance 未完成。\n  怎么修：先向用户报告当前状态/剩余交付物/方案，再由用户裁决延期（\`ccm goal deadline amend --user-authorized\`）/缩范围（\`ccm goal amend\`）/分阶段/终止——不得为按期静默降低验收或伪造完成。`;
       emit('BIZ-DEADLINE-OVERDUE', msg);
     }
   }
