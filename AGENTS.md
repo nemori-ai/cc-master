@@ -374,6 +374,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 写新 ADR / 援引现有 ADR / 判断 ADR-vs-design_docs | [`adrs/AGENTS.md`](adrs/AGENTS.md) + [`adrs/`](adrs/) |
 | 落 dogfood 发现 / 援引已踩反模式 | [`design_docs/dogfood-findings.md`](design_docs/dogfood-findings.md) |
 | 援引设计留痕 / 有意排除的决策 | [`design_docs/spec.md` §12](design_docs/spec.md) |
+| 判一条知识该留 / 压成线索 / 迁给接口 / 退役（汰换台账方法与判定）；或查「为什么不逐点做消融」「测试类型能授权哪种决定」 | [`design_docs/disposition-ledger/README.md`](design_docs/disposition-ledger/README.md)（方法 + 112 条环境事实判定 + 证据与两条撤回记录）|
 | 追踪六条愿景的落地 gap / 重审某能力兑现度 | [`design_docs/vision-landing-tracker.md`](design_docs/vision-landing-tracker.md)（兑现度矩阵 + 六张 gap 卡 + 排序讨论清单，living 追踪）|
 | 临时计划 / 草稿（不进版本控制）| 写在 `design_docs/plans/`（gitignored），不进正式 design_docs |
 | 装 / 用插件（用户视角）| [`README.md`](README.md) / [`README_zh.md`](README_zh.md) |
