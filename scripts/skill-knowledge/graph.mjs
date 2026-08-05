@@ -11,6 +11,7 @@ import {
 import { attestInventoryEntry } from './inventory.mjs';
 import { loadKnowledgeSource } from './loader.mjs';
 import { extractMarkers } from './markers.mjs';
+import { isUnassignedModule, unassignedModuleIds } from './unassigned.mjs';
 import {
   analyzeAgainstGraph,
   compositionToSkillView,
@@ -398,16 +399,33 @@ export function buildAndValidateGraph({
     }
   }
 
+  // 知识的存在性与它是否被分发，是两件正交的事。
+  //
+  // 这里曾无条件要求「每个模块都必须被某个 admitted composition 消费」，于是因果是反的——
+  // 先有 skill，知识才被允许存在。那让图退化成 skill 的索引，而不是独立的知识库。做一道菜
+  // 可以备一批食材，不强制每样都用上。
+  //
+  // 但也不能一刀放开：**有意留作备料的知识，和忘了接线的知识，在图上长得一模一样**。全放开
+  // 就从过严掉进过松，将来谁加了模块忘了归属，没有任何东西会提醒。
+  //
+  // 故以 `lifecycle.state: "draft"` 作为「尚未分配给任何 skill」的显式声明：
+  //   draft    + 无消费者  → 合法备料，不报错；由 report 单列，保持可见
+  //   accepted + 无消费者  → 仍是错误：它自称已定稿，却没有任何 skill 分发它
+  // 备料是有意为之，遗忘不是，两者必须分得开。
   for (const moduleDoc of modules) {
     const consumers = moduleConsumers.get(moduleDoc.id) ?? [];
-    if (!skipCompositionAdmission && consumers.length === 0) {
+    const unassignedByDesign = isUnassignedModule({
+      lifecycle: moduleDoc.data?.lifecycle,
+      consumers,
+    });
+    if (!skipCompositionAdmission && consumers.length === 0 && !unassignedByDesign) {
       pushError(diagnostics, {
-        code: 'SKG-OWNERSHIP-ORPHAN',
-        message: `Global module is not consumed by any admitted composition: ${moduleDoc.id}`,
+        code: 'SKG-MODULE-UNCONSUMED',
+        message: `Accepted module is not consumed by any admitted composition: ${moduleDoc.id}`,
         location: moduleDoc.path,
-        witness: { module: moduleDoc.id, path: moduleDoc.path },
+        witness: { module: moduleDoc.id, path: moduleDoc.path, lifecycle: moduleDoc.data?.lifecycle?.state ?? null },
         remediation:
-          'Add the module to an accepted composition.consumes.modules list with derived admit.',
+          'Either add the module to an accepted composition.consumes.modules list, or mark it lifecycle.state="draft" to declare it as intentionally unassigned knowledge.',
         exitCode: 4,
       });
     }
@@ -468,6 +486,10 @@ export function buildAndValidateGraph({
     }
   }
 
+  // 这条与上面那条模块检查曾共用 `SKG-OWNERSHIP-ORPHAN` 一个码，但它们管的是两件不同的事：
+  //   模块无消费者     = 备了食材没用上 —— 未必是错误（见上）
+  //   skill 未被引用   = 菜做好了没上桌 —— 确实是错误，保留
+  // 同码导致两者无法区分、无法分别处置，故上面那条已改用 SKG-MODULE-UNCONSUMED，本条保持原码。
   for (const skillDoc of skills) {
     const skill = skillDoc.data;
     if (!portfolioSkillRefs.has(skill.id)) {
@@ -1031,9 +1053,19 @@ export function buildAndValidateGraph({
     }
 
     // Router budget soft check using deterministic estimator over cue/summary text.
+    //
+    // 只统计**真的会出现在路由面上**的模块。尚未分配给任何 skill 的备料（draft + 零消费者，
+    // 判据与上面 SKG-MODULE-UNCONSUMED 完全同一个）不进任何 composition，因而不进任何
+    // entry 的路由表——它的 cue 与 intent 现在一个 token 都不烧。把它算进来，量的是一笔
+    // 没人付的成本，还会让「知识先立、skill 后组」在攒到十几条时被一道假闸卡死。
+    //
+    // 这不是给备料开豁免：它被 admit 进 composition 的那一刻，成本就变成真的、立刻计入。
+    // 延后的那部分由 report 的 unassigned_knowledge 持续挂账，不会在阶段 C 突然冒出来。
+    const parked = unassignedModuleIds(modules, (item) => moduleConsumers.get(item.id) ?? []);
+    const routableModules = modules.filter((item) => !parked.has(item.id));
     const atlasText = [
       ...(portfolio.entries ?? []).flatMap((entry) => entry.recognition_cues ?? []),
-      ...modules.flatMap((item) => [
+      ...routableModules.flatMap((item) => [
         item.data.intent,
         ...(item.data.recognition_cues ?? []),
       ]),

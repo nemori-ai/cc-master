@@ -1,0 +1,163 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:delivery.scope-restraint",
+  "title": "过交付的两种形态",
+  "intent": "补上过交付侧缺失的统一原则——问题不放大、边界外不顺手做。",
+  "recognition_cues": [
+    "顺手把旁边的也做了",
+    "这个需求背后其实是更深的结构问题",
+    "做得更多是不是更好"
+  ],
+  "boundary": {
+    "includes": [
+      "问题界定层面的不放大",
+      "边界外发现该报告而非该动手"
+    ],
+    "excludes": [
+      "方案选择层面的从简",
+      "欠交付侧的护栏"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:delivery.no-inflation",
+      "point:delivery.no-overreach"
+    ],
+    "rationale": "界定一件事该做多少时召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：过交付侧无统一道层原则已由内容轴实测确认，归入哪个 skill 待结构重排时统一决定。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:delivery.scope-restraint"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.delivery.scope-restraint"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:delivery.no-inflation",
+      "title": "不要把简单问题放大成复杂问题",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "从简纪律管的是同一目标下的方案选择，管不到目标本身被放大；只问一句——你在解的是被要求的问题还是它更一般的版本。",
+      "recognition_cues": [
+        "这里其实缺一层抽象",
+        "顺便把这类问题一起解决"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/delivery.no-inflation.md",
+        "marker": "point:delivery.no-inflation",
+        "heading_hint": "不要把简单问题放大成复杂问题"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:delivery.no-inflation"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:delivery.no-inflation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.delivery.no-inflation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:delivery.no-overreach",
+      "title": "不要做边界之外的工作",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "顺手做会稀释审阅面、弄脏回滚、让验收判据对不上；看见了就报告，要不要做由目标的主人决定。",
+      "recognition_cues": [
+        "路过顺手重构一下",
+        "发现另一个问题一并修了"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/delivery.no-overreach.md",
+        "marker": "point:delivery.no-overreach",
+        "heading_hint": "不要做边界之外的工作"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:delivery.no-overreach"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:delivery.no-overreach"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.delivery.no-overreach"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:delivery.inflation-vs-overreach",
+      "type": "contrasts_with",
+      "from": "point:delivery.no-inflation",
+      "to": "point:delivery.no-overreach",
+      "when": [
+        "分不清这次多做的是同一个问题的更大版本，还是另一个问题"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:delivery.scope-restraint"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.delivery.inflation-vs-overreach"
+          }
+        ]
+      }
+    }
+  ]
+}

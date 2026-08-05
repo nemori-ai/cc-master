@@ -1,0 +1,405 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:preference.defaults",
+  "title": "实施倾向与让位机制",
+  "intent": "在具体做法上给出缺省倾向，同时守住让位于项目自身约定的形状与举证责任。",
+  "recognition_cues": [
+    "这件事该按什么习惯做",
+    "项目没规定时默认怎么办",
+    "评审要看哪几个维度",
+    "反复评不过怎么办"
+  ],
+  "boundary": {
+    "includes": [
+      "三级让位与举证责任",
+      "隔离实施 / 文档对齐 / 评审维度 / 不收敛作信号四条缺省"
+    ],
+    "excludes": [
+      "项目的硬约束与红线",
+      "提交权与收口方式这类必须去项目里发现的约定"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:preference.precedence"
+    ],
+    "rationale": "具体做法上需要一个缺省、或怀疑该让位于项目约定时召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：内容轴已写死本模块结构，但归入哪个 skill 待结构重排时统一决定。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:preference.defaults"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.preference.defaults"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:preference.precedence",
+      "title": "倾向是缺省值，不是规则",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "三级让位——项目显式规则 > 项目隐含惯例 > 兜底倾向；声称项目另有约定的一方必须给出文件行或既有代码位置，推测不算证据。",
+      "recognition_cues": [
+        "这个项目没明说该怎么办",
+        "我觉得这个项目偏好某种做法"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/preference.precedence.md",
+        "marker": "point:preference.precedence",
+        "heading_hint": "倾向是缺省值，不是规则"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:preference.precedence"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:preference.precedence"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.preference.precedence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:preference.isolated-implementation",
+      "title": "默认隔离实施",
+      "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
+      "summary": "写文件的实施默认在自己的工作树里做，并行时一 hub 一执行者一树；分界在会不会并发而非改了几行；收口约定必须去项目里发现，不能带预设进去。",
+      "recognition_cues": [
+        "就改一行要不要开工作树",
+        "并行实施怎么隔离"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/preference.isolated-implementation.md",
+        "marker": "point:preference.isolated-implementation",
+        "heading_hint": "默认隔离实施"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:preference.isolated-implementation"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:preference.isolated-implementation"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.preference.isolated-implementation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:preference.doc-alignment",
+      "title": "文档对齐：先读齐，改完回写",
+      "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
+      "summary": "实施前把相关文档读齐、改完把不再成立的文字改过来；判据是这次改动让哪些文字失效，不是改动大不大。",
+      "recognition_cues": [
+        "改完要不要更新文档",
+        "要不要为这个改动写设计文档"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/preference.doc-alignment.md",
+        "marker": "point:preference.doc-alignment",
+        "heading_hint": "文档对齐：先读齐，改完回写"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:preference.doc-alignment"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:preference.doc-alignment"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.preference.doc-alignment"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:preference.review-scoping",
+      "title": "评审评哪些维度",
+      "point_kind": "procedure",
+      "failure_mode": "motivation_conflict",
+      "summary": "维度数量随「错了的代价」伸缩而非改动大小；每个维度要落到具体判据，跑固定全维度清单是用穷举替代判断。",
+      "recognition_cues": [
+        "这次评审要看什么",
+        "评审维度清单"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/preference.review-scoping.md",
+        "marker": "point:preference.review-scoping",
+        "heading_hint": "评审评哪些维度"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:preference.review-scoping"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:preference.review-scoping"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.preference.review-scoping"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:preference.non-convergence-as-signal",
+      "title": "不收敛是诊断信号，不只是熔断条件",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "轮次计数是验收侧自动累积的上游盲区证据；回溯前对照三条硬判据，两条以上命中才回溯，否则那是想换个题目做。",
+      "recognition_cues": [
+        "第几轮了还没评过",
+        "评审轮次逼近上限"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/preference.non-convergence-as-signal.md",
+        "marker": "point:preference.non-convergence-as-signal",
+        "heading_hint": "不收敛是诊断信号，不只是熔断条件"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:preference.non-convergence-as-signal"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:preference.non-convergence-as-signal"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.preference.non-convergence-as-signal"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:preference.root-to-isolation",
+      "type": "deepens_to",
+      "from": "point:preference.precedence",
+      "to": "point:preference.isolated-implementation",
+      "when": [
+        "要定这次实施在哪棵树上做"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:preference.defaults"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.preference.root-to-isolation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:preference.root-to-doc",
+      "type": "deepens_to",
+      "from": "point:preference.precedence",
+      "to": "point:preference.doc-alignment",
+      "when": [
+        "要定这次改动牵动哪些文档"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:preference.defaults"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.preference.root-to-doc"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:preference.root-to-review",
+      "type": "deepens_to",
+      "from": "point:preference.precedence",
+      "to": "point:preference.review-scoping",
+      "when": [
+        "要定这次评审铺开到哪几个维度"
+      ],
+      "path_role": "next",
+      "order": 3,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:preference.defaults"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.preference.root-to-review"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:preference.root-to-nonconvergence",
+      "type": "deepens_to",
+      "from": "point:preference.precedence",
+      "to": "point:preference.non-convergence-as-signal",
+      "when": [
+        "评审反复不过，要定继续修还是回溯上游"
+      ],
+      "path_role": "next",
+      "order": 4,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:preference.defaults"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.preference.root-to-nonconvergence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:preference.review-vs-nonconvergence",
+      "type": "contrasts_with",
+      "from": "point:preference.review-scoping",
+      "to": "point:preference.non-convergence-as-signal",
+      "when": [
+        "分不清这次评不过是维度选错了，还是上游有盲区"
+      ],
+      "path_role": "contrast",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:preference.defaults"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.preference.review-vs-nonconvergence"
+          }
+        ]
+      }
+    }
+  ]
+}

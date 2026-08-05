@@ -9,7 +9,8 @@ import {
 import { loadPublishedBehaviorEvidence } from './behavior-eval.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
 import { buildAndValidateGraph, resolveEntityId, shortestPath } from './graph.mjs';
-import { compareCodePoint } from './hash.mjs';
+import { compareCodePoint, estimateBudget } from './hash.mjs';
+import { isUnassignedModule } from './unassigned.mjs';
 
 const HOSTS = new Set(HARDENING_CONTRACT.C9.hosts);
 const REPORT_FORMATS = new Set(['json', 'markdown']);
@@ -92,9 +93,40 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
     behavioral_evidence_status: behavioralEvidence,
     capabilities: { ...CAPABILITIES },
     ...(built.graph ? { failure_mode_profile: buildFailureModeProfile(built.graph) } : {}),
+    ...(built.graph ? { unassigned_knowledge: buildUnassignedKnowledge(built.graph) } : {}),
     diagnostics: publicDiagnostics(diagnostics),
   });
   return { exitCode, body };
+}
+
+/**
+ * 图上有、但尚未进入任何 skill 的知识。
+ *
+ * 允许模块以 `lifecycle.state:"draft"` 无消费者地存在（知识的存在性与是否被分发是两件事），
+ * 但"允许存在"不能滑成"允许被遗忘"——所以它必须在这里持续可见。备料是有意为之，遗忘不是；
+ * 这一节就是把前者摆在明面上，让后者无处藏身。
+ */
+function buildUnassignedKnowledge(graph) {
+  const modules = (graph.modules ?? []).filter(isUnassignedModule);
+  const pointCount = modules.reduce((sum, m) => sum + (m.points?.length ?? 0), 0);
+  // 这批知识现在不占路由预算（不在任何 composition 里，就不在任何 entry 的路由表上），
+  // 但被 admit 的那一刻会全额计入。挂在这里，是为了让阶段 C 的那笔账**现在就能看见**——
+  // 否则一批备料同时转正，会表现为路由预算毫无预兆地爆掉。
+  const deferredAtlasText = modules
+    .flatMap((m) => [m.intent, ...(m.recognition_cues ?? [])])
+    .filter(Boolean)
+    .join('\n');
+  return {
+    module_count: modules.length,
+    point_count: pointCount,
+    deferred_atlas_tokens: estimateBudget(deferredAtlasText).estimated_tokens,
+    modules: modules.map((m) => ({
+      id: m.id,
+      title: m.title ?? null,
+      points: (m.points ?? []).length,
+      since: m.lifecycle?.since ?? null,
+    })),
+  };
 }
 
 // Buckets every authored point (each point carries exactly one `failure_mode`,

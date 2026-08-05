@@ -1,0 +1,235 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:dispatch.prompt-craft",
+  "title": "派发 prompt 的道与红线",
+  "intent": "教契约字段之外的正文该长什么形状、约束到什么程度算刚好、哪几条绝不能写与绝不能省。",
+  "recognition_cues": [
+    "派发单该写多细",
+    "要不要把实现方案写进派发指令",
+    "worker 做偏了是不是没说清楚"
+  ],
+  "boundary": {
+    "includes": [
+      "派发正文的五块形状",
+      "补信息与替它判断的分界",
+      "绝不能写与绝不能省的清单"
+    ],
+    "excludes": [
+      "契约必须含哪些字段",
+      "面向特定模型的措辞结构偏好",
+      "该不该派发这件事"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:dispatch.prompt-shape"
+    ],
+    "rationale": "写派发 prompt 时召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：内容轴指定的落点是既有派发链上的点而非新模块，但那些模块已被 composition 消费，加点要同步文章清单。故先以 draft 模块立住，归并到派发链留到结构重排时一并做。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:dispatch.prompt-craft"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.dispatch.prompt-craft"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:dispatch.prompt-shape",
+      "title": "派发 prompt 该长什么形状",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "给目标和判据不给步骤和方案；背景/目标/边界/自证/求助条件五块；分界是它拿不到还是它做不到——删了会做错的是信息，删了只是做法不同的是你的偏好。",
+      "recognition_cues": [
+        "派发单正文写什么",
+        "要不要把步骤列给 worker"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/dispatch.prompt-shape.md",
+        "marker": "point:dispatch.prompt-shape",
+        "heading_hint": "派发 prompt 该长什么形状"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:dispatch.prompt-shape"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:dispatch.prompt-shape"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.dispatch.prompt-shape"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:dispatch.prompt-calibration",
+      "title": "约束到什么程度算刚好",
+      "point_kind": "decision_rule",
+      "failure_mode": "motivation_conflict",
+      "summary": "每句问一次是在补它拿不到的信息还是替它做它能做的判断；已会的别教、验收与升级条件不能省、项目事实指路径别抄、实现方案别写死——钉死方案换来的确定性代价是失去第二双眼睛。",
+      "recognition_cues": [
+        "派发单是不是写太细了",
+        "多说一句总没坏处吧"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/dispatch.prompt-calibration.md",
+        "marker": "point:dispatch.prompt-calibration",
+        "heading_hint": "约束到什么程度算刚好"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:dispatch.prompt-calibration"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:dispatch.prompt-calibration"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.dispatch.prompt-calibration"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:dispatch.prompt-red-lines",
+      "title": "派发 prompt 的最小约束红线",
+      "point_kind": "boundary",
+      "failure_mode": "motivation_conflict",
+      "summary": "绝不能写：已想好的方案分解、凭据与原始输入、未经验证的事实；绝不能省：可自证的完成判据、求助条件、并行隔离位置、最小背景。钉死方案是指挥不演奏的隐蔽违反——问一句「若执行者比你更懂，哪句会挡它的路」。",
+      "recognition_cues": [
+        "派发单里什么绝对不能写",
+        "把方案写死给 worker 行不行"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/dispatch.prompt-red-lines.md",
+        "marker": "point:dispatch.prompt-red-lines",
+        "heading_hint": "派发 prompt 的最小约束红线"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:dispatch.prompt-red-lines"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:dispatch.prompt-red-lines"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.dispatch.prompt-red-lines"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:dispatch.shape-to-calibration",
+      "type": "deepens_to",
+      "from": "point:dispatch.prompt-shape",
+      "to": "point:dispatch.prompt-calibration",
+      "when": [
+        "形状定了，要判具体每一句该不该留"
+      ],
+      "path_role": "next",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:dispatch.prompt-craft"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.dispatch.shape-to-calibration"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:dispatch.calibration-to-red-lines",
+      "type": "next",
+      "from": "point:dispatch.prompt-calibration",
+      "to": "point:dispatch.prompt-red-lines",
+      "when": [
+        "品味有伸缩空间，要确认哪几条没有"
+      ],
+      "path_role": "check",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:dispatch.prompt-craft"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.dispatch.calibration-to-red-lines"
+          }
+        ]
+      }
+    }
+  ]
+}

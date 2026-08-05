@@ -34,6 +34,7 @@ import {
   skillAnchorId,
 } from './paths.mjs';
 import { buildRuntimeRouterPlan } from './runtime-router-plan.mjs';
+import { unassignedModuleIds } from '../unassigned.mjs';
 
 export const NAV_END = '<!-- ccm:k:nav:end -->';
 export const RUNTIME_ROUTER_START = '<!-- ccm:k:generated -->';
@@ -619,7 +620,16 @@ export function buildEntryPinBlock({
     ? buildRuntimeRouterPlan({ host, graph })
     : null;
   const pointById = new Map((graph.points ?? []).map((item) => [item.id, item]));
-  const modules = [...(graph.modules ?? [])].sort((a, b) => a.id.localeCompare(b.id));
+  // 发布表面只挂已经属于某个 skill 的知识。备料没有 skill-local 落位,挂上去的链接会指向
+  // repo-only 的知识路由页,而发布物不得引用那里。
+  //
+  // 这里必须自己滤一遍,不能指望上游:进入发布链的入口有两个——`runCompile`(在入口把图收窄
+  // 成发布集)与受信投影的规划器(直接调本函数)。后者不经过前者,所以「上游已经滤过了」这个
+  // 假设在这条路径上不成立。判据本身仍是同一个,见 unassigned.mjs。
+  const parked = unassignedModuleIds(graph.modules ?? []);
+  const modules = [...(graph.modules ?? [])]
+    .filter((item) => !parked.has(item.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const surface = (entry.surfaces ?? []).find((item) => item.host === host);
   if (!surface) {
     throw new SkillOverlayError(

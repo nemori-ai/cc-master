@@ -181,6 +181,9 @@
     "failure_mode_profile": {
       "$ref": "#/$defs/failureModeProfile"
     },
+    "unassigned_knowledge": {
+      "$ref": "#/$defs/unassignedKnowledge"
+    },
     "improvement_claim": {
       "type": "string",
       "minLength": 1
@@ -1011,6 +1014,67 @@
             },
             "governance_meta_skill_is_runtime": {
               "const": false
+            }
+          }
+        }
+      }
+    },
+    "unassignedKnowledge": {
+      "description": "图上有、但尚未进入任何 skill 的知识：lifecycle.state 为 draft 且无消费者的模块。知识的存在性与它是否被分发是两件正交的事，故这类模块合法；但「允许存在」不能滑成「允许被遗忘」，所以它必须在报告里持续可见。",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_count",
+        "point_count",
+        "deferred_atlas_tokens",
+        "modules"
+      ],
+      "properties": {
+        "module_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "point_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deferred_atlas_tokens": {
+          "description": "这批备料现在不计入路由预算（不在任何 composition 里就不在任何 entry 的路由表上），但被 admit 时会全额计入。挂账在此，是为了让那笔延后的成本现在就可见，而不是在一批备料同时转正时表现为路由预算无预兆爆掉。",
+          "type": "integer",
+          "minimum": 0
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "points",
+              "since"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^module:[a-z0-9][a-z0-9.-]*$"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "points": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "since": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         }

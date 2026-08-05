@@ -57,6 +57,7 @@ const KNOWLEDGE_ROOT = 'plugin/src/knowledge';
 const PORTFOLIO_JSON = `${KNOWLEDGE_ROOT}/portfolio.json`;
 const GUIDE_COMPOSITION_JSON = `${KNOWLEDGE_ROOT}/compositions/skill.master-orchestrator-guide.json`;
 const ENDPOINT_MODULE_JSON = `${KNOWLEDGE_ROOT}/graph/modules/verification.endpoint.json`;
+const NEVER_PLAY_MODULE_JSON = `${KNOWLEDGE_ROOT}/graph/modules/conduct.never-play.json`;
 const POINTS_DIR = `${KNOWLEDGE_ROOT}/points`;
 
 const readSourceJson = (root, relative) =>
@@ -405,8 +406,37 @@ test('SKG-PILOT-07: ownership tree rejects bad refs, orphans, and broken entry c
       );
       writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
     }, () => {
-      const result = checkK1(isoCli, 'ownership orphan module');
-      assertFailsClosed(result, 'SKG-OWNERSHIP-ORPHAN', 'orphan module');
+      // 该模块仍是 lifecycle.state:"accepted" —— 自称已定稿却没有任何 skill 分发它，仍必须 fail closed。
+      // 诊断码由 SKG-OWNERSHIP-ORPHAN 改为 SKG-MODULE-UNCONSUMED：前者原本同时管「模块没被消费」
+      // 和「skill 产物没被 portfolio 引用」两件事，共用一码导致两者无法区分、无法分别处置。
+      const result = checkK1(isoCli, 'unconsumed accepted module');
+      assertFailsClosed(result, 'SKG-MODULE-UNCONSUMED', 'unconsumed accepted module');
+    });
+
+    // 反向：同样摘出模块，但把它标成 draft —— 这是"有意留作备料的知识"的显式声明，必须放行。
+    // 知识的存在性与它是否被分发是两件正交的事：做一道菜可以备一批食材，不强制每样都用上。
+    // 但放行不等于可以消失，所以 report 必须把它列进 unassigned_knowledge —— 备料是有意为之，
+    // 遗忘不是，两者必须分得开。这条用例守的就是这个区分；没有它，将来谁把豁免删掉都不会报警。
+    withMutation(root, [GUIDE_COMPOSITION_JSON, NEVER_PLAY_MODULE_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.consumes.modules = composition.consumes.modules.filter(
+        (ref) => ref.id !== 'module:conduct.never-play',
+      );
+      composition.entry_modules = (composition.entry_modules ?? []).filter(
+        (id) => id !== 'module:conduct.never-play',
+      );
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+      const moduleDoc = readSourceJson(root, NEVER_PLAY_MODULE_JSON);
+      moduleDoc.lifecycle.state = 'draft';
+      writeSourceJson(root, NEVER_PLAY_MODULE_JSON, moduleDoc);
+    }, () => {
+      const result = checkK1(isoCli, 'draft module may stay unconsumed');
+      const codes = (result.diagnostics ?? []).map((item) => item.code);
+      assert.equal(
+        codes.includes('SKG-MODULE-UNCONSUMED'),
+        false,
+        'a draft module declared as intentionally unassigned must not be reported as unconsumed',
+      );
     });
 
     // Entry target chain: missing skill / wrong module / cross-module point.
@@ -623,6 +653,58 @@ test('SKG-PILOT-11: duplicate entry ids fail K-I01 even when bodies differ', asy
       const hit = assertFailsClosed(result, 'SKG-ID-DUPLICATE', 'duplicate entry id');
       assert.equal(hit.witness.id, 'entry:master-orchestrator');
       assert.ok(hit.remediation);
+    });
+  });
+});
+
+test('SKG-PILOT-12: router budget counts routable modules only, and still bites', async () => {
+  await withIsolatedSkillKnowledgeRepo(({ repoRoot: root, runCli: isoCli }) => {
+    // 路由预算量的是**会出现在路由面上**的 cue/intent。尚未分配给任何 skill 的备料
+    // （draft + 零消费者）不进任何 composition，也就不进任何 entry 的路由表，它现在
+    // 一个 token 都不烧——把它算进来，量的是一笔没人付的成本。
+    //
+    // 这条用例必须双向：只证"备料不计入"，等于允许有人把整个预算检查删掉也照样通过。
+    // 所以同一段膨胀文本，挂在备料上要放行，挂在真的会被路由到的模块上要拦下。
+    const inflate = (moduleDoc) => {
+      moduleDoc.recognition_cues = Array.from(
+        { length: 400 },
+        (_unused, index) => `膨胀到足以撑爆路由预算的识别线索 number ${index}`,
+      );
+    };
+
+    // 备料侧：摘出消费者 + 标 draft + 膨胀 → 必须放行。
+    withMutation(root, [GUIDE_COMPOSITION_JSON, NEVER_PLAY_MODULE_JSON], () => {
+      const composition = readSourceJson(root, GUIDE_COMPOSITION_JSON);
+      composition.consumes.modules = composition.consumes.modules.filter(
+        (ref) => ref.id !== 'module:conduct.never-play',
+      );
+      composition.entry_modules = (composition.entry_modules ?? []).filter(
+        (id) => id !== 'module:conduct.never-play',
+      );
+      writeSourceJson(root, GUIDE_COMPOSITION_JSON, composition);
+      const moduleDoc = readSourceJson(root, NEVER_PLAY_MODULE_JSON);
+      moduleDoc.lifecycle.state = 'draft';
+      inflate(moduleDoc);
+      writeSourceJson(root, NEVER_PLAY_MODULE_JSON, moduleDoc);
+    }, () => {
+      const { codes } = checkK1(isoCli, 'unassigned draft stays out of router budget');
+      assert.equal(
+        codes.includes('SKG-BUDGET-ROUTER'),
+        false,
+        'knowledge parked outside every composition must not be charged router budget',
+      );
+    });
+
+    // 可路由侧：同样的膨胀，模块仍被 composition 消费 → 必须拦下。
+    // 没有这一半，上一半就无法区分"豁免生效"与"检查根本不工作"。
+    withMutation(root, [NEVER_PLAY_MODULE_JSON], () => {
+      const moduleDoc = readSourceJson(root, NEVER_PLAY_MODULE_JSON);
+      inflate(moduleDoc);
+      writeSourceJson(root, NEVER_PLAY_MODULE_JSON, moduleDoc);
+    }, () => {
+      const result = checkK1(isoCli, 'consumed module still charged router budget');
+      const hit = assertFailsClosed(result, 'SKG-BUDGET-ROUTER', 'routable module over budget');
+      assert.ok(hit.witness?.budget, 'router budget overflow must carry a witness');
     });
   });
 });

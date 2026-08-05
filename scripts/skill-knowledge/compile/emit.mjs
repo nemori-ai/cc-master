@@ -13,6 +13,7 @@ import {
   posixRelative,
 } from './paths.mjs';
 import { buildRuntimeRouterPlan } from './runtime-router-plan.mjs';
+import { unassignedModuleIds } from '../unassigned.mjs';
 import {
   applyEntryPinOverlay,
   applyPointOverlaysToSkillMarkdown,
@@ -397,8 +398,19 @@ export function buildHostArtifacts({ host, graph, repoRoot, hostDistAbsolute = n
   const diagnostics = [];
   const routerPlan = buildRuntimeRouterPlan({ host, graph });
   const atlasPath = routerPlan.atlas.path;
-  const modules = [...graph.modules].sort((a, b) => a.id.localeCompare(b.id));
-  const points = [...graph.points].sort((a, b) => a.id.localeCompare(b.id));
+  // 只编译已经属于某个 skill 的知识。备料没有 skill-local 落位,放它进来不会得到「这块知识
+  // 还没归属」这种诊断,而是没落位报 MODULE-PLACEMENT、binding 落在 repo-only 根下报
+  // BINDING-PATH——一堆指错地方的错。
+  //
+  // 本函数是公开入口,受信投影的策略构建器会直接调它(不经 runCompile),所以这一道不能省。
+  // 判据见 ../unassigned.mjs,三个发布入口共用同一个定义。
+  const parked = unassignedModuleIds(graph.modules);
+  const modules = graph.modules
+    .filter((item) => !parked.has(item.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const points = graph.points
+    .filter((item) => !parked.has(item.module_id))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const pointById = new Map(points.map((point) => [point.id, point]));
 
   const trust = hostDistAbsolute

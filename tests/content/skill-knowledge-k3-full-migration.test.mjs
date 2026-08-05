@@ -27,7 +27,7 @@ function jsonFiles(relative) {
     .sort();
 }
 
-test('SKG-K3-01A-01: graph-only source has the frozen 47/250/429 inventory and eight artifact pairs', () => {
+test('SKG-K3-01A-01: graph-only source keeps eight artifact pairs and no module without a declared home', () => {
   assert.equal(
     fs.existsSync(path.join(knowledgeRoot, 'skills')),
     false,
@@ -37,13 +37,34 @@ test('SKG-K3-01A-01: graph-only source has the frozen 47/250/429 inventory and e
   const moduleFiles = jsonFiles('plugin/src/knowledge/graph/modules');
   const compositionFiles = jsonFiles('plugin/src/knowledge/compositions');
   const analysisFiles = jsonFiles('plugin/src/knowledge/analyses');
-  assert.equal(moduleFiles.length, 47);
   assert.equal(compositionFiles.length, 8);
   assert.equal(analysisFiles.length, 8);
 
   const modules = moduleFiles.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
-  assert.equal(modules.reduce((count, module) => count + module.points.length, 0), 250);
-  assert.equal(modules.reduce((count, module) => count + module.edges.length, 0), 429);
+
+  // 这里曾经冻着 47 个模块 / 250 个点 / 429 条边。那三个数不服务本用例的命题——它守的是
+  // 「授权源是 graph-only、没有遗留的 skill 清单或 owner 式成员关系」,而总量与此无关:
+  // 图上多一条尚未分配的知识既不引入 owner_skill,也不让 skills/ 目录复活。在「知识先立、
+  // skill 后组」之下多一条备料是常态动作,冻总量只会让每次立知识都要顺手改一次测试,
+  // 那道门很快会被当成噪声划掉。
+  //
+  // 真正该守的是**没有来路不明的模块**:每个模块要么被某个 composition 消费,要么显式
+  // 声明为尚未分配的备料。这一条在图长大时不动,而在有人加了模块却忘了接线时立刻报警。
+  const consumedModuleIds = new Set(
+    compositionFiles
+      .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
+      .flatMap((composition) => composition.consumes.modules.map((ref) => ref.id)),
+  );
+  const homeless = modules.filter(
+    (module) =>
+      !consumedModuleIds.has(module.id) && module.lifecycle?.state !== 'draft',
+  );
+  assert.deepEqual(
+    homeless.map((module) => module.id),
+    [],
+    'every module must be consumed by a composition or declared draft (intentionally unassigned)',
+  );
+
   for (const module of modules) {
     assert.equal(
       Object.prototype.hasOwnProperty.call(module, 'owner_skill'),
@@ -110,19 +131,44 @@ test('SKG-K3-01A-03: every runtime skill is an accepted, recomputable compositio
     true,
     JSON.stringify(built.diagnostics.filter((item) => item.severity === 'error').slice(0, 8)),
   );
+  // 冻住的是**产品面**：八个 skill、八个 composition、八份分析、八个 entry 一一对应。
+  // 这几个数变了,意味着 portfolio 的形状变了,那必须是一次显式决定。
   assert.deepEqual(
-    built.graph.counts,
     {
-      portfolio: 1,
-      skill: 8,
-      composition: 8,
-      candidate_analysis: 8,
-      module: 47,
-      point: 250,
-      edge: 429,
-      entry: 8,
-      change: 0,
+      portfolio: built.graph.counts.portfolio,
+      skill: built.graph.counts.skill,
+      composition: built.graph.counts.composition,
+      candidate_analysis: built.graph.counts.candidate_analysis,
+      entry: built.graph.counts.entry,
+      change: built.graph.counts.change,
     },
+    { portfolio: 1, skill: 8, composition: 8, candidate_analysis: 8, entry: 8, change: 0 },
+  );
+
+  // 而 module / point / edge 的**总量**曾经也冻在这里(47 / 250 / 429)。那是冻错了对象:
+  // 本用例守的是「每个 skill 都是可重算的准入 composition」,总量不服务这个命题;它只在
+  // 图上多一条知识时就报警,而在「知识先立、skill 后组」之下,多一条尚未分配的备料是常态
+  // 动作,不是回归。冻总量会把每一次立知识都变成一次改测试,那道门很快就会被当成噪声。
+  //
+  // 换成冻**被 admit 的 composition 实际消费的那部分**——它只在 skill 成员关系真的变动时
+  // 才移动,那正是本用例关心的东西。图上的备料随便长,不影响这个数。
+  const consumedModuleIds = new Set(
+    built.graph.compositions.flatMap((item) =>
+      item.consumes.modules.map((ref) => ref.id),
+    ),
+  );
+  const consumedPoints = built.graph.points.filter((point) =>
+    consumedModuleIds.has(point.module_id),
+  );
+  assert.deepEqual(
+    { modules: consumedModuleIds.size, points: consumedPoints.length },
+    { modules: 47, points: 250 },
+    'modules/points consumed by admitted compositions must not drift silently',
+  );
+  assert.ok(
+    built.graph.counts.module >= consumedModuleIds.size &&
+      built.graph.counts.point >= consumedPoints.length,
+    'graph totals must cover everything the admitted compositions consume',
   );
   assert.ok(
     built.graph.skills.every((skill) => skill._from_composition === true),

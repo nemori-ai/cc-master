@@ -1,0 +1,92 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:stopping.abandonment",
+  "title": "目标放弃的品味",
+  "intent": "补上停止判据缺失的那一侧——目标本身不值得继续时如何识别并交回给人。",
+  "recognition_cues": [
+    "跑了很久但前提可能变了",
+    "该不该继续推这个目标",
+    "沉没成本"
+  ],
+  "boundary": {
+    "includes": [
+      "前提被推翻 vs 进展艰难的判别",
+      "放弃时交回给人的形态"
+    ],
+    "excludes": [
+      "任务层的换方法重启",
+      "外部证据改变目标语义时的修订流程"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:stopping.abandon-goal"
+    ],
+    "rationale": "长程编排中怀疑目标前提时按需召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：护栏缺口已确认，归入哪个 skill 待结构重排时统一决定。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:stopping.abandonment"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.stopping.abandonment"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:stopping.abandon-goal",
+      "title": "什么时候该放弃这个目标",
+      "point_kind": "principle",
+      "failure_mode": "motivation_conflict",
+      "summary": "触发重议的是前提被推翻而非进展艰难；前提塌了要停下来公开交回给人，不要悄悄换掉目标继续跑。",
+      "recognition_cues": [
+        "投入很多但方向可能错了",
+        "还要不要继续做这件事"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/stopping.abandon-goal.md",
+        "marker": "point:stopping.abandon-goal",
+        "heading_hint": "什么时候该放弃这个目标"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:stopping.abandon-goal"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:stopping.abandon-goal"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.stopping.abandon-goal"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": []
+}
