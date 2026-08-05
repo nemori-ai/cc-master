@@ -19,6 +19,9 @@ import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { OUTPUT_SAMPLES } from '../src/generated/output-samples.js';
+import { sanitizeSample } from '../src/output-sample-sanitize.js';
+import { SAMPLE_POSITIONALS, SAMPLE_SEED_STEPS } from '../src/output-sample-seed.js';
 import { REGISTRY } from '../src/registry.js';
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ccm.cjs');
@@ -45,13 +48,12 @@ before(() => {
     const env = { ...process.env, CC_MASTER_HOME: dir };
     const q = (args: string[]) =>
       execFileSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env });
-    // board init --goal 已经立起 Goal Contract，再 goal set 会被拒（already active）。
-    q(['board', 'init', '--goal', `output contract conformance probe (${state})`]);
+    // rich 板必须与 gen-output-samples.mjs 用**同一份**种子（见 output-sample-seed.ts）：
+    // 两边种得不一样，样例核对就会红得毫无信息量。empty 板只建板不填内容。
     if (state === 'rich') {
-      q(['task', 'add', 'T1', '--title', 'probe task', '--estimate', '2h']);
-      q(['task', 'add', 'T2', '--title', 'downstream', '--deps', 'T1']);
-      q(['task', 'start', 'T1']);
-      q(['log', 'add', 'probe log', '--kind', 'note']);
+      for (const step of SAMPLE_SEED_STEPS) q([...step]);
+    } else {
+      q(['board', 'init', '--goal', 'output contract conformance probe (empty)']);
     }
   }
 });
@@ -124,3 +126,21 @@ test('覆盖率是报告，不是闸——只记录当前有多少 verb 声明�
   console.log(`[output-contract] 已声明 ${n} 条 / 只读 verb 共 ${total} 条`);
   assert.ok(n > 0, '至少要有一条声明，否则这道闸空转');
 });
+
+// 样例是 `--schema` 里承载嵌套结构那一层的东西。它由 scripts/gen-output-samples.mjs 从
+// 真实输出捕获——捕获这件事本身保证了它当时是真的，但保证不了它**现在**还是真的。
+// 这道用例负责后半句：拿同一个净化器重跑一遍，对不上就红。
+//
+// 没有它，样例就是一份「捕获那天是对的」的快照——和它要取代的那份文档副本毫无区别。
+for (const key of Object.keys(OUTPUT_SAMPLES)) {
+  const [noun, ...rest] = key.split(' ');
+  const verb = rest.join(' ');
+  test(`输出样例仍与真实输出一致：${key}`, () => {
+    const env = run('rich', [noun as string, verb, ...(SAMPLE_POSITIONALS[key] ?? [])]);
+    assert.deepEqual(
+      sanitizeSample(env.data),
+      OUTPUT_SAMPLES[key],
+      `${key} 的输出形状变了，样例已过期——跑 node scripts/gen-output-samples.mjs 重新生成`,
+    );
+  });
+}
