@@ -11,6 +11,7 @@ import { diagnostic, selectExitCode } from './diagnostics.mjs';
 import { canonicalGraphHash, hashMarkdownSpan, sha256Hex } from './hash.mjs';
 import { attestInventoryEntry } from './inventory.mjs';
 import { extractMarkers } from './markers.mjs';
+import { isUnassignedModule } from './unassigned.mjs';
 import { validateAuthoredDocument, validatorsAvailable } from './schema.mjs';
 import { validateCandidateRuntimeProjection } from './candidate-runtime.mjs';
 import { resolveHostCoveragePlan } from './host-coverage.mjs';
@@ -316,11 +317,15 @@ function validateGraph(graph, repoRoot, workspace, scope) {
     if (entries.length > 1) diagnostics.push(txDiagnostic('SKG-ID-DUPLICATE', 'Knowledge identity is declared more than once.', entries[0].path, { id, locations: entries.map((item) => item.path) }, 'Keep exactly one declaration for each identity.'));
   }
   for (const module of graph.modules) {
-    // Global modules are admitted only through one or more composition consumers.
+    // Global modules are admitted only through one or more composition consumers——
+    // 但「尚未分配给任何 skill 的备料」是合法状态（draft + 零消费者），判据见 ./unassigned.mjs。
+    // 这里曾无条件要求有消费者，于是备料一进图，typed change 事务整条路径就不可用：
+    // `change begin` 对每个备料模块报 MEMBERSHIP-INVALID 并拒绝开事务，连改一个完全无关的文件
+    // 都开不起来。这是「图 == 发布集」那个假设的第六处落点，也是唯一一处会**阻断写路径**的。
     const consumers = [...graph.skillsById.values()].filter((skill) =>
       (skill.data.modules ?? []).some((ref) => ref.id === module.data.id),
     );
-    if (consumers.length === 0) {
+    if (consumers.length === 0 && !isUnassignedModule({ lifecycle: module.data?.lifecycle, consumers })) {
       diagnostics.push(
         txDiagnostic(
           'SKG-MEMBERSHIP-INVALID',
