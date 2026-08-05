@@ -1406,3 +1406,13 @@
 - **影响**:这是本仓「机制齐备 + 消费侧零指导 = 设施空转」的第二个实例,与估算校准回路完全同型(那一处是只教了怎么读 `calibration_status`、没教什么时候 `capture`,于是永远未校准)。两处合起来给出一条可复用的判据:**凡是「发的一侧自动化了、读的一侧靠自觉」的设施,都该假定它正在空转。** 代价形态是全静默的——不读收件箱不报错、不变慢、本次编排从头到尾自洽,代价落在板与板**之间**,而那里不属于任何一块板的视野。
 - **处置(含蒸馏判定)**:**蒸馏判定:已回流**,落成 `module:coordination.cross-board`(draft,尚未分配给任何 skill——按「知识先立、skill 后组」,归属待结构重排统一决定)四个点:①「建议只有被读才产生价值」(prosthetic·读的责任在消费侧 + 裁量仍在自己)②「什么时候看花名册、什么时候读收件箱」(environment_fact·固定挂侦察步 + 三个额外时机 + 读完 ack + 消息会腐)③「知道有同侪之后要算的是重叠面」(capability_gap·同文件 / 同一个人 / 同一产物三维)④「等用户不是各自等,是在排队」(prosthetic·把顺序建议与代价差一起交上去)。**第三条诚实标为 capability_gap 并预告它可能最先被删**:证据显示那个 session 一旦知道同侪存在就**自己算出了**文件重叠,能力是有的,这条真正补的只是维度完整性(它漏了另外两维)。**另派生一条 ccm 侧缺口(非 skills 缺口)**:架构否决了点对点协商,**CLI 却未设防**——实测 `ccm --board <他人板> coordination notify` rc=0,改掉目标板 owner.session_id 后仍写入成功。该拒的没拒,应另开 issue。
 - **严重度 / 来源**:high(设施空转)/ 二手(另一 session transcript,2026-07-28;命令面事实经本机 `ccm 0.22.1` 复核)。
+
+---
+
+## Finding #120 — 一条跨 composition 的边不报「这条边不合法」,而是把目标 composition 整个判为未准入,连带 18 个无辜模块报 UNCONSUMED;20 条诊断里没有一条指向真凶 · should-fix(诊断指错对象·排障成本被放大)
+
+- **现象 / 证据**:给 draft 模块 `dispatch.prompt-craft` 加一条 `requires` 边指向 `point:conduct.never-play`(属已定稿的 `composition:skill.master-orchestrator-guide`),意图是表达「把方案钉死给 worker 是指挥不演奏的隐蔽违反」。`check --stage K1` 从 `ok=true diag=0` 变成 **`ok=false diag=20`**:1 条 `SKG-COMPOSITION-NOT-ADMITTED` + 4 条 `SKG-ENTRY-TARGET-CHAIN` + **15 条 `SKG-MODULE-UNCONSUMED`,列的全是 `conduct.never-play` / `goal.contract` / `state.board` 等本来好端端的模块**。删掉那一条边,立刻回到 `diag=0`。
+- **根因**:跨界边不合法这件事,不是在**边**这一层拒绝的,而是让目标 composition 的 derived-admit 失败;composition 一旦不准入,它消费的全部模块瞬间变成「无人消费」,于是 15 条 UNCONSUMED 一起冒出来。**因果链的头部没有诊断,尾部全是诊断。**
+- **影响**:排障方向被主动误导。20 条诊断没有一条提到 `dispatch.prompt-craft`,更没有一条提到那条边;第一反应会是「我把某个 composition 改坏了」而去查 composition 文件——而真凶是另一个文件里的一行 `to`。本次因为是**刚加完就跑**、diff 只有一个文件才立刻定位;若这条边混在一批改动里提交,定位成本会高一个量级。与 [[Finding #114]] 同族但方向相反:那一处是**该报的没报**,这一处是**报了一堆但全指向无辜方**。
+- **处置(含蒸馏判定)**:本轮**不改工具**——跨界边策略本身正在结构轴 L1 的议程上待放宽,在那之前加一条「拒绝跨 composition 边」的专门诊断,可能马上就要拆掉。**蒸馏判定:入账不回流,登记为 L1 的验收项**——放宽跨界边时,必须同时保证**非法跨界边报在边上、而不是报在被它牵连的 composition 上**;这条要写进 L1 的完成判据,否则放宽之后剩下的少数非法形态仍然是这种指错对象的报法。两处受影响的知识已在母本里显式记账(`dispatch.prompt-red-lines` 与 `preference.non-convergence-as-signal` 各缺一条跨界边),不假装链已接上。
+- **严重度 / 来源**:should-fix(诊断可用性)/ 一手(2026-08-05,阶段 B 批 4)。
