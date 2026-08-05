@@ -10,6 +10,7 @@ import { loadPublishedBehaviorEvidence } from './behavior-eval.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
 import { buildAndValidateGraph, resolveEntityId, shortestPath } from './graph.mjs';
 import { compareCodePoint, estimateBudget } from './hash.mjs';
+import { isUnassignedModule } from './unassigned.mjs';
 
 const HOSTS = new Set(HARDENING_CONTRACT.C9.hosts);
 const REPORT_FORMATS = new Set(['json', 'markdown']);
@@ -106,9 +107,7 @@ export function runReport({ repoRoot, source = DEFAULT_SOURCE_ROOT }) {
  * 这一节就是把前者摆在明面上，让后者无处藏身。
  */
 function buildUnassignedKnowledge(graph) {
-  const modules = (graph.modules ?? []).filter(
-    (m) => m.lifecycle?.state === 'draft' && (m.consumers ?? []).length === 0,
-  );
+  const modules = (graph.modules ?? []).filter(isUnassignedModule);
   const pointCount = modules.reduce((sum, m) => sum + (m.points?.length ?? 0), 0);
   // 这批知识现在不占路由预算（不在任何 composition 里，就不在任何 entry 的路由表上），
   // 但被 admit 的那一刻会全额计入。挂在这里，是为了让阶段 C 的那笔账**现在就能看见**——

@@ -11,6 +11,7 @@ import {
 import { attestInventoryEntry } from './inventory.mjs';
 import { loadKnowledgeSource } from './loader.mjs';
 import { extractMarkers } from './markers.mjs';
+import { isUnassignedModule, unassignedModuleIds } from './unassigned.mjs';
 import {
   analyzeAgainstGraph,
   compositionToSkillView,
@@ -413,7 +414,10 @@ export function buildAndValidateGraph({
   // 备料是有意为之，遗忘不是，两者必须分得开。
   for (const moduleDoc of modules) {
     const consumers = moduleConsumers.get(moduleDoc.id) ?? [];
-    const unassignedByDesign = moduleDoc.data?.lifecycle?.state === 'draft';
+    const unassignedByDesign = isUnassignedModule({
+      lifecycle: moduleDoc.data?.lifecycle,
+      consumers,
+    });
     if (!skipCompositionAdmission && consumers.length === 0 && !unassignedByDesign) {
       pushError(diagnostics, {
         code: 'SKG-MODULE-UNCONSUMED',
@@ -1057,11 +1061,8 @@ export function buildAndValidateGraph({
     //
     // 这不是给备料开豁免：它被 admit 进 composition 的那一刻，成本就变成真的、立刻计入。
     // 延后的那部分由 report 的 unassigned_knowledge 持续挂账，不会在阶段 C 突然冒出来。
-    const routableModules = modules.filter((item) => {
-      const unassignedByDesign = item.data?.lifecycle?.state === 'draft';
-      const consumers = moduleConsumers.get(item.id) ?? [];
-      return !(unassignedByDesign && consumers.length === 0);
-    });
+    const parked = unassignedModuleIds(modules, (item) => moduleConsumers.get(item.id) ?? []);
+    const routableModules = modules.filter((item) => !parked.has(item.id));
     const atlasText = [
       ...(portfolio.entries ?? []).flatMap((entry) => entry.recognition_cues ?? []),
       ...routableModules.flatMap((item) => [

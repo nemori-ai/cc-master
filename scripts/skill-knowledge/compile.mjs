@@ -9,6 +9,7 @@ import {
 } from './contracts.mjs';
 import { diagnostic, outputDiagnostic, selectExitCode } from './diagnostics.mjs';
 import { buildAndValidateGraph } from './graph.mjs';
+import { isUnassignedModule } from './unassigned.mjs';
 import { buildHostArtifacts, diffArtifacts, writeArtifacts } from './compile/emit.mjs';
 import { PRODUCT_HOSTS, entrySurfaceToDistPath } from './compile/paths.mjs';
 import {
@@ -338,12 +339,26 @@ export function runCompile({
     };
   }
 
+  // 编译产出的是可发布表面，所以喂给编译链的图里只能有**已经属于某个 skill 的知识**。
+  //
+  // 尚未分配的备料（draft + 零消费者）在这里一次性滤掉，而不是让它流下去再由每个环节各自
+  // 提防。这条路已经走错过一次：先在编译落位、entry pin、模块预算三处分别打了补丁，跑起来
+  // 第四处（拓扑校验 H1–H4）照样崩——因为下游有多少个环节假设「图 == 发布集」是不可知的，
+  // 逐个补丁永远差最后一个。在入口把图收窄成发布集，下游全部环节自动正确。
+  const assignedModuleIds = built.graph.modules
+    .filter((item) => !isUnassignedModule(item))
+    .map((item) => item.id);
+  const publishableGraph =
+    assignedModuleIds.length === built.graph.modules.length
+      ? built.graph
+      : projectCoverageSubgraph(built.graph, assignedModuleIds);
+
   const hostResults = [];
   const diagnostics = [];
   for (const item of hosts) {
     const result = compileOneHost({
       host: item,
-      graph: built.graph,
+      graph: publishableGraph,
       repoRoot,
       checkOnly: check,
       hostDistAbsolute:
