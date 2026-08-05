@@ -1,0 +1,304 @@
+{
+  "schema_version": "cc-master/skill-knowledge-source/v1alpha1",
+  "kind": "module",
+  "id": "module:coordination.cross-board",
+  "title": "跨编排的消费侧",
+  "intent": "教多编排并行时怎么读中介建议、何时读、算什么重叠，以及竞争同一个人时怎么把顺序代价交上去。",
+  "recognition_cues": [
+    "还有别的编排在跑",
+    "收件箱里的通知没人读",
+    "几块板都在等同一个人"
+  ],
+  "boundary": {
+    "includes": [
+      "花名册与收件箱的消费触发点",
+      "同侪重叠面的三个维度",
+      "跨板用户关口的顺序建议"
+    ],
+    "excludes": [
+      "编排者之间的点对点协商",
+      "中介如何计算建议",
+      "单板内的决策包组织"
+    ]
+  },
+  "access": {
+    "class": "on_demand",
+    "relevant_entries": [
+      "entry:master-orchestrator"
+    ],
+    "primary_points": [
+      "point:coordination.advisory-consumption"
+    ],
+    "rationale": "侦察步发现有同侪在跑、或收件箱有未处理通知时召回。"
+  },
+  "lifecycle": {
+    "state": "draft",
+    "since": "2026-08-05",
+    "rationale": "知识先立、skill 后组：消费侧零指导已由真实编排记录证实，但归入哪个 skill 待结构重排时统一决定。"
+  },
+  "admission": {
+    "evidence": [
+      {
+        "kind": "canonical-prose",
+        "ref": "module:coordination.cross-board"
+      }
+    ],
+    "verifiers": [
+      {
+        "kind": "golden",
+        "ref": "golden.module.coordination.cross-board"
+      }
+    ]
+  },
+  "points": [
+    {
+      "id": "point:coordination.advisory-consumption",
+      "title": "建议只有被读才产生价值",
+      "point_kind": "principle",
+      "failure_mode": "prosthetic",
+      "summary": "中介出建议、消费侧负责读；收件箱满与空的体感完全一样，没有信号会提醒你；读到之后裁量仍在你，照单全收与一概不理都是失败。",
+      "recognition_cues": [
+        "收件箱积压",
+        "别的编排给的建议要不要听"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/coordination.advisory-consumption.md",
+        "marker": "point:coordination.advisory-consumption",
+        "heading_hint": "建议只有被读才产生价值"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:coordination.advisory-consumption"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:coordination.advisory-consumption"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.coordination.advisory-consumption"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:coordination.consumption-triggers",
+      "title": "什么时候看花名册、什么时候读收件箱",
+      "point_kind": "procedure",
+      "failure_mode": "environment_fact",
+      "summary": "peers list 与 coordination inbox list 固定挂在每回合侦察步，另在并行派发前、推向合并前、配额吃紧时各跑一次；读完就 ack；通知会腐，先看写的时间。",
+      "recognition_cues": [
+        "什么时候该查有没有别人在跑",
+        "怎么读协调通知"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/coordination.consumption-triggers.md",
+        "marker": "point:coordination.consumption-triggers",
+        "heading_hint": "什么时候看花名册、什么时候读收件箱"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:coordination.consumption-triggers"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:coordination.consumption-triggers"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.coordination.consumption-triggers"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:coordination.overlap-surface",
+      "title": "知道有同侪之后，要算的是重叠面",
+      "point_kind": "procedure",
+      "failure_mode": "capability_gap",
+      "summary": "逐个同侪对三维——同一批文件、同一个人、同一个产物；第三维最贵，撞上不是重解冲突而是整个作废；重叠随推进变化，别只算一次。",
+      "recognition_cues": [
+        "有别的编排在改同一批文件",
+        "跨板会不会撞车"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/coordination.overlap-surface.md",
+        "marker": "point:coordination.overlap-surface",
+        "heading_hint": "知道有同侪之后，要算的是重叠面"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:coordination.overlap-surface"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:coordination.overlap-surface"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.coordination.overlap-surface"
+          }
+        ]
+      }
+    },
+    {
+      "id": "point:hitl.cross-board-queue",
+      "title": "等用户，不是各自等，是在排队",
+      "point_kind": "principle",
+      "failure_mode": "prosthetic",
+      "summary": "多块板竞争同一个人时把顺序建议连同代价差一起交上去；你交的是排序与代价不是催促，拍板仍在人；这件事你不做没有人做。",
+      "recognition_cues": [
+        "几个合并请求都在等同一个人",
+        "都卡在等用户"
+      ],
+      "binding": {
+        "path": "plugin/src/knowledge/points/hitl.cross-board-queue.md",
+        "marker": "point:hitl.cross-board-queue",
+        "heading_hint": "等用户，不是各自等，是在排队"
+      },
+      "authority": {
+        "role": "canonical",
+        "subject": "subject:hitl.cross-board-queue"
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "point:hitl.cross-board-queue"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.point.hitl.cross-board-queue"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:coordination.consumption-to-triggers",
+      "type": "operationalizes",
+      "from": "point:coordination.consumption-triggers",
+      "to": "point:coordination.advisory-consumption",
+      "when": [
+        "认了读的责任在自己，要落到具体什么时候读"
+      ],
+      "path_role": "support",
+      "order": 1,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:coordination.cross-board"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.coordination.consumption-to-triggers"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:coordination.triggers-to-overlap",
+      "type": "next",
+      "from": "point:coordination.consumption-triggers",
+      "to": "point:coordination.overlap-surface",
+      "when": [
+        "花名册读出来了，要定接下来算什么"
+      ],
+      "path_role": "next",
+      "order": 2,
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:coordination.cross-board"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.coordination.triggers-to-overlap"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge:coordination.queue-requires-overlap",
+      "type": "requires",
+      "from": "point:hitl.cross-board-queue",
+      "to": "point:coordination.overlap-surface",
+      "when": [
+        "要估几块板竞争同一个人时的顺序代价差"
+      ],
+      "path_role": "support",
+      "runtime": {
+        "enabled_by_default": true
+      },
+      "lifecycle": {
+        "state": "draft",
+        "since": "2026-08-05"
+      },
+      "admission": {
+        "evidence": [
+          {
+            "kind": "canonical-prose",
+            "ref": "module:coordination.cross-board"
+          }
+        ],
+        "verifiers": [
+          {
+            "kind": "golden",
+            "ref": "golden.edge.coordination.queue-requires-overlap"
+          }
+        ]
+      }
+    }
+  ]
+}
