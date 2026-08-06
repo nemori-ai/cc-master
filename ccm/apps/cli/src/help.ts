@@ -248,6 +248,21 @@ function _verbLevel(reg: Reg, noun: string, verb: string): string {
   lines.push('USAGE');
   lines.push(`  ${_usageLine(noun, verb, spec)}`);
 
+  // DESCRIPTION：读写属性由 `read` **派生**（140 条不必各写一遍），其后接命令独有的补充。
+  // 只有补充行存在、或读写属性值得声明时才起这一段——没内容就不留空标题。
+  // ⚠ 措辞必须精确到 `read` **真正**代表什么：它是「走 runRead 还是 runWrite」这条**路径**事实，
+  // 不是「改不改 board」这条**内容**事实。二者不等价——`calibration capture` 是 read:false（走写入
+  // 关卡），但它写的是 home 级校准语料，board 一字不动。第一版派生成「改 board」，样板当场渲染出
+  // 「写入：…改 board」紧跟人写的「board 一字不动」两行相邻打架。改成只声明路径，具体改什么由
+  // 各命令的 description 补。
+  const sideEffect = spec.read
+    ? '只读：不写入任何持久状态。'
+    : '写入：经 ccm 写入关卡（带锁 + 校验），失败即整体回滚。';
+  const descLines = [sideEffect, ...(spec.description ?? [])];
+  lines.push('');
+  lines.push('DESCRIPTION');
+  for (const d of descLines) lines.push(`  ${d}`);
+
   // ARGUMENTS：positionals（有则列）。
   const positionals = Array.isArray(spec.positionals) ? spec.positionals : [];
   if (positionals.length) {
@@ -284,6 +299,32 @@ function _verbLevel(reg: Reg, noun: string, verb: string): string {
     lines.push('');
     lines.push('EXAMPLES');
     for (const e of examples) lines.push(`  $ ${e}`);
+  }
+
+  // FILES / EXIT STATUS / SEE ALSO：三段都只在 registry 真写了内容时才渲染。
+  // 空段比没有段更糟——它承诺了信息却什么也不给，读者会以为被截断了。
+  const files = spec.files ?? [];
+  if (files.length) {
+    lines.push('');
+    lines.push('FILES');
+    const w = Math.max(...files.map(([p]) => p.length), 4) + 2;
+    for (const [p, d] of files) lines.push(`  ${_padRight(p, w)}${d}`);
+  }
+
+  const exits = spec.exitStatus ?? [];
+  if (exits.length) {
+    lines.push('');
+    // 标题点明「特有」，免得读者以为这里是退出码全集——通用码在 ccm --help。
+    lines.push('EXIT STATUS  (本命令特有；通用码见 ccm --help)');
+    const w = Math.max(...exits.map(([c]) => c.length), 4) + 2;
+    for (const [c, d] of exits) lines.push(`  ${_padRight(c, w)}${d}`);
+  }
+
+  const seeAlso = spec.seeAlso ?? [];
+  if (seeAlso.length) {
+    lines.push('');
+    lines.push('SEE ALSO');
+    for (const s of seeAlso) lines.push(`  ${s}`);
   }
 
   lines.push('');
