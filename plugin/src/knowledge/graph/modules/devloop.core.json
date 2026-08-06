@@ -167,7 +167,7 @@
       "id": "point:devloop.instrument",
       "title": "测试是测量仪器",
       "point_kind": "principle",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "先架仪器再下降；失败是梯度，假梯度先校准。",
       "recognition_cues": [
         "没有测试就改",
@@ -205,7 +205,7 @@
       "id": "point:devloop.explore-exploit",
       "title": "explore vs exploit",
       "point_kind": "decision_rule",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "早期探索买信息，接近验收再精修；过早 exploit 是反模式。",
       "recognition_cues": [
         "一上来就精修未验证方案"
@@ -242,7 +242,7 @@
       "id": "point:devloop.plateau-restart",
       "title": "plateau 则 restart",
       "point_kind": "decision_rule",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "局部最小值时换方向，不沿同一沟再打补丁。",
       "recognition_cues": [
         "钻牛角尖",
