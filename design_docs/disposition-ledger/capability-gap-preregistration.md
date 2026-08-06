@@ -57,6 +57,42 @@ import("./scripts/skill-knowledge/graph.mjs").then(m=>{
 
 ---
 
+---
+
+## 0.5 与新分母对齐（2026-08-06 · 档位重判之后）
+
+本表写于 `capability_gap` = **87** 时。[`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md) 的判据补充获批并由第二方重判后，分母变为 **78**（见 [`tier-rejudgement.md`](tier-rejudgement.md)）。本节把两者对齐——**不重写正文，只标出哪些条目已失效**。
+
+### 表内 7 条已不再属本档，**移出测试范围**
+
+`capacity.ranking-and-contraction` · `ddd.strategic-boundaries` · `devloop.instrument` · `devloop.plateau-restart` · `multilayer.admission-and-escalation` · `oop.encapsulation-vocabulary` · `slicing.walking-skeleton`
+
+它们现在是 `motivation_conflict`，按路线表**护栏档不测，留 + 加固**。它们在 §2 的条目仍留着（预注册的推演本身没白做，日后若翻回来可直接复用），但**不进第 0 层**。
+
+> 其中 `devloop.instrument` 正是本表当初标了「**档位疑议**」的两条之一——重判确认了那个疑议。
+
+### 「无法预注册」7 条里有 2 条已改档
+
+`goal.trace-and-delta` · `devloop.explore-exploit` —— 本表 §3.3 当初判它们「**档位可能标错，声称的增量在压力侧、本档测不到**」。**重判独立确认了这个判断。**
+
+这两条现已是 `motivation_conflict`，处置从「无法预注册」变为「护栏档，不测」——**不再是悬而未决，是有了归宿**。
+
+### 对齐后的数字
+
+| | 条数 |
+|---|---:|
+| `capability_gap` 总数 | **78** |
+| 其中 **进第 0 层测试范围** | **73** |
+| 其中 无法预注册（§3，仍属本档） | 5 |
+| ~~已移出（改判护栏）~~ | ~~9~~ |
+
+**实测预算按 73 排，不是 80，也不是 87。**
+
+### 一条没变的约束
+
+本表**仍未被任何人审阅**。分母对齐不等于内容被审——跑之前仍必须由不是本表作者的人审过承重任务与预注册的 X。
+
+
 ## 1. 怎么读这张表
 
 ### 1.1 每条的字段（照 §7 模板）

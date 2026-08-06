@@ -23,5 +23,5 @@
 
 - 环境事实档（112）：**判定完成**，见迁移台账。
 - 能力补课档（87）：**预注册已产出、未审、未执行**。见 [`capability-gap-preregistration.md`](capability-gap-preregistration.md)：80 条进第 0 层测试表、7 条判为无法预注册。三层筛 + 批级消融的方案不变。
-  - ⚠ **一个会改变分母的悬案（已诊断，见 [`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md)）**：全量复核后，问题不是「若干条标错」，而是**判据在 `capability_gap` / `motivation_conflict` 边界上没画完**——全部 267 点里有 **62 条**同时具备「方法主体」与「压力失效」，而过滤器没说这种情形谁优先，于是同一种情形被判成了两种档（37 motiv : 25 其它）。**判据补充提议已写，待批；本轮未改动任何 `failure_mode`。** 分母不定，能力补课档的实测预算排不了。
+  - ✅ **分母悬案已解**：判据补充获用户批准（[`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md)），62 条 `both` 桶由第二方统一重判（[`tier-rejudgement.md`](tier-rejudgement.md)），**`capability_gap` 87 → 78**，其中 **73 条进第 0 层测试范围**。实测预算按 73 排。
 - 护栏（63）/ 义肢（5）：**不测**——两者都不因模型变强而失效，测它们是花钱确认已知。
