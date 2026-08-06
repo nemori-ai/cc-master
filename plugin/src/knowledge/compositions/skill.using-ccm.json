@@ -187,8 +187,8 @@
         },
         {
           "point": "point:ccm.board.validation-rules",
-          "point_sha256": "b5e30c14d719c9394fcbe0314c6d9d6838148cd3dc41872fa4f60079be3abc71",
-          "passage_sha256": "b5e30c14d719c9394fcbe0314c6d9d6838148cd3dc41872fa4f60079be3abc71"
+          "point_sha256": "9279625148c8efad9de7b3f4fa73016f2d0789b70160f0e2366ee997ec624a67",
+          "passage_sha256": "9279625148c8efad9de7b3f4fa73016f2d0789b70160f0e2366ee997ec624a67"
         },
         {
           "point": "point:ccm.board.watchdog",
