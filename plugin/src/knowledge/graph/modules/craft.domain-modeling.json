@@ -275,7 +275,7 @@
       "id": "point:ddd.strategic-boundaries",
       "title": "战略边界与语言",
       "point_kind": "procedure",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "用语言变化、能力、本体轴、context mapping 与 ubiquitous language 发现 BC。",
       "recognition_cues": [
         "需要战略边界与语言"

@@ -128,7 +128,7 @@
       "id": "point:goal.trace-and-delta",
       "title": "Goal trace 与 delta 分类",
       "point_kind": "decision_rule",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "每个节点回指 acceptance；新发现按 clarification、scope change 或 amendment 分类。",
       "recognition_cues": [
         "工作中怀疑 scope 漂移",

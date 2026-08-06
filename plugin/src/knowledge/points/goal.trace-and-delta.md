@@ -39,7 +39,7 @@ ccm goal check --board <board> --json
 
 ## 失效类型
 
-`capability_gap`（主体：事实方法） —— 完全清楚该先做 Goal Trace Test、无法追溯就先分类，但看到一件顺手又明显有价值的事时会想「这么明显有用，先做完再解释也一样」，是主动绕开分类流程而非不懂流程。
+`motivation_conflict`（双重性质·方法部分更强的模型能自己补回来，留下的是约束） —— 完全清楚该先做 Goal Trace Test、无法追溯就先分类，但看到一件顺手又明显有价值的事时会想「这么明显有用，先做完再解释也一样」，是主动绕开分类流程而非不懂流程。
 
 主体是 Goal Trace Test 三问与 Delta Classifier 四分类判据，是判断新信息该往哪去的方法框架。
 

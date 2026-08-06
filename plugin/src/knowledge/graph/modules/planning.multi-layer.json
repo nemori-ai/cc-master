@@ -127,7 +127,7 @@
       "id": "point:multilayer.admission-and-escalation",
       "title": "多层 planning 准入与 escalation 边界",
       "point_kind": "decision_rule",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "只让足够复杂且内部耦合的节点使用项目层；跨节点依赖或 owner 变化才升级到顶层。",
       "recognition_cues": [
         "判断节点是否值得单独 plan",

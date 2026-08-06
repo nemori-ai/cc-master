@@ -22,7 +22,7 @@ point: capacity.ranking-and-contraction
 
 ## 失效类型
 
-`capability_gap`（主体：事实方法） —— 删掉后,agent 在容量紧张时容易直接把任务整体降档、或替用户跨越硬总闸这类更省事的近路,而不是按同档换候选→降 WIP→停派→watchdog→surface 的既定顺序处理。
+`motivation_conflict`（双重性质·方法部分更强的模型能自己补回来，留下的是约束） —— 删掉后,agent 在容量紧张时容易直接把任务整体降档、或替用户跨越硬总闸这类更省事的近路,而不是按同档换候选→降 WIP→停派→watchdog→surface 的既定顺序处理。
 
 删掉后缺少容量收紧时降档→降 WIP→硬停→arm→surface 的有序决策框架。
 

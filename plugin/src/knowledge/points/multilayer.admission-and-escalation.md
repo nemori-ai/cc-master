@@ -35,7 +35,7 @@ point: multilayer.admission-and-escalation
 
 ## 失效类型
 
-`capability_gap`（主体：事实方法） —— escalate需要停下来写escalation map、等顶层响应,而继续在节点内部往下钻感觉是在"持续推进";删掉这条阈值判据,agent身处复杂节点深处时,容易靠着沉没成本继续闷头串行做完,即便内部其实是可并行的sub-DAG。
+`motivation_conflict`（双重性质·方法部分更强的模型能自己补回来，留下的是约束） —— escalate需要停下来写escalation map、等顶层响应,而继续在节点内部往下钻感觉是在"持续推进";删掉这条阈值判据,agent身处复杂节点深处时,容易靠着沉没成本继续闷头串行做完,即便内部其实是可并行的sub-DAG。
 
 主体是准入判据与「纵深消化 vs 炸开成顶层并行」的分界标准，缺的是判断框架。
 

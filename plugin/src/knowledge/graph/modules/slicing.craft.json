@@ -53,7 +53,7 @@
       "id": "point:slicing.walking-skeleton",
       "title": "walking skeleton",
       "point_kind": "procedure",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "第一片是最薄端到端线；共享核心最小化，schema 增量生长。",
       "recognition_cues": [
         "一次定全地基"

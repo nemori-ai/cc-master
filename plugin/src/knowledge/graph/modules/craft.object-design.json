@@ -127,7 +127,7 @@
       "id": "point:oop.encapsulation-vocabulary",
       "title": "封装即词汇",
       "point_kind": "principle",
-      "failure_mode": "capability_gap",
+      "failure_mode": "motivation_conflict",
       "summary": "让聚合根以领域动词持有守卫、状态翻转与副作用。",
       "recognition_cues": [
         "需要封装即词汇"
