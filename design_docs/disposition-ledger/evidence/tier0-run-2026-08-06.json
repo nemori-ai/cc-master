@@ -1,0 +1,376 @@
+{
+ "ran_at": "2026-08-06",
+ "subject_cli": "2.1.220（65 份产物全部在此版本下产出）",
+ "grader_cli": "2.1.223（四片全部在此版本下评分·跨版本混杂已用重跑消除）",
+ "k": 5,
+ "points": 13,
+ "runs": 65,
+ "gradings": 130,
+ "grader_design": "甲=中立判 X 是否出现；乙=对抗、竭力找出 X 出现的证据。任一评委判「出现」即计出现（偏「留」侧）",
+ "per_point": {
+  "craft.composition-over-wrapper": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "craft.composition-over-wrapper#1": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "craft.composition-over-wrapper#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "craft.composition-over-wrapper#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "craft.composition-over-wrapper#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "craft.composition-over-wrapper#2": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "ddd.admission-question": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "ddd.admission-question#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.admission-question#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.admission-question#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.admission-question#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.admission-question#1": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "ddd.aggregate-ownership": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "ddd.aggregate-ownership#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.aggregate-ownership#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.aggregate-ownership#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.aggregate-ownership#1": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.aggregate-ownership#2": {
+     "B": "未出现",
+     "A": "未出现"
+    }
+   }
+  },
+  "craft.layered-thinking": {
+   "k": 5,
+   "x_appeared": 5,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": false,
+   "runs": {
+    "craft.layered-thinking#4": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "craft.layered-thinking#5": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "craft.layered-thinking#1": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "craft.layered-thinking#2": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "craft.layered-thinking#3": {
+     "A": "出现",
+     "B": "出现"
+    }
+   }
+  },
+  "devloop.ml-components": {
+   "k": 5,
+   "x_appeared": 5,
+   "grader_disagreement": 1,
+   "gate1_k_of_k": false,
+   "runs": {
+    "devloop.ml-components#5": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "devloop.ml-components#1": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "devloop.ml-components#2": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "devloop.ml-components#3": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "devloop.ml-components#4": {
+     "A": "出现",
+     "B": "出现"
+    }
+   }
+  },
+  "distill.evidence-fidelity": {
+   "k": 5,
+   "x_appeared": 4,
+   "grader_disagreement": 3,
+   "gate1_k_of_k": false,
+   "runs": {
+    "distill.evidence-fidelity#1": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.evidence-fidelity#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "distill.evidence-fidelity#3": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.evidence-fidelity#4": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "distill.evidence-fidelity#5": {
+     "A": "未出现",
+     "B": "出现"
+    }
+   }
+  },
+  "scheduling.dag-and-critical-path": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "scheduling.dag-and-critical-path#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "scheduling.dag-and-critical-path#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "scheduling.dag-and-critical-path#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "scheduling.dag-and-critical-path#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "scheduling.dag-and-critical-path#1": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "distill.landing-craft": {
+   "k": 5,
+   "x_appeared": 4,
+   "grader_disagreement": 4,
+   "gate1_k_of_k": false,
+   "runs": {
+    "distill.landing-craft#3": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.landing-craft#4": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.landing-craft#1": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.landing-craft#5": {
+     "A": "未出现",
+     "B": "出现"
+    },
+    "distill.landing-craft#2": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "devloop.core-thesis": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "devloop.core-thesis#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.core-thesis#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.core-thesis#5": {
+     "B": "未出现",
+     "A": "未出现"
+    },
+    "devloop.core-thesis#1": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.core-thesis#2": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "devloop.ledger-when": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "devloop.ledger-when#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.ledger-when#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.ledger-when#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.ledger-when#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "devloop.ledger-when#1": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "workflow.pattern-completeness-critic": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "workflow.pattern-completeness-critic#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "workflow.pattern-completeness-critic#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "workflow.pattern-completeness-critic#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "workflow.pattern-completeness-critic#5": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "workflow.pattern-completeness-critic#1": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "ddd.failure-radar": {
+   "k": 5,
+   "x_appeared": 0,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": true,
+   "runs": {
+    "ddd.failure-radar#1": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.failure-radar#2": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.failure-radar#3": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.failure-radar#4": {
+     "A": "未出现",
+     "B": "未出现"
+    },
+    "ddd.failure-radar#5": {
+     "A": "未出现",
+     "B": "未出现"
+    }
+   }
+  },
+  "multilayer.handoff-contract": {
+   "k": 5,
+   "x_appeared": 5,
+   "grader_disagreement": 0,
+   "gate1_k_of_k": false,
+   "runs": {
+    "multilayer.handoff-contract#1": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "multilayer.handoff-contract#2": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "multilayer.handoff-contract#3": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "multilayer.handoff-contract#4": {
+     "A": "出现",
+     "B": "出现"
+    },
+    "multilayer.handoff-contract#5": {
+     "A": "出现",
+     "B": "出现"
+    }
+   }
+  }
+ }
+}
