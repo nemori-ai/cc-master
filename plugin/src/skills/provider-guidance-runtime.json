@@ -1,7 +1,7 @@
 {
   "schema": "cc-master.provider-guidance-runtime.v2",
   "facts_registry": "ccm/apps/cli/src/provider-model-facts.json",
-  "projection_as_of": "2026-07-30T05:30:00Z",
+  "projection_as_of": "2026-08-06T07:00:00Z",
   "hosts": {
     "claude-code": {
       "skills": {
