@@ -65,7 +65,7 @@ test('Claude facts are fresh, provenance-complete, and account-scope honest', ()
     note: 'Claude API public token pricing; Claude Code plan billing and live quota remain separate',
   });
   assert.ok(fable.source_refs.includes('anthropic-fable-5-capabilities'));
-  assert.equal(facts.revision, '2026-07-30.1');
+  assert.equal(facts.revision, '2026-08-06.1');
   assert.notEqual(fable.availability.account_scope, 'global');
 });
 
@@ -115,7 +115,9 @@ test('Cursor facts separate first-party pool identity, Auto billing, and executa
     facts.source.some(
       (source: { id: string; url: string }) =>
         source.id === 'cursor-models-pricing' &&
-        source.url === 'https://cursor.com/docs/models-and-pricing.md',
+        // 2026-08-06：原 URL(/docs/models-and-pricing.md)已 404,官方定价页指向
+        // /docs/account/pricing。这道断言把来源钉死是对的,但钉的必须是活链。
+        source.url === 'https://cursor.com/docs/account/pricing',
     ),
   );
   assert.equal(
@@ -181,7 +183,7 @@ test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', 
   assert.ok(facts.unknown.includes('kimi_k3_effective_kimi_code_default_reasoning_effort'));
   assert.ok(!facts.unknown.includes('kimi_k3_open_weights'));
   assert.ok(facts.unknown.includes('kimi_code_cli_headless_quota_signal'));
-  assert.equal(facts.revision, '2026-07-30.1');
+  assert.equal(facts.revision, '2026-08-06.1');
   // Official Moonshot K3 launch-blog limitations must surface on the K3 fact note.
   const k3Note = byId.get('kimi-k3').pricing.note;
   assert.ok(
@@ -220,10 +222,10 @@ test('expired snapshots remain observable but fail closed for automatic selectio
 
 test('registry validation rejects freshness and provenance hostile mutants', async () => {
   const module = await import('../src/provider-model-facts.js');
-  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-30.1');
+  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-08-06.1');
   assert.equal(
     module.PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'].revision,
-    '2026-07-30.1',
+    '2026-08-06.1',
   );
   const valid = structuredClone(module.PROVIDER_MODEL_FACTS_REGISTRY);
   const cases: Array<[string, (registry: any) => void, RegExp]> = [
