@@ -112,8 +112,12 @@ function _topLevel(reg: Reg, aliases: Aliases, nounAliases: NounAliases = {}): s
   lines.push('  ccm <alias> [args] [flags]');
   lines.push('');
   lines.push('CORE NAMESPACES');
-  for (const noun of Object.keys(reg)) {
-    lines.push(`  ${_padRight(noun, 12)}${_namespaceBlurb(noun)}`);
+  // 列宽按最长 namespace 名算，不写死。写死过 12，而 `status-report` 有 13 个字符——
+  // 填充被吃光，渲染成 `status-report生成式 board …`（名字与描述之间没有空格）。
+  const nouns = Object.keys(reg);
+  const nounW = Math.max(...nouns.map((n) => n.length), 12) + 2;
+  for (const noun of nouns) {
+    lines.push(`  ${_padRight(noun, nounW)}${_namespaceBlurb(noun, reg)}`);
   }
   // ALIASES：command 级 alias → [noun, verb]（渲染成 ccm <noun> <verb>）+ namespace 级 NOUN_ALIASES
   //   → 真实 noun（渲染成 ccm <noun> <command>，覆盖该 noun 全部子命令）。
@@ -152,8 +156,14 @@ function _topLevel(reg: Reg, aliases: Aliases, nounAliases: NounAliases = {}): s
   return lines.join('\n');
 }
 
-// namespace 一行简述（help 草稿 §0 CORE NAMESPACES）。未知 noun → 用其首个 verb 的 summary 兜底。
-function _namespaceBlurb(noun: string): string {
+// namespace 一行简述（help 草稿 §0 CORE NAMESPACES）。未列入下表的 noun → 用其首个 verb 的
+// summary 兜底。
+//
+// ⚠ 这句兜底此前**只写在注释里、代码没实现**（函数体是 `return M[noun] || ''`），于是 39 个
+// namespace 里有 18 个在根 help 与 noun 层标题里都是一片空白（`ccm worker —— ` 后面什么都没有）。
+// 兜底本身也不是全部——真正的解是逐个补进 M；但在补齐之前，露一句首 verb 的 summary 也远好过
+// 什么都不说。
+function _namespaceBlurb(noun: string, reg?: Reg): string {
   const M: Record<string, string> = {
     board: '板级：查看 / 校验 / DAG 分析 / 建板 / 改配置',
     task: '任务：增删改查 + 状态机（DAG 节点）',
@@ -173,7 +183,13 @@ function _namespaceBlurb(noun: string): string {
     statusline: 'status line：渲染单行状态行（ctx/5h/7d）+ 安装 / 卸载（self-contained·0.10.0）',
     upgrade: '自升级：把 ccm 二进制 + cc-master 插件升到各自线最新（--to 指定 / --dry-run 预览）',
   };
-  return M[noun] || '';
+  if (M[noun]) return M[noun] as string;
+  if (!reg) return '';
+  const verbs = reg[noun];
+  if (!verbs) return '';
+  const first = Object.keys(verbs)[0];
+  if (!first) return '';
+  return (verbs[first] as VerbSpec).summary || '';
 }
 
 // ── noun 层（有 noun 无 verb）：列该域 COMMANDS（verb summary）+ 例子 ────────────────────────────────
@@ -181,7 +197,10 @@ function _nounLevel(reg: Reg, noun: string): string {
   // printHelp 已确认 reg[noun] 存在才进本函数（as 窄断言·不改逻辑）。
   const verbs = reg[noun] as NounSpec;
   const lines: string[] = [];
-  lines.push(`ccm ${noun} —— ${_namespaceBlurb(noun)}`);
+  // blurb 为空时连破折号一起省掉——`ccm worker —— ` 这种悬着的破折号比没有描述更难看，
+  // 且会让读者以为描述被截断了。
+  const blurb = _namespaceBlurb(noun, reg);
+  lines.push(blurb ? `ccm ${noun} —— ${blurb}` : `ccm ${noun}`);
   lines.push('');
   lines.push('USAGE');
   lines.push(`  ccm ${noun} <command> [args] [flags]`);
