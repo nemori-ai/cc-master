@@ -9,6 +9,7 @@
 | [`measurement-design.md`](measurement-design.md) | **方法**：要检验的命题、为什么逐点消融不成立（功效/多重比较）、四个效度威胁、测试类型→它能授权的决定、非对称决策规则、预注册模板、诚实边界 |
 | [`env-fact-migration-ledger.md`](env-fact-migration-ledger.md) | **判定**：112 条环境事实逐条判「迁 help / 留 skill / 需改行为」，判据是 Unix man 段落规约（单命令 → help，跨命令 → 技术文档） |
 | [`D-tier-run-log.md`](D-tier-run-log.md) | **证据与撤回记录**：确定性比对的实测输出，含**两条已撤回的错误论断**及其成因 |
+| [`exam-first-funnel.md`](exam-first-funnel.md) | **已放弃的一条路**：闭卷考试当第一道筛。被对抗性审查收窄、再被试点实测否决——7/7 题全部泄露考点。保留作为「为什么这条走不通」的记录，含泄题测试原始数据 |
 | [`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md) | **档位边界诊断**：`capability_gap` 与 `motivation_conflict` 之间那条线没画完——62 个点落在同一种情形上却被判成两种档（37:25）。含判据补充提议。**待批，本轮未改任何 `failure_mode`** |
 | [`capability-gap-preregistration.md`](capability-gap-preregistration.md) | **能力补课档 87 条的预注册表**（80 条可预注册 + 7 条无法预注册及其原因）。只准备，不测量，不判定。**尚未被任何人审阅——跑之前必须审** |
 | [`output-contract-and-help-budget.md`](output-contract-and-help-budget.md) | **两个未决项的裁决**：`--help` 不分层改设预算闸（附 167 条 help 的体量实测）；新增 `--schema` 且必须带一致性闸 |
