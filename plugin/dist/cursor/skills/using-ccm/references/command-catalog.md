@@ -395,6 +395,8 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.worker-quota -->
 ## namespace worker（raw transport + tracked dispatch）
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 ### worker help
 
 ```text
@@ -448,10 +450,6 @@ ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path
 
 ### worker dispatch
 
-```text
-ccm worker dispatch [--board <path>] --harness <codex|claude-code|cursor-agent|kimi-code> --task <task-id> --idempotency-key <key> --intent <safe-summary> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] [--transcript <absolute-path>] -- <provider argv...>
-```
-
 - `dispatch` 复用 `run` 的 provider resolver、argv/stdin/cwd 透传、超时/输出上限和 owned process-tree supervisor，但**不是 detach**：命令同步监督到 terminal 才返回。要让 shell 调用本身后台化，仍由 origin harness 的后台 terminal/Shell 机制承载；ccm 不伪造 durable job。
 - `--task` 必须指向所选 board 的现有 task；它只产生 `agents[].links[]`，**绝不**改 task 的 `status`、`handle`、`routing.attempts` 或 `acceptance`。`--intent` 会持久化，必须是安全、非敏感摘要。
 - `--idempotency-key` 必填。首次调用在 board lock 内 `prepare` 再唯一 `claim`；同 key + 同 request digest 精确 replay，不再 spawn；同 key + 不同 digest 硬冲突。digest 只覆盖非敏感结构：harness/task/canonical cwd/timeout/output ceiling/stdin mode/provider argv 数量；prompt、argv 内容、stdin 与 environment 既不落 board，也不哈希进可持久的 digest。业务幂等语义完全由调用方显式 key 承担；换了语义请求就必须换 key。
@@ -479,7 +477,6 @@ ccm provider facts <provider> [--as-of <UTC>] [--json]
 - 行为：返回 `ccm/provider-model-facts/v1` snapshot，必带 `source`、`observed_at`、`valid_until`、`account_scope`、`confidence`、`unknown`、`models`、`freshness`、`catalog_eligible_for_admission_check`、`eligible_for_automatic_selection` 与 `automatic_selection_blockers`。它不访问 provider、不证明 live entitlement / quota / exact admission，所以静态 snapshot 的 automatic-selection eligibility 保持 false。
 - Cursor 的每个 `models[]` 条目另带 `quota_pool:"first_party"|"usage_based"`，用于把 model route 绑定到对应独立池；该静态映射仍不证明 live entitlement 或 headroom。
 - `--as-of`：冻结 freshness 求值时间；缺省当前 UTC。`future-invalid` / `hard-stale` 仍 exit 0 可解释，但连 admission check 都不准入；fresh 只允许进入下一道 live admission。
-- 例：`ccm provider facts codex --json` · `ccm provider facts cursor --as-of 2026-07-15T12:00:00Z --json`。
 
 ### provider inspect
 
@@ -490,10 +487,6 @@ ccm provider facts <provider> [--as-of <UTC>] [--json]
 ## namespace model-policy（统一模型角色与排序 advisory）
 
 ### model-policy show
-
-```text
-ccm model-policy show --task <task-taxonomy> [--as-of <UTC>] [--json]
-```
 
 - `--task` 必填，取项目 registry 中的稳定 taxonomy，例如 `architecture-design`、`implementation-from-spec`、`routine-heterogeneous-review`、`repository-code-research`、`mechanical-deterministic-work`。
 - 输出 `ccm/model-policy-read-model/v1`。`hard_facts` 是官方 provider snapshot，`project_role_evidence` 是项目角色候选 / blockers，`community_advisory` 是带 provenance、TTL、confidence、contradictions 与 freshness 的 taste ledger；三层不可互相补证。
@@ -611,10 +604,6 @@ Codex/Cursor 的 account/session/credential/auth mutation request 固定 deny，
 
 ### quota reserve
 
-```bash
-ccm quota reserve --input <json|@file|-> [--home <dir>] [--json]
-```
-
 请求必须是闭合 `ccm/quota-reservation-request/v1`，带明确 `checked_at`，amount 为 positive finite，且只能创建 `held`；
 caller 不能自铸 `committed`，也不能自铸 capacity/headroom/request hash。命令从 owner-only observation
 authority 重验 source/account/pool/identity 与 hard-window buckets，并按 source profile 的 fresh/hard TTL、
@@ -633,10 +622,6 @@ ticket digest 与 attempt/run/account/pool/identity/aggregation/source/expiry li
 输入控制。该命令只保留本地容量，不声称 provider 已预留或退款。
 
 ### quota audit
-
-```bash
-ccm quota audit --input <json|@file|-> [--home <dir>] [--json]
-```
 
 用 launch/process evidence 审计 reservation。只有 store locked/readable、claim absent、process identity
 proven-absent 且 TTL 已到才能把 held 判为 expired；`committed` 即使 claim absent 或墙钟已过也只能
@@ -811,27 +796,20 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.goal -->
 ## namespace goal
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 Goal Contract 是 `board.goal` 的 revisioned 写入面。raw request / issue 只作证据；agent 先澄清转写，再通过本 namespace 持久化。`--brief-file` 的输入必须是 ≤1 MiB、有效 UTF-8、非 symlink 的普通文件；ccm 把它复制到 `<home>/goals/<board-stem>/rNNNN.goal.md`，以 `0600` 权限保存，并在 `board.goal_contract.brief` 记录 home-relative ref + SHA-256。revision 文件 immutable，不覆盖旧版。
 
 ### goal set
 
 **写**：首次把 pending skeleton / legacy board 转成 r1 Goal Contract。
 
-```bash
-ccm goal set --summary "<normalized goal>" --assurance <pending|asserted> [--brief-file /abs/goal.md]
-```
-
 - `--summary`、`--assurance` 必填；已有非 skeleton contract 时拒绝，改用 `goal amend`。
 - `asserted` 表示 agent 按安全默认补齐且 Goal Framing Test 通过；不是伪造用户确认。
-- 例：`ccm goal set --board /abs/x.board.json --summary "交付一份通过验收的 draft PR，不合并" --assurance asserted --brief-file /tmp/goal.md`
 
 ### goal confirm
 
 **写**：把当前 revision 的 assurance 升到 `confirmed`，revision 不变。
-
-```bash
-ccm goal confirm --user-authorized
-```
 
 - `--user-authorized` 必填且只代表当前对话已有真实用户确认；agent 绝不自授权。
 
@@ -850,17 +828,9 @@ ccm goal amend --summary "<new normalized goal>" --reason "<semantic delta>" \
 
 **只读**：显示 summary、contract 与受管 Brief 绝对路径；legacy board 的 contract 显示为 legacy/null。
 
-```bash
-ccm goal show [--json]
-```
-
 ### goal check
 
 **只读**：校验 contract 形状、Brief containment / 普通文件 / 存在性 / SHA-256。
-
-```bash
-ccm goal check [--json]
-```
 
 - verdict：`ok`（goal settled **且**交付 DDL settled，integrity valid）、`pending`（goal 还须澄清/确认）、`deadline_pending`（goal 已 settle 但交付 DDL 未 settle——键缺失或仍 pending）、`legacy`（旧板，无 contract）、`malformed`、`missing_brief`、`hash_mismatch`。
 - `malformed|missing_brief|hash_mismatch` exit 3；`ok|pending|deadline_pending|legacy` exit 0。exit 0 不代表可以执行——`pending`/`deadline_pending` 都门控派发，调用方必须读取 verdict。
@@ -911,13 +881,11 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.capability-deps -->
 ## namespace capability
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 ### capability check
 
 **只读、零写**：检查当前独立发版的 ccm 是否兑现指定稳定 capability。
-
-```bash
-ccm capability check <capability-id> [--json]
-```
 
 - 当前稳定 id：`board-init/structured-board-path-v1`、`goal-contract/v1`、`goal-deadline/v1`。
 - 支持时 exit 0 + `supported:true`；未知/不支持时 exit 3。plugin bootstrap 用它/等价 init capability envelope 做写前握手。
@@ -926,10 +894,6 @@ ccm capability check <capability-id> [--json]
 
 **只读、零写**：声明本 ccm 兑现的**全部** capability + 版本，作跨版本斜错协商的基础清单。
 
-```bash
-ccm capability list [--json]
-```
-
 - `--json` 输出结构化清单：`{ "schema": "ccm/capability-manifest/v1", "ccm_version": "<本 ccm 版本>", "capabilities": [ { "id", "name", "version" } ] }`。
 - 当前 capabilities（append-only·顺序稳定）：`board-init/structured-board-path-v1`、`goal-contract/v1`、`goal-deadline/v1`。
 - 新 plugin 遇旧 ccm 时枚举它做降级判断：想用的 id 不在清单里 → 关掉对应功能或提示用户「升级 ccm 到兑现该 id 的版本」。
@@ -937,10 +901,6 @@ ccm capability list [--json]
 ### capability negotiate
 
 **只读、零写**：consumer 声明可接受的 capability id 集，engine 返回双方交集里版本最高的一项，或 exit 3 明确拒绝。
-
-```bash
-ccm capability negotiate <capability-family> --accept <capability-id> [--accept <capability-id>...] [--json]
-```
 
 - `<capability-family>`：能力族名（如 `goal-deadline`）。
 - `--accept`：可重复；每项为完整 id（如 `goal-deadline/v1`）或同族版本后缀（如 `v1`）。
@@ -2262,6 +2222,8 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.account -->
 ## namespace account
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 Cursor host 当前**不支持账号池管理 / 换号**。`ccm account add/delete/refresh/list/switch` 走到时必须显式报 `NotImplemented` 或 unsupported；不要读取或覆写其他 harness 的 credential store，也不要把账号池当 Cursor 可用容量。Cursor 只保留 `ccm usage show/advise/burn-rate` 对**当前账户 billing_period** 用量的只读能力。
 
 下面是 ccm 的精确 CLI grammar；host overlay 决定这些 verb 是可执行能力还是显式 `NotImplemented`。
@@ -2269,27 +2231,17 @@ Cursor host 当前**不支持账号池管理 / 换号**。`ccm account add/delet
 
 ### account add
 
-`ccm account add <email> [--vault-kind keychain|file] [--vault-file <path>] [--keychain-service <name>] [--expires <iso>] [--registry <path>] [--json]`
-
 ### account refresh
 
-`ccm account refresh <email> [--vault-kind keychain|file] [--vault-file <path>] [--keychain-service <name>] [--expires <iso>] [--registry <path>] [--json]`
-
 ### account delete
-
-`ccm account delete <email> [--vault-kind keychain|file] [--vault-file <path>] [--keychain-service <name>] [--registry <path>] [--yes] [--json]`
 
 破坏性；非 TTY 必须 `--yes`。
 
 ### account list
 
-`ccm account list [--probe-keychain] [--registry <path>] [--json]`
-
 `--probe-keychain` 只探活条目存在性，不读取 token 值。
 
 ### account switch
-
-`ccm account switch [--email <email>|--account <email>] [--vault-kind keychain|file] [--vault-file <path>] [--keychain-service <name>] [--registry <path>] [--now <iso>] [--json]`
 
 `--account` 是 `--email` 的旧别名；两者都跳过自动选号。所有 JSON / log / registry 输出保持 token-blind。
 

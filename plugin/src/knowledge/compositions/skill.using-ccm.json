@@ -227,8 +227,8 @@
       "reconciliations": [
         {
           "point": "point:ccm.cmd.account",
-          "point_sha256": "90e664aa78ec7d526ac09b8de4c36216f4b8c3219505f0f4f3af9887515a9a50",
-          "passage_sha256": "90e664aa78ec7d526ac09b8de4c36216f4b8c3219505f0f4f3af9887515a9a50"
+          "point_sha256": "fc48e7ec1e46b18b1a91284ab0141be2b28aa68adfdf79288f22eb639994c9a8",
+          "passage_sha256": "fc48e7ec1e46b18b1a91284ab0141be2b28aa68adfdf79288f22eb639994c9a8"
         },
         {
           "point": "point:ccm.cmd.agent",
@@ -257,8 +257,8 @@
         },
         {
           "point": "point:ccm.cmd.capability-deps",
-          "point_sha256": "da9fb3d41252c2e509bf7558209e19387ccdff3a0127299d6ace061e0b179478",
-          "passage_sha256": "da9fb3d41252c2e509bf7558209e19387ccdff3a0127299d6ace061e0b179478"
+          "point_sha256": "e2df80d626e5cd6f21072d1532ceac1a8a13fb61039f4e038e63f7bb03ef9404",
+          "passage_sha256": "e2df80d626e5cd6f21072d1532ceac1a8a13fb61039f4e038e63f7bb03ef9404"
         },
         {
           "point": "point:ccm.cmd.cross-harness-facts",
@@ -272,8 +272,8 @@
         },
         {
           "point": "point:ccm.cmd.goal",
-          "point_sha256": "22e8f1525411ef90c5e16d21634eb355369e2c30c2bd648dcb18733070be60db",
-          "passage_sha256": "22e8f1525411ef90c5e16d21634eb355369e2c30c2bd648dcb18733070be60db"
+          "point_sha256": "ae2c416f52d4fa83dca10b6f4d42d3f2e7d0c35c4ea4bb7473ba6c532df08842",
+          "passage_sha256": "ae2c416f52d4fa83dca10b6f4d42d3f2e7d0c35c4ea4bb7473ba6c532df08842"
         },
         {
           "point": "point:ccm.cmd.jc",
@@ -327,8 +327,8 @@
         },
         {
           "point": "point:ccm.cmd.worker-quota",
-          "point_sha256": "51d4bddfd3106906b367472e58dbc3e6ed20a69dc0aea3759d0bd94268580a22",
-          "passage_sha256": "51d4bddfd3106906b367472e58dbc3e6ed20a69dc0aea3759d0bd94268580a22"
+          "point_sha256": "16910e76ad7a3c5019725dd6e350062cfeb55913108dec9302ed4f9fc55bcb47",
+          "passage_sha256": "16910e76ad7a3c5019725dd6e350062cfeb55913108dec9302ed4f9fc55bcb47"
         }
       ]
     },
