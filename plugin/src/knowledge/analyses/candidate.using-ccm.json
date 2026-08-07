@@ -151,9 +151,9 @@
           },
           {
             "path": "plugin/src/skills/using-ccm/canonical/references/command-catalog.md",
-            "utf8_bytes": 195040,
-            "lines": 3465,
-            "estimated_tokens": 65014
+            "utf8_bytes": 176794,
+            "lines": 2849,
+            "estimated_tokens": 58932
           },
           {
             "path": "plugin/src/skills/using-ccm/canonical/SKILL.md",
@@ -162,14 +162,14 @@
             "estimated_tokens": 7525
           }
         ],
-        "utf8_bytes": 331447,
-        "estimated_lines": 5007,
+        "utf8_bytes": 313201,
+        "estimated_lines": 4391,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 110483,
+        "estimated_tokens": 104401,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }

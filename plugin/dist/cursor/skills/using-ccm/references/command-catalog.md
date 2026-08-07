@@ -664,103 +664,64 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.board -->
 ## namespace board
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置。
 
 ### board show
 
 **读**
 
-```
-ccm board show [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | JSON 输出（返回摘要，见 [--json 输出形状](#--json-输出形状)） |
 
-- 例：`ccm board show` · `ccm board show --json`
-
 ### board lint
 
 **读**（有 hard error → exit 3）
 
-```
-ccm board lint [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 以 JSON 出 violations（否则人类报告） |
-| `--raw` | | bool | 直读 `--board` 指定文件的原始字节喂 lint（绕过 discover 的 JSON 预校验——坏 JSON 也能 lint 成 FMT-JSON 错而非 exit 5；hook 用·须配 `--board`） |
-
-- 例：`ccm lint` · `ccm board lint --json` · `ccm board lint --board <path> --raw --json`
 
 ### board graph
 
 **读**
 
-```
-ccm board graph [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出（否则人类树视图） |
 
-- 例：`ccm board graph` · `ccm board graph --json`
-
 ### board critical-path
 
 **读**
 
-```
-ccm board critical-path [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
 
-- 例：`ccm board critical-path` · `ccm board critical-path --json`
-
 ### board next
 
 **读**（别名 `ccm next`）
 
-```
-ccm board next [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出（否则人类表格） |
 
-- 例：`ccm next` · `ccm board next --json`
-
 ### board init
 
 **写**
 
-```
-ccm board init [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | default | 含义 |
@@ -771,7 +732,6 @@ ccm board init [flags]
 | `--dry-run` | `-n` | bool | false | 跑完整建板校验但不落盘；仍声明 capability，但输出不含 `data.board_path` |
 | `--capabilities` | | bool | false | 只读返回 init 能力列表；不解析路径、不加锁、不建目录，供独立发版的 plugin 写前握手 |
 
-- 例：`ccm board init`（master-orchestrator fresh 形态）· `ccm board init --goal "已转写的明确目标"`（显式 asserted）· `ccm board init --github-issue https://github.com/o/r/issues/9`
 - 产物：`<home>/<YYYYMMDDThhmmssZ>-<pid>.board.json`
 - 结构化路径合同：真实 `--json` 输出含绝对 `data.board_path` 和
   `data.capabilities:["board-init/structured-board-path-v1","goal-contract/v1"]`。用 `--capabilities --json` 做写前握手；
@@ -783,25 +743,14 @@ ccm board init [flags]
 
 **写**
 
-```
-ccm board update [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--goal <str>` | | string | 仅 legacy board 可重定 goal；已有 `goal_contract` 时拒绝，须改用 `ccm goal amend` |
-| `--wip-limit <str>` | | int | `scheduling.wip_limit`（并发软上限） |
-| `--owner-wip <str>` | | int | `scheduling.owner_wip_limit` |
-| `--branch <str>` | | string | `git.branch` |
-| `--worktree <str>` | | string | `git.worktree` |
-| `--priority <enum>` | | enum `urgent\|high\|normal\|low\|trivial` | `coordination.priority`（板级优先级·跨板协调裁决主轴·非法值 → exit 2） |
 | `--set <path=val>` | | string（可重复） | 设**板级顶层** ✎ 标量（裸 path 落 board 顶层；🔒 `schema`/`goal`/`owner`/`git`/`tasks` 被拒 exit 3；`tasks[<id>].path` 作用于该 task） |
 | `--set-json <path=json>` | | string（可重复） | 设**板级顶层** ✎ 对象/数组（scoping 同上） |
 
-- 例：`ccm board update --wip-limit 4 --branch feature-x` · `ccm board update --priority high` · `ccm board update --set notes="收尾备注"` · legacy-only：`ccm board update --goal "收尾冲刺"`
 - `--priority` 写 ✎ `coordination.priority`（板级优先级·`ccm peers` 跨板花名册的裁决主轴 + 机械 fair-share 权重源；缺/坏 → 解析为 `normal`）。枚举校验在 update 端（坏值 exit 2·不静默写非法值）；它是 agent-shaped ✎ 字段（hook 不读·非窄腰）。init 时用户给的板级优先级经此落盘（命令体 bootstrap 段指导 orchestrator 捕获并记入）。
 - 发现：`--goal` 在此是 legacy payload，**不**当发现过滤器；已有 Goal Contract 时 writer 在持锁校验内拒绝静默改写。所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），多 active 板时用 `--board <path>` 消歧。
 
@@ -809,11 +758,6 @@ ccm board update [flags]
 
 **写**（归档板·翻 `owner.active=false`·带锁·停用即休眠·显式可逆）
 
-```
-ccm board archive [flags]
-```
-
-- positional：无
 - 行为：经引擎**带锁**把 `owner.active` 翻 `false`（停用即休眠·全套 hook 对它休眠）；**非破坏**——`tasks`/`log`/`goal`/`git` 全留（审计留痕·文件不删）。给 Cursor adapter 的 stop / handoff / resume 流程一条**走单写者带锁管线**的归档路径，替代手编辑 board JSON 翻 active。幂等：已 `false` 再 archive 仍 `false`（无副作用）。日后可经 `ccm`/Cursor resume + board recon 复活。孤儿 / rollup 检查归调用方。
 - flags：
 
@@ -822,36 +766,22 @@ ccm board archive [flags]
 | `--json` | | bool | 结构化输出（返回归档后 board 摘要） |
 | `--dry-run` | `-n` | bool | 预览：跑完整校验但不落盘（owner.active 仍 true） |
 
-- 例：`ccm board archive` · `ccm board archive --board <path>` · `ccm board archive --dry-run`
-
 ### board set-param
 
 **写**（hook-owned 参数区·least-privilege·带锁）
 
-```
-ccm board set-param <key> <value> [flags]
-```
-
-- positional：`<key>`（必填·**白名单**：当前 `last_identity_remind`、`last_critpath_remind`、`last_goal_remind`、`last_account_switch`、`stop_allow_until`、`last_deadline_risk_check`、`last_deadline_risk_fingerprint`）、`<value>`（必填·按 key 声明类型校验）
 - 作用域**收窄到 `board.runtime.<白名单 key>`**——非白名单 key / 非法值 / 字符串键传空值 → `exit 2`（Usage）；**绝不触碰 🔒/👁 窄腰**。
 - 主要使用者是周期 hook（身份提示 hook 写 `runtime.last_identity_remind`、临界路径提示 hook 写 `runtime.last_critpath_remind`、Goal Contract 对齐 hook 写 `runtime.last_goal_remind`、交付 DDL 风险 hook 写 `runtime.last_deadline_risk_check` + `runtime.last_deadline_risk_fingerprint`）+ 账号切换机制写 `runtime.last_account_switch`（换号时刻·usage-pacing hook 读它做「检测到换号」ambient）+ Codex Stop hook 释放闸（agent 独立确认可停后写短期未来 `runtime.stop_allow_until`，Stop hook 在该时刻前放行）经进程边界 spawn 写；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
 - flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
 - 值类型：`last_identity_remind` / `last_critpath_remind` / `last_goal_remind` / `last_account_switch` / `stop_allow_until` / `last_deadline_risk_check` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`）；`last_deadline_risk_fingerprint` 须非空字符串（risk-input 摘要指纹·非时间戳）；否则 `exit 2`。
-- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_account_switch 2026-06-30T08:00:00Z --board <path>` · `ccm board set-param last_deadline_risk_check 2026-07-16T09:00:00Z --board <path>` · `ccm board set-param last_deadline_risk_fingerprint "at_risk|critpath|band3" --board <path>`
 
 ### board stamp-harness
 
 **写**（ARM-time harness stamp·带锁·可信 detect guard）
 
-```
-ccm board stamp-harness [flags]
-```
-
-- positional：无
 - 行为：从当前进程 env 的已知 harness `detect(env)` 派生可信 harness id，写 `owner.harness`。只在 `claude-code` / `codex` / `cursor` / `kimi-code` 的真实 env 命中时写；无可信 env 时 no-op，**不**用历史兼容默认（无 env → Claude Code）覆盖既有值。
 - 作用域：只写 `owner.harness`（观察字段，非武装闸）。hook arming 仍只看 `owner.active` + `owner.session_id`。
 - flags：`--json`（结构化输出 `{ok,data:{stamped,trusted_harness,owner:{harness}}}`）；`--dry-run` 跑完整校验不落盘。
-- 例：`ccm board stamp-harness --board <path> --json`
 
 ### board enable-contract
 
@@ -866,7 +796,6 @@ ccm board enable-contract [--preflight] [--json]
 - 历史 `done|failed|escalated` subagent 按 `task_id + created_at` 精确 grandfather；它们之后 retry 会进入新 attempt，不再豁免。
 - 两个 marker 都缺是合法 legacy；本命令没有 disable verb。generic `--set-json meta...`、祖先替换与 `--force` 不能绕 dedicated writer / preflight。
 - activation 本身不读取 provider、不 route、不 spawn、不 reserve，也不让同步 `ccm worker run` 自动回填 board。
-- 例：`ccm board enable-contract --preflight --json` · `ccm board enable-contract`
 
 ---
 
@@ -1095,6 +1024,8 @@ Knowledge navigation:
 <a id="ccm-k-point-ccm-cmd-task"></a>
 <!-- ccm:k:start point:ccm.cmd.task -->
 ## namespace task
+
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
 
 任务：增删改查 + 状态机（DAG 节点）。
 
@@ -1340,51 +1271,23 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.log -->
 ## namespace log
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 append-only 审计轨迹。
 
 ### log add
 
 **写**（只增不改不删）
 
-```
-ccm log add <summary> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<summary>` | 是 | 一句话摘要 |
-
-- flags：
-
-| flag | 短名 | 类型 | enum 取值 | 含义 |
-|---|---|---|---|---|
-| `--kind <enum>` | | enum | `dispatch, recon, verify, finding, decision, replan, handoff, note` | log 类别 |
-| `--task <str>` | | string | | 关联的 task id |
-| `--detail <str>` | | string | | 详情（长文） |
-| `--ref <a,b>` | | csv（可重复） | | 关联引用 |
-
-- 例：`ccm log add "派发 T7 给 subagent" --kind dispatch --task T7` · `ccm log add "改用方案 B" --kind decision --detail "理由:..."`
-
 ### log list
 
 **读**（别名 `ls`）
 
-```
-ccm log list [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | enum 取值 | 含义 |
 |---|---|---|---|---|
-| `--kind <enum>` | | enum | logKind 枚举 | 只列某类 |
-| `--task <str>` | | string | | 只列关联某 task 的 |
 | `--json` | | bool | | JSON 数组 |
-
-- 例：`ccm log list --task T7` · `ccm log list --kind decision --json`
 
 ---
 
@@ -1400,71 +1303,36 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.jc -->
 ## namespace jc
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 judgment_calls 自驱决策记录。
 
 ### jc add
 
 **写**
 
-```
-ccm jc add <summary> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<summary>` | 是 | 一句话摘要 |
-
 - flags：
 
 | flag | 短名 | 类型 | enum 取值 | 含义 |
 |---|---|---|---|---|
-| `--category <enum>` | | enum | `architecture, drift, spec-impl-misalignment, other` | 自决类别 |
-| `--severity <enum>` | | enum | `low, medium, high, critical` | 严重度 |
-| `--decision <str>` | | string | | 做了什么决定 |
-| `--rationale <str>` | | string | | 为什么这么决 |
-| `--impact <str>` | | string | | 影响面 / 反转代价 |
-| `--refs <a,b>` | | csv（可重复） | | 佐证引用 |
-| `--task-ref <str>` | | string | | 关联 task |
 | `--set <path=val>` | | string（可重复） | | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
 | `--set-json <path=json>` | | string（可重复） | | 通用设 ✎ 对象/数组（scoping 同左） |
 
-- 例：`ccm jc add "选 ICU MessageFormat" --category architecture --severity high`
 - 产物：新建 id 形如 `J1`、初始 `status: pending_review`、盖 `raised_at`。
 
 ### jc list
 
 **读**（别名 `ls`）
 
-```
-ccm jc list [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | enum 取值 | 含义 |
 |---|---|---|---|---|
-| `--status <enum>` | | enum | `pending_review, upheld, overturned` | 只列某 status |
-| `--severity <enum>` | | enum | `low, medium, high, critical` | 只列某 severity |
 | `--json` | | bool | | JSON 数组 |
-
-- 例：`ccm jc list --status pending_review` · `ccm jc list --severity critical --json`
 
 ### jc show
 
 **读**
-
-```
-ccm jc show <id> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<id>` | 是 | jc id |
 
 - flags：
 
@@ -1472,30 +1340,9 @@ ccm jc show <id> [flags]
 |---|---|---|---|
 | `--json` | | bool | 完整 jc JSON |
 
-- 例：`ccm jc show J1`
-
 ### jc resolve
 
 **写**
-
-```
-ccm jc resolve <id> --status <upheld|overturned> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<id>` | 是 | jc id |
-
-- flags：
-
-| flag | 短名 | 类型 | enum 取值 | 必填 | 含义 |
-|---|---|---|---|---|---|
-| `--status <enum>` | | enum | `upheld`（维持）/ `overturned`（推翻） | 是 | 裁决结果 |
-| `--note <str>` | | string | | | 裁决理由（存 `resolution_note`） |
-
-- 例：`ccm jc resolve J1 --status upheld --note "事后看是对的"`
 
 ---
 
@@ -1511,17 +1358,14 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.cadence -->
 ## namespace cadence
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 节奏 / iteration 收口。
 
 ### cadence update
 
 **写**
 
-```
-ccm cadence update [flags]
-```
-
-- positional：无
 - flags（设 / 改节奏配置 target = `{ship_every, min_unit}`）：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1531,68 +1375,34 @@ ccm cadence update [flags]
 | `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
 | `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组（scoping 同左） |
 
-- 例：`ccm cadence update --ship-every 3h --min-unit "1 PR"`
-
 ### cadence open
 
 **写**
-
-```
-ccm cadence open <iter-id> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<iter-id>` | 是 | iteration id |
 
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--goal <str>` | | string | 本 iteration 目标 |
-| `--deadline <str>` | | ISO-8601 UTC | 截止时刻（严格 `YYYY-MM-DDTHH:MM:SSZ`） |
-| `--members <a,b>` | | csv | 纳入本 iteration 的 task |
 | `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
 | `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组（scoping 同左） |
-
-- 例：`ccm cadence open I1 --goal "ship 框架+翻译切片" --deadline 2026-06-05T14:00:00Z --members T0,T1`
 
 ### cadence ship
 
 **写**
 
-```
-ccm cadence ship <iter-id> [flags]
-```
-
-- positional：
-
-| 名 | 必填 | 含义 |
-|---|---|---|
-| `<iter-id>` | 是 | iteration id |
-
 - 行为：收口一个 iteration（成员须全 `done`+`verified`）
 - flags：仅 global flags
-- 例：`ccm cadence ship I1`
 
 ### cadence status
 
 **读**
 
-```
-ccm cadence status [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm cadence status`
 
 ---
 
@@ -1607,58 +1417,38 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.watchdog -->
 ## namespace watchdog
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 自我唤醒 watchdog。
 
 ### watchdog arm
 
 **写**
 
-```
-ccm watchdog arm --fire-at <str> --mechanism <cron|loop|monitor|shell> --job-id <str> [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | enum 取值 | 必填 | 含义 |
 |---|---|---|---|---|---|
-| `--fire-at <str>` | | ISO-8601 UTC | | 是 | 触发时刻（严格 `YYYY-MM-DDTHH:MM:SSZ`） |
-| `--mechanism <enum>` | | enum | `cron, loop, monitor, shell` | 是 | 唤醒机制（降级链） |
 | `--job-id <str>` | | nonblank string | | 是 | 真实外部调度句柄；用于追踪、recon 与退役，所有 mechanism 都必填 |
-| `--checklist <str>` | | string | | | 唤醒后该检查什么 |
 
-- 例：`ccm watchdog arm --fire-at 2026-06-24T12:00:00Z --mechanism cron --job-id cron-abc --checklist "查后台 3 个 subagent"`
 - 原子性：缺 `--job-id` → usage error；值为空白 → validation error；两种都不改 board，`--force` 不能越过。
 
 ### watchdog disarm
 
 **写**
 
-```
-ccm watchdog disarm [flags]
-```
-
-- positional：无
 - 行为：退役 watchdog（删除 canonical `watchdog` 与 legacy `wakeup` 整字段，结果为 ABSENT，不留 `null` / 空对象）
 - flags：仅 global flags
-- 例：`ccm watchdog disarm`
 
 ### watchdog status
 
 **读**
 
-```
-ccm watchdog status [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm watchdog status`
 
 ---
 
@@ -1674,63 +1464,41 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.baseline -->
 ## namespace baseline
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 EVM 计划基线（plan baseline）：从当前 tasks 的 `estimate` + `deps` 快照成 `board.baseline`（`task_estimates` + `dag_snapshot` + `bac_h`），供 estimate 引擎算 EVM / SPI。**board 内唯一写 noun**——`usage` / `estimate` 两 namespace 纯只读，baseline 刻意置于只读之外（写关卡）。
 
 ### baseline snapshot
 
 **写**
 
-```
-ccm baseline snapshot [flags]
-```
-
-- positional：无
 - 行为：从当前 tasks 快照 `board.baseline`；**已存在则 exit 3（VALIDATION）**——用全局 `--force` 覆盖，或 `baseline reset` 移旧入 history
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--t0 <str>` | | ISO-8601 UTC | EVM 零时刻（严格 `YYYY-MM-DDTHH:MM:SSZ`；默认 now） |
-| `--note <str>` | | string | 快照说明 |
 | `--force` | `-f` | bool（全局） | 已有 baseline 时覆盖（否则 exit 3） |
 | `--dry-run` | `-n` | bool | 试跑不落盘 |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm baseline snapshot --t0 2026-06-25T08:00:00Z --note "sprint 1 start"`
 
 ### baseline show
 
 **读**
 
-```
-ccm baseline show [flags]
-```
-
-- positional：无
 - 行为：只读当前 `board.baseline`；无 baseline 也 exit 0（`has_baseline:false`）
 - flags：`--json`（结构化输出）
-- 例：`ccm baseline show --json`
 
 ### baseline reset
 
 **写**
 
-```
-ccm baseline reset [flags]
-```
-
-- positional：无
 - 行为：re-baseline——旧 baseline 进 `history[]`（只增不删）+ 建新快照；**非 TTY 须 `--yes`**（破坏性）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--t0 <str>` | | ISO-8601 UTC | 新基线 EVM 零时刻（默认 now） |
-| `--note <str>` | | string | 重新 baseline 理由 |
 | `--yes` | `-y` | bool | 非 TTY 确认（破坏性操作） |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm baseline reset --note "mid-sprint re-estimate" --yes`
 
 ---
 
@@ -1762,6 +1530,8 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.agent -->
 ## namespace agent（Agent Registry·登记/探测/读取）
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 运行时 agent 登记簿：凡派发皆登记——sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进本板 ✎ `agents[]` 花名册。**它是登记 / 探测 / 读取 noun**：九个 verb（create / bind / amend / link / terminal / probe / list / show / rm）不含任何 spawn / route / dispatch 语义（不起进程、不选路、不派活；dispatch 命令面归 `worker`）。其中 create / bind / terminal / probe 走生命周期状态机，`amend`（补正 handle 域）与 `rm`（删登记）是**登记簿事后修正**——不经状态机、不做状态转移。agent = 实际跑起来的运行时实例（runtime 层），与 task 的 `executor`（planning 层的计划执行者类型）分层不合并——概念与字段取值见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)。
 
 agent 生命周期状态机（写 verb 强制·同态重入幂等）：
@@ -1780,45 +1550,25 @@ terminal  → （唯一终态·probe 永不复活）
 
 **写**
 
-```
-ccm agent create --type <t> --harness <h> --intent <str> [flags]
-```
-
-- positional：无
 - 行为：往本板 `agents[]` append 一条登记（`lifecycle.state=starting`·`handle.kind=none`），agent id 自动生成（`agt-NNN` 递增零填充）；`account_ref` / `quota_pool_ref` 预留 `null`（只存 ref 不存数值）。返回 `agent_id`
 - flags：
 
 | flag | 短名 | 类型 | enum 取值 | 必填 | 含义 |
 |---|---|---|---|---|---|
-| `--type <enum>` | | enum | `cli-worker, subagent, background-shell, workflow` | 是 | agent 类型 |
 | `--harness <enum>` | | enum | `codex, claude-code, cursor-agent, kimi-code, origin` | 是 | agent 所在的 runtime / transcript 语义分区。`origin` 只用于不需要具体 host transcript parser 的本 orchestrator 本地机制；要流式观察 native subagent 时按下方 host-specific 配方登记具体 harness。 |
-| `--intent <str>` | | string | | 是 | 一句话：派它去干什么 |
-| `--model <str>` | | string | | | 已知才填的模型（unknown 保真·缺则不填） |
-| `--cwd <str>` | | string | | | agent 工作目录 |
 | `--json` | | bool | | | 结构化输出（`{agent_id, agent}`） |
-
-- 例：`ccm agent create --type cli-worker --harness codex --intent "review repo diff"` · `ccm agent create --board /abs/x.board.json --type background-shell --harness origin --intent "跑回归测试" --json`
 
 ### agent bind
 
 **写**
 
-```
-ccm agent bind <id> --handle <kind:value> [flags]
-```
-
-- positional：`<id>`（必填）
 - 行为：交真实 handle 证据，`starting→running`（`uncertain→running` / `orphaned→running` 复活、`running→running` 幂等重绑也合法——新 handle 即证据）。**无证据拒绝（exit 3）**：`kind` 必须 ∈ `session-id|pid|task-id` 且 value 非空——无真实 handle 不算 running。`terminal` 态 bind → 非法转移（exit 3·终态不复活）
 - flags：
 
 | flag | 短名 | 类型 | 必填 | 含义 |
 |---|---|---|---|---|
-| `--handle <kind:value>` | | string | 是 | handle 证据，`kind ∈ session-id\|pid\|task-id`，value 非空 |
 | `--attach-cmd <str>` | | string | | 一键接入命令。**必须自包含**：登记的是「复制到任意 shell 都能跑」的完整命令——凡执行位置敏感的，把 `cd <工作目录> && ` 一并写进去（claude-code 是典型：`claude --resume <sid>` 必须在原 cwd 执行，session 按项目目录归档，写成 `cd /abs/worktree && claude --resume <sid>`） |
-| `--transcript <str>` | | string | | transcript 路径引用（绝不内嵌内容） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent bind agt-002 --handle pid:48213`
 
 **codex worker 登记配方（sid 运行时才生成·两步 bind 升级到位）**：codex 没有 claude-code 那样的 `--session-id` 预设——sid 在 worker 启动后才存在。别用凑合 handle 顶替，照这个顺序登记：
 
@@ -1833,61 +1583,36 @@ ccm agent bind <id> --handle <kind:value> [flags]
 
 **写**（只改 handle 域·非状态转移）
 
-```
-ccm agent amend <id> [--handle <kind:value>] [--attach-cmd "..."] [--transcript <path>] [flags]
-```
-
-- positional：`<id>`（必填）
 - 行为：事后补正已登记 agent 的 **handle 域三件套**——`handle`（kind:value）/ `attach_cmd` / `transcript_ref`，至少给一项，否则 usage 报错。**任何生命周期状态都能 amend，含 `terminal`**——因为它不是状态转移、不交证据、不复活：**绝不**触碰 `lifecycle.state` / `probe` / `links` / `intent`（要改状态仍走 `bind` / `terminal` 等既有 verb）。`--handle` 复用 `bind` 的同一套校验（`kind ∈ session-id\|pid\|task-id` 且 value 非空，坏 handle 不入登记簿）。agent id 不存在 → exit 5
 - flags：
 
 | flag | 短名 | 类型 | 必填 | 含义 |
 |---|---|---|---|---|
-| `--handle <kind:value>` | | string | | 补正 handle 证据（校验同 `bind`） |
 | `--attach-cmd <str>` | | string | | 补正一键接入命令（同 `bind`：执行位置敏感的连 `cd` 一起写自包含） |
-| `--transcript <str>` | | string | | 补正 transcript 路径引用 |
 | `--json` | | bool | | 结构化输出（`{agent}`） |
 
 - 为什么存在：坏 handle 常在 agent 已 `terminal` 后才被发现，此时 `bind` 被状态机拒（终态冻结），唯一出路曾是重复 `create` 一条新登记——**同一个真实 worker 在 roster 撕成两行**。`amend` 就是补正而不撕裂的出口。
 - **心智锚**：登记后发现 handle 不完美（sid 拼错、attach 命令漏了 `cd`、transcript 路径写错），**用 `amend` 补正，绝不重复 `create` 登记**——一个真实 worker 两行 roster 是撕裂，会让花名册、viewer 与 resume 后的自己都数错在跑的 agent。
-- 例：`ccm agent amend agt-001 --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent amend agt-002 --handle session-id:0197-fixed --transcript /abs/worker.log`
 
 ### agent link
 
 **写**
 
-```
-ccm agent link <id> --task <task-id> [flags]
-```
-
-- positional：`<id>`（必填）
 - 行为：建 agent↔task 关联，**join 存 agent 侧 `links[]`**（`{task_id, linked_at}`·非 `task.routing.attempts[]`——冻结 routing envelope 与 native-attempt dedicated writer 都不允许通用写，agent 侧 links 保持冻结合同零触碰）。**幂等**：已有指向同一 task 的 link 不重复追加（`--json` 回 `idempotent:true`）。目标 task 必须存在于本板，否则 exit 3
 - flags：`--task <task-id>`（必填）· `--json`
-- 例：`ccm agent link agt-001 --task T7`
 
 ### agent terminal
 
 **写**
 
-```
-ccm agent terminal <id> --outcome <str> [flags]
-```
-
-- positional：`<id>`（必填）
 - 行为：`starting/running/uncertain/orphaned → terminal`，盖 `ended_at` + 登记 `outcome`（`starting→terminal` = **启动失败收口**——spawn 失败、无 handle 可 bind 的 agent 也要能收口，别留永久僵尸；`terminal→terminal` 幂等）。**terminal ≠ task done**——本命令绝不碰 task status，父层仍须独立验收后走 `task done --verified --artifact`
 - flags：`--outcome <str>`（必填·收口结论一句话）· `--json`
-- 例：`ccm agent terminal agt-001 --outcome "review approved, 3 findings filed"`
 - **收口是「凡派发皆登记」的对称后半段**：一个 agent 的产出被收割 / 端点验收掉（成功收工，非只 spawn 失败）后就 `terminal` 它——漏了它 agent 永停 `running`、堆成僵尸污染 recon 的 in_flight/phantom 判定。`ccm agent probe` **只判死活、永不 →terminal**，替不了这一步。批量收口：`ccm agent terminal <id>` 每次一个 id，多个 agent 就顺序 bash 背靠背跑（各自抢一次 board 锁·天然串行·零 race），别 `&` 后台并行 ccm 写。
 
 ### agent probe
 
 **写**（仅写 `agents[]` 段）
 
-```
-ccm agent probe [<id>] [flags]
-```
-
-- positional：`<id>`（可选；缺省探测本板全体 agent）
 - 行为：活性探测 + reconcile。**只写 agent 自己的 `probe` / `lifecycle` 字段，绝不碰 `task.handle` / attempt 投影**。探测手段按 handle 分级：
   - `pid` → 进程存活判定（进程在 / 存在但无权限 → `alive`；kill-0 确定进程不存在 → `gone`）；
   - `session-id` → 按 harness 的会话落盘根扫描会话文件 mtime（codex 默认 `~/.codex/sessions/**`·递归扫描 + 文件名精确匹配；claude-code 默认 `~/.claude/projects/*/<sid>.jsonl`·定向寻址；`origin` 等无会话落盘的 harness → `method=none`、`observed=unknown`）；
@@ -1903,43 +1628,24 @@ ccm agent probe [<id>] [flags]
 | `--freshness-sec <n>` | | string | mtime 判活窗口秒（默认 300·须正数——非法值 exit 2 拒绝进入写路径，不带病判活） |
 | `--json` | | bool | 结构化输出（`{probed, reconcile_rejected}`） |
 
-- 例：`ccm agent probe agt-001` · `ccm agent probe --board /abs/x.board.json --json`
-
 ### agent list
 
 **读**
 
-```
-ccm agent list [flags]
-```
-
-- positional：无
 - 行为：只读花名册：全体 agent + 按 `lifecycle.state` 分桶计数；每行含 state / harness / type / intent / 已关联 task。**附带 stale-running advisory**：凡 active-state（非 `terminal`）agent 的 linked task **全部已 `done`**，就列为「疑似产出已收割却漏收口」候选（json 落 `stale_candidates:[{id,links}]`·human 输出末尾一条 advisory 行指名候选）。**纯只读提示、绝不自动 terminal**——收口终态判断归 orchestrator，复核后自己 `ccm agent terminal <id>`。保守判据：链非空 + 每条 link 都指向存在且 `done` 的 task 才入选（任一 link 指向不存在 / 未 done 的 task → 不提示）
 - flags：`--json`（`{count, buckets, agents, stale_candidates}`）
-- 例：`ccm agent list` · `ccm agent list --board /abs/x.board.json --json`
 
 ### agent show
 
 **读**
 
-```
-ccm agent show <id> [flags]
-```
-
-- positional：`<id>`（必填；不存在 → exit 5，**不是** `data:null`）
 - 行为：单 agent 钻取：record + attach 命令 + transcript 路径 + probe 观测与新鲜度 + links
 - flags：`--json`（`{agent}`）
-- 例：`ccm agent show agt-001 --json`
 
 ### agent rm
 
 **写**（破坏性·删登记·非状态转移）
 
-```
-ccm agent rm <id> [--yes] [flags]
-```
-
-- positional：`<id>`（必填）
 - 行为：从本板 `agents[]` 删除整条 agent 记录（该 agent 侧的 `links[]` 随记录一并消失）——重复登记 / 误登记的撕裂行的**清除**出口（与 `amend` 互补：`amend` 补正保留的那条，`rm` 删多出来的那条）。**不经状态机**（删除 ≠ 状态转移），仍走带锁 + lint 写入关卡。破坏性，语义对齐 `task rm`：**非 TTY 须 `--yes`**，否则 refuse（exit 2）；agent id 不存在 → exit 5
 - flags：
 
@@ -1947,8 +1653,6 @@ ccm agent rm <id> [--yes] [flags]
 |---|---|---|---|
 | `--yes` | `-y` | bool | 非交互环境确认（破坏性操作·不加则 exit 2 拒绝） |
 | `--json` | | bool | 结构化输出（`{removed}`；支持 `--dry-run` 预演） |
-
-- 例：`ccm agent rm agt-003 --yes` · `ccm agent rm agt-003 --dry-run`
 
 ---
 
@@ -1964,6 +1668,8 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.peers-coord -->
 ## namespace peers（协调感知·只读跨板）
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 多 orchestrator 协调的**感知层**：M 个 orchestrator 并行抽同一活跃配额缸，各自孤立 pacing 会公地悲剧——感知通道让每个 orchestrator 看见全体 peer 的 goal / workload / priority / 死活，喂价值感知的**独立**自我配速（不必双向协商即可单方面合理让路 / 认领 slack；通信通道**不存在**·只读感知 + 机械 fair-share floor 收口）。**纯只读跨板**——扫 `<home>/boards/` 全体板，零写、不抢 board-lock、**不需要 active board 自身**（感知是用户级跨板·同 usage/estimate）。**token-blind**：花名册只投影 goal / priority / workload / state% / liveness——**无任何 secret / token**。
 
 > 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id / harness）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
@@ -1972,21 +1678,13 @@ Knowledge navigation:
 
 **读**（别名 `ccm peers`）
 
-```
-ccm peers [list] [flags]
-```
-
-- positional：无
 - 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `harness` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。同时按 `owner.harness` 生成 `pools[]`：同 harness 才在同一竞争池；缺失或坏值降为 `unknown`，且每块 unknown board 单独成池，避免不明来源互相混排。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
 - 排序：`priority` 降序（`urgent` 先 → `trivial`）→ 心跳新→旧 → 文件名（稳定 tiebreak）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--freshness-sec <n>` | | string | 心跳判活窗口秒（默认 600·正整数·非整数/缺则用默认） |
 | `--json` | | bool | 结构化花名册（否则人类表格） |
-
-- 例：`ccm peers` · `ccm peers --json` · `ccm peers --freshness-sec 300 --json`
 
 ---
 
@@ -2005,7 +1703,6 @@ ccm coordination inbox list [flags]
 ccm coordination inbox ack <id...> [flags]
 ```
 
-- positional：`list|ack`（必填）；`ack` 后跟一个或多个通知 id。
 - 行为：
   - `list`：读取当前板 `coordination.inbox`；缺失 = 空 inbox；`--unconsumed` 只列未消费通知。
   - `ack`：把给定 id 从 `unconsumed` 标记为 `consumed`，写 `consumed_at`，可选写 `consumed_note`；已 consumed/expired 的 id 幂等 no-op；未知 id → exit 2。
@@ -2013,15 +1710,7 @@ ccm coordination inbox ack <id...> [flags]
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--unconsumed` | | bool | `list` 时只列 status=unconsumed |
-| `--current-subscription` | | bool | `list` 时只按当前 session-bound subscription 精确读取；不匹配返回空 |
-| `--origin <host>` | | enum | `claude-code|codex|cursor|kimi-code`；与 session / epoch 一起绑定 |
-| `--session-epoch <id>` | | string | 可选当前订阅 epoch；旧 epoch fail closed |
-| `--capability <id>` | | string | 精确订阅读固定为 `coordination-inbox` |
-| `--note <str>` | | string | `ack` 时记录 consumed_note |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm coordination inbox list --unconsumed --json` · `ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "已降档并暂停 fill-work"`
 
 `--current-subscription` 还要求全局 `--session-id` 与可解析的精确 board；缺 `origin` / session / capability、
 identity 不匹配或 epoch 已旧都返回空，不降级成宽读。
@@ -2035,53 +1724,32 @@ ccm coordination subscription register --origin <host> --session-id <sid> --capa
 ccm coordination subscription current --origin <host> --session-id <sid> --capability coordination-inbox [flags]
 ```
 
-- positional：`register|current`（必填）。
 - `--origin` 必填，取 `claude-code|codex|cursor|kimi-code`；`--session-id` 是全局必填 flag；
   `--capability` 当前只接受 `coordination-inbox`。board 仍按全局 `--board` / session / home 发现规则精确解析。
 - `register` 对同一 `board_path + origin + capability + session_id` 幂等；新 scope 由 ccm 签发 opaque
   `subscription_id` 与 `session_epoch`。`current` 只读同一精确 identity，不创建 fallback。
-- 例：`ccm coordination subscription register --origin kimi-code --session-id SID --capability coordination-inbox --board /abs/x.board.json --json --no-input`
 
 ### coordination notify
 
 **写**（低层 append）
 
-```
-ccm coordination notify --kind <kind> --summary <str> --expires <iso> [flags]
-```
-
-- positional：无
 - 行为：append 一条 `unconsumed` 通知到当前板 `coordination.inbox`。写关卡随后自动执行：过期通知转 `expired`；同一 kind 只保留最新 unconsumed，旧 unconsumed 标 `expired` 并写 `superseded_by`；终态通知按 TTL / capacity GC。此命令是低层机制面，通常由 producer / Tier2 流程调用；普通 agent 消费通知用 `inbox list|ack`。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--kind <kind>` | | enum（必填） | 通知类型，取值见本节开头 kind 闭集 |
-| `--summary <str>` | | string（必填） | 人类可读摘要 |
-| `--strength <weak|strong>` | | enum | 标签协议里的 advisory strength（默认 `strong`） |
-| `--payload <json>` | | JSON object string | 结构化 payload（默认 `{}`） |
-| `--expires <iso>` | | ISO-8601 UTC（必填） | `expires_at`，过期后写关卡标 `expired` |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm coordination notify --kind pacing_yield --summary "为高优 peer 让路" --strength strong --payload '{"peer":"A"}' --expires 2026-07-09T17:00:00Z`
 
 ### coordination arbitrate
 
 **写**（deterministic pool arbiter）
 
-```
-ccm coordination arbitrate [flags]
-```
-
-- positional：无
 - 行为：运行 pool-aware allocation。流程：解析当前 board → 扫 `<home>/boards/` 的活+心跳新鲜 peer → 按 `owner.harness` 分池（只看当前板所在池）→ 读取当前 harness 的 usage signal / quota model / pollable → 归一为 `PoolPressure` → 按 priority-weighted fair-share 算每个 peer 的 row（`pacing_yield` / `pacing_claim` / `pacing_throttle` / `pacing_switch` / `pacing_stop` / `hold`）→ 只把当前 board 的 row 在命中边沿条件时 append 到**本板** `coordination.inbox`。M==1 时退化为 `ccm usage advise` 的单板 verdict 行为。边沿去重：同内容 dedup、不足冷却不刷屏；只有 band 跨越 / roster 变 / 本行目标份额 delta 超阈值 / kind 变化才追加。通知 payload 带 `producer:"coordination-arbiter"`、`dedup_key`、`pressure_band`、`roster_signature`、`target_headroom_pct`、`delta_headroom_pct`、`base_verdict` 和 own peer 摘要。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出（含 `mode` / `appended` / `append_reason` / `own_row` / `allocation` / `notification` / `unconsumed`） |
-
-- 例：`ccm coordination arbitrate --json`
 
 ---
 
@@ -2095,6 +1763,8 @@ Knowledge navigation:
 <a id="ccm-k-point-ccm-cmd-usage"></a>
 <!-- ccm:k:start point:ccm.cmd.usage -->
 ## namespace usage（只读 advisory）
+
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
 
 `usage` 用全局 `--harness <target>` 下钻一个 selected target 的当前登录态；它不是 machine-wide inventory。
 要一次看本机所有受支持 quota target，先用 `quota status --machine-wide`。全部 usage verb 纯 query / compute，
@@ -2110,11 +1780,6 @@ confidence、as-of / freshness 等诚实字段，编排动作归 `master-orchest
 
 **读**
 
-```
-ccm usage show [flags]
-```
-
-- positional：无
 - 行为：读取 `--harness` 选中的 target 当前登录态；data 顶层 `available` 只回答当前 signal 是否可用，缺信号时
   `available:false`、exit 0。统一窗口形状在 `current.five_hour`、`current.seven_day`、
   `current.fable_seven_day`、`current.billing_period`；named pools 在 `current.pools[]`，不适用或不可得的窗口为
@@ -2125,21 +1790,13 @@ ccm usage show [flags]
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--accounts <v>` | | enum | `all`（默认）\| `current` | 列全部 registry snapshot 或只列当前号 |
 | `--effective-n <n>` | | string | 正整数 | 覆写 advisory 的有效配额份数；不改变 provider 登录态，也不授权换号 |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm usage show` · `ccm usage show --accounts current --json`
 
 ### usage advise
 
 **读**
 
-```
-ccm usage advise [flags]
-```
-
-- positional：无
 - 行为：读取 `--harness` 选中的 target current signal，返回单侧 `verdict`、`strength`、`levers[]`、
   `nearest_reset`、各窗口百分比与 `available`。缺信号时 `hold + available:false`。这是 advisory，不执行
   WIP、模型、账号或 dispatch 动作；Codex 只把 7d 当 hard pacing 维度，任何 5h 字段只作 ignored
@@ -2151,37 +1808,21 @@ ccm usage advise [flags]
 | `--effective-n <n>` | | string | 覆写 advisory 的有效配额份数；不改变 provider 登录态，也不授权换号 |
 | `--json` | | bool | 结构化输出 |
 
-- 例：`ccm usage advise` · `ccm usage advise --effective-n 3 --json`
-
 ### usage task-cost
 
 **读**
 
-```
-ccm usage task-cost [<task-id>] [flags]
-```
-
-- positional：`<task-id>`（可选·给则单任务模式，不给则聚合模式）
 - 行为：读 board `observability.tokens`（input+output）算任务 token 成本；无 token / shell 任务 → `N/A`（`na:true`·诚实标）。聚合模式按 `--group-by` 维度合计 + `coverage_pct`（有 token 任务占比）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--group-by <v>` | | enum | `task`（默认）\| `executor` \| `type` \| `tier` | 聚合维度（无 task-id 时） |
-| `--scope <v>` | | enum | `home` \| `this-repo` \| `this-board`（默认本板 observability） | 历史语料范围 |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm usage task-cost T2` · `ccm usage task-cost --group-by executor --json`
 
 ### usage burn-rate
 
 **读**
 
-```
-ccm usage burn-rate [flags]
-```
-
-- positional：无
 - 行为：当前实现只投影 `five_hour` 与 `seven_day` 的窗口已逝 burn（`used% / elapsed-hours`）；信号不可得
   时相应窗口为 null / low confidence，全部缺失则 `available:false`、exit 0。Codex 只消费 `seven_day`，
   任何 5h 结果必须忽略。**当前实现尚未投影 `billing_period` burn-rate**，因此 Cursor target 会诚实降级，
@@ -2190,20 +1831,12 @@ ccm usage burn-rate [flags]
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（backtest 回放·影响窗口已逝时间·默认 now） |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm usage burn-rate` · `ccm usage burn-rate --json`
 
 ### usage runway
 
 **读**
 
-```
-ccm usage runway [flags]
-```
-
-- positional：无
 - 行为：复用 burn-rate，只对 `five_hour`（90% corridor）与 `seven_day`（85% corridor）计算
   `ample | will-exhaust-before-reset | unknown`。Codex 只消费 `seven_day`。**当前实现尚未投影
   `billing_period` runway**，Cursor target 返回 unavailable / unknown；不要把它解释成 ample。
@@ -2211,10 +1844,7 @@ ccm usage runway [flags]
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（backtest 回放·默认 now） |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm usage runway` · `ccm usage runway --json`
 
 ---
 
@@ -2231,90 +1861,54 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.ops-surfaces -->
 ## namespace status-report
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 生成式 board 状态报告。`render` 纯 stdout 计算；`write` / `show` / `watch` 只写 derived report artifact 到 `<home>/reports/status-report/boards/<board-file-stem>.status-report.json`，**不写 board JSON**。JSON schema 是 `ccm/status-report/v1`；freshness 由 board hash / topology hash / advisory hash / input hash / TTL 判定。报告 `delivery` 块列 mode 与每条 dep edge 的同源 qualification；readySet 使用注入本地 target drift/missing-object facts 的同一 evaluator。web viewer 的 Status module 读同一报告路径，DAG view-model 的 dep edge 也携带 qualification，不另造第二套交付模型。
 
 ### status-report render
 
 **读**
 
-```
-ccm status-report render [flags]
-```
-
-- positional：无
 - 行为：读取目标 board，计算报告并输出到 stdout；不写 artifact，不抢 board lock，不写 board。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
 | `--max-age <dur>` | | duration | artifact TTL 计算参数（默认 `30s`；支持 `s/m/h/d`） |
 | `--json` | | bool | 输出完整 `ccm/status-report/v1` envelope；否则输出人类摘要 |
-
-- 例：`ccm status-report render --json` · `ccm status-report render --board <path>`
 
 ### status-report write
 
 **写 report artifact，不写 board**
 
-```
-ccm status-report write [flags]
-```
-
-- positional：无
 - 行为：复用 fresh artifact；缺失 / 过期 / `--force` 时重新计算并原子写 report artifact。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
-| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
 | `--json` | | bool | 输出完整 envelope（否则只回显 artifact path） |
-
-- 例：`ccm status-report write` · `ccm status-report write --json`
 
 ### status-report show
 
 **读 / 按需写 report artifact，不写 board**
 
-```
-ccm status-report show [flags]
-```
-
-- positional：无
 - 行为：用户入口；fresh artifact 直接读，缺失 / 过期 / `--refresh` 时刷新后显示。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--refresh` | | bool | 忽略现有 artifact，强制刷新 |
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
-| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
 | `--json` | | bool | 输出完整 envelope（否则输出人类摘要） |
-
-- 例：`ccm status-report show` · `ccm status-report show --json --refresh`
 
 ### status-report watch
 
 **前台循环写 report artifact，不写 board**
 
-```
-ccm status-report watch [flags]
-```
-
-- positional：无
 - 行为：v1 是前台周期循环；每 tick 调用与 `write` 相同的 artifact 写路径。脚本 / 测试 / 一次性刷新用 `--iterations 1` 做有界 tick；没有 `--iterations` 时持续运行。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--interval <dur>` | | duration | 刷新间隔（默认 `30s`；支持 `s/m/h/d`） |
-| `--iterations <n>` | | string | 迭代次数；缺省持续运行 |
-| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
-| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
 | `--json` | | bool | 每 tick 输出 artifact metadata JSON |
-
-- 例：`ccm status-report watch --interval 30s` · `ccm status-report watch --iterations 1 --json`
 
 ---
 
@@ -2326,97 +1920,54 @@ ccm status-report watch [flags]
 
 **写 service state，不写 board**
 
-```
-ccm web-viewer start [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--host <str>` | | string | 监听地址（v1 只允许 `127.0.0.1`） |
-| `--port <n>` | | int | 监听端口（默认 `0` = 系统分配；固定端口冲突则失败） |
-| `--reuse` | | bool | 复用同 home 的健康 service（默认行为） |
-| `--no-open` | | bool | 只启动 / 复用，不尝试打开浏览器 |
 | `--board <path>` | | string | 全局 flag：只用于初始 board selection |
 | `--goal <substr>` | | string | 全局 flag：只用于初始 board selection |
 | `--json` | | bool | 结构化输出（含一次性 `open_url`） |
-
-- 例：`ccm web-viewer start` · `ccm web-viewer start --goal "Ship" --json`
 
 ### web-viewer open
 
 **写 service state，不写 board**
 
-```
-ccm web-viewer open [id] [flags]
-```
-
-- positional：`[id]`（可选 service id）
 - 行为：打开当前 home 的 viewer；默认无健康 service 时 start-then-open，CI / 无 GUI 时打印 URL。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--no-start` | | bool | 只打开已有健康 service；不存在则不启动 |
 | `--board <path>` | | string | 全局 flag：只用于初始 board selection |
 | `--goal <substr>` | | string | 全局 flag：只用于初始 board selection |
 | `--json` | | bool | 结构化输出（含一次性 `open_url`） |
-
-- 例：`ccm web-viewer open` · `ccm web-viewer open --board <path>` · `ccm web-viewer open --no-start --json`
 
 ### web-viewer status
 
 **读**
 
-```
-ccm web-viewer status [id] [flags]
-```
-
-- positional：`[id]`（可选 service id）
 - 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`，用于判断服务是否还握着旧 ccm 二进制。
 - flags：`--json`
-- 例：`ccm web-viewer status` · `ccm web-viewer status --json`
 
 ### web-viewer stop
 
 **写 service state，不写 board**
 
-```
-ccm web-viewer stop [id] [flags]
-```
-
-- positional：`[id]`（可选 service id）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--all` | | bool | 停止 / 清理当前 home 下全部 viewer state |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm web-viewer stop` · `ccm web-viewer stop --all --json`
 
 ### web-viewer restart
 
 **写 service state，不写 board**
 
-```
-ccm web-viewer restart [id] [flags]
-```
-
-- positional：`[id]`（可选 service id）
 - 行为：停旧启新，生成新 token；`--board` / `--goal` 只影响新实例初始 selection。
 - flags：`--host <str>`、`--port <n>`、`--board <path>`、`--goal <substr>`、`--json`
-- 例：`ccm web-viewer restart` · `ccm web-viewer restart --board <path> --json`
 
 ### web-viewer serve
 
 **内部 daemon target**
-
-```
-ccm web-viewer serve --state <path>
-```
 
 由 `start` 派生调用；用户通常不直接调用。
 
@@ -2432,66 +1983,35 @@ service state 落在 `<home>/services/monitor/`：`state.json` / `pid` / `log`�
 
 **写 service state，不写 board**
 
-```
-ccm monitor start [flags]
-```
-
-- positional：无
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--interval <sec>` | | int | tick 间隔秒（默认 `45`，范围 `5..3600`） |
-| `--quota-source <mode>` | | enum | `cached-only`（默认）\|`machine-wide`；后者须显式 opt-in live producer |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm monitor start` · `ccm monitor start --interval 30 --json`
 
 ### monitor stop
 
 **写 service state，不写 board**
 
-```
-ccm monitor stop [flags]
-```
-
-- positional：无
 - 行为：停止 daemon 并把 monitor `wanted:false`。后续 `ccm services reconcile --after-binary-replace` 不会把它重新拉起。
 - flags：`--json`
-- 例：`ccm monitor stop --json`
 
 ### monitor status
 
 **读**
 
-```
-ccm monitor status [flags]
-```
-
-- positional：无
 - 行为：显示 running / stale / stopped、pid、home、last_tick、last_error。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`。
 - flags：`--json`
-- 例：`ccm monitor status` · `ccm monitor status --json`
 
 ### monitor restart
 
 **写 service state，不写 board**
 
-```
-ccm monitor restart [flags]
-```
-
-- positional：无
 - flags：`--interval <sec>`、`--quota-source <cached-only|machine-wide>`（缺省保留现有 mode）、`--json`
-- 例：`ccm monitor restart --json`
 
 ### monitor serve
 
 **内部 daemon target**
-
-```
-ccm monitor serve --state <path>
-```
 
 由 `start` / OS service 派生调用。用户通常不直接调用。前台运行 tick loop；测试/调试可用 `--iterations <n>` 做有界 tick。
 
@@ -2499,25 +2019,15 @@ ccm monitor serve --state <path>
 
 **写用户级 OS service 文件，不写 board**
 
-```
-ccm monitor install-service [flags]
-```
-
 - 行为：在 macOS 写 LaunchAgent，在 Linux 写 `systemd --user` unit，并把 monitor state 标为 `wanted:true`。不依赖 PM2。
 - flags：`--interval <sec>`、`--quota-source <cached-only|machine-wide>`（默认 `cached-only`，持久化到 service）、`--json`
-- 例：`ccm monitor install-service --json`
 
 ### monitor uninstall-service
 
 **写 service state，不写 board**
 
-```
-ccm monitor uninstall-service [flags]
-```
-
 - 行为：Linux 保持既有 `systemd --user` 卸载流程。macOS 先用结构化 `launchctl bootout` 停用 LaunchAgent，再删除 plist；只有停用与删除都成功后才停止 monitor 并返回 `ok:true` / `uninstalled:true`。识别到 service `already-absent` 是幂等停用成功，但仍须把残留 plist 删除（或确认本就不存在）。真实 `bootout` 失败时返回非零、`deactivation.state:"active"`，保留 plist；`bootout` 成功但 plist 删除失败时，`deactivation.state:"inactive"` 仍保持真实，同时聚合结果返回非零、`ok:false` / `uninstalled:false` / `stopped:false`。`--json` 的 macOS 结果带三态 `deactivation.steps[].result`（`succeeded` / `already-absent` / `failed`）与 `unit_removal` 证据；不得把任一失败当成已卸载。
 - flags：`--json`
-- 例：`ccm monitor uninstall-service --json`
 
 ---
 
@@ -2529,20 +2039,12 @@ home 常驻服务 reconcile。它覆盖 `monitor` 与 `web-viewer`，用于 `ccm
 
 **写 service state，不写 board**
 
-```
-ccm services reconcile [flags]
-```
-
-- positional：无
 - 行为：扫描 `<home>/services/{monitor,web-viewer}/`；只重启 wanted 服务。未 wanted 的 service state 只报告 `skip`，不会自动 start。`--after-binary-replace` 是安装/升级路径的显式标记，语义同样是 best-effort reconcile。web-viewer 重启前会把内联 frontend 资产物化到 `<home>/services/web-viewer/app-dist/<ccm_version>/`，重启后探活 `/_ccm/health` 与 `/`（非 503）；监听端口默认 `0`（系统分配随机 ephemeral，不写死）。**不**自动打开浏览器。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--after-binary-replace` | | bool | 标记调用来自 ccm 二进制安装/替换后 |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm services reconcile --after-binary-replace` · `ccm services reconcile --after-binary-replace --json`
 
 ---
 
@@ -2559,10 +2061,6 @@ Authenticode / locked SEA backend gate 尚未通过，相关写 verb fail closed
 
 **写 immutable image store；不 activation**
 
-```text
-ccm runtime stage <artifact> --provenance <file> [--json]
-```
-
 - `--provenance`（required）：`ccm/runtime-provenance/v1` JSON，包含 official repository、release
   tag、platform asset 和 SHA-256。
 - 校验 non-symlink regular file、owner/security、permission、platform asset、pinned-fd hash 与
@@ -2576,10 +2074,6 @@ ccm runtime stage <artifact> --provenance <file> [--json]
 
 **写 append-only activation commit**
 
-```text
-ccm runtime activate <transaction-id> [--json]
-```
-
 - 锁内重验 staged event、READY、exact image hash、manifest/provenance digest 与 identity。
 - 成功返回 `sequence`、`transaction_id`、`current`、`previous`、`operation:"activate"`、
   `activation_path`。同一已完成 transaction 重试幂等返回原 commit。
@@ -2591,10 +2085,6 @@ ccm runtime activate <transaction-id> [--json]
 
 **读**
 
-```text
-ccm runtime resolve [--json]
-```
-
 返回当前 `sequence`、`transaction_id`、`sha256`、`image_path` / `image_ref`、
 `activation_path` 和 `invoke_assurance`。其中 Linux 报
 `exact-fd-v1/local-sha256-provenance/resistant`，Darwin 报
@@ -2605,10 +2095,6 @@ current → `exit 5`。
 ### runtime invoke
 
 **按平台声明的 assurance 启动 current image；不写 board**
-
-```text
-ccm runtime invoke [--require-assurance exact-object] -- <runtime-argv...>
-```
 
 selector 重验并固定 image fd。Linux 由 build-attested `linux-exact-fd-v1` launcher 对该 fd
 直接执行；Darwin 由 build-attested `darwin-path-attested-v1` launcher 在最后一个 native handoff
@@ -2624,10 +2110,6 @@ invocation。launcher/backend 在 payload 执行前失败返回结构化 `RUNTIM
 
 **默认只读；`--repair` 写 append-only recovery event**
 
-```text
-ccm runtime doctor [--installed-path <legacy-binary>] [--repair] [--json]
-```
-
 - `--installed-path`：只解释现有 in-place file 的迁移计划；`mutates_source:false`、
   `preserves_home:true`，不会移动旧 binary。
 - 无 `--repair`：报告 backend、current、transaction/activation 数、prepared/crash gap 和 stale lock。
@@ -2641,10 +2123,6 @@ ccm runtime doctor [--installed-path <legacy-binary>] [--repair] [--json]
 ### runtime rollback
 
 **写 append-only activation commit**
-
-```text
-ccm runtime rollback [--json]
-```
 
 重验 previous 后追加 `operation:"rollback"` 的新 commit：旧 previous 成为新 current，旧 current
 成为新 previous。无 previous → `exit 5`；activation disable → `exit 3`。只影响新 invocation，
@@ -2665,159 +2143,89 @@ Knowledge navigation:
 <!-- ccm:k:start point:ccm.cmd.estimate -->
 ## namespace estimate（只读 advisory）
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 工作侧只读 advisory（分解/规划 + 按时长选档）：消费 ccm 引擎的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**。
 
 ### estimate show
 
 **读**
 
-```
-ccm estimate show [<task-id>] [flags]
-```
-
-- positional：`<task-id>`（可选·给则单任务，不给则全部 active 任务）
 - 行为：每任务 raw estimate + EWMA 分层校准乘子覆写（`calibrated_h = raw × multiplier`·同 repo+type+executor+tier 多层收缩）+ conformal 区间（Mondrian 分组·快速瞥）。缺估值/无语料 → `no-history`（退原值）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate show T6 --json` · `ccm estimate show --scope this-repo`
 
 ### estimate forecast
 
 **读**
 
-```
-ccm estimate forecast [flags]
-```
-
-- positional：无
 - 行为：双通道 Monte Carlo——① 估算-DAG-MC（依赖结构感知·log-normal·校准估值）+ ② 吞吐-MC（#NoEstimates·不依赖估值·`coverage<50%` 时主导）→ P50/P80/P95 ETA + makespan + 敏感度三件套 **CI/CRI/SSI**；①②偏差 >20% 出 consistency warning。板有 asserted/confirmed 交付 DDL 时**附 `deadline_risk` 摘要块**（相对 DDL 的 margin/风险 band·复用 `estimate deadline-risk` verdict·不重算）；无 DDL → `null`（不假绿）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--mode <v>` | | enum | `estimate` \| `throughput` \| `both`（默认） | 通道（coverage<50% 吞吐主导） |
-| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest·默认 now） |
 | `--effective-n <n>` | | string | 正整数（默认 1） | 号池有效配额份数：N 路并行配额 → **吞吐通道② 天数 ÷N**（资源型加速）。估算-DAG 通道① 是临界路径 makespan、**不受 N 缩短**（已假设无界并行·见输出 `notes`）。回显 `effective_n` |
-| `--runs <n>` | | string | | MC trials（默认 2000） |
-| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate forecast --json` · `ccm estimate forecast --mode both --runs 5000 --seed 42 --json` · `ccm estimate forecast --effective-n 3 --json`
 
 ### estimate evm
 
 **读**
 
-```
-ccm estimate evm [flags]
-```
-
-- positional：无
 - 行为：EVM（PV/EV/AC → CPI/EAC/ETC/VAC）+ **Earned Schedule**（SPI(t)=ES/AT·SV(t)·IEAC(t)·全程保判别力·修 SPI($) 末期失灵）。消费 `board.baseline`——**无 baseline 降级 warn**（`has_baseline:false`·exit 0·先 `ccm baseline snapshot`）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
-| `--ac-source <v>` | | enum | `duration`（实测小时·默认）\| `token`（遥测） | AC 口径 |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate evm --json` · `ccm estimate evm --ac-source token --as-of 2026-06-25T12:00:00Z`
 
 ### estimate velocity
 
 **读**
 
-```
-ccm estimate velocity [flags]
-```
-
-- positional：无
 - 行为：历史吞吐（tasks/day）+ backlog 清空 ETA（P50/P80/P95）+ **SLE**（cycle-time 服务水平期望 P50/P85/P95·Kanban Guide 2020）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
 | `--window <n>` | | string | | 滑窗天数：只取 `finished_at` 落在最近 n 天的 done 语料喂 SLE/吞吐/velocity。**缺省（不传）→ 不过滤全语料**（`window_days` 回显 `null`）；传 n → 过滤 |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate velocity --json` · `ccm estimate velocity --window 14`
 
 ### estimate risk
 
 **读**
 
-```
-ccm estimate risk [flags]
-```
-
-- positional：无
 - 行为：综合风险——敏感度 **CI/CRI/SSI**（MC 高临界节点）+ **WIP-aging SLE**（在飞任务 age > SLE_P85 → `at_risk`·> P95 → `critical`）+ **CCPM buffer_health**（项目缓冲绿/黄/红区）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
-| `--runs <n>` | | string | | MC trials（默认 2000） |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate risk --json` · `ccm estimate risk --scope this-repo`
 
 ### estimate cost-to-complete
 
 **读**
 
-```
-ccm estimate cost-to-complete [flags]
-```
-
-- positional：无
 - 行为：清空剩余 backlog 的总**配额%** P50/P80/P95（剩余工作 × 每单位配额%增量·throughput 式 MC·偿付力账本）——每单位 %-增量 = 账户权威 burn-rate（%/h）× 历史任务实测工期（duration-grounded·串行归因假设）；外加 **token 辅助 sizing**（`knnPredict` 预测各 backlog 任务 token·**辅助相对量计·非预算账本**，只把总% 按相对重量切到各任务）。账户 burn 不可得 → `available:false` + `cost_to_complete_pct:null`（exit 0·降级·非 exit 1）；`backlog:0` → cost `0%`。p95 = 5% 硬墙（引擎分位口径·绝不 100%）
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--scope <v>` | | enum | `home`（默认·跨板多层收缩）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
-| `--runs <n>` | | string | | MC trials（默认 2000） |
-| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate cost-to-complete` · `ccm estimate cost-to-complete --scope this-repo --seed 42 --json`
 
 ### estimate deadline-risk
 
 **读**
 
-```
-ccm estimate deadline-risk [flags]
-```
-
-- positional：无
 - 行为：交付 DDL（`goal_contract.deadline`）风险 verdict——三通道 Monte Carlo 出**准时概率** `on_time_probability` + 分位 margin + 六态 `risk_band` + top drivers。三通道各司其职：**RCPSP-in-trial**（真调度当前 DAG + 吃 `scheduling.wip_limit` 资源竞争）是**唯一 verdict 源**，`on_time_probability` 只从它来；**precedence-only**（无资源闸）只作显式标注的乐观下界（喂 `forecast`/`margin` + 双通道分歧信号）；**throughput** 降为 heuristic 参考（`channels.throughput_reference`·`kind:"heuristic-reference"`）**绝不映射 verdict**。诚实降级（**绝不假绿**）：无 DDL（state ∈ `pending`/`none`/键缺失）/ 图含环 / 无有效预测 / coverage·history 太弱 / 双通道严重分歧（`> 0.25`）/ RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`（**绝不退 throughput 冒充 resource-aware**）；`now ≥ DDL` 且未完成 → `overdue`（strong）。band 阈值为 **explicitly uncalibrated 保守起点**（`calibration_status:"uncalibrated-conservative"`·on_track ≥ 0.90 / at_risk < 0.65 / likely_late < 0.40·待 labeled 语料校准）。纯只读零写，hook 只搬运结果、绝不重算
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-| `--scope <v>` | | enum | `home`（默认·跨板多层收缩）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
 | `--runs <n>` | | string | | MC trials（默认 2000·latency 降档阶梯埋好防极端大图） |
-| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
-| `--effective-n <n>` | | string | | 号池有效配额份数覆写（**只缩 throughput 参考·非 verdict**） |
 | `--json` | | bool | | 结构化输出 |
-
-- 例：`ccm estimate deadline-risk --json` · `ccm estimate deadline-risk --scope this-board --seed 42 --json`
 
 ---
 
@@ -2892,6 +2300,8 @@ Cursor host 当前**不支持账号池管理 / 换号**。`ccm account add/delet
 <!-- ccm:k:start point:ccm.cmd.misc-ns -->
 ## namespace statusline
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 Cursor host 当前没有 Claude Code 那种外部命令式 status-line hook。`ccm statusline install/uninstall` 在 Cursor 下必须显式 `NotImplemented`，且不得写 Claude Code settings。当前 Cursor 用量信号来自 `Cursor dashboard GetCurrentPeriodUsage` 的 rate limits，而不是 statusline sidecar。
 
 ---
@@ -2924,10 +2334,6 @@ ccm attempt write-set \
 
 ### harness list
 
-```
-ccm harness list [--json] [--machine-wide]
-```
-
 - 读所有 ccm 已知 harness 的本机安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测；Cursor 分开报 `cursor-ide-plugin` (`ide-plugin`) 和 `cursor-agent` (`cli-headless`)；Kimi 通过 `kimi` CLI / `KIMI_CODE_HOME` 或默认 `~/.kimi-code` 探测。
 - 顶层 harness 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。`installed[]` 保持 plugin-target 语义：只有 `cursor-agent` 时不把 Cursor IDE 报成 installed、也不触发 IDE plugin upgrade；文本相应显式写 `plugin-target=installed|missing`，不以裸 `Cursor missing` 掩掉已安装的 headless surface。
 - `surfaces[]` 是独立 descriptor：`id`、`kind`、`installed`、`available`、`binary{name,path,available}`、`configPaths`、`facts`、`admission`、`capabilities`。顶层 `installedSurfaces[]` 列已安装 surface id。`cursor-agent` 仅以可执行 binary presence 翻真（支持 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`）；symlink 报 PATH 命中的入口绝对路径，非可执行文件不算。
@@ -2936,7 +2342,6 @@ ccm harness list [--json] [--machine-wide]
 - 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），保留同一份 `surfaces[]` / `installedSurfaces[]`，并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor / Kimi 为 `null`。
 - `--machine-wide --json` 另带严格准入用的 `surfaceInventory`（`ccm/machine-surface-inventory/v1`）：Cursor IDE plugin 与 `agent|cursor-agent` headless CLI 是两个独立 descriptor；只做 `--version` / `--help` / `status --help` / `status --format json` 的只读探测，不转发 API key、不触发登录/换号/模型请求。它可以读取并净化 auth 状态，但 model、quota 等 unknown 必须保真，任一准入必需事实 unknown 都令 `eligibility.automatic=false`。Cursor Agent 的 supported-version contract 是经实测冻结的精确 allowlist，未知版本 fail closed；collector 时间窗必须覆盖当前 as-of 且 TTL 有界。`surfaceInventory` 的 UTF-8 JSON 硬上限为 4096 bytes；开放字符串发生有界投影时回显 `truncation.{applied,max_bytes,fields,fields_omitted}`，受影响 surface automatic ineligible，并保留 account/credential mutation 等负能力事实。
 - flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
-- 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 
 ### harness current
 
@@ -2967,7 +2372,6 @@ ccm upgrade [--json] [--harness <id>] [--all-harnesses]
 ccm upgrade all [--json] [--harness <id>] [--all-harnesses]
 ```
 
-- positional：无
 - 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）。插件阶段**默认**枚举本机已安装且支持 plugin 分发的 harness 并逐个升级；`--harness` 收窄为单目标（与 `--all-harnesses` 互斥；后者现为默认行为的兼容别名）
 - flags：
 
@@ -2975,49 +2379,29 @@ ccm upgrade all [--json] [--harness <id>] [--all-harnesses]
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
 | `--harness <id>` | | string | 插件升级阶段只升指定 harness（不影响 ccm 二进制自升级） |
-| `--all-harnesses` | | bool | 兼容别名：插件升级默认即升本机已安装 harness；与 `--harness` 互斥 |
-
-- 例：`ccm upgrade` · `ccm upgrade --dry-run` · `ccm upgrade --harness cursor --dry-run`
 
 ### upgrade ccm
 
 **写**（SEA 二进制原子自替换）
 
-```
-ccm upgrade ccm [--to <ccm-v*tag>] [--json]
-```
-
-- positional：无
 - 行为：探当前 SEA 自身路径（`process.execPath`）→ 下载新 `ccm-<plat>` 到同目录临时文件 → `chmod +x` → 验新二进制 `--version` 能跑 → 原子 `rename` 覆盖自身路径（macOS/Linux 运行中进程持旧 inode·覆盖安全）。成功后 best-effort 跑 `ccm services reconcile --after-binary-replace`（wanted monitor/web-viewer 停旧起新；web-viewer 物化 frontend 资产并用系统分配随机端口，不自动 open 浏览器）。**非 SEA**（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错（exit 1）。未显式 `--to` 且本地核版本 ≥ 线上最新 tag 核版本 → 视为已最新、跳过（避免意外降级；ccm 二进制内部版本号与 `ccm-v*` 发布线**已解耦**，比较仅作参考门）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--to <tag>` | | string | 指定 `ccm-v*` tag（默认线上最新·如 `ccm-v0.1.0`） |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm upgrade ccm` · `ccm upgrade ccm --to ccm-v0.1.0 --dry-run`
 
 ### upgrade plugin
 
 **写**（harness-specific plugin manager）
 
-```
-ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
-```
-
-- positional：无
 - 行为：默认枚举本机已安装且支持 `pluginDistribution` 的 harness，并逐个执行各自 adapter 升级。Cursor adapter 会从本机已安装的 cc-master 包读取 adapter 产物，刷新本地 Cursor marketplace/plugin 注册，并按 `plugin/dist/cursor` 中的 skills + hooks 进行更新；入口命令以 Cursor slash commands（`/as-master-orchestrator` 等）为主。需要只升 Cursor 时传 `--harness cursor`；`--all-harnesses` 现为默认行为的兼容别名（与 `--harness` 互斥）。Cursor adapter 不触碰 Claude Code settings / marketplace。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--to <tag>` | | string | 期望的 `v*` tag（**信息性**·实际升到 marketplace 最新） |
 | `--harness <id>` | | string | 只升指定 harness（与 `--all-harnesses` 互斥） |
-| `--all-harnesses` | | bool | 兼容别名：默认即枚举本机已安装 harness；与 `--harness` 互斥 |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run` · `ccm upgrade plugin --harness cursor --dry-run --json` · `ccm upgrade plugin --all-harnesses --dry-run --json`
 
 ---
 

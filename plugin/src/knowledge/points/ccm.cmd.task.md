@@ -7,6 +7,8 @@ point: ccm.cmd.task
 <!-- ccm:k:start point:ccm.cmd.task -->
 ## namespace task
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 任务：增删改查 + 状态机（DAG 节点）。
 
 **语法 / positional / flags / 例一律以 `ccm task <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：各 verb 的语义边界、跨 verb 的批量与投影规则、以及「这个专用 writer 为什么不能用 generic setter 代替」这类判断。

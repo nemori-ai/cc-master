@@ -232,23 +232,23 @@
         },
         {
           "point": "point:ccm.cmd.agent",
-          "point_sha256": "fe0ee7492fe4c8083e8f142b723e7932f8952d14d20f0465239be54961f4c72f",
-          "passage_sha256": "fe0ee7492fe4c8083e8f142b723e7932f8952d14d20f0465239be54961f4c72f"
+          "point_sha256": "1d40bc9b8fb77162a89a9f5c805aaf667e8f345efef20c0433b2554ec0960712",
+          "passage_sha256": "1d40bc9b8fb77162a89a9f5c805aaf667e8f345efef20c0433b2554ec0960712"
         },
         {
           "point": "point:ccm.cmd.baseline",
-          "point_sha256": "545dab300c0f152f697e15fd05545d14b87631511f97518fa13167ac474b7903",
-          "passage_sha256": "545dab300c0f152f697e15fd05545d14b87631511f97518fa13167ac474b7903"
+          "point_sha256": "83e1718f37a1876f0b22fb8e7d5807442d81a34acedae5d7a930b55e4d182150",
+          "passage_sha256": "83e1718f37a1876f0b22fb8e7d5807442d81a34acedae5d7a930b55e4d182150"
         },
         {
           "point": "point:ccm.cmd.board",
-          "point_sha256": "30bf76e9f038f28980b90987733e715b4263cd3b3257ddf3e4cc20cdc5c59c12",
-          "passage_sha256": "30bf76e9f038f28980b90987733e715b4263cd3b3257ddf3e4cc20cdc5c59c12"
+          "point_sha256": "d92c10efb61b0d6588c6cb03c768b94aaa4e459cddd91e5e84bbd2bf4a9a600f",
+          "passage_sha256": "d92c10efb61b0d6588c6cb03c768b94aaa4e459cddd91e5e84bbd2bf4a9a600f"
         },
         {
           "point": "point:ccm.cmd.cadence",
-          "point_sha256": "705d26611f430c333cadc462b8c82f9cb4ac5d369c6c60d7e121145802fb9dd8",
-          "passage_sha256": "705d26611f430c333cadc462b8c82f9cb4ac5d369c6c60d7e121145802fb9dd8"
+          "point_sha256": "ecefcb1144e80ac08f96a2e97f1416d7d8eac26d5e8e87fce39cc7ce10bf73a9",
+          "passage_sha256": "ecefcb1144e80ac08f96a2e97f1416d7d8eac26d5e8e87fce39cc7ce10bf73a9"
         },
         {
           "point": "point:ccm.cmd.calibration",
@@ -267,8 +267,8 @@
         },
         {
           "point": "point:ccm.cmd.estimate",
-          "point_sha256": "dbb9742a2e0b9e22196e7d3d9993ac2a34614a7347150f51b174797e660004be",
-          "passage_sha256": "dbb9742a2e0b9e22196e7d3d9993ac2a34614a7347150f51b174797e660004be"
+          "point_sha256": "5c99860684b2ebf32b5ae006afe55470294c2208bf2eb78fd2d579cc92c9e04a",
+          "passage_sha256": "5c99860684b2ebf32b5ae006afe55470294c2208bf2eb78fd2d579cc92c9e04a"
         },
         {
           "point": "point:ccm.cmd.goal",
@@ -277,8 +277,8 @@
         },
         {
           "point": "point:ccm.cmd.jc",
-          "point_sha256": "597f98c8590a273f545492dfa052861ef74b6f7db8431b7df4f155e99381525a",
-          "passage_sha256": "597f98c8590a273f545492dfa052861ef74b6f7db8431b7df4f155e99381525a"
+          "point_sha256": "eb5f06f627acc504dde0c7a3d0927928db805a30de63922fd9a6d97e161210b4",
+          "passage_sha256": "eb5f06f627acc504dde0c7a3d0927928db805a30de63922fd9a6d97e161210b4"
         },
         {
           "point": "point:ccm.cmd.json-shape",
@@ -287,18 +287,18 @@
         },
         {
           "point": "point:ccm.cmd.log",
-          "point_sha256": "58d1552d666f387495254cfc30f4e46b163bd6d62b1cfa19246c1fb4995679c6",
-          "passage_sha256": "58d1552d666f387495254cfc30f4e46b163bd6d62b1cfa19246c1fb4995679c6"
+          "point_sha256": "ca44e37a0a372e4fa6bf8f1847458c382b1aef6fc6121ccba091494cc8996984",
+          "passage_sha256": "ca44e37a0a372e4fa6bf8f1847458c382b1aef6fc6121ccba091494cc8996984"
         },
         {
           "point": "point:ccm.cmd.misc-ns",
-          "point_sha256": "783fb525d8e02a8a2316bac42a04d20166163879ad3c386fbfe69e2af07870a9",
-          "passage_sha256": "783fb525d8e02a8a2316bac42a04d20166163879ad3c386fbfe69e2af07870a9"
+          "point_sha256": "bc2dbe27d1b5d360e2e3345c9be6f6aa8f4277e0b2aca8370d5785a4ef09c362",
+          "passage_sha256": "bc2dbe27d1b5d360e2e3345c9be6f6aa8f4277e0b2aca8370d5785a4ef09c362"
         },
         {
           "point": "point:ccm.cmd.ops-surfaces",
-          "point_sha256": "5879013b6cabdcd562a472d2bcd2635db089e61a50e4c3e75fb8cf1acd620ef6",
-          "passage_sha256": "5879013b6cabdcd562a472d2bcd2635db089e61a50e4c3e75fb8cf1acd620ef6"
+          "point_sha256": "59b1f712b1af6246218c8050f006561d2682c584d465bc17fb4038d837898fad",
+          "passage_sha256": "59b1f712b1af6246218c8050f006561d2682c584d465bc17fb4038d837898fad"
         },
         {
           "point": "point:ccm.cmd.overview",
@@ -307,23 +307,23 @@
         },
         {
           "point": "point:ccm.cmd.peers-coord",
-          "point_sha256": "92c39e236ab374b54eade3de5af7a8311b68862f2651b9bc8d68738eb8e04a74",
-          "passage_sha256": "92c39e236ab374b54eade3de5af7a8311b68862f2651b9bc8d68738eb8e04a74"
+          "point_sha256": "a957eb39a4a2ba0222b81cdc5294c45c3a6b00e9d58c6d829764b1f91f58835c",
+          "passage_sha256": "a957eb39a4a2ba0222b81cdc5294c45c3a6b00e9d58c6d829764b1f91f58835c"
         },
         {
           "point": "point:ccm.cmd.task",
-          "point_sha256": "9041a2585c3c63a0acd1fcca48d8baf3d4549e68d11fe0e53cc7dec1e14a4da6",
-          "passage_sha256": "9041a2585c3c63a0acd1fcca48d8baf3d4549e68d11fe0e53cc7dec1e14a4da6"
+          "point_sha256": "d0a6f9ea297a4817f6d2ff4afbd1db42970d954f4f623d6282836e634df3216a",
+          "passage_sha256": "d0a6f9ea297a4817f6d2ff4afbd1db42970d954f4f623d6282836e634df3216a"
         },
         {
           "point": "point:ccm.cmd.usage",
-          "point_sha256": "0618da96abcb62de3ac7ce48c46e00144d15d9256a508be9ee224f8e0cb0c2b4",
-          "passage_sha256": "c876a3c6c4dc7166d33f0fa567ecd5e24432b150d5b27d47f0cc5bd9556fb3c2"
+          "point_sha256": "8d4c18c716da307fbcbd3a566d212ba99292b130a681494598cda9c27b26689e",
+          "passage_sha256": "39d3b23d3966d52ef293962eeba888a84c252dd5399d440e44e0d4d42c745164"
         },
         {
           "point": "point:ccm.cmd.watchdog",
-          "point_sha256": "a8d9a606320ea839c811bbece3dc1cbdff7bcfe69e44927ba14d4338ebfbeb8c",
-          "passage_sha256": "a8d9a606320ea839c811bbece3dc1cbdff7bcfe69e44927ba14d4338ebfbeb8c"
+          "point_sha256": "7eb06998f85f7a4f9fd9e700f1d574c9f146ac40e7a1dadd9fa0d2008f98afd5",
+          "passage_sha256": "7eb06998f85f7a4f9fd9e700f1d574c9f146ac40e7a1dadd9fa0d2008f98afd5"
         },
         {
           "point": "point:ccm.cmd.worker-quota",
