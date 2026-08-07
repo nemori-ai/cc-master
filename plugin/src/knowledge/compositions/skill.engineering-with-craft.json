@@ -90,8 +90,8 @@
         },
         {
           "point": "point:craft.stage-handoff",
-          "point_sha256": "599f6b125f4fc8857b40f27ae1af6f54e9c0ed5bb866d3672540f36825de03fc",
-          "passage_sha256": "3b40403e70b0cb48b3c2ed892275d1eb79e3bb25bb607841165d57a15ce37de7"
+          "point_sha256": "046c5918d78b04560e27f691a3a0350460d7e2a55608c11b2722e42f0d88b094",
+          "passage_sha256": "ebb105f741e180692c253dbdb50440a88df42104949cd60b01b7aad999503fa1"
         }
       ]
     },
@@ -226,8 +226,8 @@
         },
         {
           "point": "point:sdd.alignment",
-          "point_sha256": "9181b2af20c046ea741c3674ff4a282b265052e55dd85804c1bd8bfb4c657c10",
-          "passage_sha256": "9181b2af20c046ea741c3674ff4a282b265052e55dd85804c1bd8bfb4c657c10"
+          "point_sha256": "4d64fad2c8cbf437c9433eb8200f66606f0d55421047af86106baf1da4966c0b",
+          "passage_sha256": "4d64fad2c8cbf437c9433eb8200f66606f0d55421047af86106baf1da4966c0b"
         },
         {
           "point": "point:sdd.change-order",
@@ -236,8 +236,8 @@
         },
         {
           "point": "point:sdd.core-belief",
-          "point_sha256": "4d17c122dd32280f5c62cb3c8621f7f3a2687a2b490bd59c91c4277f9e2464fb",
-          "passage_sha256": "4d17c122dd32280f5c62cb3c8621f7f3a2687a2b490bd59c91c4277f9e2464fb"
+          "point_sha256": "4cd7c2b1c8f1866e9ee5c0f950258cd9672ecba8d2c9c5fbbe18ca2cfdfa1939",
+          "passage_sha256": "4cd7c2b1c8f1866e9ee5c0f950258cd9672ecba8d2c9c5fbbe18ca2cfdfa1939"
         },
         {
           "point": "point:sdd.drift-red-line",
@@ -288,8 +288,8 @@
         },
         {
           "point": "point:tdd.constraint-parity",
-          "point_sha256": "11c0c1fc0273c6eb008b0f75c03b89a2f8e1267ea1bede948bb76cfb342b901d",
-          "passage_sha256": "11c0c1fc0273c6eb008b0f75c03b89a2f8e1267ea1bede948bb76cfb342b901d"
+          "point_sha256": "e279e9364adb5d6b40dd4ed308f21d69b99120d7d8f284aae93302c854f11e84",
+          "passage_sha256": "e279e9364adb5d6b40dd4ed308f21d69b99120d7d8f284aae93302c854f11e84"
         },
         {
           "point": "point:tdd.design-feedback",

@@ -121,9 +121,9 @@
         "files": [
           {
             "path": "plugin/src/skills/engineering-with-craft/canonical/SKILL.md",
-            "utf8_bytes": 10903,
-            "lines": 128,
-            "estimated_tokens": 3635
+            "utf8_bytes": 10515,
+            "lines": 130,
+            "estimated_tokens": 3505
           },
           {
             "path": "plugin/src/skills/engineering-with-craft/canonical/references/ddd.md",
@@ -139,25 +139,25 @@
           },
           {
             "path": "plugin/src/skills/engineering-with-craft/canonical/references/sdd.md",
-            "utf8_bytes": 14436,
-            "lines": 218,
-            "estimated_tokens": 4812
+            "utf8_bytes": 13812,
+            "lines": 213,
+            "estimated_tokens": 4604
           },
           {
             "path": "plugin/src/skills/engineering-with-craft/canonical/references/tdd.md",
-            "utf8_bytes": 13616,
-            "lines": 209,
-            "estimated_tokens": 4539
+            "utf8_bytes": 13369,
+            "lines": 205,
+            "estimated_tokens": 4457
           }
         ],
-        "utf8_bytes": 72042,
-        "estimated_lines": 1020,
+        "utf8_bytes": 70783,
+        "estimated_lines": 1013,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 24014,
+        "estimated_tokens": 23595,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }
