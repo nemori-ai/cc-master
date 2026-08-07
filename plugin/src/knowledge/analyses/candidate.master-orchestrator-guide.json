@@ -197,9 +197,9 @@
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/decomposition.md",
-            "utf8_bytes": 12135,
-            "lines": 120,
-            "estimated_tokens": 4045
+            "utf8_bytes": 11816,
+            "lines": 116,
+            "estimated_tokens": 3939
           },
           {
             "path": "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
@@ -256,14 +256,14 @@
             "estimated_tokens": 5003
           }
         ],
-        "utf8_bytes": 229630,
-        "estimated_lines": 2064,
+        "utf8_bytes": 229311,
+        "estimated_lines": 2060,
         "policy_max_lines": 8192,
         "policy_max_utf8_bytes": 524288,
         "within_read_budget": true
       },
       "token": {
-        "estimated_tokens": 76544,
+        "estimated_tokens": 76437,
         "policy_max_tokens": 131072,
         "within_token_budget": true
       }

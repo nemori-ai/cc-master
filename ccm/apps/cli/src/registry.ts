@@ -63,7 +63,34 @@ export interface OutputSchemaSpec {
   /** 该 verb 存在合法的空结果（如 read-by-id 查不到）——此时 data 为 null，不参与 keys 校验。 */
   nullable?: boolean;
 }
-export interface VerbSpec {
+// ── Unix 段（man/`--help` 传统段落）的承载字段 ────────────────────────────────────────────────────
+//
+// 由来：汰换台账判定「112 条环境事实里，命令目录一族主体迁 `--help`」。而实测发现要接收这些内容的
+// 四个段（DESCRIPTION / FILES / EXIT STATUS / SEE ALSO）在 140 个子命令上**覆盖 0%** —— help 当时
+// 只有 SYNOPSIS / OPTIONS / EXAMPLES 三段，恰好是母本已经逐字重复的那三段。所以迁移的第一步是
+// **建段**，不是搬内容；先删 skill 会把知识删进真空。详见
+// design_docs/disposition-ledger/help-section-gap-audit.md。
+//
+// 四个字段全部可选：没写的命令照旧只渲染原三段，不产生空标题。
+//
+// ⚠ 三条防复制的纪律（违反了就是把 28k 的 help 撑成几倍，预算闸会当场拦下）：
+//   · `description` 只写**这条命令独有**的语义，尤其是「不改什么」。「只读 board / 会写 board」
+//     **不要手写** —— 已由 `read` 字段派生。
+//   · `exitStatus` 只列**本命令特有**的退出条件。0/1/2/3/4/5 的通用含义在 `ccm --help` 里说过一次，
+//     140 份各抄一遍是纯浪费。
+//   · `seeAlso` 只写**跨 namespace** 的相关命令。同域兄弟命令 `ccm <noun> --help` 已经全列了。
+export interface HelpSections {
+  /** DESCRIPTION 补充行。副作用的读写属性由 `read` 派生，此处只写命令独有语义与「不改什么」。 */
+  description?: string[];
+  /** FILES：读写的路径 → 一句话说明。 */
+  files?: [string, string][];
+  /** EXIT STATUS：本命令**特有**的退出条件 → 触发情形。通用码不列。 */
+  exitStatus?: [string, string][];
+  /** SEE ALSO：跨 namespace 的相关命令（同域兄弟不列）。 */
+  seeAlso?: string[];
+}
+
+export interface VerbSpec extends HelpSections {
   summary: string;
   read: boolean;
   positionals: Positional[];
@@ -490,6 +517,15 @@ export const REGISTRY: Registry = {
       examples: ['ccm lint', 'ccm board lint --json', 'ccm board lint --board <path> --raw --json'],
       handler: 'board.lint',
       outputSchema: { keys: ['ok', 'violations', 'report'] },
+      // Unix 段样板（只读侧）。「只读」那句由 read:true 派生，此处不重复。
+      description: [
+        '只报不修：一条 violation 也不会被自动改掉，修法在每条报错的正文里。',
+        'warn 不影响退出码；只有 hard error 才退 3。',
+      ],
+      exitStatus: [['3', '存在 hard error（warn 单独存在时仍退 0）']],
+      seeAlso: [
+        'ccm task update  —— 大多数 BIZ 违规的修法入口（board 变更只走 ccm，不要手改文件）',
+      ],
     },
     graph: {
       summary: 'DAG 全量分析：拓扑 / 环 / readySet / 临界路径 / makespan',
@@ -2774,6 +2810,20 @@ export const REGISTRY: Registry = {
         'ccm calibration capture --scope this-board --as-of 2026-07-20T12:00:00Z --json',
       ],
       handler: 'calibration.capture',
+      // Unix 段样板（写侧）。「走写入关卡」那句由 read:false 派生，此处不重复。
+      description: [
+        '写的是 home 级校准语料，不是 board —— board 只读，窄腰字段一字不动。',
+        '复用 estimate deadline-risk 的同一预测计算路径，把采集时的真实 backlog、预测 band /',
+        'probability、coverage / confidence、WIP 与未回填 label 一并追加。',
+        '幂等键 snapshot_id = <board_id>@<captured_at_ms>：同 board + 同 --as-of 重放返回',
+        'captured:false / duplicate:true 而不追加；不同 --as-of 是该 board 的新观察。',
+        'board 无 deadline 时跳过落盘（skipped_reason 说明原因）。',
+      ],
+      files: [['<home>/calibration/deadline-snapshots.jsonl', 'append-only 语料；跨 board 共享']],
+      seeAlso: [
+        'ccm estimate deadline-risk  —— 消费本语料出 forecast（scope 口径与本命令一致；它纯只读，绝不创建 store）',
+        '本命令只采预测侧 observed snapshot；label 回填与 calibration flip 不在此命令内',
+      ],
     },
   },
 

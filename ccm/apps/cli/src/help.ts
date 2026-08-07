@@ -112,8 +112,12 @@ function _topLevel(reg: Reg, aliases: Aliases, nounAliases: NounAliases = {}): s
   lines.push('  ccm <alias> [args] [flags]');
   lines.push('');
   lines.push('CORE NAMESPACES');
-  for (const noun of Object.keys(reg)) {
-    lines.push(`  ${_padRight(noun, 12)}${_namespaceBlurb(noun)}`);
+  // 列宽按最长 namespace 名算，不写死。写死过 12，而 `status-report` 有 13 个字符——
+  // 填充被吃光，渲染成 `status-report生成式 board …`（名字与描述之间没有空格）。
+  const nouns = Object.keys(reg);
+  const nounW = Math.max(...nouns.map((n) => n.length), 12) + 2;
+  for (const noun of nouns) {
+    lines.push(`  ${_padRight(noun, nounW)}${_namespaceBlurb(noun, reg)}`);
   }
   // ALIASES：command 级 alias → [noun, verb]（渲染成 ccm <noun> <verb>）+ namespace 级 NOUN_ALIASES
   //   → 真实 noun（渲染成 ccm <noun> <command>，覆盖该 noun 全部子命令）。
@@ -152,8 +156,14 @@ function _topLevel(reg: Reg, aliases: Aliases, nounAliases: NounAliases = {}): s
   return lines.join('\n');
 }
 
-// namespace 一行简述（help 草稿 §0 CORE NAMESPACES）。未知 noun → 用其首个 verb 的 summary 兜底。
-function _namespaceBlurb(noun: string): string {
+// namespace 一行简述（help 草稿 §0 CORE NAMESPACES）。未列入下表的 noun → 用其首个 verb 的
+// summary 兜底。
+//
+// ⚠ 这句兜底此前**只写在注释里、代码没实现**（函数体是 `return M[noun] || ''`），于是 39 个
+// namespace 里有 18 个在根 help 与 noun 层标题里都是一片空白（`ccm worker —— ` 后面什么都没有）。
+// 兜底本身也不是全部——真正的解是逐个补进 M；但在补齐之前，露一句首 verb 的 summary 也远好过
+// 什么都不说。
+function _namespaceBlurb(noun: string, reg?: Reg): string {
   const M: Record<string, string> = {
     board: '板级：查看 / 校验 / DAG 分析 / 建板 / 改配置',
     task: '任务：增删改查 + 状态机（DAG 节点）',
@@ -173,7 +183,13 @@ function _namespaceBlurb(noun: string): string {
     statusline: 'status line：渲染单行状态行（ctx/5h/7d）+ 安装 / 卸载（self-contained·0.10.0）',
     upgrade: '自升级：把 ccm 二进制 + cc-master 插件升到各自线最新（--to 指定 / --dry-run 预览）',
   };
-  return M[noun] || '';
+  if (M[noun]) return M[noun] as string;
+  if (!reg) return '';
+  const verbs = reg[noun];
+  if (!verbs) return '';
+  const first = Object.keys(verbs)[0];
+  if (!first) return '';
+  return (verbs[first] as VerbSpec).summary || '';
 }
 
 // ── noun 层（有 noun 无 verb）：列该域 COMMANDS（verb summary）+ 例子 ────────────────────────────────
@@ -181,7 +197,10 @@ function _nounLevel(reg: Reg, noun: string): string {
   // printHelp 已确认 reg[noun] 存在才进本函数（as 窄断言·不改逻辑）。
   const verbs = reg[noun] as NounSpec;
   const lines: string[] = [];
-  lines.push(`ccm ${noun} —— ${_namespaceBlurb(noun)}`);
+  // blurb 为空时连破折号一起省掉——`ccm worker —— ` 这种悬着的破折号比没有描述更难看，
+  // 且会让读者以为描述被截断了。
+  const blurb = _namespaceBlurb(noun, reg);
+  lines.push(blurb ? `ccm ${noun} —— ${blurb}` : `ccm ${noun}`);
   lines.push('');
   lines.push('USAGE');
   lines.push(`  ccm ${noun} <command> [args] [flags]`);
@@ -229,6 +248,21 @@ function _verbLevel(reg: Reg, noun: string, verb: string): string {
   lines.push('USAGE');
   lines.push(`  ${_usageLine(noun, verb, spec)}`);
 
+  // DESCRIPTION：读写属性由 `read` **派生**（140 条不必各写一遍），其后接命令独有的补充。
+  // 只有补充行存在、或读写属性值得声明时才起这一段——没内容就不留空标题。
+  // ⚠ 措辞必须精确到 `read` **真正**代表什么：它是「走 runRead 还是 runWrite」这条**路径**事实，
+  // 不是「改不改 board」这条**内容**事实。二者不等价——`calibration capture` 是 read:false（走写入
+  // 关卡），但它写的是 home 级校准语料，board 一字不动。第一版派生成「改 board」，样板当场渲染出
+  // 「写入：…改 board」紧跟人写的「board 一字不动」两行相邻打架。改成只声明路径，具体改什么由
+  // 各命令的 description 补。
+  const sideEffect = spec.read
+    ? '只读：不写入任何持久状态。'
+    : '写入：经 ccm 写入关卡（带锁 + 校验），失败即整体回滚。';
+  const descLines = [sideEffect, ...(spec.description ?? [])];
+  lines.push('');
+  lines.push('DESCRIPTION');
+  for (const d of descLines) lines.push(`  ${d}`);
+
   // ARGUMENTS：positionals（有则列）。
   const positionals = Array.isArray(spec.positionals) ? spec.positionals : [];
   if (positionals.length) {
@@ -265,6 +299,32 @@ function _verbLevel(reg: Reg, noun: string, verb: string): string {
     lines.push('');
     lines.push('EXAMPLES');
     for (const e of examples) lines.push(`  $ ${e}`);
+  }
+
+  // FILES / EXIT STATUS / SEE ALSO：三段都只在 registry 真写了内容时才渲染。
+  // 空段比没有段更糟——它承诺了信息却什么也不给，读者会以为被截断了。
+  const files = spec.files ?? [];
+  if (files.length) {
+    lines.push('');
+    lines.push('FILES');
+    const w = Math.max(...files.map(([p]) => p.length), 4) + 2;
+    for (const [p, d] of files) lines.push(`  ${_padRight(p, w)}${d}`);
+  }
+
+  const exits = spec.exitStatus ?? [];
+  if (exits.length) {
+    lines.push('');
+    // 标题点明「特有」，免得读者以为这里是退出码全集——通用码在 ccm --help。
+    lines.push('EXIT STATUS  (本命令特有；通用码见 ccm --help)');
+    const w = Math.max(...exits.map(([c]) => c.length), 4) + 2;
+    for (const [c, d] of exits) lines.push(`  ${_padRight(c, w)}${d}`);
+  }
+
+  const seeAlso = spec.seeAlso ?? [];
+  if (seeAlso.length) {
+    lines.push('');
+    lines.push('SEE ALSO');
+    for (const s of seeAlso) lines.push(`  ${s}`);
   }
 
   lines.push('');

@@ -252,8 +252,8 @@
         },
         {
           "point": "point:ccm.cmd.calibration",
-          "point_sha256": "bf2fd71a1d82288d4014409e76fde07f35eed439316f0e42f94d24ac265521a5",
-          "passage_sha256": "bf2fd71a1d82288d4014409e76fde07f35eed439316f0e42f94d24ac265521a5"
+          "point_sha256": "ee1fd5ba4556d7efa36127451c16b85b8ccd63053328c193d2d679e70408e622",
+          "passage_sha256": "ee1fd5ba4556d7efa36127451c16b85b8ccd63053328c193d2d679e70408e622"
         },
         {
           "point": "point:ccm.cmd.capability-deps",
@@ -312,8 +312,8 @@
         },
         {
           "point": "point:ccm.cmd.task",
-          "point_sha256": "c274c39f0fdaf61cecd8eb34a4f6d2be09876d40a20a8c6ce7a875303385c996",
-          "passage_sha256": "c274c39f0fdaf61cecd8eb34a4f6d2be09876d40a20a8c6ce7a875303385c996"
+          "point_sha256": "9041a2585c3c63a0acd1fcca48d8baf3d4549e68d11fe0e53cc7dec1e14a4da6",
+          "passage_sha256": "9041a2585c3c63a0acd1fcca48d8baf3d4549e68d11fe0e53cc7dec1e14a4da6"
         },
         {
           "point": "point:ccm.cmd.usage",

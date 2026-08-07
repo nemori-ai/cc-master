@@ -276,8 +276,8 @@
         },
         {
           "point": "point:scheduling.parallelism-and-granularity",
-          "point_sha256": "1586eadaf88fa3499b98e1c0a7039487d101f57116f2eb237ab47449f0b81b2c",
-          "passage_sha256": "1586eadaf88fa3499b98e1c0a7039487d101f57116f2eb237ab47449f0b81b2c"
+          "point_sha256": "f2157820d88b32849d1ec4815fce498616204e3ae10a004941f5b843fd3898ff",
+          "passage_sha256": "f2157820d88b32849d1ec4815fce498616204e3ae10a004941f5b843fd3898ff"
         }
       ]
     },

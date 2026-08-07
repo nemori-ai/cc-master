@@ -14,7 +14,12 @@
 | [`exam-first-funnel.md`](exam-first-funnel.md) | **已放弃的一条路**：闭卷考试当第一道筛。被对抗性审查收窄、再被试点实测否决——7/7 题全部泄露考点。保留作为「为什么这条走不通」的记录，含泄题测试原始数据 |
 | [`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md) | **档位边界诊断**：`capability_gap` 与 `motivation_conflict` 之间那条线没画完——62 个点落在同一种情形上却被判成两种档（37:25）。含判据补充提议。**待批，本轮未改任何 `failure_mode`** |
 | [`capability-gap-preregistration.md`](capability-gap-preregistration.md) | **能力补课档 87 条的预注册表**（80 条可预注册 + 7 条无法预注册及其原因）。只准备，不测量，不判定。**尚未被任何人审阅——跑之前必须审** |
+| [`tier0-prompts.json`](tier0-prompts.json) | **第 0 层实测用的提示词库**：72 条承重任务里过闸并经独立抽查后**可跑的 13 条**，逐条带第三方原话、把握等级、打回次数与诱饵说明。**其余 59 条留在库外**（57 条未过闸 + 2 条被抽查拉出）——按 [`tier0-leak-gate.md`](tier0-leak-gate.md) §5，没经过闸的提示词不许拿去跑，硬塞进去只会让下游把「未泄」当成事实 |
+| [`tier0-prompt-spotcheck.md`](tier0-prompt-spotcheck.md) | **提示词库的独立抽查**：7 抽 1 真泄、1 半泄、5 未泄——**闸基本是好的**，拉出 2 条（15→13）。含抽查者自己拿错比对基准的记录（比对了「探针的旧错误猜测」而非真考点，[[Finding #123]]），以及「实测预算从约 324 次塌缩到约 60 次、但覆盖面只剩 78 条里的 13 条」这一对后果 |
 | [`output-contract-and-help-budget.md`](output-contract-and-help-budget.md) | **两个未决项的裁决**：`--help` 不分层改设预算闸（附 167 条 help 的体量实测）；新增 `--schema` 且必须带一致性闸 |
+| [`tier0-run-2026-08-06.md`](tier0-run-2026-08-06.md) | **第 0 层实测结果**：13 点 × k=5 = 65 份产物，双评 130 次（评委乙对抗、任一见 X 即计出现）。8 条过闸 1+2，但**出题方跑前点名的三条「最不放心」全部命中**——作废后**净 5 条进候选删除批，仍不授权删除**（批级消融未跑）。含跑测中途 CLI 被替换的处置记录 |
+| [`tier1-run-2026-08-06.md`](tier1-run-2026-08-06.md) | **第 1 层实测结果**：57 条过不了泄题闸的点 × k=2。修正后 **known 20 / partial 28 / unknown 9**。第 1 层**只授权压成线索**，且 known 只够到该闸的前一半（后一半是正文解释占比，本轮未测）——**一条也压不了**。含装置缺陷 [[Finding #124]] 与端点抽查的三条更正 |
+| [`help-section-gap-audit.md`](help-section-gap-audit.md) | **A 族迁移的机械前提**：140 个子命令全量实测——`EXAMPLES`/`FLAGS` 覆盖 100%/96%，而要接收迁移内容的 `DESCRIPTION`/`FILES`/`EXIT STATUS`/`SEE ALSO` **覆盖 0%**。迁移不是搬内容，是**先建段再搬**。附预算闸冲突面（只卡 4 条）与两处现成缺陷（18 个 namespace 根描述为空、`status-report` 排版溢出）|
 
 ## 读之前先知道两件事
 
@@ -24,8 +29,11 @@
 
 ## 状态
 
-- 环境事实档（112）：**判定完成**，见迁移台账。
-- 能力补课档（87）：**预注册已产出、未审、未执行**。见 [`capability-gap-preregistration.md`](capability-gap-preregistration.md)：80 条进第 0 层测试表、7 条判为无法预注册。三层筛 + 批级消融的方案不变。
+- 环境事实档（112）：**判定完成，执行未开始**。见迁移台账。⚠ 机械前提已量化（[`help-section-gap-audit.md`](help-section-gap-audit.md)）：接收迁移内容的四个 Unix 段在 140 个子命令上**覆盖 0%**——迁移的第一步是**建段**，不是搬内容。
+- 能力补课档（87→78）：**预注册已审，提示词已过闸并抽查——可跑 13 条**。见 [`capability-gap-preregistration.md`](capability-gap-preregistration.md)：80 条进第 0 层测试表、7 条判为无法预注册。三层筛 + 批级消融的方案不变。
   - ⚠ **预注册表已被独立审查，判「有条件能跑」**（[`prereg-review-2026-08-06.md`](prereg-review-2026-08-06.md)）。5 项必须先改才能跑，最要紧的是**泄题会让判据静默串档**：一道泄了题的第 0 层测试实质是第 1 层，而第 1 层按 §5.1 **只授权压成线索、绝不授权删除**——而记录格式里没有任何字段会留下这个降级痕迹。
-  - ✅ **分母悬案已解**：判据补充获用户批准（[`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md)），62 条 `both` 桶由第二方统一重判（[`tier-rejudgement.md`](tier-rejudgement.md)），**`capability_gap` 87 → 78**，其中 **73 条进第 0 层测试范围**。实测预算按 73 排。
+  - ✅ **分母悬案已解**：判据补充获用户批准（[`failure-mode-tier-boundary.md`](failure-mode-tier-boundary.md)），62 条 `both` 桶由第二方统一重判（[`tier-rejudgement.md`](tier-rejudgement.md)），**`capability_gap` 87 → 78**，其中 **73 条进第 0 层测试范围**。
+  - ✅ **提示词已入库**：73 −1（转批级消融）= 72 条出题，**57 条过不了泄题闸**，入库 15 条经独立抽查再拉出 2 条 → **可跑 13 条**（[`tier0-prompt-spotcheck.md`](tier0-prompt-spotcheck.md)）。实测预算随之从约 324 次塌缩到 **约 60 次**；代价是第 0 层最终只覆盖 78 条里的 13 条，**其余 65 条没有删除授权，最多压成线索**。
+  - ✅ **实测已跑完**（[`tier0-run-2026-08-06.md`](tier0-run-2026-08-06.md)）：8 条过 k 次全中 + 双评一致，作废跑前点名的 3 条后**净 5 条进候选删除批**。批级消融未跑，**本轮不删任何一条**。
+  - ✅ **57 条已走第 1 层**（[`tier1-run-2026-08-06.md`](tier1-run-2026-08-06.md)）：known 20 / partial 28 / unknown 9。**没有删除授权**（第 1 层的定义如此），且 known 那 20 条离「压成线索」还差后半道闸。
 - 护栏（63）/ 义肢（5）：**不测**——两者都不因模型变强而失效，测它们是花钱确认已知。

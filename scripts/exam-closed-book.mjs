@@ -115,7 +115,26 @@ function ask(question, timeoutMs) {
       fs.rmSync(dir, { recursive: true, force: true });
       if (timedOut) return resolve({ status: 'timeout', answer: null });
       if (code !== 0) return resolve({ status: 'error', answer: null, stderr: err.slice(0, 400) });
-      resolve({ status: 'ok', answer: out.trim() });
+      const answer = out.trim();
+      // ── 退出码 0 不等于答了题 ────────────────────────────────────────────────────────
+      //
+      // `--tools ""` 之下模型有时会**幻觉出一次工具调用**然后停住：吐一句「我先扫一眼仓库」
+      // 或一段假的 `**Tool Use: Bash**` JSON，就结束了。进程退 0、stdout 非空，装置照记
+      // `ok`——而里面根本没有答案。实测命中率约 9%（114 份里 10 份）。
+      //
+      // 这类产物比掉出**更危险**：掉出会进 dropped 计数、看得见；这个混进 counted，评分时
+      // 变成一个凭空捏造的「模型不知道」。方向上偏保守（把会的判成不会），但仍是假数据，
+      // 而假数据会驱动错误决策。
+      //
+      // 判据取两条形态特征，不用长度阈值——长度会把真正简短的正确回答误杀。
+      const looksLikeToolAttempt =
+        /(\*\*Tool Use|<\/?(function_calls|invoke|antml)|\*\(checking|我先(看|瞅|扫)一眼|我先看看)/.test(
+          answer,
+        ) && answer.length < 400;
+      if (!answer || looksLikeToolAttempt) {
+        return resolve({ status: 'no-answer', answer, reason: 'tool-attempt-or-empty' });
+      }
+      resolve({ status: 'ok', answer });
     });
   });
 }
@@ -127,7 +146,13 @@ let dropped = 0;
 
 for (const [i, q] of questions.entries()) {
   process.stderr.write(`[${i + 1}/${questions.length}] ${q.point_id} … `);
-  const r = await ask(q.question, q.timeout_ms ?? 240_000);
+  // no-answer 自动重试：这类失败是随机的（同一题再问一次通常就正常答了），不像 timeout
+  // 那样反映题本身慢。最多三次，之后计入 dropped 而**绝不**当 ok 混进分母。
+  let r = await ask(q.question, q.timeout_ms ?? 240_000);
+  for (let attempt = 2; r.status === 'no-answer' && attempt <= 3; attempt++) {
+    process.stderr.write(`no-answer,重试 ${attempt}/3 … `);
+    r = await ask(q.question, q.timeout_ms ?? 240_000);
+  }
   if (r.status === 'ok') counted += 1;
   else dropped += 1;
   process.stderr.write(`${r.status}${r.answer ? ` (${r.answer.length} 字)` : ''}\n`);
