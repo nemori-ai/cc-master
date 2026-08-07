@@ -1090,16 +1090,13 @@ ccm task route-bind <id> --selection <json|@file|-> --attempt <json|@file|-> [--
 
 **写**
 
-- 行为：→ `done`·盖 `finished_at`;写入关卡要求同时带 `--verified` 与非空 `--artifact`,否则 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)
-- review task 的 `status=done` / `verified=true` 表示 review 工作和报告已完成；审批结论单独写在当前 attempt 的 `review_verdict`。只有精确 `APPROVE` 满足显式 review gate；未声明 gate 却传 `--review-verdict` 会以 exit 3 拒绝且不落盘。`stale|failed|escalated → ready` 开新 attempt 时清旧 verdict；本次 `task done` 不带 `--review-verdict` 也会显式保持 current verdict 缺失，不复用上轮批准。
+- 行为：→ `done`·盖 `finished_at`。真完成语义（`--verified` + 非空 `--artifact`）与 review verdict 规则见 `ccm task done --help`。
 
 ### task retry
 
 **写**
 
-- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。每个 task 的旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` / `delivery` 连同来源 status 先以 `ccm/task-retry/v1` 结构归档到 append-only log，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict` / `delivery` 并把 `verified` 设为布尔 `false`。归档与复位同一次持锁写入，不能只成功一半。随后写入关卡按同一依赖资格 evaluator 归一：只有 deps 全满足（declared edge `qualified` / legacy edge satisfied）的 task 最终落 `ready`，否则落 `blocked`。human 与 JSON 输出都逐项回显这个 reconcile 后的最终态（批量可同时出现 `blocked` / `ready`）。
-- 非上述三态会报非法转移（exit 3），`--force` 也不会扩大 retry 的来源集合；若 `done` 需要重做，先合法转为 `stale`，再 `retry`。
-- 合法的通用 `ccm task set-status <id> ready` 也共享同一归档 + reset，避免旧路径遗留旧证据；面向重跑意图仍优先使用具名 `retry`。
+- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。归档进 append-only log 的 attempt 证据含 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` / `delivery`；复位后按依赖资格归一——**deps 全满足**落 `ready`，否则落 `blocked`。归档 + 复位 + 归一的精确顺序与原子性见 `ccm task retry --help`。
 
 ### task attest-delivery
 
@@ -1154,7 +1151,7 @@ id 依次 `transition` + 覆写字段，但只跑**一次** `lintBoard` + **一�
 
 **写**
 
-- 行为：清除 `blocked_on`（+ 附属 `decision_package`）语义阻塞标记，**不直接定 status**——交回写入关卡的 `reconcileGating` 按 deps 满足度归一（deps 全满足→`ready`，否则→`blocked`）。这是 `task block` 的解除侧、也是「不该手 `set-status` 解 deps 阻塞」的正解。
+- 行为：清 `blocked_on` 后交回 deps 门控定 status，见 `ccm task unblock --help`。
 
 ### task set-status
 

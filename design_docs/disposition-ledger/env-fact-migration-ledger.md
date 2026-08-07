@@ -124,3 +124,57 @@
 2. **skill 侧**：待 ccm 侧落地后再删 —— **顺序不能反**。先删 skill 再补 help，中间那段时间知识两头皆无。
 3. **锁步纪律条文**：ccm 侧落地后同步改 `AGENTS.md` §6 的锁步条款（对象从「两份 reference 逐条对齐」收窄为「跨命令语义变化时同步」）。
 4. **B/C/D 族**：本台账已判为「以留为主」，不进迁移批；其中 `validation-rules` 需逐规则核对 lint 消息覆盖度（下一轮）。
+
+---
+
+## 8. A 族执行记录（2026-08-07）
+
+**已交还 `--help`，分发净减合计约 47k tok**（四 host 计）。逐条见下；三条判定被执行时的实情修正。
+
+### 8.1 已完成
+
+| 点 | 处置 |
+|---|---|
+| `calibration` | 完整往返：先补 help 四段（`snapshot_id` 幂等键 / 无 deadline 跳过 / label 回填边界），再删 skill。留下「`board_id` 为何用路径 SHA-256」——help 说「是什么」，不说「为什么这么设计」 |
+| `task` | 20 个 verb 的 positional/flags/语法/例交还；散文全留 |
+| 甲组 12 条 | ops-surfaces / agent / board / misc-ns / estimate / peers-coord / usage / jc / baseline / cadence / watchdog / log |
+| 乙组 4 条 | goal / account / capability-deps / worker-quota —— 减量小，因为体量绝大多数是语义散文，按判据本就该留 |
+
+### 8.2 ★ 判据补第三条：content contract 锚点
+
+原判据两条：**① help 里有没有 ② 跨不跨命令**。执行中撞出第三条：
+
+> **③ 这段重复是不是某条 content contract 的锚点。**
+
+实例（三个不同测试文件各命中一次）：
+- `tests/content/cross-harness-board-routing-guidance` 钉 `board enable-contract` / `task set-planning|set-routing|route-bind` 的语法行——它守「专用 writer 不能被 generic setter 代替」，语法行是识别锚点。
+- `macos-qualification-workflow` 钉 `monitor uninstall-service` 整节 canonical≡dist。
+- `all origins receive one machine-wide quota view` 钉 `model-policy advise --input` / `quota refresh --machine-wide`。
+
+**改测试去迁就压缩是错的方向**：压缩是手段，合约是目的。
+
+另一条执行教训：**母本 flag 表里重列全局 flag，往往正因为它在这个 verb 上有额外语义**（`board init --dry-run` 的「输出不含 `data.board_path`」、`agent create --harness` 的 transcript 观察配方）。第一版一刀切删整表撞了三处合约，改为**全局 flag 行一律保留**、非全局行只在描述不比 help 丰富时才删。
+
+### 8.3 三条判定修正（原判建立在不成立的前提上）
+
+**`overview` —— 原判「迁（主体）」，改判「基本留」。** 原判理由是「顶层 namespace 清单 = `ccm --help` 根输出，已重复」。实测**母本是超集**：它对每个 namespace 的描述远比根 help 的一行丰富。且它的 global flags 表挂着 `--goal` 在 `board update`/`board init`/`cadence open` 三个 verb 上的例外、`--set`/`--set-json` 被哪些写命令接受、裸 path 在不同命令语境下落哪里——**全是跨命令语义**，按判据②本就归 skill。
+
+**`cross-harness-facts` —— 原判「迁（部分）」，改判「留」。** 它是**流程节**（发现目标事实 → advise → 显式 dispatch）而非命令目录，且每一行命令都被 hot-path 测试逐条钉住。
+
+**`worker-quota` —— 原判「迁（部分）」，实情确认。** 18172 字符里能交还的只有语法行（483）。主体是**跨 harness 沙箱标志对照表**（codex `--sandbox workspace-write` / cursor-agent `-f/--force` / claude-code `--permission-mode acceptEdits` / kimi-code `-p` 不可叠 `--yolo`）——那不是 ccm 的命令面，`--help` 装不下。
+
+### 8.4 `json-shape` 的真卡点（修正此前记载）
+
+此前记为「`--schema` 样例对机器相关命令太空洞」。**那只对了一半，真卡点是版本**：
+
+> **`--schema` 是 ccm `0.23.0` 的功能，而当前发布线上的是 `0.22.1`。**
+
+现在删掉这 24259 字符，用户手上的 ccm 敲 `--schema` 直接报错——**正是本台账 §7 第 2 步禁止的「先删 skill 再补接口，中间知识两头皆无」**。
+
+**前置条件写死：`json-shape` 的迁移必须排在 ccm `0.23.0` 发版之后。** 在那之前一个字不动。
+
+发版之后的可迁范围（按散文占比机械筛，散文 < 30% 即纯字段 dump）：`board graph` / `board critical-path` / `task list` / `jc list` / `jc show` / `peers list` / `coordination inbox list|ack|notify|arbitrate` / `usage burn-rate` / `usage runway` / `estimate evm|velocity|cost-to-complete|deadline-risk`，合计约 11.5k 字符。**其余高散文占比的节留**——它们混着语义不变式（如「first-party 与 usage-based 的 `quota_scope_digest` 永不因同一登录态折成一个可互补容量」），那是判断，`--schema` 给不了。
+
+### 8.5 仍欠的一笔
+
+`task` 的散文约 8.9k 字符尚未逐条判归属：各 verb 的语义边界（只关于一条命令 → 该进 help `DESCRIPTION`）与跨 verb 的批量语义 / 五个 native-attempt verb 的硬边界（横跨两条以上 → 留）。这是一次逐条 authoring，不是机械变换。

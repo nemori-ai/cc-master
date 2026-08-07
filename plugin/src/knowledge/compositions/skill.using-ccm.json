@@ -312,8 +312,8 @@
         },
         {
           "point": "point:ccm.cmd.task",
-          "point_sha256": "d0a6f9ea297a4817f6d2ff4afbd1db42970d954f4f623d6282836e634df3216a",
-          "passage_sha256": "d0a6f9ea297a4817f6d2ff4afbd1db42970d954f4f623d6282836e634df3216a"
+          "point_sha256": "7dcba48d4f9601012c20315f9a3e1fb137a3607ba37f3afedb1b8384d215c940",
+          "passage_sha256": "7dcba48d4f9601012c20315f9a3e1fb137a3607ba37f3afedb1b8384d215c940"
         },
         {
           "point": "point:ccm.cmd.usage",
