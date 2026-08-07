@@ -7,63 +7,41 @@ point: ccm.cmd.baseline
 <!-- ccm:k:start point:ccm.cmd.baseline -->
 ## namespace baseline
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 EVM 计划基线（plan baseline）：从当前 tasks 的 `estimate` + `deps` 快照成 `board.baseline`（`task_estimates` + `dag_snapshot` + `bac_h`），供 estimate 引擎算 EVM / SPI。**board 内唯一写 noun**——`usage` / `estimate` 两 namespace 纯只读，baseline 刻意置于只读之外（写关卡）。
 
 ### baseline snapshot
 
 **写**
 
-```
-ccm baseline snapshot [flags]
-```
-
-- positional：无
 - 行为：从当前 tasks 快照 `board.baseline`；**已存在则 exit 3（VALIDATION）**——用全局 `--force` 覆盖，或 `baseline reset` 移旧入 history
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--t0 <str>` | | ISO-8601 UTC | EVM 零时刻（严格 `YYYY-MM-DDTHH:MM:SSZ`；默认 now） |
-| `--note <str>` | | string | 快照说明 |
 | `--force` | `-f` | bool（全局） | 已有 baseline 时覆盖（否则 exit 3） |
 | `--dry-run` | `-n` | bool | 试跑不落盘 |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm baseline snapshot --t0 2026-06-25T08:00:00Z --note "sprint 1 start"`
 
 ### baseline show
 
 **读**
 
-```
-ccm baseline show [flags]
-```
-
-- positional：无
 - 行为：只读当前 `board.baseline`；无 baseline 也 exit 0（`has_baseline:false`）
 - flags：`--json`（结构化输出）
-- 例：`ccm baseline show --json`
 
 ### baseline reset
 
 **写**
 
-```
-ccm baseline reset [flags]
-```
-
-- positional：无
 - 行为：re-baseline——旧 baseline 进 `history[]`（只增不删）+ 建新快照；**非 TTY 须 `--yes`**（破坏性）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--t0 <str>` | | ISO-8601 UTC | 新基线 EVM 零时刻（默认 now） |
-| `--note <str>` | | string | 重新 baseline 理由 |
 | `--yes` | `-y` | bool | 非 TTY 确认（破坏性操作） |
 | `--json` | | bool | 结构化输出 |
-
-- 例：`ccm baseline reset --note "mid-sprint re-estimate" --yes`
 
 ---
 

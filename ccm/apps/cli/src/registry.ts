@@ -1199,6 +1199,19 @@ export const REGISTRY: Registry = {
         'ccm task done T7 T8 T9 --artifact /abs/out.md --verified',
       ],
       handler: 'task.done',
+      // 从 command-catalog 迁来的**单命令**语义；横跨 start/done/retry 的批量语义留 skill。
+      description: [
+        '写入关卡要求同时带 --verified 与非空 --artifact，否则 BIZ-DONE-VERIFIED 硬闸拒绝落盘。',
+        'review task 的 done / verified 只表示 review 工作与报告已完成；审批结论单独写在当前 attempt',
+        '的 review_verdict。只有精确 APPROVE 满足显式 review gate；未声明 gate 却传 --review-verdict',
+        '会以 exit 3 拒绝且不落盘。本命令不带 --review-verdict 时显式保持 verdict 缺失，绝不复用上轮批准。',
+      ],
+      exitStatus: [
+        [
+          '3',
+          '裸 done（缺 --verified 或非空 --artifact）；或未声明 review gate 却传 --review-verdict',
+        ],
+      ],
     },
     retry: {
       summary:
@@ -1210,6 +1223,17 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm task retry T7', 'ccm task retry T7 T8 T9'],
       handler: 'task.retry',
+      description: [
+        '只允许 stale / failed / escalated → ready。--force 不会扩大来源集合；done 要重做得先合法转为',
+        'stale 再 retry。',
+        '旧 started_at / finished_at / artifact / verified / review_verdict / delivery 连同来源 status，',
+        '先以 ccm/task-retry/v1 归档进 append-only log，再清空并把 verified 置回 false —— 归档与复位是',
+        '同一次持锁写入，不会只成功一半。随后按同一依赖资格 evaluator 归一：deps 全满足落 ready，否则落 blocked。',
+      ],
+      exitStatus: [['3', '来源 status 不在 stale|failed|escalated 内（非法转移）']],
+      seeAlso: [
+        'ccm task set-status <id> ready —— 共享同一归档 + reset；面向重跑意图仍优先用具名 retry',
+      ],
     },
     'attest-delivery': {
       summary:
@@ -1419,6 +1443,12 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm task unblock T7'],
       handler: 'task.unblock',
+      description: [
+        '清除 blocked_on（及附属 decision_package）这个语义阻塞标记，但**不直接定 status** —— 交回写入',
+        '关卡的 reconcileGating 按 deps 满足度归一：deps 全满足 → ready，否则 → blocked。',
+        '这是 task block 的解除侧，也是「不该手 set-status 去解 deps 阻塞」的正解。',
+      ],
+      seeAlso: ['ccm task block —— 设置侧'],
     },
     'set-status': {
       summary: '通用状态转移',

@@ -7,6 +7,8 @@ point: ccm.cmd.worker-quota
 <!-- ccm:k:start point:ccm.cmd.worker-quota -->
 ## namespace worker（raw transport + tracked dispatch）
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 ### worker help
 
 ```text
@@ -60,10 +62,6 @@ ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path
 
 ### worker dispatch
 
-```text
-ccm worker dispatch [--board <path>] --harness <codex|claude-code|cursor-agent|kimi-code> --task <task-id> --idempotency-key <key> --intent <safe-summary> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] [--transcript <absolute-path>] -- <provider argv...>
-```
-
 - `dispatch` 复用 `run` 的 provider resolver、argv/stdin/cwd 透传、超时/输出上限和 owned process-tree supervisor，但**不是 detach**：命令同步监督到 terminal 才返回。要让 shell 调用本身后台化，仍由 origin harness 的后台 terminal/Shell 机制承载；ccm 不伪造 durable job。
 - `--task` 必须指向所选 board 的现有 task；它只产生 `agents[].links[]`，**绝不**改 task 的 `status`、`handle`、`routing.attempts` 或 `acceptance`。`--intent` 会持久化，必须是安全、非敏感摘要。
 - `--idempotency-key` 必填。首次调用在 board lock 内 `prepare` 再唯一 `claim`；同 key + 同 request digest 精确 replay，不再 spawn；同 key + 不同 digest 硬冲突。digest 只覆盖非敏感结构：harness/task/canonical cwd/timeout/output ceiling/stdin mode/provider argv 数量；prompt、argv 内容、stdin 与 environment 既不落 board，也不哈希进可持久的 digest。业务幂等语义完全由调用方显式 key 承担；换了语义请求就必须换 key。
@@ -91,7 +89,6 @@ ccm provider facts <provider> [--as-of <UTC>] [--json]
 - 行为：返回 `ccm/provider-model-facts/v1` snapshot，必带 `source`、`observed_at`、`valid_until`、`account_scope`、`confidence`、`unknown`、`models`、`freshness`、`catalog_eligible_for_admission_check`、`eligible_for_automatic_selection` 与 `automatic_selection_blockers`。它不访问 provider、不证明 live entitlement / quota / exact admission，所以静态 snapshot 的 automatic-selection eligibility 保持 false。
 - Cursor 的每个 `models[]` 条目另带 `quota_pool:"first_party"|"usage_based"`，用于把 model route 绑定到对应独立池；该静态映射仍不证明 live entitlement 或 headroom。
 - `--as-of`：冻结 freshness 求值时间；缺省当前 UTC。`future-invalid` / `hard-stale` 仍 exit 0 可解释，但连 admission check 都不准入；fresh 只允许进入下一道 live admission。
-- 例：`ccm provider facts codex --json` · `ccm provider facts cursor --as-of 2026-07-15T12:00:00Z --json`。
 
 ### provider inspect
 
@@ -102,10 +99,6 @@ ccm provider facts <provider> [--as-of <UTC>] [--json]
 ## namespace model-policy（统一模型角色与排序 advisory）
 
 ### model-policy show
-
-```text
-ccm model-policy show --task <task-taxonomy> [--as-of <UTC>] [--json]
-```
 
 - `--task` 必填，取项目 registry 中的稳定 taxonomy，例如 `architecture-design`、`implementation-from-spec`、`routine-heterogeneous-review`、`repository-code-research`、`mechanical-deterministic-work`。
 - 输出 `ccm/model-policy-read-model/v1`。`hard_facts` 是官方 provider snapshot，`project_role_evidence` 是项目角色候选 / blockers，`community_advisory` 是带 provenance、TTL、confidence、contradictions 与 freshness 的 taste ledger；三层不可互相补证。
@@ -223,10 +216,6 @@ Codex/Cursor 的 account/session/credential/auth mutation request 固定 deny，
 
 ### quota reserve
 
-```bash
-ccm quota reserve --input <json|@file|-> [--home <dir>] [--json]
-```
-
 请求必须是闭合 `ccm/quota-reservation-request/v1`，带明确 `checked_at`，amount 为 positive finite，且只能创建 `held`；
 caller 不能自铸 `committed`，也不能自铸 capacity/headroom/request hash。命令从 owner-only observation
 authority 重验 source/account/pool/identity 与 hard-window buckets，并按 source profile 的 fresh/hard TTL、
@@ -245,10 +234,6 @@ ticket digest 与 attempt/run/account/pool/identity/aggregation/source/expiry li
 输入控制。该命令只保留本地容量，不声称 provider 已预留或退款。
 
 ### quota audit
-
-```bash
-ccm quota audit --input <json|@file|-> [--home <dir>] [--json]
-```
 
 用 launch/process evidence 审计 reservation。只有 store locked/readable、claim absent、process identity
 proven-absent 且 TTL 已到才能把 held 判为 expired；`committed` 即使 claim absent 或墙钟已过也只能

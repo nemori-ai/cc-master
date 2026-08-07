@@ -7,27 +7,20 @@ point: ccm.cmd.goal
 <!-- ccm:k:start point:ccm.cmd.goal -->
 ## namespace goal
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 Goal Contract 是 `board.goal` 的 revisioned 写入面。raw request / issue 只作证据；agent 先澄清转写，再通过本 namespace 持久化。`--brief-file` 的输入必须是 ≤1 MiB、有效 UTF-8、非 symlink 的普通文件；ccm 把它复制到 `<home>/goals/<board-stem>/rNNNN.goal.md`，以 `0600` 权限保存，并在 `board.goal_contract.brief` 记录 home-relative ref + SHA-256。revision 文件 immutable，不覆盖旧版。
 
 ### goal set
 
 **写**：首次把 pending skeleton / legacy board 转成 r1 Goal Contract。
 
-```bash
-ccm goal set --summary "<normalized goal>" --assurance <pending|asserted> [--brief-file /abs/goal.md]
-```
-
 - `--summary`、`--assurance` 必填；已有非 skeleton contract 时拒绝，改用 `goal amend`。
 - `asserted` 表示 agent 按安全默认补齐且 Goal Framing Test 通过；不是伪造用户确认。
-- 例：`ccm goal set --board /abs/x.board.json --summary "交付一份通过验收的 draft PR，不合并" --assurance asserted --brief-file /tmp/goal.md`
 
 ### goal confirm
 
 **写**：把当前 revision 的 assurance 升到 `confirmed`，revision 不变。
-
-```bash
-ccm goal confirm --user-authorized
-```
 
 - `--user-authorized` 必填且只代表当前对话已有真实用户确认；agent 绝不自授权。
 
@@ -46,17 +39,9 @@ ccm goal amend --summary "<new normalized goal>" --reason "<semantic delta>" \
 
 **只读**：显示 summary、contract 与受管 Brief 绝对路径；legacy board 的 contract 显示为 legacy/null。
 
-```bash
-ccm goal show [--json]
-```
-
 ### goal check
 
 **只读**：校验 contract 形状、Brief containment / 普通文件 / 存在性 / SHA-256。
-
-```bash
-ccm goal check [--json]
-```
 
 - verdict：`ok`（goal settled **且**交付 DDL settled，integrity valid）、`pending`（goal 还须澄清/确认）、`deadline_pending`（goal 已 settle 但交付 DDL 未 settle——键缺失或仍 pending）、`legacy`（旧板，无 contract）、`malformed`、`missing_brief`、`hash_mismatch`。
 - `malformed|missing_brief|hash_mismatch` exit 3；`ok|pending|deadline_pending|legacy` exit 0。exit 0 不代表可以执行——`pending`/`deadline_pending` 都门控派发，调用方必须读取 verdict。

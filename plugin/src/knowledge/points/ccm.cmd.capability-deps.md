@@ -7,13 +7,11 @@ point: ccm.cmd.capability-deps
 <!-- ccm:k:start point:ccm.cmd.capability-deps -->
 ## namespace capability
 
+**语法 / positional / 例一律以 `ccm <namespace> <verb> --help` 为准**（本节曾逐条复制它们，已交还——副本天然会过期）。下面只留 help 不说的：在这个 verb 上有额外语义的 flag、语义边界、跨 verb 规则。
+
 ### capability check
 
 **只读、零写**：检查当前独立发版的 ccm 是否兑现指定稳定 capability。
-
-```bash
-ccm capability check <capability-id> [--json]
-```
 
 - 当前稳定 id：`board-init/structured-board-path-v1`、`goal-contract/v1`、`goal-deadline/v1`。
 - 支持时 exit 0 + `supported:true`；未知/不支持时 exit 3。plugin bootstrap 用它/等价 init capability envelope 做写前握手。
@@ -22,10 +20,6 @@ ccm capability check <capability-id> [--json]
 
 **只读、零写**：声明本 ccm 兑现的**全部** capability + 版本，作跨版本斜错协商的基础清单。
 
-```bash
-ccm capability list [--json]
-```
-
 - `--json` 输出结构化清单：`{ "schema": "ccm/capability-manifest/v1", "ccm_version": "<本 ccm 版本>", "capabilities": [ { "id", "name", "version" } ] }`。
 - 当前 capabilities（append-only·顺序稳定）：`board-init/structured-board-path-v1`、`goal-contract/v1`、`goal-deadline/v1`。
 - 新 plugin 遇旧 ccm 时枚举它做降级判断：想用的 id 不在清单里 → 关掉对应功能或提示用户「升级 ccm 到兑现该 id 的版本」。
@@ -33,10 +27,6 @@ ccm capability list [--json]
 ### capability negotiate
 
 **只读、零写**：consumer 声明可接受的 capability id 集，engine 返回双方交集里版本最高的一项，或 exit 3 明确拒绝。
-
-```bash
-ccm capability negotiate <capability-family> --accept <capability-id> [--accept <capability-id>...] [--json]
-```
 
 - `<capability-family>`：能力族名（如 `goal-deadline`）。
 - `--accept`：可重复；每项为完整 id（如 `goal-deadline/v1`）或同族版本后缀（如 `v1`）。
