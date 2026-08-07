@@ -2810,13 +2810,20 @@ export const REGISTRY: Registry = {
         'ccm calibration capture --scope this-board --as-of 2026-07-20T12:00:00Z --json',
       ],
       handler: 'calibration.capture',
-      // Unix 段样板（写侧）。「写入 board」那句由 read:false 派生，此处不重复。
+      // Unix 段样板（写侧）。「走写入关卡」那句由 read:false 派生，此处不重复。
       description: [
-        '写的是 home 级校准语料，不是 board —— board 一字不动。',
-        '同一 (board, as-of) 重复采集是幂等的：第二次返回 duplicate 而不追加。',
+        '写的是 home 级校准语料，不是 board —— board 只读，窄腰字段一字不动。',
+        '复用 estimate deadline-risk 的同一预测计算路径，把采集时的真实 backlog、预测 band /',
+        'probability、coverage / confidence、WIP 与未回填 label 一并追加。',
+        '幂等键 snapshot_id = <board_id>@<captured_at_ms>：同 board + 同 --as-of 重放返回',
+        'captured:false / duplicate:true 而不追加；不同 --as-of 是该 board 的新观察。',
+        'board 无 deadline 时跳过落盘（skipped_reason 说明原因）。',
       ],
       files: [['<home>/calibration/deadline-snapshots.jsonl', 'append-only 语料；跨 board 共享']],
-      seeAlso: ['ccm estimate deadline-risk  —— 消费本语料出 forecast（scope 口径与本命令一致）'],
+      seeAlso: [
+        'ccm estimate deadline-risk  —— 消费本语料出 forecast（scope 口径与本命令一致；它纯只读，绝不创建 store）',
+        '本命令只采预测侧 observed snapshot；label 回填与 calibration flip 不在此命令内',
+      ],
     },
   },
 
